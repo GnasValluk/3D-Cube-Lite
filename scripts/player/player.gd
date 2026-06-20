@@ -44,6 +44,11 @@ var _was_floor: bool = false
 var _time:      float = 0.0
 var _camera:    Camera3D
 
+# ── Camera switching ──────────────────────────────────────────────────────────
+var _iso_rig: Node3D      # CameraRig (isometric)
+var _tp_rig:  Node3D      # TPCameraRig (third-person)
+var _use_tp:  bool = false
+
 # ── Squash/stretch ────────────────────────────────────────────────────────────
 var _sy_tgt: float = 1.0
 var _sy_cur: float = 1.0
@@ -77,6 +82,11 @@ func _ready() -> void:
 	_build_materials()
 	_build_raptor()
 	await get_tree().process_frame
+	# Lấy tham chiếu tới cả 2 camera rig từ scene cha
+	var scene_root := get_parent()
+	_iso_rig = scene_root.get_node_or_null("CameraRig")
+	_tp_rig  = scene_root.get_node_or_null("TPCameraRig")
+	# Bắt đầu với iso camera
 	_camera = get_viewport().get_camera_3d()
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -84,6 +94,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		var k := event as InputEventKey
 		if k.keycode == KEY_SPACE and k.pressed and not k.echo:
 			_jbuf = JUMP_BUFFER
+		# F1: chuyển đổi giữa iso camera và third-person camera
+		if k.keycode == KEY_F1 and k.pressed and not k.echo:
+			_toggle_camera()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -300,6 +313,23 @@ func _read_input() -> Vector3:
 	var fwd := -cb.z; fwd.y = 0.0; fwd = fwd.normalized()
 	var rgt :=  cb.x; rgt.y = 0.0; rgt = rgt.normalized()
 	return fwd * -rz + rgt * rx
+
+# ── Camera toggle ─────────────────────────────────────────────────────────────
+func _toggle_camera() -> void:
+	_use_tp = not _use_tp
+	if _use_tp:
+		if is_instance_valid(_iso_rig) and _iso_rig.has_method("deactivate"):
+			_iso_rig.deactivate()
+		if is_instance_valid(_tp_rig) and _tp_rig.has_method("activate"):
+			_tp_rig.activate()
+	else:
+		if is_instance_valid(_tp_rig) and _tp_rig.has_method("deactivate"):
+			_tp_rig.deactivate()
+		if is_instance_valid(_iso_rig) and _iso_rig.has_method("activate"):
+			_iso_rig.activate()
+	# Cập nhật _camera để _read_input dùng đúng camera đang active
+	await get_tree().process_frame
+	_camera = get_viewport().get_camera_3d()
 
 # ── Animation ─────────────────────────────────────────────────────────────────
 func _animate(delta: float) -> void:

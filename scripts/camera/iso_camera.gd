@@ -33,6 +33,11 @@ func _ready() -> void:
 	_camera.near       = 0.5
 	_camera.far        = 300.0
 
+func activate() -> void:
+	_camera.current = true
+
+func deactivate() -> void:
+	_camera.current = false
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(_target):
