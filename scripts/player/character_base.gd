@@ -5,7 +5,7 @@
 ## và khai báo: _rig, _neck, _snout_bot, _tail[]
 
 extends CharacterBody3D
-class_name CharacterBase
+## CharacterBase – duplicate class_name removed; use core version
 
 # ── Export – tuỳ chỉnh per-character ─────────────────────────────────────────
 @export var move_speed:        float = 5.5

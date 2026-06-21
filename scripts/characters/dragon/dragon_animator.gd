@@ -20,14 +20,15 @@ func setup(m: DragonMesh, b: CharacterBase) -> void:
 func animate(delta: float) -> void:
 	var t: float = base._time
 	match base._state:
-		CharacterBase.State.IDLE:   _idle(delta, t)
-		CharacterBase.State.WALK:   _walk(delta, t, 1.0)
-		CharacterBase.State.SPRINT: _walk(delta, t, sprint_cycle_mult)
-		CharacterBase.State.CROUCH: _crouch(delta, t)
-		CharacterBase.State.DASH:   _dash(delta, t)
-		CharacterBase.State.ATTACK: _attack(delta, t)
-		CharacterBase.State.JUMP:   _air(delta, t)
-		CharacterBase.State.FALL:   _air(delta, t)
+		CharacterBase.State.IDLE:           _idle(delta, t)
+		CharacterBase.State.WALK:           _walk(delta, t, 1.0)
+		CharacterBase.State.SPRINT:         _walk(delta, t, sprint_cycle_mult)
+		CharacterBase.State.CROUCH:         _crouch(delta, t)
+		CharacterBase.State.DASH:           _dash(delta, t)
+		CharacterBase.State.ATTACK:         _breathe_fire(delta, t)
+		CharacterBase.State.DEVOUR:         _devour(delta, t)
+		CharacterBase.State.JUMP:           _air(delta, t)
+		CharacterBase.State.FALL:           _air(delta, t)
 
 # ── Shorthand refs ────────────────────────────────────────────────────────────
 func m() -> DragonMesh: return mesh
@@ -171,55 +172,146 @@ func _dash(delta: float, _t: float) -> void:
 		m().tail[i].rotation.x = lerp(m().tail[i].rotation.x,-0.12, delta*20.0)
 		m().tail[i].rotation.y = lerp(m().tail[i].rotation.y, 0.0,  delta*20.0)
 
-# ── ATTACK ────────────────────────────────────────────────────────────────────
-func _attack(delta: float, _t: float) -> void:
+# ── BREATHE FIRE (LMB) ────────────────────────────────────────────────────────
+# Phase 0→0.30 : Windup – cổ thụt lại, cánh bung, ngực phồng lên
+# Phase 0.30→1 : Khè – cổ vươn thẳng ra trước, miệng mở tối đa, cánh dang rộng
+#                cổ và đầu rung nhẹ để giả hiệu ứng luồng lửa
+func _breathe_fire(delta: float, t: float) -> void:
 	var prog: float = 1.0 - (base._attack_timer / base.attack_duration)
-	if prog < 0.35:
-		m().neck.rotation.x       = lerp(m().neck.rotation.x,   0.35, delta*20.0)
-		m().neck2.rotation.x      = lerp(m().neck2.rotation.x,  0.25, delta*20.0)
-		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, 0.20, delta*20.0)
-		m().jaw.rotation.x        = lerp(m().jaw.rotation.x,    0.0,  delta*15.0)
-		m().rig.rotation.x        = lerp(m().rig.rotation.x,   -0.15, delta*14.0)
-		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,  -0.55, delta*24.0)
-		m().wing_l.rotation.x  = lerp(m().wing_l.rotation.x,  -0.20, delta*22.0)
-		m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z, -0.15, delta*22.0)
-		m().wing_l2.rotation.x = lerp(m().wing_l2.rotation.x, -0.10, delta*20.0)
-		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z,   0.55, delta*24.0)
-		m().wing_r.rotation.x  = lerp(m().wing_r.rotation.x,  -0.20, delta*22.0)
-		m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z,  0.15, delta*22.0)
-		m().wing_r2.rotation.x = lerp(m().wing_r2.rotation.x, -0.10, delta*20.0)
-		m().fl_thigh.rotation.x = lerp(m().fl_thigh.rotation.x,-0.60, delta*20.0)
-		m().fr_thigh.rotation.x = lerp(m().fr_thigh.rotation.x,-0.60, delta*20.0)
-		m().fl_shin.rotation.x  = lerp(m().fl_shin.rotation.x,  0.80, delta*20.0)
-		m().fr_shin.rotation.x  = lerp(m().fr_shin.rotation.x,  0.80, delta*20.0)
-	else:
-		m().neck.rotation.x       = lerp(m().neck.rotation.x,  -0.65, delta*35.0)
-		m().neck2.rotation.x      = lerp(m().neck2.rotation.x, -0.45, delta*35.0)
-		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x,-0.20, delta*35.0)
-		m().jaw.rotation.x        = lerp(m().jaw.rotation.x,    0.45, delta*35.0)
-		m().rig.rotation.x        = lerp(m().rig.rotation.x,    0.20, delta*25.0)
-		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,   0.70, delta*32.0)
-		m().wing_l.rotation.x  = lerp(m().wing_l.rotation.x,   0.18, delta*30.0)
-		m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z,  0.85, delta*30.0)
-		m().wing_l2.rotation.x = lerp(m().wing_l2.rotation.x,  0.22, delta*28.0)
-		m().wing_l3.rotation.x = lerp(m().wing_l3.rotation.x,  0.30, delta*25.0)
-		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z,  -0.70, delta*32.0)
-		m().wing_r.rotation.x  = lerp(m().wing_r.rotation.x,   0.18, delta*30.0)
-		m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z, -0.85, delta*30.0)
-		m().wing_r2.rotation.x = lerp(m().wing_r2.rotation.x,  0.22, delta*28.0)
-		m().wing_r3.rotation.x = lerp(m().wing_r3.rotation.x,  0.30, delta*25.0)
-		m().fl_thigh.rotation.x = lerp(m().fl_thigh.rotation.x, 0.65, delta*32.0)
-		m().fr_thigh.rotation.x = lerp(m().fr_thigh.rotation.x, 0.65, delta*32.0)
-		m().fl_shin.rotation.x  = lerp(m().fl_shin.rotation.x,  0.20, delta*30.0)
-		m().fr_shin.rotation.x  = lerp(m().fr_shin.rotation.x,  0.20, delta*30.0)
-		for i in range(m().tail.size()):
-			m().tail[i].rotation.x = lerp(m().tail[i].rotation.x, 0.25+float(i)*0.08, delta*25.0)
-	m().bl_thigh.rotation.x = lerp(m().bl_thigh.rotation.x, 0.30, delta*8.0)
-	m().bl_shin.rotation.x  = lerp(m().bl_shin.rotation.x,  0.45, delta*8.0)
-	m().br_thigh.rotation.x = lerp(m().br_thigh.rotation.x, 0.30, delta*8.0)
-	m().br_shin.rotation.x  = lerp(m().br_shin.rotation.x,  0.45, delta*8.0)
 
-# ── AIR ───────────────────────────────────────────────────────────────────────
+	if prog < 0.30:
+		# ── Windup: nạp năng lượng ──────────────────────────────────────────
+		var p: float = prog / 0.30   # 0→1
+		# Cổ kéo thụt vào, đầu ngẩng cao
+		m().neck.rotation.x       = lerp(m().neck.rotation.x,       0.40, delta*22.0)
+		m().neck2.rotation.x      = lerp(m().neck2.rotation.x,      0.30, delta*22.0)
+		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, 0.25, delta*20.0)
+		# Miệng còn đóng
+		m().jaw.rotation.x        = lerp(m().jaw.rotation.x,        0.0,  delta*15.0)
+		# Thân hơi nhún lên – ngực phồng
+		m().rig.position.y = lerp(m().rig.position.y, 0.18 + p*0.06, delta*16.0)
+		m().rig.rotation.x = lerp(m().rig.rotation.x, -0.20,          delta*14.0)
+		# Cánh bung lên trên chuẩn bị
+		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z, -0.60, delta*24.0)
+		m().wing_l.rotation.x  = lerp(m().wing_l.rotation.x, -0.25, delta*22.0)
+		m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z,-0.20, delta*22.0)
+		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z,  0.60, delta*24.0)
+		m().wing_r.rotation.x  = lerp(m().wing_r.rotation.x, -0.25, delta*22.0)
+		m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z, 0.20, delta*22.0)
+		# Chân trước chịu lực
+		m().fl_thigh.rotation.x = lerp(m().fl_thigh.rotation.x, 0.30, delta*18.0)
+		m().fr_thigh.rotation.x = lerp(m().fr_thigh.rotation.x, 0.30, delta*18.0)
+		m().fl_shin.rotation.x  = lerp(m().fl_shin.rotation.x,  0.50, delta*18.0)
+		m().fr_shin.rotation.x  = lerp(m().fr_shin.rotation.x,  0.50, delta*18.0)
+	else:
+		# ── Khè lửa: cổ phóng thẳng ra, miệng há rộng, rung nhẹ ─────────────
+		var fire_shake: float = sin(t * 28.0) * 0.025   # rung cổ khi khè
+		# Cổ vươn thẳng phía trước thấp
+		m().neck.rotation.x       = lerp(m().neck.rotation.x,  -0.55 + fire_shake, delta*32.0)
+		m().neck2.rotation.x      = lerp(m().neck2.rotation.x, -0.40 + fire_shake, delta*32.0)
+		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, -0.15, delta*28.0)
+		# Miệng mở hết cỡ – rung theo nhịp khè
+		m().jaw.rotation.x = lerp(m().jaw.rotation.x, 0.55 + abs(fire_shake)*2.0, delta*35.0)
+		# Thân nghiêng về trước
+		m().rig.rotation.x = lerp(m().rig.rotation.x, 0.25, delta*20.0)
+		m().rig.position.y = lerp(m().rig.position.y, 0.10, delta*10.0)
+		# Cánh xoè dang ngang uy nghi – giữ nguyên để không che lửa
+		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,  0.10, delta*18.0)
+		m().wing_l.rotation.x  = lerp(m().wing_l.rotation.x, -0.10, delta*16.0)
+		m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z, 0.15, delta*16.0)
+		m().wing_l2.rotation.x = lerp(m().wing_l2.rotation.x,-0.05, delta*14.0)
+		m().wing_l3.rotation.x = lerp(m().wing_l3.rotation.x,-0.05, delta*12.0)
+		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z, -0.10, delta*18.0)
+		m().wing_r.rotation.x  = lerp(m().wing_r.rotation.x, -0.10, delta*16.0)
+		m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z,-0.15, delta*16.0)
+		m().wing_r2.rotation.x = lerp(m().wing_r2.rotation.x,-0.05, delta*14.0)
+		m().wing_r3.rotation.x = lerp(m().wing_r3.rotation.x,-0.05, delta*12.0)
+		# Chân trước chịu lực tốt
+		m().fl_thigh.rotation.x = lerp(m().fl_thigh.rotation.x, 0.45, delta*20.0)
+		m().fr_thigh.rotation.x = lerp(m().fr_thigh.rotation.x, 0.45, delta*20.0)
+		m().fl_shin.rotation.x  = lerp(m().fl_shin.rotation.x,  0.65, delta*20.0)
+		m().fr_shin.rotation.x  = lerp(m().fr_shin.rotation.x,  0.65, delta*20.0)
+		# Đuôi vút lên cân bằng
+		for i in range(m().tail.size()):
+			m().tail[i].rotation.x = lerp(m().tail[i].rotation.x, 0.20+float(i)*0.06, delta*18.0)
+		# Vây lưng rung theo nhịp lửa
+		for i in range(m().spine_fins.size()):
+			m().spine_fins[i].rotation.z = sin(t*20.0+float(i)*0.8)*0.12
+
+	# Chân sau đứng vững suốt
+	m().bl_thigh.rotation.x = lerp(m().bl_thigh.rotation.x, 0.28, delta*8.0)
+	m().bl_shin.rotation.x  = lerp(m().bl_shin.rotation.x,  0.42, delta*8.0)
+	m().br_thigh.rotation.x = lerp(m().br_thigh.rotation.x, 0.28, delta*8.0)
+	m().br_shin.rotation.x  = lerp(m().br_shin.rotation.x,  0.42, delta*8.0)
+
+# ── DEVOUR (RMB) ──────────────────────────────────────────────────────────────
+# Phase 0→0.25 : Ngẩng đầu lên cao (chuẩn bị)
+# Phase 0.25→0.65: Bổ đầu xuống cực nhanh, miệng mở, chân trước bổ xuống
+# Phase 0.65→1 : Nhai – đầu rung nhẹ, miệng đóng mở đóng mở
+func _devour(delta: float, t: float) -> void:
+	var prog: float = 1.0 - (base._attack2_timer / base._attack2_duration)
+
+	if prog < 0.25:
+		# Ngẩng đầu lên, miệng mở sẵn
+		m().neck.rotation.x       = lerp(m().neck.rotation.x,      -0.55, delta*25.0)
+		m().neck2.rotation.x      = lerp(m().neck2.rotation.x,     -0.45, delta*25.0)
+		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x,-0.30, delta*22.0)
+		m().jaw.rotation.x        = lerp(m().jaw.rotation.x,        0.35, delta*20.0)
+		m().rig.position.y        = lerp(m().rig.position.y,        0.22, delta*18.0)
+		m().rig.rotation.x        = lerp(m().rig.rotation.x,       -0.25, delta*16.0)
+		# Cánh hơi dựng lên
+		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z, -0.45, delta*20.0)
+		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z,  0.45, delta*20.0)
+		m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z,-0.25, delta*18.0)
+		m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z, 0.25, delta*18.0)
+		# Chân trước nhấc lên
+		m().fl_thigh.rotation.x = lerp(m().fl_thigh.rotation.x,-0.55, delta*22.0)
+		m().fr_thigh.rotation.x = lerp(m().fr_thigh.rotation.x,-0.55, delta*22.0)
+		m().fl_shin.rotation.x  = lerp(m().fl_shin.rotation.x,  0.70, delta*22.0)
+		m().fr_shin.rotation.x  = lerp(m().fr_shin.rotation.x,  0.70, delta*22.0)
+
+	elif prog < 0.65:
+		# Bổ xuống cực nhanh – cổ thẳng đứng đâm xuống
+		m().neck.rotation.x       = lerp(m().neck.rotation.x,       0.70, delta*55.0)
+		m().neck2.rotation.x      = lerp(m().neck2.rotation.x,      0.55, delta*55.0)
+		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, 0.40, delta*50.0)
+		# Miệng há rộng tối đa khi cắm xuống
+		m().jaw.rotation.x = lerp(m().jaw.rotation.x, 0.60, delta*50.0)
+		m().rig.position.y = lerp(m().rig.position.y, -0.10, delta*40.0)
+		m().rig.rotation.x = lerp(m().rig.rotation.x,  0.45, delta*40.0)
+		# Cánh đập xuống mạnh vì lực bổ
+		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,  0.75, delta*45.0)
+		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z, -0.75, delta*45.0)
+		# Chân trước bổ xuống cùng
+		m().fl_thigh.rotation.x = lerp(m().fl_thigh.rotation.x, 0.75, delta*48.0)
+		m().fr_thigh.rotation.x = lerp(m().fr_thigh.rotation.x, 0.75, delta*48.0)
+		m().fl_shin.rotation.x  = lerp(m().fl_shin.rotation.x,  0.30, delta*45.0)
+		m().fr_shin.rotation.x  = lerp(m().fr_shin.rotation.x,  0.30, delta*45.0)
+		m().fl_foot.rotation.x  = lerp(m().fl_foot.rotation.x, -0.20, delta*40.0)
+		m().fr_foot.rotation.x  = lerp(m().fr_foot.rotation.x, -0.20, delta*40.0)
+
+	else:
+		# Nhai – đầu giật lên giật xuống nhỏ, miệng đóng mở
+		var chew: float = sin(t * 18.0) * 0.14
+		m().neck.rotation.x       = lerp(m().neck.rotation.x,       0.50 + chew*0.5, delta*22.0)
+		m().neck2.rotation.x      = lerp(m().neck2.rotation.x,      0.38 + chew*0.3, delta*22.0)
+		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, 0.28 + chew*0.4, delta*20.0)
+		m().jaw.rotation.x        = lerp(m().jaw.rotation.x, max(0.0, 0.30 + chew*1.5), delta*30.0)
+		m().rig.rotation.x        = lerp(m().rig.rotation.x, 0.30 + chew*0.2, delta*12.0)
+		# Cánh thả về bình thường
+		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,  0.30, delta*8.0)
+		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z, -0.30, delta*8.0)
+
+	# Chân sau giữ vững suốt
+	m().bl_thigh.rotation.x = lerp(m().bl_thigh.rotation.x, 0.30, delta*8.0)
+	m().bl_shin.rotation.x  = lerp(m().bl_shin.rotation.x,  0.50, delta*8.0)
+	m().br_thigh.rotation.x = lerp(m().br_thigh.rotation.x, 0.30, delta*8.0)
+	m().br_shin.rotation.x  = lerp(m().br_shin.rotation.x,  0.50, delta*8.0)
+	# Đuôi vút lên để cân bằng lực
+	for i in range(m().tail.size()):
+		m().tail[i].rotation.x = lerp(m().tail[i].rotation.x, 0.15+float(i)*0.05, delta*12.0)
+
+
 func _air(delta: float, _t: float) -> void:
 	m().rig.position.y = lerp(m().rig.position.y, 0.10, delta*5.0)
 	var rising: bool = base._state == CharacterBase.State.JUMP

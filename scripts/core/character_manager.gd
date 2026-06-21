@@ -65,7 +65,7 @@ func _build_hud() -> void:
 
 func _update_hud() -> void:
 	if not is_instance_valid(_label): return
-	var ch := _characters[_current]
+	var ch: CharacterBase = _characters[_current]
 	var idx_str := "[%d/%d]" % [_current + 1, _characters.size()]
 	var name_str: String = ch.name
 	_label.text = "%s  %s    Tab=next  Shift+Tab=prev  F1=camera" % [idx_str, name_str]
@@ -86,8 +86,8 @@ func _switch_prev() -> void:
 
 func _switch_to(idx: int) -> void:
 	if idx == _current: return
-	var prev_ch := _characters[_current]
-	var next_ch := _characters[idx]
+	var prev_ch: CharacterBase = _characters[_current]
+	var next_ch: CharacterBase = _characters[idx]
 
 	_characters[_current].set_active(false)
 	_current = idx
