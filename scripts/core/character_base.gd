@@ -111,6 +111,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_jbuf = JUMP_BUFFER
 			if k.keycode == KEY_F1:
 				_toggle_camera()
+			if k.keycode == KEY_R:
+				if _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
+					_attack2_timer = _attack2_duration
+					_state = State.DEVOUR
+					_on_secondary_attack()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _active:
@@ -123,11 +128,6 @@ func _unhandled_input(event: InputEvent) -> void:
 					_attack_timer = attack_duration
 					_state = State.ATTACK
 					_on_primary_attack()
-			elif mb.button_index == MOUSE_BUTTON_RIGHT:
-				if _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
-					_attack2_timer = _attack2_duration
-					_state = State.DEVOUR
-					_on_secondary_attack()
 
 # ── Physics ───────────────────────────────────────────────────────────────────
 func _physics_process(delta: float) -> void:

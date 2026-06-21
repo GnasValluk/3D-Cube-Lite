@@ -1,6 +1,6 @@
 ## dragon/dragon_character.gd – Rồng Neon (Nhân vật 2)
 ## LMB = Khè lửa + bắn fireball
-## RMB = Cuối xuống ăn xác (Devour)
+## R = Cúi xuống ăn xác (Devour)
 
 extends CharacterBase
 class_name DragonCharacter
@@ -54,7 +54,7 @@ func _build_character() -> void:
 func _on_primary_attack() -> void:
 	_fire_spawned = false
 
-# ── RMB: Devour – không cần gì thêm ở đây ────────────────────────────────────
+# ── R: Devour – không cần gì thêm ở đây ──────────────────────────────────────
 func _on_secondary_attack() -> void:
 	pass
 

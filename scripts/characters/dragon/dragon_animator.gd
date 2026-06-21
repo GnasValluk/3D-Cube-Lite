@@ -248,7 +248,7 @@ func _breathe_fire(delta: float, t: float) -> void:
 	m().br_thigh.rotation.x = lerp(m().br_thigh.rotation.x, 0.28, delta*8.0)
 	m().br_shin.rotation.x  = lerp(m().br_shin.rotation.x,  0.42, delta*8.0)
 
-# ── DEVOUR (RMB) ──────────────────────────────────────────────────────────────
+# ── DEVOUR (R) ────────────────────────────────────────────────────────────────
 # Chân đứng yên, thân không nghiêng – chỉ cổ cúi xuống rồi nhai liên tục
 func _devour(delta: float, t: float) -> void:
 	var prog: float = 1.0 - (base._attack2_timer / base._attack2_duration)

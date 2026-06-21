@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://main001"]
+[gd_scene load_steps=9 format=3 uid="uid://main001"]
 
 [ext_resource type="Script" path="res://scripts/world/world_generator.gd" id="2_worldgen"]
 [ext_resource type="Script" path="res://scripts/camera/iso_camera.gd" id="3_camera"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/core/character_manager.gd" id="7_manager"]
 [ext_resource type="Script" path="res://scripts/characters/raptor/raptor_character.gd" id="8_raptor"]
 [ext_resource type="Script" path="res://scripts/characters/dragon/dragon_character.gd" id="9_dragon"]
+[ext_resource type="Script" path="res://scripts/characters/warrior/warrior_character.gd" id="10_warrior"]
 
 [node name="Main" type="Node3D"]
 
@@ -30,6 +31,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 [node name="Dragon" type="CharacterBody3D" parent="CharacterManager"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
 script = ExtResource("9_dragon")
+
+[node name="Warrior" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("10_warrior")
 
 [node name="CameraRig" type="Node3D" parent="."]
 script = ExtResource("3_camera")
