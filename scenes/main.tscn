@@ -5,9 +5,9 @@
 [ext_resource type="Script" path="res://scripts/player/neon_pulse.gd" id="4_pulse"]
 [ext_resource type="Script" path="res://scripts/world/neon_environment.gd" id="5_env"]
 [ext_resource type="Script" path="res://scripts/camera/third_person_camera.gd" id="6_tpcamera"]
-[ext_resource type="Script" path="res://scripts/player/character_manager.gd" id="7_manager"]
-[ext_resource type="Script" path="res://scripts/player/raptor_character.gd" id="8_raptor"]
-[ext_resource type="Script" path="res://scripts/player/dragon_character.gd" id="9_dragon"]
+[ext_resource type="Script" path="res://scripts/core/character_manager.gd" id="7_manager"]
+[ext_resource type="Script" path="res://scripts/characters/raptor/raptor_character.gd" id="8_raptor"]
+[ext_resource type="Script" path="res://scripts/characters/dragon/dragon_character.gd" id="9_dragon"]
 
 [node name="Main" type="Node3D"]
 
