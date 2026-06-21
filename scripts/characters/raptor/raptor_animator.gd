@@ -27,6 +27,7 @@ func animate(delta: float) -> void:
 		CharacterBase.State.CROUCH: _crouch(delta, t)
 		CharacterBase.State.DASH:   _dash(delta, t)
 		CharacterBase.State.ATTACK: _attack(delta, t)
+		CharacterBase.State.DEVOUR: _devour(delta, t)
 		CharacterBase.State.JUMP:   _air(delta, t)
 		CharacterBase.State.FALL:   _air(delta, t)
 
@@ -108,24 +109,62 @@ func _dash(delta: float, _t: float) -> void:
 # ── ATTACK ────────────────────────────────────────────────────────────────────
 func _attack(delta: float, _t: float) -> void:
 	var prog: float = 1.0 - (base._attack_timer / base.attack_duration)
-	if prog < 0.4:
-		mesh.neck.rotation.x      = lerp(mesh.neck.rotation.x,       0.20, delta*18.0)
-		mesh.snout_bot.rotation.x = lerp(mesh.snout_bot.rotation.x,  0.0,  delta*10.0)
-		mesh.arm_l.rotation.x     = lerp(mesh.arm_l.rotation.x,     -0.80, delta*18.0)
-		mesh.arm_r.rotation.x     = lerp(mesh.arm_r.rotation.x,     -0.80, delta*18.0)
-		mesh.rig.rotation.x       = lerp(mesh.rig.rotation.x,        -0.10, delta*12.0)
+	if prog < 0.28:
+		mesh.rig.position.y       = lerp(mesh.rig.position.y,        0.10, delta*14.0)
+		mesh.rig.rotation.x       = lerp(mesh.rig.rotation.x,        0.04, delta*14.0)
+		mesh.neck.rotation.x      = lerp(mesh.neck.rotation.x,       0.12, delta*24.0)
+		mesh.neck.rotation.y      = lerp(mesh.neck.rotation.y,       0.0,  delta*18.0)
+		mesh.snout_bot.rotation.x = lerp(mesh.snout_bot.rotation.x,  0.34, delta*26.0)
+		mesh.arm_l.rotation.x     = lerp(mesh.arm_l.rotation.x,     -0.20, delta*16.0)
+		mesh.arm_r.rotation.x     = lerp(mesh.arm_r.rotation.x,     -0.20, delta*16.0)
 	else:
-		mesh.neck.rotation.x      = lerp(mesh.neck.rotation.x,      -0.55, delta*30.0)
-		mesh.snout_bot.rotation.x = lerp(mesh.snout_bot.rotation.x,  0.28, delta*30.0)
-		mesh.arm_l.rotation.x     = lerp(mesh.arm_l.rotation.x,      0.70, delta*30.0)
-		mesh.arm_r.rotation.x     = lerp(mesh.arm_r.rotation.x,      0.70, delta*30.0)
-		mesh.rig.rotation.x       = lerp(mesh.rig.rotation.x,         0.15, delta*20.0)
+		var strike_prog: float = (prog - 0.28) / 0.72
+		var bite_close: float = smoothstep(0.08, 0.40, strike_prog)
+		mesh.rig.position.y       = lerp(mesh.rig.position.y,        0.08, delta*18.0)
+		mesh.rig.rotation.x       = lerp(mesh.rig.rotation.x,        0.10, delta*18.0)
+		mesh.neck.rotation.x      = lerp(mesh.neck.rotation.x,       0.22 + strike_prog * 0.06, delta*30.0)
+		mesh.neck.rotation.y      = lerp(mesh.neck.rotation.y,       0.0, delta*18.0)
+		mesh.snout_bot.rotation.x = lerp(mesh.snout_bot.rotation.x,  0.42 - bite_close * 0.40, delta*40.0)
+		mesh.arm_l.rotation.x     = lerp(mesh.arm_l.rotation.x,      0.10, delta*20.0)
+		mesh.arm_r.rotation.x     = lerp(mesh.arm_r.rotation.x,      0.10, delta*20.0)
 		for i in range(mesh.tail.size()):
-			mesh.tail[i].rotation.x = lerp(mesh.tail[i].rotation.x, 0.20+float(i)*0.08, delta*20.0)
-	mesh.thigh_l.rotation.x = lerp(mesh.thigh_l.rotation.x, 0.20, delta*8.0)
-	mesh.shin_l.rotation.x  = lerp(mesh.shin_l.rotation.x,  0.35, delta*8.0)
-	mesh.thigh_r.rotation.x = lerp(mesh.thigh_r.rotation.x, 0.20, delta*8.0)
-	mesh.shin_r.rotation.x  = lerp(mesh.shin_r.rotation.x,  0.35, delta*8.0)
+			mesh.tail[i].rotation.x = lerp(mesh.tail[i].rotation.x, 0.08 + float(i) * 0.05, delta*16.0)
+	mesh.thigh_l.rotation.x = lerp(mesh.thigh_l.rotation.x, 0.16, delta*10.0)
+	mesh.shin_l.rotation.x  = lerp(mesh.shin_l.rotation.x,  0.32, delta*10.0)
+	mesh.foot_l.rotation.x  = lerp(mesh.foot_l.rotation.x, -0.14, delta*10.0)
+	mesh.thigh_r.rotation.x = lerp(mesh.thigh_r.rotation.x, 0.16, delta*10.0)
+	mesh.shin_r.rotation.x  = lerp(mesh.shin_r.rotation.x,  0.32, delta*10.0)
+	mesh.foot_r.rotation.x  = lerp(mesh.foot_r.rotation.x, -0.14, delta*10.0)
+
+# ── DEVOUR ────────────────────────────────────────────────────────────────────
+func _devour(delta: float, t: float) -> void:
+	var prog: float = 1.0 - (base._attack2_timer / base._attack2_duration)
+
+	mesh.rig.position.y = lerp(mesh.rig.position.y, 0.10, delta*8.0)
+	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta*8.0)
+	mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta*8.0)
+	mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.15, delta*8.0)
+	mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.15, delta*8.0)
+	mesh.thigh_l.rotation.x = lerp(mesh.thigh_l.rotation.x, 0.15, delta*8.0)
+	mesh.shin_l.rotation.x  = lerp(mesh.shin_l.rotation.x, 0.30, delta*8.0)
+	mesh.foot_l.rotation.x  = lerp(mesh.foot_l.rotation.x, -0.15, delta*8.0)
+	mesh.thigh_r.rotation.x = lerp(mesh.thigh_r.rotation.x, 0.15, delta*8.0)
+	mesh.shin_r.rotation.x  = lerp(mesh.shin_r.rotation.x, 0.30, delta*8.0)
+	mesh.foot_r.rotation.x  = lerp(mesh.foot_r.rotation.x, -0.15, delta*8.0)
+
+	if prog < 0.20:
+		mesh.neck.rotation.x      = lerp(mesh.neck.rotation.x, 0.98, delta*30.0)
+		mesh.snout_bot.rotation.x = lerp(mesh.snout_bot.rotation.x, 0.46, delta*30.0)
+	else:
+		var chew_wave: float = sin(t * 18.0)
+		var chew_open: float = (chew_wave * 0.5 + 0.5) * 0.52
+		var chew_nod: float = abs(sin(t * 18.0)) * 0.12
+		mesh.neck.rotation.x      = lerp(mesh.neck.rotation.x, 0.94 - chew_nod, delta*24.0)
+		mesh.snout_bot.rotation.x = lerp(mesh.snout_bot.rotation.x, chew_open, delta*42.0)
+
+	for i in range(mesh.tail.size()):
+		mesh.tail[i].rotation.x = lerp(mesh.tail[i].rotation.x, 0.04 + float(i) * 0.03, delta*8.0)
+		mesh.tail[i].rotation.y = lerp(mesh.tail[i].rotation.y, 0.0, delta*8.0)
 
 # ── AIR ───────────────────────────────────────────────────────────────────────
 func _air(delta: float, _t: float) -> void:

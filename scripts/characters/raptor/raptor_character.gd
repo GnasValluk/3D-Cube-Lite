@@ -11,6 +11,8 @@ func _build_character() -> void:
 	move_speed   = 5.5
 	sprint_speed = 9.5
 	jump_height  = 1.4
+	attack_duration = 0.40
+	_attack2_duration = 0.90
 
 	# Collision
 	var col := CollisionShape3D.new()
@@ -27,6 +29,12 @@ func _build_character() -> void:
 	# Animator
 	_anim = RaptorAnimator.new()
 	_anim.setup(_mesh, self)
+
+func _on_primary_attack() -> void:
+	pass
+
+func _on_secondary_attack() -> void:
+	pass
 
 func _animate(delta: float) -> void:
 	_anim.animate(delta)

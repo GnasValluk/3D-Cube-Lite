@@ -10,8 +10,21 @@ var _anim: DragonAnimator
 
 # Thời điểm trong animation để bắn fireball (giây sau khi bắt đầu khè)
 const FIRE_SPAWN_TIME := 0.30
+const FLIGHT_DOUBLE_TAP_WINDOW := 0.35
+const FLIGHT_DURATION := 10.0
+const FLIGHT_TAKEOFF_TIME := 0.60
+const FLIGHT_LANDING_TIME := 0.60
+const FLIGHT_CRUISE_HEIGHT := 3.0
 
 var _fire_spawned: bool = false   # tránh spam
+var _last_space_press_time: float = -10.0
+var _flying: bool = false
+var _flight_timer: float = 0.0
+var _flight_ground_y: float = 0.0
+var _flight_cruise_y: float = 0.0
+var _flight_anim_blend: float = 0.0
+var _flight_landing: bool = false
+var _flight_landing_start_y: float = 0.0
 
 func _build_character() -> void:
 	move_speed       = 4.8
@@ -45,16 +58,122 @@ func _on_primary_attack() -> void:
 func _on_secondary_attack() -> void:
 	pass
 
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not _active:
+		return
+	if event is InputEventKey:
+		var k := event as InputEventKey
+		if k.pressed and not k.echo and k.keycode == KEY_SPACE:
+			var now: float = float(Time.get_ticks_msec()) * 0.001
+			var double_tap: bool = (now - _last_space_press_time) <= FLIGHT_DOUBLE_TAP_WINDOW
+			_last_space_press_time = now
+			if double_tap:
+				if _flying and not _flight_landing:
+					_begin_landing()
+					return
+				if not _flying and _state != State.DASH and _attack_timer <= 0.0 and _attack2_timer <= 0.0:
+					_start_flight()
+					return
+			if _flying:
+				return
+	super._unhandled_key_input(event)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _flying:
+		return
+	super._unhandled_input(event)
+
 # ── Spawn fireball vào đúng thời điểm trong animation ────────────────────────
 func _physics_process(delta: float) -> void:
+	if _flying:
+		_update_flight(delta)
+		return
+
 	# Gọi base trước
 	super._physics_process(delta)
+	if is_on_floor():
+		_flight_ground_y = global_position.y
 	# Spawn fireball khi đã qua FIRE_SPAWN_TIME trong animation khè
 	if _state == State.ATTACK and not _fire_spawned:
 		var elapsed: float = attack_duration - _attack_timer
 		if elapsed >= FIRE_SPAWN_TIME:
 			_spawn_fireball()
 			_fire_spawned = true
+
+func is_flying() -> bool:
+	return _flying
+
+func get_flight_blend() -> float:
+	return _flight_anim_blend
+
+func _start_flight() -> void:
+	_flying = true
+	_flight_timer = 0.0
+	_flight_anim_blend = 0.0
+	_flight_landing = false
+	_attack_timer = 0.0
+	_attack2_timer = 0.0
+	_dash_timer = 0.0
+	_jbuf = 0.0
+	if is_on_floor():
+		_flight_ground_y = global_position.y
+	_flight_cruise_y = _flight_ground_y + FLIGHT_CRUISE_HEIGHT
+	velocity = Vector3.ZERO
+	_state = State.JUMP
+
+func _begin_landing() -> void:
+	_flight_landing = true
+	_flight_timer = 0.0
+	_flight_landing_start_y = global_position.y
+
+func _update_flight(delta: float) -> void:
+	_time += delta
+	_flight_timer += delta
+
+	var dir := _read_input()
+	var spd: float = move_speed * 0.9
+	if dir.length_squared() > 0.001:
+		dir = dir.normalized()
+		velocity.x = move_toward(velocity.x, dir.x * spd, acceleration * delta)
+		velocity.z = move_toward(velocity.z, dir.z * spd, acceleration * delta)
+		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z), delta * 10.0)
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
+		velocity.z = move_toward(velocity.z, 0.0, friction * delta)
+
+	if not _flight_landing and _flight_timer >= FLIGHT_DURATION:
+		_begin_landing()
+
+	var desired_y: float
+	if _flight_landing:
+		var land_p: float = smoothstep(0.0, 1.0, min(_flight_timer / FLIGHT_LANDING_TIME, 1.0))
+		_flight_anim_blend = 1.0 - land_p
+		desired_y = lerp(_flight_landing_start_y, _flight_ground_y + 0.05, land_p)
+	elif _flight_timer < FLIGHT_TAKEOFF_TIME:
+		var lift_p: float = smoothstep(0.0, 1.0, _flight_timer / FLIGHT_TAKEOFF_TIME)
+		_flight_anim_blend = lift_p
+		desired_y = lerp(_flight_ground_y + 0.10, _flight_cruise_y, lift_p)
+	else:
+		_flight_anim_blend = 1.0
+		desired_y = _flight_cruise_y + sin(_time * 4.0) * 0.10
+
+	var target_vertical_speed: float = clamp((desired_y - global_position.y) * 6.0, -4.5, 5.0)
+	velocity.y = move_toward(velocity.y, target_vertical_speed, 18.0 * delta)
+	_state = State.JUMP
+	move_and_slide()
+	if _flight_landing and (is_on_floor() or global_position.y <= _flight_ground_y + 0.08):
+		_flying = false
+		_flight_anim_blend = 0.0
+		_flight_landing = false
+		_flight_timer = 0.0
+		velocity.y = -0.5
+		if Vector2(velocity.x, velocity.z).length_squared() > 0.04:
+			_state = State.WALK
+		else:
+			_state = State.IDLE
+		_animate(delta)
+		return
+	_animate(delta)
 
 func _spawn_fireball() -> void:
 	var fb := DragonFireball.new()

@@ -34,6 +34,8 @@ var _dash_cd:         float   = 0.0
 var _attack_timer:    float   = 0.0
 var _attack2_timer:   float   = 0.0
 var _attack2_duration: float  = 0.70
+var _action_lunge_timer: float = 0.0
+var _action_lunge_speed: float = 0.0
 var _dash_dir:        Vector3 = Vector3.ZERO
 
 # ── Physics internals ─────────────────────────────────────────────────────────
@@ -135,6 +137,7 @@ func _physics_process(delta: float) -> void:
 	_dash_cd        = max(_dash_cd - delta, 0.0)
 	_attack_timer   = max(_attack_timer - delta, 0.0)
 	_attack2_timer  = max(_attack2_timer - delta, 0.0)
+	_action_lunge_timer = max(_action_lunge_timer - delta, 0.0)
 	var on_floor: bool = is_on_floor()
 
 	if on_floor:
@@ -183,6 +186,7 @@ func _physics_process(delta: float) -> void:
 	# Movement ────────────────────────────────────────────────────────────────
 	var attacking: bool = _attack_timer > 0.0
 	var devouring: bool = _attack2_timer > 0.0
+	var lunging: bool = _action_lunge_timer > 0.0 and (attacking or devouring)
 	var crouching: bool = Input.is_key_pressed(KEY_CTRL)
 	var sprinting: bool = Input.is_key_pressed(KEY_SHIFT) and not crouching
 	var spd: float
@@ -199,6 +203,10 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, dir.x * spd, acceleration * delta)
 		velocity.z = move_toward(velocity.z, dir.z * spd, acceleration * delta)
 		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z), delta * 14.0)
+	elif lunging:
+		var fwd := Vector3(sin(rotation.y), 0.0, cos(rotation.y)).normalized()
+		velocity.x = fwd.x * _action_lunge_speed
+		velocity.z = fwd.z * _action_lunge_speed
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
 		velocity.z = move_toward(velocity.z, 0.0, friction * delta)
@@ -259,6 +267,10 @@ func _read_input() -> Vector3:
 	var fwd: Vector3 = -cb.z; fwd.y = 0.0; fwd = fwd.normalized()
 	var rgt: Vector3 =  cb.x; rgt.y = 0.0; rgt = rgt.normalized()
 	return fwd * -rz + rgt * rx
+
+func _start_forward_lunge(speed: float, duration: float) -> void:
+	_action_lunge_speed = speed
+	_action_lunge_timer = duration
 
 # ── Camera toggle ─────────────────────────────────────────────────────────────
 func _toggle_camera() -> void:
