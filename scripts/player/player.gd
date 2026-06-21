@@ -140,7 +140,7 @@ func _build_raptor() -> void:
 	_neck = _pivot(_rig, Vector3(0,0.74,0.26))
 	_box(_neck, Vector3(0,0.10,0.12), Vector3(0.20,0.22,0.30), _mat_body)
 	_box(_neck, Vector3(0,0.22,0.26), Vector3(0.16,0.18,0.22), _mat_body)
-	var hp := _pivot(_neck, Vector3(0,0.28,0.32))
+	var hp: Node3D = _pivot(_neck, Vector3(0,0.28,0.32))
 	_box(hp, Vector3(0,0,0.04),     Vector3(0.22,0.18,0.30), _mat_body)
 	_box(hp, Vector3(0,-0.02,0.21), Vector3(0.16,0.08,0.18), _mat_body)
 	_snout_bot = _box(hp, Vector3(0,-0.07,0.18), Vector3(0.14,0.06,0.16), _mat_body)
@@ -163,9 +163,9 @@ func _build_raptor() -> void:
 	_box(_arm_r, Vector3(0,-0.20,0.02), Vector3(0.06,0.10,0.06), _mat_body)
 	_box(_arm_r, Vector3(0.02,-0.28,0.04), Vector3(0.04,0.06,0.03), _mat_dark)
 	_thigh_l = _pivot(_rig, Vector3(-0.16,0.50,-0.10))
-	var ll := _build_leg(_thigh_l,-1.0); _shin_l=ll[0]; _foot_l=ll[1]
+	var ll: Array[Node3D] = _build_leg(_thigh_l,-1.0); _shin_l=ll[0]; _foot_l=ll[1]
 	_thigh_r = _pivot(_rig, Vector3(0.16,0.50,-0.10))
-	var lr := _build_leg(_thigh_r, 1.0); _shin_r=lr[0]; _foot_r=lr[1]
+	var lr: Array[Node3D] = _build_leg(_thigh_r, 1.0); _shin_r=lr[0]; _foot_r=lr[1]
 	_tail.clear()
 	var tsz: Array[Vector3] = [
 		Vector3(0.26,0.20,0.22),Vector3(0.20,0.16,0.20),Vector3(0.15,0.12,0.18),
@@ -173,7 +173,7 @@ func _build_raptor() -> void:
 	var tp2: Node3D = _rig
 	for i in range(5):
 		var off: Vector3 = Vector3(0,0.58,-0.44) if i==0 else Vector3(0,0,-tsz[i-1].z)
-		var tp := _pivot(tp2, off)
+		var tp: Node3D = _pivot(tp2, off)
 		_box(tp, Vector3(0,0,-tsz[i].z*0.5), tsz[i], _mat_body)
 		if i < 3:
 			_box(tp, Vector3(0,tsz[i].y*0.55,-tsz[i].z*0.4),
@@ -184,9 +184,9 @@ func _build_raptor() -> void:
 func _build_leg(tp: Node3D, side: float) -> Array[Node3D]:
 	_box(tp, Vector3(0,-0.14,0.04), Vector3(0.14,0.28,0.16), _mat_body)
 	_box(tp, Vector3(0,-0.30,0.08), Vector3(0.10,0.08,0.10), _mat_light)
-	var shin := _pivot(tp, Vector3(0,-0.30,0.06))
+	var shin: Node3D = _pivot(tp, Vector3(0,-0.30,0.06))
 	_box(shin, Vector3(0,-0.12,-0.02), Vector3(0.10,0.22,0.10), _mat_body)
-	var foot := _pivot(shin, Vector3(0,-0.24,-0.02))
+	var foot: Node3D = _pivot(shin, Vector3(0,-0.24,-0.02))
 	_box(foot, Vector3(0,-0.03,0.06), Vector3(0.10,0.06,0.20), _mat_body)
 	for tt in range(3):
 		var tx: float = (-0.06+float(tt)*0.06)*side

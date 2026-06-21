@@ -47,6 +47,11 @@ func deactivate() -> void:
 	_is_active = false
 	_camera.current = false
 
+func set_target(node: Node3D) -> void:
+	_target = node
+	if _is_active:
+		_yaw = rad_to_deg(_target.rotation.y) + 180.0
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_active:
 		return

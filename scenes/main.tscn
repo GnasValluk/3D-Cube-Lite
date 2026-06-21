@@ -1,37 +1,46 @@
-[gd_scene load_steps=6 format=3 uid="uid://main001"]
+[gd_scene load_steps=8 format=3 uid="uid://main001"]
 
-[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
 [ext_resource type="Script" path="res://scripts/world/world_generator.gd" id="2_worldgen"]
 [ext_resource type="Script" path="res://scripts/camera/iso_camera.gd" id="3_camera"]
 [ext_resource type="Script" path="res://scripts/player/neon_pulse.gd" id="4_pulse"]
 [ext_resource type="Script" path="res://scripts/world/neon_environment.gd" id="5_env"]
 [ext_resource type="Script" path="res://scripts/camera/third_person_camera.gd" id="6_tpcamera"]
+[ext_resource type="Script" path="res://scripts/player/character_manager.gd" id="7_manager"]
+[ext_resource type="Script" path="res://scripts/player/raptor_character.gd" id="8_raptor"]
+[ext_resource type="Script" path="res://scripts/player/dragon_character.gd" id="9_dragon"]
 
 [node name="Main" type="Node3D"]
 
 [node name="WorldGenerator" type="Node3D" parent="."]
 script = ExtResource("2_worldgen")
 
-[node name="Player" type="CharacterBody3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
-script = ExtResource("1_player")
+[node name="CharacterManager" type="Node3D" parent="."]
+script = ExtResource("7_manager")
 
-[node name="NeonPulse" type="Node" parent="Player"]
+[node name="Raptor" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("8_raptor")
+
+[node name="NeonPulse" type="Node" parent="CharacterManager/Raptor"]
 script = ExtResource("4_pulse")
 
-[node name="PlayerLight" type="OmniLight3D" parent="Player"]
+[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Raptor"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+
+[node name="Dragon" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("9_dragon")
 
 [node name="CameraRig" type="Node3D" parent="."]
 script = ExtResource("3_camera")
-target_path = NodePath("../Player")
+target_path = NodePath("../CharacterManager/Raptor")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 current = true
 
 [node name="TPCameraRig" type="Node3D" parent="."]
 script = ExtResource("6_tpcamera")
-target_path = NodePath("../Player")
+target_path = NodePath("../CharacterManager/Raptor")
 
 [node name="Camera3D" type="Camera3D" parent="TPCameraRig"]
 

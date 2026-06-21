@@ -39,6 +39,9 @@ func activate() -> void:
 func deactivate() -> void:
 	_camera.current = false
 
+func set_target(node: Node3D) -> void:
+	_target = node
+
 func _process(delta: float) -> void:
 	if not is_instance_valid(_target):
 		return
