@@ -4,20 +4,24 @@
 extends Node3D
 class_name RaptorBullet
 
-@export var speed:    float = 30.0
-@export var lifetime: float = 1.5
+@export var speed:       float = 30.0
+@export var lifetime:    float = 1.5
+@export var hit_damage:  int   = 20
+@export var hit_radius:  float = 0.8
 
 var _dir:     Vector3 = Vector3.FORWARD
 var _age:     float   = 0.0
 var _trail_timer: float = 0.0
+var _owner: Node3D = null
 
 var _mat_core:  StandardMaterial3D
 var _mat_glow:  StandardMaterial3D
 var _mat_elec:  StandardMaterial3D
 
-func setup(origin: Vector3, direction: Vector3) -> void:
+func setup(origin: Vector3, direction: Vector3, owner: Node3D = null) -> void:
 	global_position = origin
 	_dir = direction.normalized()
+	_owner = owner
 	_build_materials()
 	_build_visual()
 
@@ -33,7 +37,6 @@ func _build_materials() -> void:
 		Color(0.90, 1.0, 1.0), 10.0)
 
 func _build_visual() -> void:
-	# ── Thân đạn (hình trụ dài) ────────────────────────────────────────
 	var body := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius    = 0.035
@@ -44,7 +47,6 @@ func _build_visual() -> void:
 	body.position = Vector3(0, 0, 0.07)
 	add_child(body)
 
-	# ── Đầu đạn nhọn (sphere nhỏ) ──────────────────────────────────────
 	var tip := MeshInstance3D.new()
 	var sph := SphereMesh.new()
 	sph.radius          = 0.04
@@ -56,7 +58,6 @@ func _build_visual() -> void:
 	tip.position = Vector3(0, 0, 0.18)
 	add_child(tip)
 
-	# ── Đuôi đạn (hơi loe ra) ──────────────────────────────────────────
 	var tail := MeshInstance3D.new()
 	var cyl2 := CylinderMesh.new()
 	cyl2.top_radius    = 0.035
@@ -67,7 +68,6 @@ func _build_visual() -> void:
 	tail.position = Vector3(0, 0, -0.04)
 	add_child(tail)
 
-	# ── Quầng sáng / glow ──────────────────────────────────────────────
 	var halo := MeshInstance3D.new()
 	var sph2 := SphereMesh.new()
 	sph2.radius          = 0.10
@@ -79,7 +79,6 @@ func _build_visual() -> void:
 	halo.position = Vector3(0, 0, 0.04)
 	add_child(halo)
 
-	# ── 3 vòng điện rung quanh thân ────────────────────────────────────
 	for i in range(3):
 		var ring := MeshInstance3D.new()
 		var tor := TorusMesh.new()
@@ -91,7 +90,6 @@ func _build_visual() -> void:
 		ring.rotation = Vector3(randf_range(0, TAU), randf_range(0, TAU), 0)
 		add_child(ring)
 
-	# ── Ánh sáng động ──────────────────────────────────────────────────
 	var light := OmniLight3D.new()
 	light.light_color  = Color(0.30, 0.80, 1.0)
 	light.light_energy = 4.0
@@ -102,13 +100,13 @@ func _process(delta: float) -> void:
 	_age += delta
 	_trail_timer += delta
 
-	# Xoay về hướng bay
 	if _dir.length_squared() > 0.001:
 		look_at(global_position + _dir, Vector3.UP)
 
 	global_position += _dir * speed * delta
 
-	# ── Hiệu ứng bay ───────────────────────────────────────────────────
+	_check_hit()
+
 	var pulse: float = 1.0 + sin(_age * 22.0) * 0.06
 	scale = Vector3(pulse, pulse, pulse)
 
@@ -116,13 +114,33 @@ func _process(delta: float) -> void:
 	_mat_glow.emission_energy_multiplier = 3.5 * flicker
 	_mat_elec.emission_energy_multiplier = 10.0 * flicker
 
-	# ── Trail ──────────────────────────────────────────────────────────
 	if _trail_timer >= 0.025:
 		_trail_timer = 0.0
 		_spawn_trail()
 
 	if _age >= lifetime:
 		_explode()
+
+func _check_hit() -> void:
+	var mgr := _find_manager()
+	if mgr == null:
+		return
+	for ch in mgr.get_children():
+		if ch is CharacterBase and ch.is_alive and ch != _owner:
+			var offset: Vector3 = global_position - ch.global_position
+			offset.y = 0.0
+			if offset.length() < hit_radius:
+				ch.take_damage(hit_damage, _owner)
+				_explode()
+				return
+
+func _find_manager() -> Node:
+	var p := get_parent()
+	while p != null:
+		if p is CharacterManager:
+			return p
+		p = p.get_parent()
+	return null
 
 func _spawn_trail() -> void:
 	var p := Node3D.new()
@@ -148,7 +166,6 @@ func _spawn_trail() -> void:
 	tween.tween_callback(func(): if is_instance_valid(p): p.queue_free())
 
 func _explode() -> void:
-	# ── Flash ──────────────────────────────────────────────────────────
 	for i in range(4):
 		var flash := OmniLight3D.new()
 		flash.light_color  = Color(0.30, 0.80, 1.0)
@@ -159,7 +176,6 @@ func _explode() -> void:
 		get_tree().create_timer(0.04 * i).timeout.connect(
 			func(): if is_instance_valid(flash): flash.queue_free())
 
-	# ── Vòng nổ lan toả ────────────────────────────────────────────────
 	for j in range(5):
 		var mat := MeshBuilder.emit_mat(
 			Color(0.35, 0.85, 1.0),
@@ -179,4 +195,5 @@ func _explode() -> void:
 		tween.tween_property(mat, "emission_energy_multiplier", 0.0, 0.25)
 		tween.tween_property(mat, "albedo_color:a", 0.0, 0.25)
 
+	set_process(false)
 	get_tree().create_timer(0.3).timeout.connect(queue_free)

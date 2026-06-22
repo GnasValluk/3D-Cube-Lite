@@ -39,6 +39,10 @@ func animate(delta: float) -> void:
 			_air(delta, t)
 		CharacterBase.State.FALL:
 			_air(delta, t)
+		CharacterBase.State.HIT:
+			_hit(delta, t)
+		CharacterBase.State.DEAD:
+			_dead(delta, t)
 
 func _idle(delta: float, t: float) -> void:
 	var b: float = sin(t * idle_breathe_speed)
@@ -226,6 +230,54 @@ func _air(delta: float, t: float) -> void:
 	m().foot_r.rotation.x = lerp(m().foot_r.rotation.x, -0.26, delta * 10.0)
 	_fists_forward(delta, 0.10)
 	_sway_cloth(delta, t, 0.18, 0.14)
+
+# ── HIT ────────────────────────────────────────────────────────────────────────
+func _hit(delta: float, _t: float) -> void:
+	var p: float = 1.0 - (base._hit_timer / 0.18)
+	m().rig.position.y = lerp(m().rig.position.y, 0.06, delta*14.0)
+	m().rig.rotation.x = lerp(m().rig.rotation.x, 0.26 - p*0.18, delta*16.0)
+	m().spine.rotation.x = lerp(m().spine.rotation.x, 0.20 - p*0.12, delta*14.0)
+	m().chest.rotation.x = lerp(m().chest.rotation.x, 0.18 - p*0.10, delta*14.0)
+	m().head.rotation.x = lerp(m().head.rotation.x, -0.20 + p*0.14, delta*16.0)
+	m().upper_arm_l.rotation.x = lerp(m().upper_arm_l.rotation.x, -0.40, delta*20.0)
+	m().upper_arm_l.rotation.z = lerp(m().upper_arm_l.rotation.z, 0.40, delta*18.0)
+	m().lower_arm_l.rotation.x = lerp(m().lower_arm_l.rotation.x, -0.20, delta*20.0)
+	m().upper_arm_r.rotation.x = lerp(m().upper_arm_r.rotation.x, -0.40, delta*20.0)
+	m().upper_arm_r.rotation.z = lerp(m().upper_arm_r.rotation.z, -0.40, delta*18.0)
+	m().lower_arm_r.rotation.x = lerp(m().lower_arm_r.rotation.x, -0.20, delta*20.0)
+	m().thigh_l.rotation.x = lerp(m().thigh_l.rotation.x, -0.08, delta*12.0)
+	m().thigh_r.rotation.x = lerp(m().thigh_r.rotation.x, -0.08, delta*12.0)
+	m().shin_l.rotation.x = lerp(m().shin_l.rotation.x, 0.42, delta*12.0)
+	m().shin_r.rotation.x = lerp(m().shin_r.rotation.x, 0.42, delta*12.0)
+
+# ── DEAD ───────────────────────────────────────────────────────────────────────
+func _dead(delta: float, t: float) -> void:
+	var prog: float = 1.0 - (base._death_timer / 1.8)
+	if prog < 0.20:
+		var p: float = prog / 0.20
+		m().rig.rotation.x = lerp(m().rig.rotation.x, p * 0.30, delta*16.0)
+		m().rig.rotation.z = lerp(m().rig.rotation.z, p * (-0.08), delta*14.0)
+		m().spine.rotation.x = lerp(m().spine.rotation.x, p * 0.20, delta*14.0)
+		m().chest.rotation.x = lerp(m().chest.rotation.x, p * 0.22, delta*14.0)
+		m().head.rotation.x = lerp(m().head.rotation.x, -p * 0.16, delta*14.0)
+		m().upper_arm_l.rotation.x = lerp(m().upper_arm_l.rotation.x, -0.40, delta*18.0)
+		m().upper_arm_r.rotation.x = lerp(m().upper_arm_r.rotation.x, -0.40, delta*18.0)
+	elif prog < 0.60:
+		var p: float = (prog - 0.20) / 0.40
+		m().rig.rotation.x = lerp(m().rig.rotation.x, 0.30 + p * 0.50, delta*14.0)
+		m().rig.rotation.z = lerp(m().rig.rotation.z, -0.08 - p * 0.18, delta*12.0)
+		m().rig.position.y = lerp(m().rig.position.y, -p * 0.14, delta*10.0)
+		m().spine.rotation.x = lerp(m().spine.rotation.x, 0.20 + p * 0.30, delta*14.0)
+		m().chest.rotation.x = lerp(m().chest.rotation.x, 0.22 + p * 0.34, delta*14.0)
+		m().head.rotation.x = lerp(m().head.rotation.x, -0.16 - p * 0.20, delta*12.0)
+		m().thigh_l.rotation.x = lerp(m().thigh_l.rotation.x, 0.60, delta*14.0)
+		m().thigh_r.rotation.x = lerp(m().thigh_r.rotation.x, 0.60, delta*14.0)
+		m().shin_l.rotation.x = lerp(m().shin_l.rotation.x, 1.00, delta*14.0)
+		m().shin_r.rotation.x = lerp(m().shin_r.rotation.x, 1.00, delta*14.0)
+	else:
+		m().rig.rotation.x = lerp(m().rig.rotation.x, 0.80, delta*8.0)
+		m().rig.rotation.z = lerp(m().rig.rotation.z, -0.26, delta*8.0)
+		m().rig.position.y = lerp(m().rig.position.y, -0.14, delta*6.0)
 
 func _set_guard_arms(delta: float, left_raise: float, right_raise: float) -> void:
 	m().shoulder_l.rotation.z = lerp(m().shoulder_l.rotation.z, 0.12, delta * 8.0)

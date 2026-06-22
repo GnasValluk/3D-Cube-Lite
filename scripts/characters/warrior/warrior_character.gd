@@ -117,6 +117,7 @@ func _update_stomp(delta: float) -> void:
 		_sy_tgt = 0.72
 		_spawn_ground_impact()
 		_shake_cameras(STOMP_SHAKE_INTENSITY, STOMP_SHAKE_DURATION)
+		_do_stomp_damage()
 
 	_animate(delta)
 
@@ -141,22 +142,20 @@ func has_stomp_impacted() -> bool:
 
 func _spawn_beam() -> void:
 	var beam := WarriorBeam.new()
-	var scene_root: Node = _scene_root()
-	scene_root.add_child(beam)
-	var beam_dir: Vector3 = _forward_dir()
+	get_parent().add_child(beam)
+	var beam_dir: Vector3 = _aim_dir if _aim_dir.length_squared() > 0.001 else _forward_dir()
 	var origin: Vector3 = global_position + Vector3(0.0, 1.18, 0.0) + beam_dir * 0.95
 	if _mesh:
 		if _mesh.chest:
 			origin = _mesh.chest.global_position + beam_dir * 0.72 + Vector3(0.0, 0.02, 0.0)
 		elif _mesh.spine:
 			origin = _mesh.spine.global_position + beam_dir * 0.82 + Vector3(0.0, 0.08, 0.0)
-	beam.setup(origin, beam_dir)
+	beam.setup(origin, beam_dir, self)
 	_shake_cameras(BEAM_SHAKE_INTENSITY, BEAM_SHAKE_DURATION)
 
 func _spawn_ground_impact() -> void:
 	var impact := WarriorGroundImpact.new()
-	var scene_root: Node = _scene_root()
-	scene_root.add_child(impact)
+	get_parent().add_child(impact)
 	impact.setup(global_position + Vector3(0.0, 0.02, 0.0))
 
 func _scene_root() -> Node:
@@ -173,6 +172,24 @@ func _shake_cameras(intensity: float, duration: float) -> void:
 		_iso_rig.call("add_shake", intensity, duration)
 	if is_instance_valid(_tp_rig) and _tp_rig.has_method("add_shake"):
 		_tp_rig.call("add_shake", intensity, duration)
+
+func _do_stomp_damage() -> void:
+	var mgr := _find_character_manager()
+	if mgr == null:
+		return
+	for ch in mgr.get_children():
+		if ch is CharacterBase and ch != self and ch.is_alive:
+			var d := global_position.distance_to(ch.global_position)
+			if d <= 4.0:
+				ch.take_damage(40, self)
+
+func _find_character_manager() -> Node:
+	var p := get_parent()
+	while p != null:
+		if p is CharacterManager:
+			return p
+		p = p.get_parent()
+	return null
 
 func _animate(delta: float) -> void:
 	_anim.animate(delta)

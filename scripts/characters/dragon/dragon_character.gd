@@ -178,21 +178,15 @@ func _update_flight(delta: float) -> void:
 func _spawn_fireball() -> void:
 	var fb := DragonFireball.new()
 
-	# Tính forward từ rotation.y trực tiếp — tránh nhầm lẫn basis convention
-	# sin/cos của rotation.y cho vector nhìn về phía nhân vật đang hướng
-	var fire_dir: Vector3 = Vector3(sin(rotation.y), 0.0, cos(rotation.y)).normalized()
+	var fire_dir: Vector3 = _aim_dir if _aim_dir.length_squared() > 0.001 else Vector3(sin(rotation.y), 0.0, cos(rotation.y)).normalized()
 
 	# Vị trí miệng: offset về phía trước + lên cao
 	var mouth_pos: Vector3 = global_position + Vector3(0, 1.4, 0) + fire_dir * 0.8
 	if _mesh and _mesh.head_pivot:
 		mouth_pos = _mesh.head_pivot.global_position + fire_dir * 0.6
 
-	# Spawn vào scene root
-	var scene_root: Node = get_parent().get_parent()
-	if scene_root == null:
-		scene_root = get_parent()
-	scene_root.add_child(fb)
-	fb.setup(mouth_pos, fire_dir)
+	get_parent().add_child(fb)
+	fb.setup(mouth_pos, fire_dir, self)
 
 func _animate(delta: float) -> void:
 	_anim.animate(delta)

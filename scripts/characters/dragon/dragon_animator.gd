@@ -33,6 +33,8 @@ func animate(delta: float) -> void:
 		CharacterBase.State.DEVOUR:         _devour(delta, t)
 		CharacterBase.State.JUMP:           _air(delta, t)
 		CharacterBase.State.FALL:           _air(delta, t)
+		CharacterBase.State.HIT:            _hit(delta, t)
+		CharacterBase.State.DEAD:           _dead(delta, t)
 
 # ── Shorthand refs ────────────────────────────────────────────────────────────
 func m() -> DragonMesh: return mesh
@@ -275,6 +277,52 @@ func _devour(delta: float, t: float) -> void:
 	for i in range(m().tail.size()):
 		m().tail[i].rotation.x = lerp(m().tail[i].rotation.x, 0.12 + float(i)*0.04, delta*10.0)
 
+# ── HIT ────────────────────────────────────────────────────────────────────────
+func _hit(delta: float, _t: float) -> void:
+	var p: float = 1.0 - (base._hit_timer / 0.18)
+	m().rig.position.y = lerp(m().rig.position.y, 0.06, delta*14.0)
+	m().rig.rotation.x = lerp(m().rig.rotation.x, 0.32 - p*0.18, delta*14.0)
+	m().neck.rotation.x  = lerp(m().neck.rotation.x,  0.80 - p*0.40, delta*30.0)
+	m().neck2.rotation.x = lerp(m().neck2.rotation.x, 0.60 - p*0.30, delta*28.0)
+	m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, 0.40 - p*0.20, delta*24.0)
+	m().jaw.rotation.x = lerp(m().jaw.rotation.x, 0.0, delta*14.0)
+	m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,  -0.40, delta*20.0)
+	m().wing_l.rotation.x  = lerp(m().wing_l.rotation.x,  -0.30, delta*18.0)
+	m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z, -0.50, delta*18.0)
+	m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z,   0.40, delta*20.0)
+	m().wing_r.rotation.x  = lerp(m().wing_r.rotation.x,  -0.30, delta*18.0)
+	m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z,  0.50, delta*18.0)
+
+# ── DEAD ───────────────────────────────────────────────────────────────────────
+func _dead(delta: float, _t: float) -> void:
+	var prog: float = 1.0 - (base._death_timer / 1.8)
+	if prog < 0.20:
+		var p: float = prog / 0.20
+		m().rig.rotation.x = lerp(m().rig.rotation.x, p * 0.30, delta*16.0)
+		m().neck.rotation.x  = lerp(m().neck.rotation.x,  0.60, delta*20.0)
+		m().neck2.rotation.x = lerp(m().neck2.rotation.x, 0.50, delta*18.0)
+		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, 0.40, delta*16.0)
+		m().jaw.rotation.x = lerp(m().jaw.rotation.x, 0.30, delta*16.0)
+		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,  -0.60, delta*20.0)
+		m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z, -0.80, delta*18.0)
+		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z,   0.60, delta*20.0)
+		m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z,  0.80, delta*18.0)
+	elif prog < 0.60:
+		var p: float = (prog - 0.20) / 0.40
+		m().rig.rotation.x = lerp(m().rig.rotation.x, 0.30 + p * 0.60, delta*14.0)
+		m().rig.rotation.z = lerp(m().rig.rotation.z, -p * 0.20, delta*12.0)
+		m().rig.position.y = lerp(m().rig.position.y, -p * 0.18, delta*10.0)
+		m().neck.rotation.x  = lerp(m().neck.rotation.x,  0.60 + p * 0.40, delta*16.0)
+		m().neck2.rotation.x = lerp(m().neck2.rotation.x, 0.50 + p * 0.30, delta*14.0)
+		m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, 0.40 + p * 0.30, delta*14.0)
+		m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,  -0.60 + p * 0.20, delta*14.0)
+		m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z, -0.80 + p * 0.30, delta*14.0)
+		m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z,   0.60 - p * 0.20, delta*14.0)
+		m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z,  0.80 - p * 0.30, delta*14.0)
+	else:
+		m().rig.rotation.x = lerp(m().rig.rotation.x, 0.90, delta*8.0)
+		m().rig.rotation.z = lerp(m().rig.rotation.z, -0.20, delta*8.0)
+		m().rig.position.y = lerp(m().rig.position.y, -0.18, delta*6.0)
 
 func _fly(delta: float, t: float, blend: float) -> void:
 	var flap: float = sin(t * lerp(6.0, 11.0, blend))

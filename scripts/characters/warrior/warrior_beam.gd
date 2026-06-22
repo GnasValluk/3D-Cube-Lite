@@ -1,22 +1,30 @@
 ## warrior/warrior_beam.gd
-## Beam năng lượng ngắn, bắn thẳng phía trước và tự xoá nhanh.
+## Beam năng lượng ngắn, bắn thẳng, gây sát thương.
 
 extends Node3D
 class_name WarriorBeam
 
-@export var speed: float = 28.0
-@export var lifetime: float = 0.35
-@export var beam_length: float = 5.8
-@export var beam_width: float = 0.18
+@export var speed:        float = 28.0
+@export var lifetime:     float = 0.35
+@export var beam_length:  float = 5.8
+@export var beam_width:   float = 0.18
+@export var hit_damage:   int   = 25
+@export var hit_radius:   float = 0.8
 
 var _dir: Vector3 = Vector3.FORWARD
 var _age: float = 0.0
 var _beam_root: Node3D
 var _light: OmniLight3D
+var _owner: Node3D = null
+var _origin: Vector3 = Vector3.ZERO
+var _hit_chars: Array[CharacterBase] = []
 
-func setup(origin: Vector3, direction: Vector3) -> void:
+func setup(origin: Vector3, direction: Vector3, owner: Node3D = null) -> void:
 	global_position = origin
 	_dir = direction.normalized()
+	_owner = owner
+	_origin = origin
+	_hit_chars.clear()
 	_build_visual()
 	_orient_to_dir()
 
@@ -75,6 +83,8 @@ func _process(delta: float) -> void:
 	_orient_to_dir()
 	global_position += _dir * speed * delta
 
+	_check_hit()
+
 	var pulse: float = 1.0 + sin(_age * 20.0) * 0.08
 	_beam_root.scale = Vector3(pulse, pulse, 1.0)
 	_beam_root.rotation.z += delta * 14.0
@@ -83,3 +93,36 @@ func _process(delta: float) -> void:
 
 	if _age >= lifetime:
 		queue_free()
+
+func _check_hit() -> void:
+	var mgr := _find_manager()
+	if mgr == null:
+		return
+	var beam_end: Vector3 = global_position + _dir * beam_length
+	for ch in mgr.get_children():
+		if ch is CharacterBase and ch.is_alive and ch != _owner and not ch in _hit_chars:
+			if _point_near_line(ch.global_position, _origin, beam_end, hit_radius):
+				ch.take_damage(hit_damage, _owner)
+				_hit_chars.append(ch)
+
+func _point_near_line(p: Vector3, a: Vector3, b: Vector3, r: float) -> bool:
+	var ab: Vector3 = b - a
+	ab.y = 0.0
+	var ap: Vector3 = p - a
+	ap.y = 0.0
+	var dot_ab: float = ab.dot(ab)
+	if dot_ab < 0.0001:
+		return ap.length() < r
+	var t: float = clamp(ap.dot(ab) / dot_ab, 0.0, 1.0)
+	var closest: Vector3 = a + ab * t
+	var offset_p: Vector3 = p - closest
+	offset_p.y = 0.0
+	return offset_p.length() < r
+
+func _find_manager() -> Node:
+	var p := get_parent()
+	while p != null:
+		if p is CharacterManager:
+			return p
+		p = p.get_parent()
+	return null

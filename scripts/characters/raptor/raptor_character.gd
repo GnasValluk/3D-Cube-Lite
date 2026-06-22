@@ -18,6 +18,8 @@ func _build_character() -> void:
 	jump_height  = 1.4
 	attack_duration = 0.40
 	_attack2_duration = 0.90
+	melee_range  = 1.5
+	melee_damage = 10
 
 	# Collision
 	var col := CollisionShape3D.new()
@@ -53,11 +55,9 @@ func _spawn_bullet() -> void:
 	var muzzle: Vector3 = global_position + Vector3(0, 0.8, 0)
 	if _mesh and _mesh.neck:
 		muzzle = _mesh.neck.global_position + Vector3(0, 0.05, 0)
-	var fire_dir: Vector3 = global_transform.basis.z
-	var root: Node = get_parent().get_parent()
-	if root == null: root = get_parent()
-	root.add_child(bullet)
-	bullet.setup(muzzle, fire_dir)
+	var fire_dir: Vector3 = _aim_dir if _aim_dir.length_squared() > 0.001 else global_transform.basis.z
+	get_parent().add_child(bullet)
+	bullet.setup(muzzle, fire_dir, self)
 
 func _on_secondary_attack() -> void:
 	pass
