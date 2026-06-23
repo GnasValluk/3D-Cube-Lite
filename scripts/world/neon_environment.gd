@@ -1,24 +1,38 @@
 ## neon_environment.gd
-## Environment style Just Shapes & Beats:
-## Nền xanh tối, bloom chọn lọc (chỉ vật thể featured mới glow),
-## không bloom lòe loẹt toàn màn hình.
+## Environment + Day/Night cycle
+## Ngày: ánh sáng đầy đủ, nền teal sáng
+## Đêm: tắt dần light, nền tối, neon vẫn glow
 
 extends WorldEnvironment
+
+const CYCLE_DURATION: float = 120.0
+var _cycle_time: float = 0.0
+var _lights: Array[Light3D] = []
+
+# ── Day values ──────────────────────────────────────────────────────────────
+const DAY_BG         := Color(0.04, 0.12, 0.12)
+const DAY_AMBIENT    := Color(0.05, 0.20, 0.18)
+const DAY_AMB_ENERGY := 0.35
+
+# ── Night values ────────────────────────────────────────────────────────────
+const NIGHT_BG         := Color(0.005, 0.015, 0.02)
+const NIGHT_AMBIENT    := Color(0.005, 0.02, 0.02)
+const NIGHT_AMB_ENERGY := 0.04
+
 
 func _ready() -> void:
 	var env := Environment.new()
 
-	# ── Nền xanh tối đặc trưng JSaB ──────────────────────────────────────────
+	# ── Nền ──────────────────────────────────────────────────────────────────
 	env.background_mode  = Environment.BG_COLOR
-	env.background_color = Color(0.04, 0.12, 0.12)
+	env.background_color = DAY_BG
 
-	# ── Ambient teal tối – tạo chiều sâu cho các đồi ─────────────────────────
+	# ── Ambient ──────────────────────────────────────────────────────────────
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color  = Color(0.05, 0.20, 0.18)
-	env.ambient_light_energy = 0.35
+	env.ambient_light_color  = DAY_AMBIENT
+	env.ambient_light_energy = DAY_AMB_ENERGY
 
-	# ── Bloom nhẹ – chỉ khuếch đại vùng cực sáng (cây featured) ─────────────
-	# threshold cao = chỉ emission > 1.0 mới glow, terrain tối không bị ảnh hưởng
+	# ── Bloom ────────────────────────────────────────────────────────────────
 	env.glow_enabled       = true
 	env.glow_normalized    = true
 	env.glow_intensity     = 0.6
@@ -35,12 +49,12 @@ func _ready() -> void:
 	env.set_glow_level(5, false)
 	env.set_glow_level(6, false)
 
-	# ── Tone mapping filmic – giữ màu teal sâu không bị wash out ─────────────
+	# ── Tone mapping ─────────────────────────────────────────────────────────
 	env.tonemap_mode     = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.0
 	env.tonemap_white    = 1.2
 
-	# ── Saturation cao để teal/cyan rực hơn ──────────────────────────────────
+	# ── Saturation ───────────────────────────────────────────────────────────
 	env.adjustment_enabled    = true
 	env.adjustment_brightness = 0.95
 	env.adjustment_contrast   = 1.05
@@ -59,9 +73,39 @@ func _setup_lights() -> void:
 		omni.light_color  = Color(0.4, 1.0, 0.85)
 		omni.light_energy = 1.5
 		omni.omni_range   = 4.0
+		_lights.append(omni)
 
 	var dir := get_parent().find_child("DirectionalLight3D", true, false) as DirectionalLight3D
 	if dir:
 		dir.light_color  = Color(0.15, 0.55, 0.50)
 		dir.light_energy = 0.6
 		dir.shadow_enabled = true
+		_lights.append(dir)
+
+	# Also find any light from featured trees
+	var all := get_parent().find_children("*", "OmniLight3D", true, false)
+	for lt in all:
+		var l := lt as OmniLight3D
+		if l != omni and not l in _lights:
+			_lights.append(l)
+
+
+func _process(delta: float) -> void:
+	if _lights.is_empty():
+		return
+	_cycle_time += delta
+	# 0→1→0 smooth with sine: 1 at peak (day), 0 at trough (night)
+	var raw: float = sin(_cycle_time / CYCLE_DURATION * TAU)
+	var t: float = clamp(raw * 0.5 + 0.5, 0.0, 1.0)
+
+	# Environment
+	environment.background_color = DAY_BG.lerp(NIGHT_BG, 1.0 - t)
+	environment.ambient_light_color = DAY_AMBIENT.lerp(NIGHT_AMBIENT, 1.0 - t)
+	environment.ambient_light_energy = lerp(DAY_AMB_ENERGY, NIGHT_AMB_ENERGY, 1.0 - t)
+
+	# Lights
+	for light in _lights:
+		var base_energy: float = 0.6
+		if light is OmniLight3D:
+			base_energy = 1.5
+		light.light_energy = base_energy * t

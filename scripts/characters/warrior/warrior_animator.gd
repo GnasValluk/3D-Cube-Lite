@@ -27,8 +27,6 @@ func animate(delta: float) -> void:
 			_walk(delta, t, 1.0)
 		CharacterBase.State.SPRINT:
 			_walk(delta, t, sprint_cycle_mult)
-		CharacterBase.State.CROUCH:
-			_crouch(delta, t)
 		CharacterBase.State.DASH:
 			_dash(delta, t)
 		CharacterBase.State.ATTACK:
@@ -83,23 +81,6 @@ func _walk(delta: float, t: float, mult: float) -> void:
 	m().shin_r.rotation.x = abs(sin(cyc2)) * 0.52
 	m().foot_r.rotation.x = -abs(sin(cyc2)) * 0.24
 	_sway_cloth(delta, t, 0.14 + mult * 0.05, 0.10 + mult * 0.04)
-
-func _crouch(delta: float, t: float) -> void:
-	m().rig.position.y = lerp(m().rig.position.y, -0.20, delta * 10.0)
-	m().rig.rotation.x = lerp(m().rig.rotation.x, 0.04, delta * 8.0)
-	m().spine.rotation.x = lerp(m().spine.rotation.x, 0.08, delta * 8.0)
-	m().chest.rotation.x = lerp(m().chest.rotation.x, 0.10, delta * 8.0)
-	m().chest.rotation.y = lerp(m().chest.rotation.y, 0.00, delta * 8.0)
-	m().head.rotation.x = lerp(m().head.rotation.x, -0.10, delta * 8.0)
-	m().head.rotation.y = lerp(m().head.rotation.y, 0.00, delta * 8.0)
-	_set_guard_arms(delta, 0.92, 0.64)
-	m().thigh_l.rotation.x = lerp(m().thigh_l.rotation.x, 0.98, delta * 10.0)
-	m().thigh_r.rotation.x = lerp(m().thigh_r.rotation.x, 0.98, delta * 10.0)
-	m().shin_l.rotation.x = lerp(m().shin_l.rotation.x, 1.18, delta * 10.0)
-	m().shin_r.rotation.x = lerp(m().shin_r.rotation.x, 1.18, delta * 10.0)
-	m().foot_l.rotation.x = lerp(m().foot_l.rotation.x, -0.48, delta * 10.0)
-	m().foot_r.rotation.x = lerp(m().foot_r.rotation.x, -0.48, delta * 10.0)
-	_sway_cloth(delta, t, 0.04, 0.03)
 
 func _dash(delta: float, t: float) -> void:
 	m().rig.position.y = lerp(m().rig.position.y, 0.02, delta * 18.0)

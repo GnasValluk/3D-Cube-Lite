@@ -9,6 +9,18 @@ signal damage_taken(amount: int, attacker: Node3D)
 signal died(attacker: Node3D)
 signal hp_changed(current: int, max_hp: int)
 
+# ── Element system ─────────────────────────────────────────────────────────────
+enum Element { NONE, DIEN, BANG, PHONG, HOA, HAC_AM, ANH_SANG }
+const ELEMENT_COLORS: Dictionary = {
+	Element.NONE:    Color(1.0, 1.0, 1.0),
+	Element.DIEN:    Color(1.0, 0.85, 0.0),
+	Element.BANG:    Color(0.40, 0.80, 1.0),
+	Element.PHONG:   Color(0.40, 1.0, 0.40),
+	Element.HOA:     Color(1.0, 0.40, 0.0),
+	Element.HAC_AM:  Color(1.0, 0.55, 1.0),
+	Element.ANH_SANG: Color(1.0, 0.85, 0.0)
+}
+
 # ── Stats ─────────────────────────────────────────────────────────────────────
 @export var max_hp:             int   = 100
 @export var hp:                 int   = 100
@@ -16,7 +28,6 @@ signal hp_changed(current: int, max_hp: int)
 @export var attack_power:       int   = 15
 @export var move_speed:         float = 5.5
 @export var sprint_speed:       float = 9.5
-@export var crouch_speed:       float = 2.5
 @export var acceleration:       float = 26.0
 @export var friction:           float = 20.0
 @export var jump_height:        float = 1.4
@@ -29,9 +40,14 @@ signal hp_changed(current: int, max_hp: int)
 @export var melee_damage:       int   = 10
 @export var melee_range:        float = 2.0
 @export var auto_aim_range:     float = 20.0
+@export var lmb_cooldown:       float = 0.0
+@export var q_cooldown:         float = 0.0
+@export var r_cooldown:         float = 0.0
+@export var cooldown_rate:      float = 1.0
 
 var is_alive: bool = true
 var character_name: String = ""
+var element: int = Element.NONE
 var _melee_hit_once: bool = false
 
 # ── State machine ─────────────────────────────────────────────────────────────
@@ -51,6 +67,9 @@ var _attack2_duration: float = 0.70
 var _action_lunge_timer: float = 0.0
 var _action_lunge_speed: float = 0.0
 var _dash_dir:        Vector3 = Vector3.ZERO
+var _lmb_cd:          float   = 0.0
+var _q_cd:            float   = 0.0
+var _r_cd:            float   = 0.0
 var _invul_timer:     float   = 0.0
 var _hit_timer:       float   = 0.0
 var _death_timer:     float   = 0.0
@@ -62,6 +81,7 @@ var _grav_rise: float = 0.0
 var _grav_fall: float = 0.0
 var _was_floor: bool  = false
 var _time:      float = 0.0
+
 
 # ── Squash / stretch ──────────────────────────────────────────────────────────
 var _sy_tgt: float = 1.0
@@ -95,6 +115,12 @@ func _ready() -> void:
 		_iso_rig = root.get_node_or_null("CameraRig")
 		_tp_rig  = root.get_node_or_null("TPCameraRig")
 		_camera  = get_viewport().get_camera_3d()
+	_add_world_hp_bar()
+
+func _add_world_hp_bar() -> void:
+	var bar := WorldHPBar.new()
+	add_child(bar)
+	bar.setup(self)
 
 func _process(delta: float) -> void:
 	if _invul_timer > 0.0:
@@ -103,10 +129,14 @@ func _process(delta: float) -> void:
 		_hit_timer = max(_hit_timer - delta, 0.0)
 
 # ── Overrideable interface ────────────────────────────────────────────────────
+func get_element() -> int:
+	return element
+
 func _build_character() -> void:      pass
 func _animate(_delta: float) -> void: pass
 func _on_primary_attack() -> void:    pass
 func _on_secondary_attack() -> void:  pass
+func _on_show_animation() -> void:    pass
 
 # ── HP / Damage ───────────────────────────────────────────────────────────────
 func take_damage(amount: int, attacker: Node3D = null) -> void:
@@ -114,9 +144,10 @@ func take_damage(amount: int, attacker: Node3D = null) -> void:
 		return
 	var dmg := maxi(1, amount - defense)
 	hp = maxi(0, hp - dmg)
-	_invul_timer = 0.15
+	_invul_timer = 0.05
 	_hit_timer = 0.18
 	_hit_flash()
+	_spawn_damage_number(dmg, attacker)
 	_state = State.HIT
 	_attack_timer = 0.0
 	_attack2_timer = 0.0
@@ -208,20 +239,14 @@ func set_active(value: bool) -> void:
 	set_process_unhandled_key_input(value)
 	if _rig:
 		_rig.visible = value
+	for child in get_children():
+		if child is WorldHPBar:
+			child.visible = value
 	if value and _is_player:
 		await get_tree().process_frame
 		_camera = get_viewport().get_camera_3d()
 
 # ── Input ─────────────────────────────────────────────────────────────────────
-func _get_ai() -> Node:
-	if not _is_player:
-		return get_node_or_null("BotAI")
-	return null
-
-func _has_ai() -> bool:
-	var n: Node = _get_ai()
-	return n != null
-
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not _active or not _is_player:
 		return
@@ -232,10 +257,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_jbuf = JUMP_BUFFER
 			if k.keycode == KEY_F1:
 				_toggle_camera()
+			if k.keycode == KEY_CTRL:
+				if _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+					_on_show_animation()
 			if k.keycode == KEY_R:
-				if _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
-					_attack2_timer = _attack2_duration
-					_state = State.DEVOUR
+				if _r_cd <= 0.0 and _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
+					_aim_dir = _calc_aim_dir()
+					var fwd := global_transform.basis.z
+					if _aim_dir.dot(fwd) < 0.99:
+						rotation.y = atan2(_aim_dir.x, _aim_dir.z)
+					_r_cd = r_cooldown
 					_on_secondary_attack()
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -245,11 +276,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
 			if mb.button_index == MOUSE_BUTTON_LEFT:
-				if _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+				if _lmb_cd <= 0.0 and _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
 					_aim_dir = _calc_aim_dir()
 					var fwd := global_transform.basis.z
 					if _aim_dir.dot(fwd) < 0.99:
 						rotation.y = atan2(_aim_dir.x, _aim_dir.z)
+					_lmb_cd = lmb_cooldown
 					_attack_timer = attack_duration
 					_state = State.ATTACK
 					_melee_hit_once = false
@@ -276,6 +308,10 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_time          += delta
+	var cd_delta: float = delta * cooldown_rate
+	_lmb_cd         = max(_lmb_cd - cd_delta, 0.0)
+	_q_cd           = max(_q_cd - cd_delta, 0.0)
+	_r_cd           = max(_r_cd - cd_delta, 0.0)
 	_dash_cd        = max(_dash_cd - delta, 0.0)
 	_attack_timer   = max(_attack_timer - delta, 0.0)
 	_attack2_timer  = max(_attack2_timer - delta, 0.0)
@@ -319,7 +355,7 @@ func _physics_process(delta: float) -> void:
 		velocity.y = -0.5
 
 	# Jump
-	if _jbuf > 0.0 and _coyote > 0.0 and _state != State.CROUCH:
+	if _jbuf > 0.0 and _coyote > 0.0:
 		velocity.y = _jump_v
 		_jbuf = 0.0
 		_coyote = 0.0
@@ -339,45 +375,14 @@ func _physics_process(delta: float) -> void:
 	var attacking: bool = _attack_timer > 0.0
 	var devouring: bool = _attack2_timer > 0.0
 	var lunging: bool = _action_lunge_timer > 0.0 and (attacking or devouring)
-	var has_ai: bool = _has_ai()
-	var ai: Node = _get_ai()
 	var dir: Vector3 = _read_input()
-	var crouching: bool
 	var sprinting: bool
 	if _is_player:
-		crouching = Input.is_key_pressed(KEY_CTRL)
-		sprinting = Input.is_key_pressed(KEY_SHIFT) and not crouching
-	elif has_ai:
-		crouching = false
-		sprinting = ai.get("is_sprinting")
+		sprinting = Input.is_key_pressed(KEY_SHIFT)
 	else:
-		crouching = false
 		sprinting = false
 
-	# AI attack trigger
-	if has_ai and ai.get("want_attack") and not attacking and not devouring and _state != State.DASH:
-		_aim_dir = _calc_aim_dir()
-		var fwd := global_transform.basis.z
-		if _aim_dir.dot(fwd) < 0.99:
-			rotation.y = atan2(_aim_dir.x, _aim_dir.z)
-		_attack_timer = attack_duration
-		_state = State.ATTACK
-		_melee_hit_once = false
-		_on_primary_attack()
-		ai.set("want_attack", false)
-
-	# AI jump
-	if has_ai and ai.get("want_jump"):
-		_jbuf = JUMP_BUFFER
-		ai.set("want_jump", false)
-
-	var spd: float
-	if crouching:
-		spd = crouch_speed
-	elif sprinting:
-		spd = sprint_speed
-	else:
-		spd = move_speed
+	var spd: float = sprint_speed if sprinting else move_speed
 
 	if dir.length_squared() > 0.001 and not attacking and not devouring:
 		dir = dir.normalized()
@@ -399,9 +404,7 @@ func _physics_process(delta: float) -> void:
 	# Dash trigger
 	var want_dash: bool = false
 	if _is_player:
-		want_dash = Input.is_key_pressed(KEY_Q) and _dash_cd <= 0.0 and not attacking and not devouring
-	elif has_ai:
-		want_dash = ai.get("want_dash") and _dash_cd <= 0.0 and not attacking and not devouring
+		want_dash = Input.is_key_pressed(KEY_Q) and _q_cd <= 0.0 and not attacking and not devouring
 	if want_dash:
 		var di := _read_input()
 		if di.length_squared() > 0.001:
@@ -410,6 +413,7 @@ func _physics_process(delta: float) -> void:
 			_dash_dir = -global_transform.basis.z
 		_dash_dir.y = 0.0
 		_dash_dir    = _dash_dir.normalized()
+		_q_cd        = q_cooldown
 		_dash_timer  = dash_duration
 		_dash_cd     = dash_cooldown
 		_state       = State.DASH
@@ -428,8 +432,6 @@ func _physics_process(delta: float) -> void:
 			_state = State.JUMP
 		else:
 			_state = State.FALL
-	elif crouching:
-		_state = State.CROUCH
 	elif dir.length_squared() > 0.001:
 		if sprinting:
 			_state = State.SPRINT
@@ -448,7 +450,7 @@ func _do_melee_hit() -> void:
 		return
 	var fwd := Vector3(sin(rotation.y), 0.0, cos(rotation.y)).normalized()
 	for ch in mgr.get_children():
-		if ch is CharacterBase and ch != self and ch.is_alive:
+		if ch is CharacterBase and ch != self and ch.is_alive and ch._active:
 			var offset: Vector3 = ch.global_position - global_position
 			offset.y = 0.0
 			var dist: float = offset.length()
@@ -482,9 +484,6 @@ func _read_input() -> Vector3:
 		var fwd: Vector3 = -cb.z; fwd.y = 0.0; fwd = fwd.normalized()
 		var rgt: Vector3 =  cb.x; rgt.y = 0.0; rgt = rgt.normalized()
 		return fwd * -rz + rgt * rx
-	var ai: Node = _get_ai()
-	if ai != null:
-		return ai.get("desired_dir")
 	return Vector3.ZERO
 
 func _calc_aim_dir() -> Vector3:
@@ -513,6 +512,18 @@ func _find_nearest_target() -> CharacterBase:
 func _start_forward_lunge(speed: float, duration: float) -> void:
 	_action_lunge_speed = speed
 	_action_lunge_timer = duration
+
+func _spawn_damage_number(dmg: int, attacker: Node3D = null) -> void:
+	var world := get_tree().current_scene
+	if world == null:
+		return
+	var elem: int = Element.NONE
+	if attacker != null and attacker.has_method("get_element"):
+		elem = attacker.get_element()
+	var col: Color = ELEMENT_COLORS.get(elem, Color.WHITE)
+	var dn := FloatingDamage.new()
+	world.add_child(dn)
+	dn.setup(dmg, global_position + Vector3(0, 1.5, 0), col)
 
 # ── Camera toggle ─────────────────────────────────────────────────────────────
 func _toggle_camera() -> void:

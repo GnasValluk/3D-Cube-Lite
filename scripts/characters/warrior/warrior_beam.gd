@@ -8,7 +8,7 @@ class_name WarriorBeam
 @export var lifetime:     float = 0.35
 @export var beam_length:  float = 5.8
 @export var beam_width:   float = 0.18
-@export var hit_damage:   int   = 25
+@export var hit_damage:  int   = 90
 @export var hit_radius:   float = 0.8
 
 var _dir: Vector3 = Vector3.FORWARD
@@ -100,7 +100,7 @@ func _check_hit() -> void:
 		return
 	var beam_end: Vector3 = global_position + _dir * beam_length
 	for ch in mgr.get_children():
-		if ch is CharacterBase and ch.is_alive and ch != _owner and not ch in _hit_chars:
+		if ch is CharacterBase and ch.is_alive and ch._active and ch != _owner and not ch in _hit_chars:
 			if _point_near_line(ch.global_position, _origin, beam_end, hit_radius):
 				ch.take_damage(hit_damage, _owner)
 				_hit_chars.append(ch)

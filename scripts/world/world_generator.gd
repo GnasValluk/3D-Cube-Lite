@@ -18,24 +18,35 @@ extends Node3D
 # GREEN  – xanh lá thuần
 
 const C_GND: Array = [
-	Color(0.07, 0.21, 0.17),   # 0 MID    – teal ấm tối
-	Color(0.12, 0.38, 0.28),   # 1 LIGHT  – teal sáng
-	Color(0.06, 0.24, 0.30),   # 2 AQUA   – blue-teal lạnh
+	Color(0.05, 0.18, 0.16),   # 0 MID    – teal tối
+	Color(0.10, 0.32, 0.26),   # 1 LIGHT  – teal trung bình
+	Color(0.04, 0.20, 0.28),   # 2 AQUA   – blue-teal lạnh
 ]
 const C_FOL: Array = [
-	Color(0.13, 0.50, 0.36),   # 0 MID
-	Color(0.20, 0.76, 0.52),   # 1 LIGHT
-	Color(0.10, 0.58, 0.68),   # 2 AQUA
+	Color(0.15, 0.90, 0.55),   # 0 MID    – neon xanh lá
+	Color(0.25, 1.00, 0.70),   # 1 LIGHT  – neon xanh sáng
+	Color(0.10, 0.70, 0.90),   # 2 AQUA   – neon xanh dương
 ]
 const C_GRS: Array = [
-	Color(0.10, 0.36, 0.26),   # 0 MID
-	Color(0.16, 0.55, 0.38),   # 1 LIGHT
-	Color(0.08, 0.40, 0.50),   # 2 AQUA
+	Color(0.10, 0.55, 0.35),   # 0 MID
+	Color(0.18, 0.70, 0.45),   # 1 LIGHT
+	Color(0.06, 0.50, 0.60),   # 2 AQUA
 ]
-const C_TRUNK       := Color(0.05, 0.16, 0.12)
-const C_FEAT_FOL    := Color(0.72, 1.00, 0.92)
-const C_FEAT_EMIT   := Color(0.28, 0.95, 0.80)
-const C_FEAT_TRUNK  := Color(0.30, 0.82, 0.70)
+const C_TRUNK       := Color(0.04, 0.12, 0.10)
+const C_FEAT_FOL    := Color(0.80, 1.00, 0.95)
+const C_FEAT_EMIT   := Color(0.35, 1.00, 0.85)
+const C_FEAT_TRUNK  := Color(0.25, 0.80, 0.65)
+
+const C_FOL_EMIT: Array = [
+	Color(0.10, 0.70, 0.40),   # 0 MID
+	Color(0.18, 0.80, 0.50),   # 1 LIGHT
+	Color(0.06, 0.50, 0.70),   # 2 AQUA
+]
+const C_GRS_EMIT: Array = [
+	Color(0.06, 0.35, 0.22),   # 0 MID
+	Color(0.10, 0.45, 0.28),   # 1 LIGHT
+	Color(0.04, 0.30, 0.40),   # 2 AQUA
+]
 
 # ── Noise layers ──────────────────────────────────────────────────────────────
 var _noise_biome: FastNoiseLite   # Tần số thấp → vùng lớn
@@ -46,6 +57,8 @@ var _mat_trunk_feat:  StandardMaterial3D
 var _mat_gnd:  Array[StandardMaterial3D] = []
 var _mat_fol:  Array[StandardMaterial3D] = []
 var _mat_grs:  Array[StandardMaterial3D] = []
+var _mat_fol_neon: Array[StandardMaterial3D] = []
+var _mat_grs_neon: Array[StandardMaterial3D] = []
 
 
 func _ready() -> void:
@@ -67,6 +80,8 @@ func _ready() -> void:
 		_mat_gnd.append(_flat(C_GND[i]))
 		_mat_fol.append(_flat(C_FOL[i]))
 		_mat_grs.append(_flat(C_GRS[i]))
+		_mat_fol_neon.append(_flat_emit(C_FOL[i], C_FOL_EMIT[i], 1.5))
+		_mat_grs_neon.append(_flat_emit(C_GRS[i], C_GRS_EMIT[i], 0.8))
 
 	generate()
 
@@ -84,7 +99,6 @@ func _flat_emit(albedo: Color, emit: Color, energy: float) -> StandardMaterial3D
 	m.emission_enabled = true; m.emission = emit
 	m.emission_energy_multiplier = energy
 	return m
-
 
 ## Domain-warped biome index tại (wx, wz)
 ## Warp làm cho ranh giới bị uốn cong tự nhiên thay vì thẳng
@@ -120,7 +134,6 @@ func generate() -> void:
 		var sf:   float = rng.randf_range(0.55, 1.40)
 		_spawn_tree(Vector3(px, 0.0, pz), b, feat, sf, rng)
 
-
 # ── Sàn: patch grid, màu theo biome noise ────────────────────────────────────
 func _spawn_ground() -> void:
 	var sb := StaticBody3D.new()
@@ -148,7 +161,7 @@ func _spawn_ground() -> void:
 
 # ── Grass patch ───────────────────────────────────────────────────────────────
 func _spawn_grass_patch(base: Vector3, b: int, rng: RandomNumberGenerator) -> void:
-	var mat := _mat_grs[b]
+	var mat := _mat_grs_neon[b]
 	for _i in range(rng.randi_range(2, 5)):
 		var ox: float = rng.randf_range(-0.28, 0.28)
 		var oz: float = rng.randf_range(-0.28, 0.28)
@@ -179,8 +192,8 @@ func _spawn_grass_patch(base: Vector3, b: int, rng: RandomNumberGenerator) -> vo
 # ── Cây ───────────────────────────────────────────────────────────────────────
 func _spawn_tree(base: Vector3, b: int, featured: bool,
 				 sf: float, rng: RandomNumberGenerator) -> void:
-	var fol_mat := _flat_emit(C_FEAT_FOL, C_FEAT_EMIT, 2.0) if featured \
-				   else _mat_fol[b]
+	var fol_mat := _flat_emit(C_FEAT_FOL, C_FEAT_EMIT, 2.5) if featured \
+				   else _mat_fol_neon[b]
 	var trk_mat := _mat_trunk_feat if featured else _mat_trunk
 
 	var trunk_h: float = rng.randf_range(0.9, 1.9) * sf

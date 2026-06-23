@@ -6,7 +6,7 @@ class_name RaptorBullet
 
 @export var speed:       float = 30.0
 @export var lifetime:    float = 1.5
-@export var hit_damage:  int   = 20
+@export var hit_damage:  int   = 30
 @export var hit_radius:  float = 0.8
 
 var _dir:     Vector3 = Vector3.FORWARD
@@ -27,14 +27,14 @@ func setup(origin: Vector3, direction: Vector3, owner: Node3D = null) -> void:
 
 func _build_materials() -> void:
 	_mat_core = MeshBuilder.emit_mat(
-		Color(0.60, 0.95, 1.0),
-		Color(0.50, 0.90, 1.0), 6.0)
+		Color(1.0, 0.85, 0.20),
+		Color(1.0, 0.80, 0.10), 6.0)
 	_mat_glow = MeshBuilder.emit_mat(
-		Color(0.25, 0.70, 1.0),
-		Color(0.20, 0.60, 1.0), 3.5)
+		Color(1.0, 0.75, 0.15),
+		Color(1.0, 0.70, 0.10), 3.5)
 	_mat_elec = MeshBuilder.emit_mat(
-		Color(0.80, 1.0, 1.0),
-		Color(0.90, 1.0, 1.0), 10.0)
+		Color(1.0, 0.95, 0.50),
+		Color(1.0, 0.95, 0.40), 10.0)
 
 func _build_visual() -> void:
 	var body := MeshInstance3D.new()
@@ -126,7 +126,7 @@ func _check_hit() -> void:
 	if mgr == null:
 		return
 	for ch in mgr.get_children():
-		if ch is CharacterBase and ch.is_alive and ch != _owner:
+		if ch is CharacterBase and ch.is_alive and ch._active and ch != _owner:
 			var offset: Vector3 = global_position - ch.global_position
 			offset.y = 0.0
 			if offset.length() < hit_radius:
@@ -145,8 +145,8 @@ func _find_manager() -> Node:
 func _spawn_trail() -> void:
 	var p := Node3D.new()
 	var mat := MeshBuilder.emit_mat(
-		Color(0.20, 0.65, 1.0),
-		Color(0.15, 0.55, 1.0), 2.0)
+		Color(1.0, 0.80, 0.15),
+		Color(1.0, 0.75, 0.10), 2.0)
 	var mi := MeshInstance3D.new()
 	var sph := SphereMesh.new()
 	sph.radius = 0.025
@@ -168,7 +168,7 @@ func _spawn_trail() -> void:
 func _explode() -> void:
 	for i in range(4):
 		var flash := OmniLight3D.new()
-		flash.light_color  = Color(0.30, 0.80, 1.0)
+		flash.light_color  = Color(1.0, 0.80, 0.15)
 		flash.light_energy = 6.0 + i * 3.0
 		flash.omni_range   = 3.5 + i * 1.0
 		get_parent().add_child(flash)
@@ -178,8 +178,8 @@ func _explode() -> void:
 
 	for j in range(5):
 		var mat := MeshBuilder.emit_mat(
-			Color(0.35, 0.85, 1.0),
-			Color(0.30, 0.75, 1.0), 5.0 - j * 0.8)
+			Color(1.0, 0.80, 0.10 + float(j) * 0.03),
+			Color(1.0, 0.75, 0.05), 6.0 - float(j) * 0.8)
 		var mi := MeshInstance3D.new()
 		var tor := TorusMesh.new()
 		tor.inner_radius = 0.02 + j * 0.02

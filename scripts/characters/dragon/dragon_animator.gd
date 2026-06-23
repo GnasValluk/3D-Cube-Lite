@@ -27,7 +27,6 @@ func animate(delta: float) -> void:
 		CharacterBase.State.IDLE:           _idle(delta, t)
 		CharacterBase.State.WALK:           _walk(delta, t, 1.0)
 		CharacterBase.State.SPRINT:         _walk(delta, t, sprint_cycle_mult)
-		CharacterBase.State.CROUCH:         _crouch(delta, t)
 		CharacterBase.State.DASH:           _dash(delta, t)
 		CharacterBase.State.ATTACK:         _breathe_fire(delta, t)
 		CharacterBase.State.DEVOUR:         _devour(delta, t)
@@ -114,40 +113,6 @@ func _walk(delta: float, t: float, mult: float) -> void:
 		m().tail[i].rotation.x = lerp(m().tail[i].rotation.x, 0.04+float(i)*0.03, delta*4.0)
 	for i in range(m().spine_fins.size()):
 		m().spine_fins[i].rotation.z = sin(cyc+float(i)*0.3)*(0.05+mult*0.04)
-
-# ── CROUCH ────────────────────────────────────────────────────────────────────
-func _crouch(delta: float, t: float) -> void:
-	m().rig.position.y = lerp(m().rig.position.y, -0.18, delta*8.0)
-	m().rig.rotation.x = lerp(m().rig.rotation.x,  0.28, delta*7.0)
-	m().neck.rotation.x       = lerp(m().neck.rotation.x,   0.15, delta*6.0)
-	m().neck2.rotation.x      = lerp(m().neck2.rotation.x,  0.10, delta*6.0)
-	m().head_pivot.rotation.x = lerp(m().head_pivot.rotation.x, 0.10, delta*5.0)
-	m().jaw.rotation.x        = lerp(m().jaw.rotation.x, 0.05, delta*5.0)
-	m().wing_l.rotation.z  = lerp(m().wing_l.rotation.z,   0.72, delta*7.0)
-	m().wing_l.rotation.x  = lerp(m().wing_l.rotation.x,  -0.15, delta*6.0)
-	m().wing_l2.rotation.z = lerp(m().wing_l2.rotation.z,  1.05, delta*7.0)
-	m().wing_l2.rotation.x = lerp(m().wing_l2.rotation.x,  0.20, delta*6.0)
-	m().wing_l3.rotation.x = lerp(m().wing_l3.rotation.x,  0.30, delta*5.0)
-	m().wing_r.rotation.z  = lerp(m().wing_r.rotation.z,  -0.72, delta*7.0)
-	m().wing_r.rotation.x  = lerp(m().wing_r.rotation.x,  -0.15, delta*6.0)
-	m().wing_r2.rotation.z = lerp(m().wing_r2.rotation.z, -1.05, delta*7.0)
-	m().wing_r2.rotation.x = lerp(m().wing_r2.rotation.x,  0.20, delta*6.0)
-	m().wing_r3.rotation.x = lerp(m().wing_r3.rotation.x,  0.30, delta*5.0)
-	m().fl_thigh.rotation.x = lerp(m().fl_thigh.rotation.x,  0.55, delta*8.0)
-	m().fl_shin.rotation.x  = lerp(m().fl_shin.rotation.x,   0.80, delta*8.0)
-	m().fl_foot.rotation.x  = lerp(m().fl_foot.rotation.x,  -0.35, delta*8.0)
-	m().fr_thigh.rotation.x = lerp(m().fr_thigh.rotation.x,  0.55, delta*8.0)
-	m().fr_shin.rotation.x  = lerp(m().fr_shin.rotation.x,   0.80, delta*8.0)
-	m().fr_foot.rotation.x  = lerp(m().fr_foot.rotation.x,  -0.35, delta*8.0)
-	m().bl_thigh.rotation.x = lerp(m().bl_thigh.rotation.x,  0.65, delta*8.0)
-	m().bl_shin.rotation.x  = lerp(m().bl_shin.rotation.x,   0.90, delta*8.0)
-	m().bl_foot.rotation.x  = lerp(m().bl_foot.rotation.x,  -0.40, delta*8.0)
-	m().br_thigh.rotation.x = lerp(m().br_thigh.rotation.x,  0.65, delta*8.0)
-	m().br_shin.rotation.x  = lerp(m().br_shin.rotation.x,   0.90, delta*8.0)
-	m().br_foot.rotation.x  = lerp(m().br_foot.rotation.x,  -0.40, delta*8.0)
-	for i in range(m().tail.size()):
-		m().tail[i].rotation.x = lerp(m().tail[i].rotation.x, -0.08+float(i)*0.02, delta*5.0)
-		m().tail[i].rotation.y = sin(t*tail_wave_speed*0.25+float(i)*0.5)*(0.06+float(i)*0.03)
 
 # ── DASH ──────────────────────────────────────────────────────────────────────
 func _dash(delta: float, _t: float) -> void:
@@ -325,8 +290,9 @@ func _dead(delta: float, _t: float) -> void:
 		m().rig.position.y = lerp(m().rig.position.y, -0.18, delta*6.0)
 
 func _fly(delta: float, t: float, blend: float) -> void:
-	var flap: float = sin(t * lerp(6.0, 11.0, blend))
-	var flap_abs: float = abs(flap)
+	var dashing: bool = base.has_method("is_flight_dashing") and base.call("is_flight_dashing")
+	var flap: float = 0.0 if dashing else sin(t * lerp(6.0, 11.0, blend))
+	var flap_abs: float = 0.0 if dashing else abs(flap)
 	m().rig.position.y = lerp(m().rig.position.y, lerp(0.10, 0.22 + flap_abs * 0.08, blend), delta*8.0)
 	m().rig.rotation.x = lerp(m().rig.rotation.x, lerp(0.0, -0.12, blend), delta*8.0)
 	m().rig.rotation.z = lerp(m().rig.rotation.z, flap * 0.03 * blend, delta*6.0)

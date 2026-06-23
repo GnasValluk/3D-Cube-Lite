@@ -35,13 +35,11 @@ func _ready() -> void:
 
 	await get_tree().process_frame
 
-	for i in range(_characters.size()):
-		if i == 0:
-			_characters[i].set_active(true)
-		else:
-			_characters[i]._active = false
-			if _characters[i]._rig:
-				_characters[i]._rig.visible = false
+	# Chỉ giữ 1 character trong tree — các character khác ở ngoài tree
+	for i in range(1, _characters.size()):
+		remove_child(_characters[i])
+
+	_characters[0].set_active(true)
 
 	_aim_cameras_at(_characters[0])
 	character_switched.emit(_characters[0])
@@ -68,11 +66,17 @@ func _switch_to(idx: int) -> void:
 	var prev_ch: CharacterBase = _characters[_current]
 	var next_ch: CharacterBase = _characters[idx]
 
-	_characters[_current].set_active(false)
+	var saved_pos := prev_ch.global_position
+	var saved_rot := prev_ch.rotation
+
+	prev_ch.set_active(false)
+	remove_child(prev_ch)
+
 	_current = idx
 
-	next_ch.global_position = prev_ch.global_position
-	next_ch.rotation        = prev_ch.rotation
+	add_child(next_ch)
+	next_ch.global_position = saved_pos
+	next_ch.rotation        = saved_rot
 	next_ch.velocity        = Vector3.ZERO
 	next_ch.set_active(true)
 

@@ -9,8 +9,8 @@
 [ext_resource type="Script" uid="uid://den6kxko002et" path="res://scripts/characters/raptor/raptor_character.gd" id="8_raptor"]
 [ext_resource type="Script" uid="uid://bb6reyoc40wal" path="res://scripts/characters/dragon/dragon_character.gd" id="9_dragon"]
 [ext_resource type="Script" uid="uid://bvbthgld4avv8" path="res://scripts/characters/warrior/warrior_character.gd" id="10_warrior"]
-[ext_resource type="Script" uid="uid://bn4y6ljst3xyr" path="res://scripts/ai/bot_spawner.gd" id="11_botspawner"]
-[ext_resource type="Script" uid="uid://va0j6wkrprqo" path="res://scripts/ui/hud.gd" id="12_hud"]
+[ext_resource type="Script" uid="uid://va0j6wkrprqo" path="res://scripts/ui/hud.gd" id="11_hud"]
+[ext_resource type="Script" uid="uid://bnckt8krws5uq" path="res://scripts/characters/dummy/dummy_character.gd" id="12_dummy"]
 
 [node name="Main" type="Node3D" unique_id=1775437779]
 
@@ -38,10 +38,17 @@ script = ExtResource("9_dragon")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
 script = ExtResource("10_warrior")
 
-[node name="BotSpawner" type="Node3D" parent="." unique_id=1035406566]
-script = ExtResource("11_botspawner")
-bot_count = 6
-spawn_radius = 35.0
+[node name="Dummy1" type="CharacterBody3D" parent="CharacterManager" unique_id=999999001]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 3, -3)
+script = ExtResource("12_dummy")
+
+[node name="Dummy2" type="CharacterBody3D" parent="CharacterManager" unique_id=999999002]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 3, 2)
+script = ExtResource("12_dummy")
+
+[node name="Dummy3" type="CharacterBody3D" parent="CharacterManager" unique_id=999999003]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, -5)
+script = ExtResource("12_dummy")
 
 [node name="CameraRig" type="Node3D" parent="." unique_id=159595523]
 script = ExtResource("3_camera")
@@ -59,8 +66,8 @@ target_path = NodePath("../CharacterManager/Raptor")
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1945226191]
 script = ExtResource("5_env")
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=447527767]
-transform = Transform3D(0.707, -0.5, 0.5, 0, 0.707, 0.707, -0.707, -0.5, 0.5, 0, 30, 0)
+
+
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=1489277508]
-script = ExtResource("12_hud")
+script = ExtResource("11_hud")

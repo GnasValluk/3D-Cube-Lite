@@ -27,11 +27,15 @@ var _stomp_ground_y: float = 0.0
 func _build_character() -> void:
 	move_speed = 4.6
 	sprint_speed = 7.4
-	crouch_speed = 2.1
 	jump_height = 1.2
 	dash_speed = 15.0
 	attack_duration = BEAM_ATTACK_DURATION
 	_attack2_duration = STOMP_DURATION
+	lmb_cooldown = 0.8
+	q_cooldown   = 1.8
+	r_cooldown   = 3.0
+	character_name = "Warrior"
+	element        = Element.BANG
 
 	var col := CollisionShape3D.new()
 	var cs := CapsuleShape3D.new()
@@ -78,6 +82,7 @@ func _on_secondary_attack() -> void:
 		_state = State.IDLE
 		return
 	_attack2_duration = STOMP_DURATION
+	_attack2_timer = _attack2_duration
 	_stomping = true
 	_stomp_impacted = false
 	_stomp_ground_y = global_position.y
@@ -174,14 +179,14 @@ func _shake_cameras(intensity: float, duration: float) -> void:
 		_tp_rig.call("add_shake", intensity, duration)
 
 func _do_stomp_damage() -> void:
-	var mgr := _find_character_manager()
+	var mgr: Node = _find_character_manager()
 	if mgr == null:
 		return
 	for ch in mgr.get_children():
-		if ch is CharacterBase and ch != self and ch.is_alive:
-			var d := global_position.distance_to(ch.global_position)
+		if ch is CharacterBase and ch != self and ch.is_alive and ch._active:
+			var d: float = global_position.distance_to(ch.global_position)
 			if d <= 4.0:
-				ch.take_damage(40, self)
+				ch.take_damage(100, self)
 
 func _find_character_manager() -> Node:
 	var p := get_parent()

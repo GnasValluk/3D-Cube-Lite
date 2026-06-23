@@ -24,7 +24,6 @@ func animate(delta: float) -> void:
 		CharacterBase.State.IDLE:   _idle(delta, t)
 		CharacterBase.State.WALK:   _walk(delta, t, 1.0)
 		CharacterBase.State.SPRINT: _walk(delta, t, sprint_cycle_mult)
-		CharacterBase.State.CROUCH: _crouch(delta, t)
 		CharacterBase.State.DASH:   _dash(delta, t)
 		CharacterBase.State.ATTACK: _attack(delta, t)
 		CharacterBase.State.DEVOUR: _devour(delta, t)
@@ -74,24 +73,6 @@ func _walk(delta: float, t: float, mult: float) -> void:
 	for i in range(mesh.tail.size()):
 		mesh.tail[i].rotation.y = sin(t*tail_sway_speed+float(i)*0.55)*(0.15+float(i)*0.06)
 		mesh.tail[i].rotation.x = 0.06+float(i)*0.04
-
-# ── CROUCH ────────────────────────────────────────────────────────────────────
-func _crouch(delta: float, t: float) -> void:
-	mesh.rig.position.y = lerp(mesh.rig.position.y, -0.12, delta*10.0)
-	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x,  0.20, delta*8.0)
-	mesh.neck.rotation.x = lerp(mesh.neck.rotation.x, -0.10, delta*6.0)
-	mesh.snout_bot.rotation.x = lerp(mesh.snout_bot.rotation.x, 0.0, delta*4.0)
-	mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.30, delta*6.0)
-	mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.30, delta*6.0)
-	mesh.thigh_l.rotation.x = lerp(mesh.thigh_l.rotation.x, 0.60, delta*8.0)
-	mesh.shin_l.rotation.x  = lerp(mesh.shin_l.rotation.x,  0.80, delta*8.0)
-	mesh.foot_l.rotation.x  = lerp(mesh.foot_l.rotation.x, -0.40, delta*8.0)
-	mesh.thigh_r.rotation.x = lerp(mesh.thigh_r.rotation.x, 0.60, delta*8.0)
-	mesh.shin_r.rotation.x  = lerp(mesh.shin_r.rotation.x,  0.80, delta*8.0)
-	mesh.foot_r.rotation.x  = lerp(mesh.foot_r.rotation.x, -0.40, delta*8.0)
-	for i in range(mesh.tail.size()):
-		mesh.tail[i].rotation.x = lerp(mesh.tail[i].rotation.x, -0.10+float(i)*0.02, delta*5.0)
-		mesh.tail[i].rotation.y = sin(t*tail_sway_speed*0.3+float(i)*0.5)*(0.04+float(i)*0.02)
 
 # ── DASH ──────────────────────────────────────────────────────────────────────
 func _dash(delta: float, _t: float) -> void:
