@@ -11,7 +11,7 @@ signal party_changed()
 
 var _characters: Array[CharacterBase] = []
 var _current:    int = 0
-var party_names: Array[String] = ["Raptor", "Dragon", "Warrior", "Beyordeath"]
+var party_names: Array[String] = ["Raptor", "Dragon", "Warrior"]
 
 var _iso_rig: Node3D
 var _tp_rig:  Node3D

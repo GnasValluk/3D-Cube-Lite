@@ -1,6 +1,3 @@
-## ui/party_ui.gd
-## Màn hình đội hình — absolute positioning, không dùng container.
-
 extends Control
 class_name PartyUI
 
@@ -17,9 +14,9 @@ var _preview_name: Label
 var _preview_element: Label
 var _preview_avatar: ColorRect
 var _preview_skill_box: Control
-var _btn_deploy: Button
 
 var _btn_quick: Button
+var _btn_confirm: Button
 var _slot_indicators: Array[Label] = []
 
 var _char_info: Dictionary = {
@@ -208,26 +205,6 @@ func _build() -> void:
 	_preview_skill_box.size = Vector2(432, 140)
 	right.add_child(_preview_skill_box)
 
-	_btn_deploy = Button.new()
-	_btn_deploy.position = Vector2(100, 300)
-	_btn_deploy.size = Vector2(280, 44)
-	_btn_deploy.text = "RA SÂN"
-	_btn_deploy.add_theme_font_size_override("font_size", 17)
-	_btn_deploy.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
-	var deploy_bg := StyleBoxFlat.new()
-	deploy_bg.bg_color = Color(0.12, 0.28, 0.55, 0.85)
-	deploy_bg.corner_radius_top_left = 8; deploy_bg.corner_radius_top_right = 8
-	deploy_bg.corner_radius_bottom_left = 8; deploy_bg.corner_radius_bottom_right = 8
-	deploy_bg.border_width_left = 1; deploy_bg.border_width_right = 1
-	deploy_bg.border_width_top = 1; deploy_bg.border_width_bottom = 1
-	deploy_bg.border_color = Color(0.3, 0.5, 0.8, 0.6)
-	_btn_deploy.add_theme_stylebox_override("normal", deploy_bg)
-	_btn_deploy.add_theme_stylebox_override("hover", deploy_bg)
-	_btn_deploy.pressed.connect(_on_deploy)
-	right.add_child(_btn_deploy)
-
-	_btn_deploy.visible = false
-
 	var bottom_y: float = 486.0
 
 	_btn_quick = Button.new()
@@ -248,9 +225,28 @@ func _build() -> void:
 	_btn_quick.pressed.connect(_on_toggle_quick)
 	bg.add_child(_btn_quick)
 
+	_btn_confirm = Button.new()
+	_btn_confirm.position = Vector2(232, bottom_y)
+	_btn_confirm.size = Vector2(140, 38)
+	_btn_confirm.text = "XÁC NHẬN"
+	_btn_confirm.add_theme_font_size_override("font_size", 14)
+	_btn_confirm.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	var cf_bg := StyleBoxFlat.new()
+	cf_bg.bg_color = Color(0.15, 0.40, 0.20, 0.85)
+	cf_bg.corner_radius_top_left = 6; cf_bg.corner_radius_top_right = 6
+	cf_bg.corner_radius_bottom_left = 6; cf_bg.corner_radius_bottom_right = 6
+	cf_bg.border_width_left = 1; cf_bg.border_width_right = 1
+	cf_bg.border_width_top = 1; cf_bg.border_width_bottom = 1
+	cf_bg.border_color = Color(0.3, 0.7, 0.35, 0.6)
+	_btn_confirm.add_theme_stylebox_override("normal", cf_bg)
+	_btn_confirm.add_theme_stylebox_override("hover", cf_bg)
+	_btn_confirm.pressed.connect(_on_confirm)
+	_btn_confirm.visible = false
+	bg.add_child(_btn_confirm)
+
 	for i in range(3):
 		var lbl := Label.new()
-		lbl.position = Vector2(240 + i * 160, bottom_y + 8)
+		lbl.position = Vector2(400 + i * 160, bottom_y + 8)
 		lbl.size = Vector2(150, 22)
 		lbl.text = "V%d: —" % [i + 1]
 		lbl.add_theme_font_size_override("font_size", 13)
@@ -301,14 +297,25 @@ func _refresh_roster() -> void:
 
 		var is_active: bool = name_str == active_name
 		var is_sel: bool = name_str == _selected
+		var in_party: bool = name_str in _party_order
 		_ros_btns[i].text = ("  ▶ " if is_active else "  ") + name_str
 
 		var btn_bg: StyleBoxFlat = _ros_btns[i].get_theme_stylebox("normal")
-		if is_sel:
+		if is_sel and is_active:
+			btn_bg.border_color = Color(ec.r, ec.g, ec.b, 0.95)
+			btn_bg.border_width_left = 3; btn_bg.border_width_right = 3
+			btn_bg.border_width_top = 3; btn_bg.border_width_bottom = 3
+			btn_bg.bg_color = Color(ec.r * 0.25, ec.g * 0.25, ec.b * 0.25, 0.9)
+		elif is_sel:
 			btn_bg.border_color = Color(ec.r, ec.g, ec.b, 0.8)
 			btn_bg.border_width_left = 2; btn_bg.border_width_right = 2
 			btn_bg.border_width_top = 2; btn_bg.border_width_bottom = 2
 			btn_bg.bg_color = Color(ec.r * 0.2, ec.g * 0.2, ec.b * 0.2, 0.8)
+		elif in_party:
+			btn_bg.border_color = Color(ec.r, ec.g, ec.b, 0.55)
+			btn_bg.border_width_left = 2; btn_bg.border_width_right = 2
+			btn_bg.border_width_top = 2; btn_bg.border_width_bottom = 2
+			btn_bg.bg_color = Color(0.12, 0.12, 0.20, 0.7)
 		elif is_active:
 			btn_bg.border_color = Color(ec.r, ec.g, ec.b, 0.6)
 			btn_bg.border_width_left = 2; btn_bg.border_width_right = 2
@@ -322,19 +329,22 @@ func _refresh_roster() -> void:
 
 func _refresh_preview() -> void:
 	_clear_skills()
+
+	if _quick_deploy:
+		_preview_name.text = "CHẾ ĐỘ NHANH"
+		_preview_element.text = "Ấn XÁC NHẬN để áp dụng"
+		_preview_avatar.color = Color(0.15, 0.15, 0.2)
+		return
+
 	if _selected == "":
 		_preview_name.text = ""
 		_preview_element.text = ""
 		_preview_avatar.color = Color(0.15, 0.15, 0.2)
-		_btn_deploy.visible = false
 		return
 
-	_btn_deploy.visible = true
 	var active: CharacterBase = _mgr.get_current_character() if _mgr else null
 	var is_active: bool = active != null and active.character_name == _selected
 	_preview_name.text = _selected.to_upper() + ("  ●" if is_active else "")
-	_btn_deploy.text = "ĐANG RA SÂN" if is_active else "RA SÂN"
-	_btn_deploy.disabled = is_active
 	var ec := _get_element_color(_selected)
 	_preview_avatar.color = ec
 	_preview_element.text = "Hệ: " + _get_element_name(_selected)
@@ -357,11 +367,12 @@ func _clear_skills() -> void:
 
 func _refresh_quick_btn() -> void:
 	if _quick_deploy:
-		_btn_quick.text = "RA SÂN NHANH: BẬT"
+		_btn_quick.text = "THIẾT LẬP NHANH: BẬT"
 		_btn_quick.add_theme_color_override("font_color", Color(1, 0.85, 0.2, 0.95))
 	else:
-		_btn_quick.text = "RA SÂN NHANH: TẮT"
+		_btn_quick.text = "THIẾT LẬP NHANH: TẮT"
 		_btn_quick.add_theme_color_override("font_color", Color(0.65, 0.65, 0.85, 0.8))
+	_btn_confirm.visible = _quick_deploy
 
 func _refresh_slot_indicators() -> void:
 	var active: CharacterBase = _mgr.get_current_character() if _mgr else null
@@ -389,39 +400,52 @@ func _on_roster_click(idx: int) -> void:
 		else:
 			if _party_order.size() < 3:
 				_party_order.append(name_str)
-		_apply()
-		_refresh()
 	else:
 		_selected = name_str
-		_refresh()
 
-func _on_deploy() -> void:
-	if _selected != "" and _mgr:
-		_mgr.switch_by_name(_selected)
+	_refresh()
+
+func _show_error(msg: String) -> void:
+	var lbl := Label.new()
+	lbl.text = msg
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lbl.add_theme_font_size_override("font_size", 16)
+	lbl.add_theme_color_override("font_color", Color(1, 0.3, 0.3, 0.95))
+	lbl.position = Vector2(232, 440)
+	lbl.size = Vector2(480, 30)
+	add_child(lbl)
+	get_tree().create_timer(1.8).timeout.connect(func():
+		if is_instance_valid(lbl):
+			lbl.queue_free()
+	)
+
+func _on_confirm() -> void:
+	if _party_order.is_empty():
+		_show_error("Cần ít nhất một nhân vật")
+	else:
+		_apply()
 		hide_party()
 
 func _on_toggle_quick() -> void:
 	_quick_deploy = not _quick_deploy
+	_selected = ""
 	_refresh()
 
 func _get_element_color(name_str: String) -> Color:
 	var info: Dictionary = _char_info.get(name_str, {})
 	var elem: Variant = info.get("element", 0)
-	if elem is int and (elem as int) > 0:
-		var tmp: Variant = CharacterBase.ELEMENT_COLORS.get(elem as int)
-		if tmp is Color:
-			return tmp as Color
-	return Color(0.3, 0.3, 0.5)
+	if typeof(elem) == TYPE_INT:
+		return CharacterBase.ELEMENT_COLORS.get(elem as int, Color.WHITE)
+	return Color.WHITE
 
 func _get_element_name(name_str: String) -> String:
 	var info: Dictionary = _char_info.get(name_str, {})
-	var elem: Variant = info.get("element", 0)
-	if elem is int:
-		match elem as int:
-			CharacterBase.Element.DIEN:    return "Điện"
-			CharacterBase.Element.BANG:    return "Băng"
-			CharacterBase.Element.DECAY:   return "Decay"
-			CharacterBase.Element.HOA:     return "Hoả"
-			CharacterBase.Element.HAC_AM:  return "Hắc Ám"
-			CharacterBase.Element.ANH_SANG: return "Ánh Sáng"
-	return ""
+	var elem: Variant = info.get("element", CharacterBase.Element.DIEN)
+	match elem:
+		CharacterBase.Element.DIEN: return "Điện"
+		CharacterBase.Element.HOA: return "Hỏa"
+		CharacterBase.Element.BANG: return "Băng"
+		CharacterBase.Element.HAC_AM: return "Hắc Ám"
+		CharacterBase.Element.DECAY: return "Phân hủy"
+		CharacterBase.Element.ANH_SANG: return "Ánh Sáng"
+	return "?"
