@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://bvbthgld4avv8" path="res://scripts/characters/warrior/warrior_character.gd" id="10_warrior"]
 [ext_resource type="Script" uid="uid://va0j6wkrprqo" path="res://scripts/ui/hud.gd" id="11_hud"]
 [ext_resource type="Script" uid="uid://bnckt8krws5uq" path="res://scripts/characters/dummy/dummy_character.gd" id="12_dummy"]
+[ext_resource type="Script" uid="uid://beyordeath" path="res://scripts/characters/beyordeath/beyordeath_character.gd" id="13_beyordeath"]
 
 [node name="Main" type="Node3D" unique_id=1775437779]
 
@@ -37,6 +38,10 @@ script = ExtResource("9_dragon")
 [node name="Warrior" type="CharacterBody3D" parent="CharacterManager" unique_id=167444859]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
 script = ExtResource("10_warrior")
+
+[node name="Beyordeath" type="CharacterBody3D" parent="CharacterManager" unique_id=167444860]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("13_beyordeath")
 
 [node name="Dummy1" type="CharacterBody3D" parent="CharacterManager" unique_id=999999001]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 3, -3)

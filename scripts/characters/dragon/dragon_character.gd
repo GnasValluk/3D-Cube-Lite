@@ -39,6 +39,7 @@ func _build_character() -> void:
 	lmb_cooldown     = 1.0
 	q_cooldown       = 2.0
 	r_cooldown       = 5.0
+	max_hp = 600
 	character_name   = "Dragon"
 	element          = Element.HAC_AM
 
@@ -63,10 +64,13 @@ func _on_primary_attack() -> void:
 	_fire_spawned = false
 
 func _on_secondary_attack() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	var fire_dir: Vector3 = _aim_dir if _aim_dir.length_squared() > 0.001 else Vector3(sin(rotation.y), 0.0, cos(rotation.y)).normalized()
 	var pos: Vector3 = global_position + fire_dir * 1.0
 	var atom: DragonAtom = DragonAtom.new()
-	get_parent().add_child(atom)
+	parent.add_child(atom)
 	atom.setup(pos, fire_dir, self)
 
 func _on_show_animation() -> void:
@@ -240,7 +244,10 @@ func _spawn_fireball() -> void:
 	if _mesh and _mesh.head_pivot:
 		mouth_pos = _mesh.head_pivot.global_position + fire_dir * 0.6
 
-	get_parent().add_child(fb)
+	var parent := get_parent()
+	if parent == null:
+		return
+	parent.add_child(fb)
 	fb.setup(mouth_pos, fire_dir, self)
 
 func _animate(delta: float) -> void:

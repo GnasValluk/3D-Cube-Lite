@@ -18,14 +18,14 @@ func _ready() -> void:
 
 func _setup_slots() -> void:
 	var total_w := slot_size.x * 4 + gap * 3
-	anchor_left = 0.0
+	anchor_left = 0.5
 	anchor_top = 1.0
-	anchor_right = 0.0
+	anchor_right = 0.5
 	anchor_bottom = 1.0
-	offset_left = 20
-	offset_top = -(slot_size.y + 20)
-	offset_right = 20 + total_w
-	offset_bottom = -20
+	offset_left = -total_w * 0.5
+	offset_top = -(slot_size.y + 24)
+	offset_right = total_w * 0.5
+	offset_bottom = -24
 
 	for i in range(4):
 		var panel := Panel.new()
@@ -35,16 +35,16 @@ func _setup_slots() -> void:
 		add_child(panel)
 
 		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.06, 0.06, 0.10, 0.85)
-		bg.corner_radius_top_left = 6
-		bg.corner_radius_top_right = 6
-		bg.corner_radius_bottom_left = 6
-		bg.corner_radius_bottom_right = 6
+		bg.bg_color = Color(0.06, 0.06, 0.10, 0.82)
+		bg.corner_radius_top_left = 10
+		bg.corner_radius_top_right = 10
+		bg.corner_radius_bottom_left = 10
+		bg.corner_radius_bottom_right = 10
 		bg.border_width_left = 1
 		bg.border_width_right = 1
 		bg.border_width_top = 1
 		bg.border_width_bottom = 1
-		bg.border_color = Color(0.3, 0.3, 0.4, 0.5)
+		bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
 		panel.add_theme_stylebox_override("panel", bg)
 
 		var icon := ColorRect.new()
@@ -57,7 +57,7 @@ func _setup_slots() -> void:
 		var hotkey := Label.new()
 		hotkey.position = Vector2(6, 36)
 		hotkey.add_theme_font_size_override("font_size", 11)
-		hotkey.add_theme_color_override("font_color", Color(0.7, 0.7, 0.8, 0.8))
+		hotkey.add_theme_color_override("font_color", Color(0.65, 0.65, 0.8, 0.7))
 		hotkey.add_theme_constant_override("shadow_offset_x", 1)
 		hotkey.add_theme_constant_override("shadow_offset_y", 1)
 		hotkey.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
@@ -67,7 +67,7 @@ func _setup_slots() -> void:
 		var cd_overlay := ColorRect.new()
 		cd_overlay.size = slot_size
 		cd_overlay.position = Vector2.ZERO
-		cd_overlay.color = Color(0, 0, 0, 0.55)
+		cd_overlay.color = Color(0, 0, 0, 0.5)
 		cd_overlay.mouse_filter = MOUSE_FILTER_IGNORE
 		cd_overlay.visible = false
 		panel.add_child(cd_overlay)
@@ -77,7 +77,7 @@ func _setup_slots() -> void:
 		cd_label.size = slot_size
 		cd_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cd_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		cd_label.add_theme_font_size_override("font_size", 22)
+		cd_label.add_theme_font_size_override("font_size", 20)
 		cd_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
 		cd_label.add_theme_constant_override("shadow_offset_x", 1)
 		cd_label.add_theme_constant_override("shadow_offset_y", 1)

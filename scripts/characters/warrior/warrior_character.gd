@@ -33,7 +33,8 @@ func _build_character() -> void:
 	_attack2_duration = STOMP_DURATION
 	lmb_cooldown = 0.8
 	q_cooldown   = 1.8
-	r_cooldown   = 3.0
+	r_cooldown   = 6.0
+	max_hp = 800
 	character_name = "Warrior"
 	element        = Element.BANG
 
@@ -146,8 +147,11 @@ func has_stomp_impacted() -> bool:
 	return _stomp_impacted
 
 func _spawn_beam() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	var beam := WarriorBeam.new()
-	get_parent().add_child(beam)
+	parent.add_child(beam)
 	var beam_dir: Vector3 = _aim_dir if _aim_dir.length_squared() > 0.001 else _forward_dir()
 	var origin: Vector3 = global_position + Vector3(0.0, 1.18, 0.0) + beam_dir * 0.95
 	if _mesh:
@@ -159,8 +163,11 @@ func _spawn_beam() -> void:
 	_shake_cameras(BEAM_SHAKE_INTENSITY, BEAM_SHAKE_DURATION)
 
 func _spawn_ground_impact() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	var impact := WarriorGroundImpact.new()
-	get_parent().add_child(impact)
+	parent.add_child(impact)
 	impact.setup(global_position + Vector3(0.0, 0.02, 0.0))
 
 func _scene_root() -> Node:
@@ -182,11 +189,23 @@ func _do_stomp_damage() -> void:
 	var mgr: Node = _find_character_manager()
 	if mgr == null:
 		return
-	for ch in mgr.get_children():
-		if ch is CharacterBase and ch != self and ch.is_alive and ch._active:
-			var d: float = global_position.distance_to(ch.global_position)
+	for ch_node in mgr.get_children():
+		if ch_node is CharacterBase and ch_node != self and ch_node.is_alive and ch_node._active:
+			var d: float = global_position.distance_to(ch_node.global_position)
 			if d <= 4.0:
-				ch.take_damage(100, self)
+				ch_node.take_damage(150, self)
+	if mgr.has_method("get_party_characters"):
+		var party: Array[CharacterBase] = mgr.get_party_characters()
+		var shield_amount: int = max_hp * 20 / 100
+		for pm in party:
+			if pm.is_alive:
+				pm.add_shield(shield_amount)
+				var applied: int = shield_amount
+				get_tree().create_timer(10.0).timeout.connect(func():
+					if is_instance_valid(pm):
+						pm.shield = max(pm.shield - applied, 0)
+						pm.shield_changed.emit(pm.shield)
+					)
 
 func _find_character_manager() -> Node:
 	var p := get_parent()

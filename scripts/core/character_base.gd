@@ -8,14 +8,15 @@ class_name CharacterBase
 signal damage_taken(amount: int, attacker: Node3D)
 signal died(attacker: Node3D)
 signal hp_changed(current: int, max_hp: int)
+signal shield_changed(current: int)
 
 # ── Element system ─────────────────────────────────────────────────────────────
-enum Element { NONE, DIEN, BANG, PHONG, HOA, HAC_AM, ANH_SANG }
+enum Element { NONE, DIEN, BANG, DECAY, HOA, HAC_AM, ANH_SANG }
 const ELEMENT_COLORS: Dictionary = {
 	Element.NONE:    Color(1.0, 1.0, 1.0),
 	Element.DIEN:    Color(1.0, 0.85, 0.0),
 	Element.BANG:    Color(0.40, 0.80, 1.0),
-	Element.PHONG:   Color(0.40, 1.0, 0.40),
+	Element.DECAY:   Color(0.40, 1.0, 0.40),
 	Element.HOA:     Color(1.0, 0.40, 0.0),
 	Element.HAC_AM:  Color(1.0, 0.55, 1.0),
 	Element.ANH_SANG: Color(1.0, 0.85, 0.0)
@@ -48,6 +49,7 @@ const ELEMENT_COLORS: Dictionary = {
 var is_alive: bool = true
 var character_name: String = ""
 var element: int = Element.NONE
+var shield: int = 0
 var _melee_hit_once: bool = false
 
 # ── State machine ─────────────────────────────────────────────────────────────
@@ -102,11 +104,11 @@ var _use_tp:  bool = false
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _ready() -> void:
-	hp = max_hp
 	_jump_v    = (2.0 * jump_height) / jump_time_rise
 	_grav_rise = (2.0 * jump_height) / (jump_time_rise * jump_time_rise)
 	_grav_fall = (2.0 * jump_height) / (jump_time_fall * jump_time_fall)
 	_build_character()
+	hp = max_hp
 	await get_tree().process_frame
 	if _is_player:
 		var root: Node = get_parent().get_parent()
@@ -137,30 +139,59 @@ func _animate(_delta: float) -> void: pass
 func _on_primary_attack() -> void:    pass
 func _on_secondary_attack() -> void:  pass
 func _on_show_animation() -> void:    pass
+func _on_dash() -> void:              pass
 
 # ── HP / Damage ───────────────────────────────────────────────────────────────
 func take_damage(amount: int, attacker: Node3D = null) -> void:
 	if not is_alive or _invul_timer > 0.0:
 		return
 	var dmg := maxi(1, amount - defense)
-	hp = maxi(0, hp - dmg)
-	_invul_timer = 0.05
-	_hit_timer = 0.18
-	_hit_flash()
-	_spawn_damage_number(dmg, attacker)
-	_state = State.HIT
-	_attack_timer = 0.0
-	_attack2_timer = 0.0
-	hp_changed.emit(hp, max_hp)
-	damage_taken.emit(dmg, attacker)
+	if shield > 0:
+		var absorbed := mini(shield, dmg)
+		shield -= absorbed
+		dmg -= absorbed
+		shield_changed.emit(shield)
+	if dmg > 0:
+		hp = maxi(0, hp - dmg)
+		_invul_timer = 0.05
+		_hit_timer = 0.18
+		_hit_flash()
+		_spawn_damage_number(dmg, attacker)
+		_state = State.HIT
+		_attack_timer = 0.0
+		_attack2_timer = 0.0
+		hp_changed.emit(hp, max_hp)
+		damage_taken.emit(dmg, attacker)
 	if hp <= 0:
 		_die(attacker)
+
+func add_shield(amount: int) -> void:
+	shield += amount
+	shield_changed.emit(shield)
 
 func heal(amount: int) -> void:
 	if not is_alive:
 		return
 	hp = mini(max_hp, hp + amount)
 	hp_changed.emit(hp, max_hp)
+
+func apply_dot(damage_per_tick: int, tick_interval: float, duration: float, attacker: Node3D = null) -> void:
+	if not is_alive:
+		return
+	var dot := Node.new()
+	var timer := Timer.new()
+	timer.wait_time = tick_interval
+	timer.autostart = true
+	timer.timeout.connect(func():
+		if is_alive:
+			take_damage(damage_per_tick, attacker)
+	)
+	dot.add_child(timer)
+	add_child(dot)
+	get_tree().create_timer(duration).timeout.connect(func():
+		if is_instance_valid(dot):
+			dot.queue_free()
+	)
 
 func _die(_attacker: Node3D = null) -> void:
 	is_alive = false
@@ -418,6 +449,7 @@ func _physics_process(delta: float) -> void:
 		_dash_cd     = dash_cooldown
 		_state       = State.DASH
 		_sy_tgt      = 1.15
+		_on_dash()
 		move_and_slide()
 		_animate(delta)
 		return

@@ -132,13 +132,16 @@ func _find_mgr() -> Node:
 	return null
 
 func _spawn_zone() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	_hit = true
 	var zone: DragonAtomZone = DragonAtomZone.new()
 	zone.damage_per_tick = zone_damage
 	zone.tick_interval   = zone_interval
 	zone.duration        = zone_duration
 	zone.radius          = zone_radius
-	get_parent().add_child(zone)
+	parent.add_child(zone)
 	zone.setup(global_position, _owner)
 	var gp: Vector3 = Vector3(global_position.x, 0.0, global_position.z)
 
@@ -150,7 +153,7 @@ func _spawn_zone() -> void:
 	ss.radius = 0.5; ss.height = 1.0
 	sph.mesh = ss; sph.material_override = mat_exp
 	sph.scale = Vector3.ZERO
-	get_parent().add_child(sph)
+	parent.add_child(sph)
 	sph.global_position = gp
 
 	var tween: Tween = create_tween()
@@ -164,7 +167,7 @@ func _spawn_zone() -> void:
 	flash.light_color = Color(0.80, 0.05, 0.55)
 	flash.light_energy = 20.0
 	flash.omni_range = 20.0
-	get_parent().add_child(flash)
+	parent.add_child(flash)
 	flash.global_position = gp
 	var ft: SceneTreeTimer = get_tree().create_timer(0.15)
 	ft.timeout.connect(_kill_node.bind(flash))

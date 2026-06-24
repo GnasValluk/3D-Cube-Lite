@@ -111,6 +111,9 @@ func _process(delta: float) -> void:
 		_explode()
 
 func _spawn_trail() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	var mat := MeshBuilder.emit_mat(
 		Color(0.60, 0.05, 0.80, 0.6),
 		Color(0.80, 0.0, 0.60), 3.0)
@@ -120,7 +123,7 @@ func _spawn_trail() -> void:
 	sph.height = 0.12
 	mi.mesh = sph
 	mi.material_override = mat
-	get_parent().add_child(mi)
+	parent.add_child(mi)
 	mi.global_position = global_position - _dir * 0.12
 
 	var tween := create_tween()
@@ -163,13 +166,16 @@ func _deal_aoe_damage() -> void:
 				ch.take_damage(aoe_damage, _owner)
 
 func _explode() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	_deal_aoe_damage()
 	for i in range(6):
 		var flash := OmniLight3D.new()
 		flash.light_color = Color(0.70 + i * 0.04, 0.05, 0.80 + i * 0.03)
 		flash.light_energy = 10.0 + i * 4.0
 		flash.omni_range = 5.0 + i * 1.5
-		get_parent().add_child(flash)
+		parent.add_child(flash)
 		flash.global_position = global_position
 		get_tree().create_timer(0.03 * i).timeout.connect(
 			func(): if is_instance_valid(flash): flash.queue_free())

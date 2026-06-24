@@ -8,7 +8,7 @@ class_name WarriorBeam
 @export var lifetime:     float = 0.35
 @export var beam_length:  float = 5.8
 @export var beam_width:   float = 0.18
-@export var hit_damage:  int   = 90
+@export var hit_damage:  int   = 100
 @export var hit_radius:   float = 0.8
 
 var _dir: Vector3 = Vector3.FORWARD

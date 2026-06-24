@@ -132,13 +132,15 @@ func _update_label() -> void:
 	_label.text = n + hint
 
 func _spawn_swap_effect(pos: Vector3) -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	var light := OmniLight3D.new()
 	light.light_color   = Color(0.6, 1.0, 0.8) if _current_idx == 0 \
 		else Color(0.9, 0.3, 1.0)
 	light.light_energy  = 6.0
 	light.omni_range    = 4.0
-	# Thêm vào scene TRƯỚC rồi mới set global_position
-	get_parent().add_child(light)
+	parent.add_child(light)
 	light.global_position = pos + Vector3(0, 1, 0)
 	var timer := get_tree().create_timer(0.25)
 	timer.timeout.connect(func(): light.queue_free())

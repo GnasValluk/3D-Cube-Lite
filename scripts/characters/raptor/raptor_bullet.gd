@@ -143,6 +143,9 @@ func _find_manager() -> Node:
 	return null
 
 func _spawn_trail() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	var p := Node3D.new()
 	var mat := MeshBuilder.emit_mat(
 		Color(1.0, 0.80, 0.15),
@@ -154,7 +157,7 @@ func _spawn_trail() -> void:
 	mi.mesh = sph
 	mi.material_override = mat
 	p.add_child(mi)
-	get_parent().add_child(p)
+	parent.add_child(p)
 	p.global_position = global_position - _dir * 0.08
 	p.rotation = rotation
 
@@ -166,12 +169,15 @@ func _spawn_trail() -> void:
 	tween.tween_callback(func(): if is_instance_valid(p): p.queue_free())
 
 func _explode() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
 	for i in range(4):
 		var flash := OmniLight3D.new()
 		flash.light_color  = Color(1.0, 0.80, 0.15)
 		flash.light_energy = 6.0 + i * 3.0
 		flash.omni_range   = 3.5 + i * 1.0
-		get_parent().add_child(flash)
+		parent.add_child(flash)
 		flash.global_position = global_position
 		get_tree().create_timer(0.04 * i).timeout.connect(
 			func(): if is_instance_valid(flash): flash.queue_free())
