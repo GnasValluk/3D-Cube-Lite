@@ -37,10 +37,10 @@ func build(root: CharacterBody3D) -> void:
 	_build_tail()
 
 func _make_materials() -> void:
-	_mat_body  = MeshBuilder.emit_mat(Color(0.85,0.72,0.12), Color(0.95,0.80,0.10), 1.8)
-	_mat_dark  = MeshBuilder.emit_mat(Color(0.30,0.22,0.04), Color(0.35,0.25,0.04), 0.8)
-	_mat_light = MeshBuilder.emit_mat(Color(0.95,0.95,0.98), Color(1.0,1.0,1.0), 3.0)
-	_mat_eye   = MeshBuilder.emit_mat(Color(1.00,0.98,0.60), Color(1.00,0.95,0.40), 4.0)
+	_mat_body  = MeshBuilder.emit_mat(Color(0.85,0.72,0.12), Color(0,0,0), 0.0)
+	_mat_dark  = MeshBuilder.emit_mat(Color(0.30,0.22,0.04), Color(0,0,0), 0.0)
+	_mat_light = MeshBuilder.emit_mat(Color(0.95,0.95,0.98), Color(0,0,0), 0.0)
+	_mat_eye   = MeshBuilder.emit_mat(Color(1.00,0.98,0.60), Color(0,0,0), 0.0)
 
 # ── Torso ─────────────────────────────────────────────────────────────────────
 func _build_torso() -> void:

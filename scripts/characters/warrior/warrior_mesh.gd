@@ -51,12 +51,12 @@ func build(root: CharacterBody3D) -> void:
 	_build_cape()
 
 func _make_materials() -> void:
-	_m_armor = MeshBuilder.emit_mat(Color(0.10, 0.12, 0.20), Color(0.18, 0.26, 0.44), 1.2)
-	_m_trim = MeshBuilder.emit_mat(Color(0.68, 0.72, 0.90), Color(0.55, 0.78, 1.00), 2.0)
-	_m_glow = MeshBuilder.emit_mat(Color(0.15, 0.80, 1.00), Color(0.08, 0.92, 1.00), 4.0)
-	_m_cloth = MeshBuilder.emit_mat(Color(0.38, 0.04, 0.08), Color(0.75, 0.06, 0.16), 1.6)
-	_m_dark = MeshBuilder.emit_mat(Color(0.04, 0.04, 0.08), Color(0.08, 0.08, 0.16), 0.8)
-	_m_edge = MeshBuilder.emit_mat(Color(0.20, 0.95, 1.00), Color(0.12, 1.00, 1.00), 5.0)
+	_m_armor = MeshBuilder.emit_mat(Color(0.10, 0.12, 0.20), Color(0, 0, 0), 0.0)
+	_m_trim = MeshBuilder.emit_mat(Color(0.68, 0.72, 0.90), Color(0, 0, 0), 0.0)
+	_m_glow = MeshBuilder.emit_mat(Color(0.15, 0.80, 1.00), Color(0, 0, 0), 0.0)
+	_m_cloth = MeshBuilder.emit_mat(Color(0.38, 0.04, 0.08), Color(0, 0, 0), 0.0)
+	_m_dark = MeshBuilder.emit_mat(Color(0.04, 0.04, 0.08), Color(0, 0, 0), 0.0)
+	_m_edge = MeshBuilder.emit_mat(Color(0.20, 0.95, 1.00), Color(0, 0, 0), 0.0)
 
 func _build_torso() -> void:
 	spine = MeshBuilder.pivot(rig, Vector3(0, 0.82, 0.02))

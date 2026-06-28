@@ -28,18 +28,26 @@ var _flight_landing_start_y: float = 0.0
 var _flight_dash_timer: float = 0.0
 var _flight_cd: float = 0.0
 @export var flight_cooldown: float = 5.0
+var _q_stacks: int = 2
+var _q_max_stacks: int = 2
+var _q_regen_timer: float = 0.0
 
 func _build_character() -> void:
-	move_speed       = 4.8
+	move_speed       = 3.6
 	sprint_speed     = 8.5
 	jump_height      = 1.8
 	dash_speed       = 16.0
 	attack_duration  = 0.65
 	_attack2_duration = 0.80
+	attack_power     = 140
+	defense          = 30
 	lmb_cooldown     = 1.0
-	q_cooldown       = 2.0
+	q_cooldown       = 5.0
 	r_cooldown       = 5.0
 	max_hp = 600
+	mana_cost_lmb = 0
+	mana_cost_q   = 0
+	mana_cost_r   = 100
 	character_name   = "Dragon"
 	element          = Element.HAC_AM
 
@@ -82,6 +90,8 @@ func _on_show_animation() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not _active:
 		return
+	if _is_building_placing():
+		return
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo and k.keycode == KEY_SPACE:
@@ -101,11 +111,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	super._unhandled_key_input(event)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _is_building_placing():
+		return
 	if _flying:
 		if event is InputEventMouseButton:
 			var mb := event as InputEventMouseButton
 			if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 				if _attack_timer <= 0.0 and _attack2_timer <= 0.0:
+					if not try_skill(mana_cost_lmb):
+						return
 					_aim_dir = _calc_aim_dir()
 					var fwd := global_transform.basis.z
 					if _aim_dir.dot(fwd) < 0.99:
@@ -122,7 +136,16 @@ func _physics_process(delta: float) -> void:
 	if _flying:
 		_update_flight(delta)
 	else:
+		_regen_q_stacks(delta * cooldown_rate)
+		if _q_stacks > 0:
+			_q_cd = 0.0
 		super._physics_process(delta)
+		if _state == State.DASH and _q_cd > 0.0:
+			_q_stacks -= 1
+			if _q_stacks > 0:
+				_q_cd = 0.0
+			else:
+				_q_regen_timer = q_cooldown
 		if is_on_floor():
 			_flight_ground_y = global_position.y
 
@@ -175,6 +198,7 @@ func _update_flight(delta: float) -> void:
 	_attack_timer = max(_attack_timer - delta, 0.0)
 	_attack2_timer = max(_attack2_timer - delta, 0.0)
 	_flight_dash_timer = max(_flight_dash_timer - delta, 0.0)
+	_regen_q_stacks(cd_delta)
 	if _attack_timer <= 0.0 and _state == State.ATTACK:
 		_state = State.JUMP
 
@@ -182,12 +206,17 @@ func _update_flight(delta: float) -> void:
 	var spd: float = move_speed * 0.9
 
 	# Dash during flight
-	var want_dash: bool = Input.is_key_pressed(KEY_Q) and _q_cd <= 0.0 and _attack_timer <= 0.0
+	var want_dash: bool = Input.is_key_pressed(KEY_Q) and _q_stacks > 0 and _attack_timer <= 0.0
 	if want_dash:
 		var ddir: Vector3 = dir if dir.length_squared() > 0.001 else -global_transform.basis.z
 		ddir.y = 0.0
 		velocity = ddir.normalized() * dash_speed * 1.2
-		_q_cd = q_cooldown
+		_q_stacks -= 1
+		if _q_stacks > 0:
+			_q_cd = 0.0
+		else:
+			_q_regen_timer = q_cooldown
+			_q_cd = q_cooldown
 		_dash_cd = dash_cooldown
 		_flight_dash_timer = 0.25
 	elif dir.length_squared() > 0.001:
@@ -233,6 +262,20 @@ func _update_flight(delta: float) -> void:
 		_animate(delta)
 		return
 	_animate(delta)
+
+func _regen_q_stacks(cd_delta: float) -> void:
+	if _q_stacks >= _q_max_stacks:
+		return
+	_q_regen_timer -= cd_delta
+	if _q_regen_timer <= 0.0:
+		_q_stacks += 1
+		_q_regen_timer = q_cooldown
+		if _q_stacks > 0:
+			_q_cd = 0.0
+
+func _on_offline_tick(_delta: float, cd_delta: float) -> void:
+	_flight_cd = max(_flight_cd - _delta, 0.0)
+	_regen_q_stacks(cd_delta)
 
 func _spawn_fireball() -> void:
 	var fb := DragonFireball.new()

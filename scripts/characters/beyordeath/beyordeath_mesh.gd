@@ -48,12 +48,12 @@ func _make_materials() -> void:
 	var dark  := Color(0.12, 0.14, 0.16)
 	var metal := Color(0.28, 0.30, 0.34)
 	_mat_white = MeshBuilder.emit_mat(white, Color(0, 0, 0), 0.0)
-	_mat_red   = MeshBuilder.emit_mat(red,   Color(0.9, 0.1, 0.1), 0.5)
-	_mat_blue  = MeshBuilder.emit_mat(blue,  Color(0.1, 0.3, 0.8), 0.5)
+	_mat_red   = MeshBuilder.emit_mat(red,   Color(0, 0, 0), 0.0)
+	_mat_blue  = MeshBuilder.emit_mat(blue,  Color(0, 0, 0), 0.0)
 	_mat_dark  = MeshBuilder.emit_mat(dark,  Color(0, 0, 0), 0.0)
 	_mat_metal = MeshBuilder.emit_mat(metal, Color(0, 0, 0), 0.0)
-	_mat_glow  = MeshBuilder.emit_mat(Color(0.25, 1.0, 0.35), Color(0.3, 1.0, 0.45), 6.0)
-	_mat_visor = MeshBuilder.emit_mat(Color(0.15, 0.60, 0.90, 0.7), Color(0.2, 0.7, 1.0), 3.0)
+	_mat_glow  = MeshBuilder.emit_mat(Color(0.25, 1.0, 0.35), Color(0, 0, 0), 0.0)
+	_mat_visor = MeshBuilder.emit_mat(Color(0.15, 0.60, 0.90, 0.7), Color(0, 0, 0), 0.0)
 
 func _box(p: Node3D, pos: Vector3, sz: Vector3, mat: StandardMaterial3D) -> MeshInstance3D:
 	return MeshBuilder.box(p, pos, sz, mat)

@@ -6,10 +6,10 @@ class_name DragonAtom
 
 @export var speed:     float = 18.0
 @export var lifetime:  float = 2.0
-@export var zone_duration: float = 3.0
+@export var zone_duration: float = 10.0
 @export var zone_radius:   float = 5.0
 @export var zone_damage:   int   = 25
-@export var zone_interval: float = 0.5
+@export var zone_interval: float = 1.0
 
 var _dir:  Vector3 = Vector3.FORWARD
 var _age:  float = 0.0

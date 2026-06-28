@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://csxnhmx33erb" path="res://scripts/world/world_generator.gd" id="2_worldgen"]
 [ext_resource type="Script" uid="uid://cmb6cfumjgen4" path="res://scripts/camera/iso_camera.gd" id="3_camera"]
 [ext_resource type="Script" uid="uid://cgk83lsgccw4s" path="res://scripts/player/neon_pulse.gd" id="4_pulse"]
-[ext_resource type="Script" uid="uid://cellwybu4sab6" path="res://scripts/world/neon_environment.gd" id="5_env"]
+[ext_resource type="Script" uid="uid://cellwybu4sab6" path="res://scripts/world/twilight_environment.gd" id="5_env"]
 [ext_resource type="Script" uid="uid://ex08qqw2wr71" path="res://scripts/camera/third_person_camera.gd" id="6_tpcamera"]
 [ext_resource type="Script" uid="uid://lovun7bimwf2" path="res://scripts/core/character_manager.gd" id="7_manager"]
 [ext_resource type="Script" uid="uid://den6kxko002et" path="res://scripts/characters/raptor/raptor_character.gd" id="8_raptor"]

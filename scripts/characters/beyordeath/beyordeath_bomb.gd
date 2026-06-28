@@ -70,7 +70,8 @@ func _explode_aoe() -> void:
 			var offset: Vector3 = ch.global_position - global_position
 			offset.y = 0.0
 			if offset.length() <= aoe_radius:
-				ch.take_damage(hit_damage, _owner)
+				var dmg: int = _owner.calc_skill_damage(hit_damage) if _owner and _owner.has_method("calc_skill_damage") else hit_damage
+				ch.take_damage(dmg, _owner)
 	var parent := get_parent()
 	if parent == null:
 		return

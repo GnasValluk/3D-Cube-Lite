@@ -123,7 +123,8 @@ func _hit_target(ch: CharacterBase) -> void:
 	if parent == null:
 		return
 	if is_instance_valid(ch):
-		ch.take_damage(100, _owner)
+		var dmg: int = _owner.calc_skill_damage(100) if _owner and _owner.has_method("calc_skill_damage") else 100
+		ch.take_damage(dmg, _owner)
 	_spawn_vfx(ch.global_position if is_instance_valid(ch) else global_position)
 	queue_free()
 

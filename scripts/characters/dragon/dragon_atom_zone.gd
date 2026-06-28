@@ -5,8 +5,8 @@ extends Node3D
 class_name DragonAtomZone
 
 @export var damage_per_tick: int   = 25
-@export var tick_interval:   float = 0.5
-@export var duration:        float = 3.0
+@export var tick_interval:   float = 1.0
+@export var duration:        float = 10.0
 @export var radius:          float = 5.0
 
 var _age:  float = 0.0
@@ -193,4 +193,5 @@ func _deal_damage() -> void:
 			var off: Vector3 = global_position - ch.global_position
 			off.y = 0.0
 			if off.length() < radius:
-				ch.take_damage(damage_per_tick, _owner)
+				var dmg: int = _owner.calc_skill_damage(damage_per_tick) if _owner and _owner.has_method("calc_skill_damage") else damage_per_tick
+				ch.take_damage(dmg, _owner)

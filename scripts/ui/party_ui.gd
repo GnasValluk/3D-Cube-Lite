@@ -8,12 +8,14 @@ var _selected: String = ""
 var _quick_deploy: bool = false
 
 var _ros_btns: Array[Button] = []
-var _ros_icons: Array[ColorRect] = []
+var _ros_icons: Array[TextureRect] = []
 
 var _preview_name: Label
 var _preview_element: Label
-var _preview_avatar: ColorRect
-var _preview_skill_box: Control
+var _preview_level: Label
+var _preview_avatar: TextureRect
+var _stat_labels: Dictionary = {}
+var _skill_labels: Array[Label] = []
 
 var _btn_quick: Button
 var _btn_confirm: Button
@@ -26,27 +28,30 @@ var _char_info: Dictionary = {
 	"Beyordeath": { "element": CharacterBase.Element.DECAY },
 }
 
-var _skill_texts: Dictionary = {
+var _skill_data: Dictionary = {
 	"Raptor": [
-		"Tả: Bắn 3 phát liên tiếp (Điện)",
-		"Q: Lướt nhanh về phía trước",
-		"R: Tia sét + Tăng 100% tốc độ 3s",
+		{ "name": "LMB", "desc": "Bắn 3 phát liên tiếp", "mana": 0, "cd": 0.6 },
+		{ "name": "Q", "desc": "Lướt điện — xuyên 3 lần", "mana": 50, "cd": 1.5 },
+		{ "name": "R", "desc": "Tia sét 75 st + Buff 100% tốc 3s", "mana": 50, "cd": 5.0 },
+		{ "name": "SPACE", "desc": "Lướt nhanh / Double-tap: —" },
 	],
 	"Dragon": [
-		"Tả: Cầu lửa nổ vùng",
-		"Q: Lướt khi bay",
-		"R: Quả cầu hạt nhân hút kẻ địch",
+		{ "name": "LMB", "desc": "Cầu lửa nổ vùng", "mana": 0, "cd": 1.0 },
+		{ "name": "Q", "desc": "Lao vụt (2 stack, 5s hồi/stack)", "mana": 0, "cd": 5.0 },
+		{ "name": "R", "desc": "Quả cầu hạt nhân — hút + 25st/tick", "mana": 100, "cd": 5.0 },
+		{ "name": "SPACE", "desc": "Double-tap: Bay 10s" },
 	],
 	"Warrior": [
-		"Tả: Chém tia băng",
-		"Q: Lao nhanh về phía trước",
-		"R: Nhảy đập gây choáng vùng",
+		{ "name": "LMB", "desc": "Chém tia băng", "mana": 0, "cd": 2.0 },
+		{ "name": "Q", "desc": "Dậm băng 250 st vùng 15m + Hàn Băng buff", "mana": 130, "cd": 25.0 },
+		{ "name": "R", "desc": "Nhảy đập 150 st + Khiên đỡ 20%HP toàn đội", "mana": 50, "cd": 10.0 },
+		{ "name": "SPACE", "desc": "Lướt nhanh / Double-tap: —" },
 	],
 	"Beyordeath": [
-		"Tả: Bắn 6 phát liên tiếp (Decay)",
-		"Q: Lao nhanh về phía trước",
-		"R: 2 hỏa tiễn tự tìm mục tiêu nổ vùng",
-		"Space: Biến hình chiến cơ 10s",
+		{ "name": "LMB", "desc": "Bắn 6 phát (17 st khi bay)", "mana": 0, "cd": 1.0 },
+		{ "name": "Q", "desc": "Lướt (đất) / Thả bom liên tục (bay: 75 MP)", "mana": 0, "cd": 3.0 },
+		{ "name": "R", "desc": "2 hỏa tiễn tự tìm — 100 st + AOE + DoT", "mana": 130, "cd": 7.0 },
+		{ "name": "SPACE", "desc": "Nhảy / Double-tap: Biến chiến cơ 10s" },
 	],
 }
 
@@ -58,7 +63,7 @@ func _ready() -> void:
 func _build() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var W: float = 960.0
-	var H: float = 580.0
+	var H: float = 600.0
 	var ox: float = (vp.x - W) * 0.5
 	var oy: float = (vp.y - H) * 0.5
 
@@ -101,7 +106,7 @@ func _build() -> void:
 
 	var left := Panel.new()
 	left.position = Vector2(16, 54)
-	left.size = Vector2(200, 420)
+	left.size = Vector2(200, 440)
 	var left_bg := StyleBoxFlat.new()
 	left_bg.bg_color = Color(0.06, 0.06, 0.10, 0.92)
 	left_bg.corner_radius_top_left = 10; left_bg.corner_radius_top_right = 10
@@ -142,75 +147,24 @@ func _build() -> void:
 		btn.pressed.connect(_on_roster_click.bind(i))
 		left.add_child(btn)
 
-		var icon := ColorRect.new()
+		var icon := TextureRect.new()
 		icon.position = Vector2(10, 9)
 		icon.size = Vector2(42, 42)
-		icon.color = Color(0.2, 0.2, 0.3)
+		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		btn.add_child(icon)
 
 		_ros_btns.append(btn)
 		_ros_icons.append(icon)
 
-	var right := Panel.new()
-	right.position = Vector2(232, 54)
-	right.size = Vector2(480, 420)
-	var right_bg := StyleBoxFlat.new()
-	right_bg.bg_color = Color(0.06, 0.06, 0.10, 0.92)
-	right_bg.corner_radius_top_left = 10; right_bg.corner_radius_top_right = 10
-	right_bg.corner_radius_bottom_left = 10; right_bg.corner_radius_bottom_right = 10
-	right_bg.border_width_left = 1; right_bg.border_width_right = 1
-	right_bg.border_width_top = 1; right_bg.border_width_bottom = 1
-	right_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
-	right.add_theme_stylebox_override("panel", right_bg)
-	bg.add_child(right)
+	_right_build(bg)
 
-	_preview_avatar = ColorRect.new()
-	_preview_avatar.position = Vector2(24, 18)
-	_preview_avatar.size = Vector2(90, 90)
-	_preview_avatar.color = Color(0.2, 0.2, 0.3)
-	var avatar_border := StyleBoxFlat.new()
-	avatar_border.corner_radius_top_left = 8; avatar_border.corner_radius_top_right = 8
-	avatar_border.corner_radius_bottom_left = 8; avatar_border.corner_radius_bottom_right = 8
-	_preview_avatar.add_theme_stylebox_override("panel", avatar_border)
-	right.add_child(_preview_avatar)
-
-	_preview_name = Label.new()
-	_preview_name.position = Vector2(128, 22)
-	_preview_name.size = Vector2(240, 30)
-	_preview_name.add_theme_font_size_override("font_size", 22)
-	_preview_name.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	right.add_child(_preview_name)
-
-	_preview_element = Label.new()
-	_preview_element.position = Vector2(128, 54)
-	_preview_element.size = Vector2(240, 18)
-	_preview_element.add_theme_font_size_override("font_size", 13)
-	right.add_child(_preview_element)
-
-	var sk_lbl := Label.new()
-	sk_lbl.text = "KỸ NĂNG"
-	sk_lbl.position = Vector2(24, 118)
-	sk_lbl.add_theme_font_size_override("font_size", 12)
-	sk_lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.65, 0.7))
-	right.add_child(sk_lbl)
-
-	var sk_div := ColorRect.new()
-	sk_div.position = Vector2(24, 112)
-	sk_div.size = Vector2(432, 1)
-	sk_div.color = Color(0.3, 0.3, 0.4, 0.3)
-	right.add_child(sk_div)
-
-	_preview_skill_box = Control.new()
-	_preview_skill_box.position = Vector2(24, 134)
-	_preview_skill_box.size = Vector2(432, 140)
-	right.add_child(_preview_skill_box)
-
-	var bottom_y: float = 486.0
+	var bottom_y: float = 500.0
 
 	_btn_quick = Button.new()
 	_btn_quick.position = Vector2(16, bottom_y)
 	_btn_quick.size = Vector2(200, 38)
-	_btn_quick.text = "RA SÂN NHANH: TẮT"
+	_btn_quick.text = "THIẾT LẬP NHANH: TẮT"
 	_btn_quick.add_theme_font_size_override("font_size", 12)
 	_btn_quick.add_theme_color_override("font_color", Color(0.65, 0.65, 0.85, 0.8))
 	var qb_bg := StyleBoxFlat.new()
@@ -263,6 +217,99 @@ func _build() -> void:
 	hint.size = Vector2(W, 20)
 	bg.add_child(hint)
 
+func _right_build(bg: Panel) -> void:
+	var right := Panel.new()
+	right.position = Vector2(232, 54)
+	right.size = Vector2(480, 440)
+	var right_bg := StyleBoxFlat.new()
+	right_bg.bg_color = Color(0.06, 0.06, 0.10, 0.92)
+	right_bg.corner_radius_top_left = 10; right_bg.corner_radius_top_right = 10
+	right_bg.corner_radius_bottom_left = 10; right_bg.corner_radius_bottom_right = 10
+	right_bg.border_width_left = 1; right_bg.border_width_right = 1
+	right_bg.border_width_top = 1; right_bg.border_width_bottom = 1
+	right_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
+	right.add_theme_stylebox_override("panel", right_bg)
+	bg.add_child(right)
+
+	_preview_avatar = TextureRect.new()
+	_preview_avatar.position = Vector2(20, 16)
+	_preview_avatar.size = Vector2(80, 80)
+	_preview_avatar.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	_preview_avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	right.add_child(_preview_avatar)
+
+	_preview_name = Label.new()
+	_preview_name.position = Vector2(114, 20)
+	_preview_name.size = Vector2(200, 30)
+	_preview_name.add_theme_font_size_override("font_size", 22)
+	_preview_name.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	right.add_child(_preview_name)
+
+	_preview_element = Label.new()
+	_preview_element.position = Vector2(114, 50)
+	_preview_element.size = Vector2(200, 18)
+	_preview_element.add_theme_font_size_override("font_size", 13)
+	right.add_child(_preview_element)
+
+	_preview_level = Label.new()
+	_preview_level.name = "PreviewLevel"
+	_preview_level.position = Vector2(114, 68)
+	_preview_level.size = Vector2(200, 18)
+	_preview_level.add_theme_font_size_override("font_size", 11)
+	_preview_level.add_theme_color_override("font_color", Color(0.6, 0.9, 0.6, 0.8))
+	right.add_child(_preview_level)
+
+	var stat_keys: Array[String] = ["hp", "mp", "atk", "def", "spd", "crit", "crit_dmg", "mp_regen", "mp_refund"]
+	var stat_pos: Array[Vector2] = [
+		Vector2(114, 90), Vector2(260, 90),
+		Vector2(114, 110), Vector2(260, 110),
+		Vector2(114, 130), Vector2(260, 130),
+		Vector2(114, 150), Vector2(260, 150),
+		Vector2(114, 170),
+	]
+	for i in range(stat_keys.size()):
+		var lbl := Label.new()
+		lbl.position = stat_pos[i]
+		lbl.size = Vector2(130, 18)
+		lbl.add_theme_font_size_override("font_size", 12)
+		lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.85, 0.8))
+		right.add_child(lbl)
+		_stat_labels[stat_keys[i]] = lbl
+
+	var div1 := ColorRect.new()
+	div1.position = Vector2(20, 186)
+	div1.size = Vector2(440, 1)
+	div1.color = Color(0.3, 0.3, 0.4, 0.3)
+	right.add_child(div1)
+
+	var sk_header := Label.new()
+	sk_header.text = "KỸ NĂNG"
+	sk_header.position = Vector2(20, 192)
+	sk_header.add_theme_font_size_override("font_size", 12)
+	sk_header.add_theme_color_override("font_color", Color(0.45, 0.45, 0.65, 0.7))
+	right.add_child(sk_header)
+
+	for i in range(4):
+		var lbl := Label.new()
+		lbl.position = Vector2(20, 214 + i * 56)
+		lbl.size = Vector2(440, 50)
+		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lbl.add_theme_font_size_override("font_size", 12)
+		lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.9, 0.85))
+		lbl.add_theme_constant_override("shadow_offset_x", 1)
+		lbl.add_theme_constant_override("shadow_offset_y", 1)
+		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+		right.add_child(lbl)
+		_skill_labels.append(lbl)
+
+func _find_char(name_str: String) -> CharacterBase:
+	if _mgr == null:
+		return null
+	for ch in _mgr.get_children():
+		if ch is CharacterBase and ch.character_name == name_str:
+			return ch as CharacterBase
+	return null
+
 func show_party(mgr: CharacterManager) -> void:
 	_mgr = mgr
 	_party_order = mgr.party_names.duplicate()
@@ -293,7 +340,9 @@ func _refresh_roster() -> void:
 	for i in range(_all_chars.size()):
 		var name_str: String = _all_chars[i]
 		var ec: Color = _get_element_color(name_str)
-		_ros_icons[i].color = ec
+		var tex_path: String = "res://assets/icon_character/" + name_str.to_lower() + ".png"
+		_ros_icons[i].texture = load(tex_path) as Texture2D
+		_ros_icons[i].modulate = Color(1, 1, 1, 1)
 
 		var is_active: bool = name_str == active_name
 		var is_sel: bool = name_str == _selected
@@ -328,42 +377,76 @@ func _refresh_roster() -> void:
 			btn_bg.bg_color = Color(0.1, 0.1, 0.18, 0.85)
 
 func _refresh_preview() -> void:
-	_clear_skills()
-
 	if _quick_deploy:
 		_preview_name.text = "CHẾ ĐỘ NHANH"
 		_preview_element.text = "Ấn XÁC NHẬN để áp dụng"
-		_preview_avatar.color = Color(0.15, 0.15, 0.2)
+		_preview_avatar.texture = null
+		_preview_avatar.modulate = Color(0.15, 0.15, 0.2, 1)
+		_preview_level.text = ""
+		for key in _stat_labels:
+			_stat_labels[key].text = ""
+		for lbl in _skill_labels:
+			lbl.text = ""
 		return
 
 	if _selected == "":
 		_preview_name.text = ""
 		_preview_element.text = ""
-		_preview_avatar.color = Color(0.15, 0.15, 0.2)
+		_preview_level.text = ""
+		_preview_avatar.texture = null
+		_preview_avatar.modulate = Color(0.15, 0.15, 0.2, 1)
+		for key in _stat_labels:
+			_stat_labels[key].text = ""
+		for lbl in _skill_labels:
+			lbl.text = ""
 		return
 
 	var active: CharacterBase = _mgr.get_current_character() if _mgr else null
 	var is_active: bool = active != null and active.character_name == _selected
-	_preview_name.text = _selected.to_upper() + ("  ●" if is_active else "")
 	var ec := _get_element_color(_selected)
-	_preview_avatar.color = ec
+
+	_preview_name.text = _selected.to_upper() + ("  ●" if is_active else "")
+	var tex_path: String = "res://assets/icon_character/" + _selected.to_lower() + ".png"
+	_preview_avatar.texture = load(tex_path) as Texture2D
+	_preview_avatar.modulate = Color(1, 1, 1, 1)
 	_preview_element.text = "Hệ: " + _get_element_name(_selected)
 	_preview_element.add_theme_color_override("font_color", Color(ec.r, ec.g, ec.b, 0.9))
 
-	var y: float = 0.0
-	for txt in _skill_texts.get(_selected, []):
-		var lbl := Label.new()
-		lbl.text = "• " + txt
-		lbl.position = Vector2(0, y)
-		lbl.size = Vector2(440, 22)
-		lbl.add_theme_font_size_override("font_size", 13)
-		lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.9, 0.85))
-		_preview_skill_box.add_child(lbl)
-		y += 26.0
+	var ch: CharacterBase = _find_char(_selected)
+	if ch != null:
+		_preview_level.text = "Cấp %d  |  EXP: %d/%d" % [ch.level, ch.exp, ch.exp_to_next]
+		_stat_labels["hp"].text = "HP: %d/%d" % [ch.hp, ch.max_hp]
+		_stat_labels["mp"].text = "MP: %d/%d" % [ch.mana, ch.max_mana]
+		_stat_labels["atk"].text = "ATK: %d" % ch.attack_power
+		_stat_labels["def"].text = "DEF: %d" % ch.defense
+		_stat_labels["spd"].text = "SPD: %.1f" % ch.move_speed
+		_stat_labels["crit"].text = "Tỉ lệ Crit: %d%%" % int(ch.crit_rate * 100.0)
+		_stat_labels["crit_dmg"].text = "Sát thương Crit: %d%%" % int(ch.crit_dmg * 100.0)
+		_stat_labels["mp_regen"].text = "Hồi MP: %.1f/s" % ch.mp_regen
+		_stat_labels["mp_refund"].text = "Hoàn MP: %d" % ch.mp_refund
+	else:
+		_preview_level.text = ""
+		_stat_labels["hp"].text = "HP: —"
+		_stat_labels["mp"].text = "MP: —"
+		_stat_labels["atk"].text = "ATK: —"
+		_stat_labels["def"].text = "DEF: —"
+		_stat_labels["spd"].text = "SPD: —"
+		_stat_labels["crit"].text = "Tỉ lệ Crit: —"
+		_stat_labels["crit_dmg"].text = "Sát thương Crit: —"
+		_stat_labels["mp_regen"].text = "Hồi MP: —"
+		_stat_labels["mp_refund"].text = "Hoàn MP: —"
 
-func _clear_skills() -> void:
-	for ch in _preview_skill_box.get_children():
-		ch.queue_free()
+	var skills: Array = _skill_data.get(_selected, [])
+	for i in range(4):
+		if i < skills.size():
+			var s: Dictionary = skills[i]
+			if s.has("mana"):
+				var mana_str: String = "%d MP" % s.mana if s.mana > 0 else "0 MP"
+				_skill_labels[i].text = "%s  |  CD: %.1fs  |  %s\n• %s" % [s.name, s.cd, mana_str, s.desc]
+			else:
+				_skill_labels[i].text = "%s\n• %s" % [s.name, s.desc]
+		else:
+			_skill_labels[i].text = ""
 
 func _refresh_quick_btn() -> void:
 	if _quick_deploy:
@@ -411,7 +494,7 @@ func _show_error(msg: String) -> void:
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.add_theme_font_size_override("font_size", 16)
 	lbl.add_theme_color_override("font_color", Color(1, 0.3, 0.3, 0.95))
-	lbl.position = Vector2(232, 440)
+	lbl.position = Vector2(232, 456)
 	lbl.size = Vector2(480, 30)
 	add_child(lbl)
 	get_tree().create_timer(1.8).timeout.connect(func():

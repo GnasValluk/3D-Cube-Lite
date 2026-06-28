@@ -24,17 +24,17 @@ func _build_character() -> void:
 
 	var mat_body := MeshBuilder.emit_mat(
 		Color(0.90, 0.05, 0.10),
-		Color(1.0, 0.0, 0.15), 4.0)
+		Color(0, 0, 0), 0.0)
 	MeshBuilder.box(_mesh_root, Vector3(0, 1.0, 0), Vector3(1.0, 2.0, 1.0), mat_body)
 
 	var mat_glow := MeshBuilder.emit_mat(
 		Color(0.90, 0.10, 0.15, 0.25),
-		Color(1.0, 0.0, 0.10), 2.0)
+		Color(0, 0, 0), 0.0)
 	MeshBuilder.sphere(_mesh_root, Vector3(0, 1.0, 0), 0.8, mat_glow)
 
 	var mat_ring := MeshBuilder.emit_mat(
 		Color(1.0, 0.20, 0.25),
-		Color(1.0, 0.10, 0.20), 5.0)
+		Color(0, 0, 0), 0.0)
 	for i in range(2):
 		var mi := MeshInstance3D.new()
 		var tor := TorusMesh.new()

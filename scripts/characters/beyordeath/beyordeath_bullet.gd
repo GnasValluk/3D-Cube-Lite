@@ -53,8 +53,8 @@ func _build_visual() -> void:
 	add_child(halo)
 	var light := OmniLight3D.new()
 	light.light_color = Color(0.25, 1.0, 0.35)
-	light.light_energy = 3.0
-	light.omni_range = 3.0
+	light.light_energy = 1.0
+	light.omni_range = 1.5
 	add_child(light)
 
 func _process(delta: float) -> void:
@@ -77,7 +77,8 @@ func _check_hit() -> void:
 			var offset: Vector3 = global_position - ch.global_position
 			offset.y = 0.0
 			if offset.length() < hit_radius:
-				ch.take_damage(hit_damage, _owner)
+				var dmg: int = _owner.calc_skill_damage(hit_damage) if _owner and _owner.has_method("calc_skill_damage") else hit_damage
+				ch.take_damage(dmg, _owner)
 				_explode()
 				return
 

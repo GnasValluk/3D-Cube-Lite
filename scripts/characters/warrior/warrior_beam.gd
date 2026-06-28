@@ -102,7 +102,8 @@ func _check_hit() -> void:
 	for ch in mgr.get_children():
 		if ch is CharacterBase and ch.is_alive and ch._active and ch != _owner and not ch in _hit_chars:
 			if _point_near_line(ch.global_position, _origin, beam_end, hit_radius):
-				ch.take_damage(hit_damage, _owner)
+				var dmg: int = _owner.calc_skill_damage(hit_damage) if _owner and _owner.has_method("calc_skill_damage") else hit_damage
+				ch.take_damage(dmg, _owner)
 				_hit_chars.append(ch)
 
 func _point_near_line(p: Vector3, a: Vector3, b: Vector3, r: float) -> bool:

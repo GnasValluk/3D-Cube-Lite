@@ -95,5 +95,6 @@ func _pull_and_hit(delta: float) -> void:
 				var cid: int = ch.get_instance_id()
 				if dist < _hit_radius and not cid in _hit_ids:
 					_hit_ids.append(cid)
-					ch.take_damage(100, _owner)
+					var dmg: int = _owner.calc_skill_damage(100) if _owner and _owner.has_method("calc_skill_damage") else 100
+					ch.take_damage(dmg, _owner)
 					ch.apply_dot(10, 1.0, 10.0, _owner)

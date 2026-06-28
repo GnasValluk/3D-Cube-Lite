@@ -1,83 +1,79 @@
-[gd_scene load_steps=9 format=3 uid="uid://player001"]
+[gd_scene format=3 uid="uid://player001"]
 
-[ext_resource type="Script" path="res://scripts/player/player.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://1go0nc8ua70p" path="res://scripts/player/player.gd" id="1_player"]
 
 [sub_resource type="BoxShape3D" id="col_shape"]
 size = Vector3(0.55, 0.85, 0.4)
 
+[sub_resource type="StandardMaterial3D" id="mat_neon_cyan"]
+albedo_color = Color(0.02, 0.14, 0.14, 1)
+metallic_specular = 0.0
+emission_enabled = true
+emission = Color(0, 0.95, 1, 1)
+emission_energy_multiplier = 3.0
+
 [sub_resource type="BoxMesh" id="mesh_body"]
 size = Vector3(0.55, 0.45, 0.38)
+
+[sub_resource type="StandardMaterial3D" id="mat_neon_white"]
+albedo_color = Color(0.05, 0.15, 0.2, 1)
+metallic_specular = 0.0
+emission_enabled = true
+emission = Color(0.6, 1, 1, 1)
+emission_energy_multiplier = 2.5
 
 [sub_resource type="BoxMesh" id="mesh_head"]
 size = Vector3(0.44, 0.34, 0.34)
 
 [sub_resource type="BoxMesh" id="mesh_ear"]
-size = Vector3(0.10, 0.38, 0.08)
+size = Vector3(0.1, 0.38, 0.08)
 
 [sub_resource type="BoxMesh" id="mesh_leg"]
-size = Vector3(0.13, 0.20, 0.13)
+size = Vector3(0.13, 0.2, 0.13)
 
-[sub_resource type="StandardMaterial3D" id="mat_neon_cyan"]
-albedo_color = Color(0.02, 0.14, 0.14, 1)
-roughness = 1.0
-metallic_specular = 0.0
-emission_enabled = true
-emission = Color(0.0, 0.95, 1.0, 1)
-emission_energy_multiplier = 3.0
-shading_mode = 1
-
-[sub_resource type="StandardMaterial3D" id="mat_neon_white"]
-albedo_color = Color(0.05, 0.15, 0.20, 1)
-roughness = 1.0
-metallic_specular = 0.0
-emission_enabled = true
-emission = Color(0.6, 1.0, 1.0, 1)
-emission_energy_multiplier = 2.5
-shading_mode = 1
-
-[node name="Player" type="CharacterBody3D"]
+[node name="Player" type="CharacterBody3D" unique_id=1539222999]
 script = ExtResource("1_player")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-position = Vector3(0, 0.425, 0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1063454863]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.425, 0)
 shape = SubResource("col_shape")
 
-[node name="Body" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.28, 0)
+[node name="Body" type="MeshInstance3D" parent="." unique_id=1315630427]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.28, 0)
+material_override = SubResource("mat_neon_cyan")
 mesh = SubResource("mesh_body")
-material_override = SubResource("mat_neon_cyan")
 
-[node name="Head" type="MeshInstance3D" parent="."]
-position = Vector3(0, 0.63, 0.08)
-mesh = SubResource("mesh_head")
+[node name="Head" type="MeshInstance3D" parent="." unique_id=852621207]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.63, 0.08)
 material_override = SubResource("mat_neon_white")
+mesh = SubResource("mesh_head")
 
-[node name="EarLeft" type="MeshInstance3D" parent="."]
-position = Vector3(-0.13, 0.96, 0.04)
+[node name="EarLeft" type="MeshInstance3D" parent="." unique_id=116100353]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.13, 0.96, 0.04)
+material_override = SubResource("mat_neon_cyan")
 mesh = SubResource("mesh_ear")
-material_override = SubResource("mat_neon_cyan")
 
-[node name="EarRight" type="MeshInstance3D" parent="."]
-position = Vector3(0.13, 0.96, 0.04)
+[node name="EarRight" type="MeshInstance3D" parent="." unique_id=905570126]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.13, 0.96, 0.04)
+material_override = SubResource("mat_neon_cyan")
 mesh = SubResource("mesh_ear")
-material_override = SubResource("mat_neon_cyan")
 
-[node name="LegFL" type="MeshInstance3D" parent="."]
-position = Vector3(-0.15, 0.10, 0.11)
-mesh = SubResource("mesh_leg")
+[node name="LegFL" type="MeshInstance3D" parent="." unique_id=932583136]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 0.1, 0.11)
 material_override = SubResource("mat_neon_cyan")
+mesh = SubResource("mesh_leg")
 
-[node name="LegFR" type="MeshInstance3D" parent="."]
-position = Vector3(0.15, 0.10, 0.11)
-mesh = SubResource("mesh_leg")
+[node name="LegFR" type="MeshInstance3D" parent="." unique_id=1457538605]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.1, 0.11)
 material_override = SubResource("mat_neon_cyan")
+mesh = SubResource("mesh_leg")
 
-[node name="LegBL" type="MeshInstance3D" parent="."]
-position = Vector3(-0.15, 0.10, -0.11)
-mesh = SubResource("mesh_leg")
+[node name="LegBL" type="MeshInstance3D" parent="." unique_id=188614195]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 0.1, -0.11)
 material_override = SubResource("mat_neon_cyan")
+mesh = SubResource("mesh_leg")
 
-[node name="LegBR" type="MeshInstance3D" parent="."]
-position = Vector3(0.15, 0.10, -0.11)
-mesh = SubResource("mesh_leg")
+[node name="LegBR" type="MeshInstance3D" parent="." unique_id=612207776]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 0.1, -0.11)
 material_override = SubResource("mat_neon_cyan")
+mesh = SubResource("mesh_leg")

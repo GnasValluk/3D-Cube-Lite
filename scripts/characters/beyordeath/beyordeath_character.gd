@@ -34,17 +34,22 @@ const JET_BURST_SHOTS: int = 10
 const JET_BURST_INTERVAL: float = 0.05
 
 func _build_character() -> void:
-	move_speed = 6.0
+	move_speed = 5.0
 	sprint_speed = 10.0
 	jump_height = 1.3
 	dash_speed = 19.0
 	dash_duration = 0.18
 	attack_duration = 0.55
 	_attack2_duration = 0.80
+	attack_power = 165
+	defense = 12
 	lmb_cooldown = 1.0
 	q_cooldown = 3.0
 	r_cooldown = 7.0
 	max_hp = 450
+	mana_cost_lmb = 0
+	mana_cost_q   = 0
+	mana_cost_r   = 130
 	character_name = "Beyordeath"
 	element = Element.DECAY
 
@@ -66,6 +71,8 @@ func _build_character() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not _active or not _is_player:
 		return
+	if _is_building_placing():
+		return
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
@@ -81,6 +88,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				return
 			if k.keycode == KEY_R:
 				if _r_cd <= 0.0 and _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
+					if not try_skill(mana_cost_r):
+						return
 					_aim_dir = _calc_aim_dir()
 					var fwd := global_transform.basis.z
 					if _aim_dir.dot(fwd) < 0.99:
@@ -105,6 +114,8 @@ func _handle_space() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _active or not _is_player:
+		return
+	if _is_building_placing():
 		return
 	if _jet_mode:
 		if event is InputEventMouseButton:
@@ -230,7 +241,7 @@ func _update_jet(delta: float) -> void:
 	var spd: float = move_speed * 1.1
 
 	var want_dash: bool = Input.is_key_pressed(KEY_Q) and _q_cd <= 0.0 and _attack_timer <= 0.0
-	if want_dash and _jet_dash_timer <= 0.0:
+	if want_dash and _jet_dash_timer <= 0.0 and try_skill(75):
 		var ddir: Vector3 = dir if dir.length_squared() > 0.001 else -global_transform.basis.z
 		ddir.y = 0.0
 		_jet_dash_dir = ddir.normalized()

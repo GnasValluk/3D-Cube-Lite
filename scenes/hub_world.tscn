@@ -1,0 +1,103 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/hub_world.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/camera/iso_camera.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/player/neon_pulse.gd" id="3"]
+[ext_resource type="Script" path="res://scripts/world/twilight_environment.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/camera/third_person_camera.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/core/character_manager.gd" id="6"]
+[ext_resource type="Script" path="res://scripts/characters/raptor/raptor_character.gd" id="7"]
+[ext_resource type="Script" path="res://scripts/characters/dragon/dragon_character.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/characters/warrior/warrior_character.gd" id="9"]
+[ext_resource type="Script" path="res://scripts/characters/beyordeath/beyordeath_character.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/ui/hud.gd" id="11"]
+[ext_resource type="Script" path="res://scripts/characters/dummy/dummy_character.gd" id="12"]
+[ext_resource type="Script" path="res://scripts/world/decorative_tile.gd" id="13"]
+[ext_resource type="Script" path="res://scripts/world/placement_system.gd" id="14"]
+[ext_resource type="Script" path="res://scripts/world/explore_system.gd" id="15"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.866, -0.5, 0, 0.5, 0.866, 0, 0, 0)
+
+[node name="CharacterManager" type="Node3D" parent="."]
+script = ExtResource("6")
+
+[node name="PlacementSystem" type="Node" parent="."]
+script = ExtResource("14")
+
+[node name="Raptor" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("7")
+
+[node name="NeonPulse" type="Node" parent="CharacterManager/Raptor"]
+script = ExtResource("3")
+
+[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Raptor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+
+[node name="Dragon" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("8")
+
+[node name="NeonPulse" type="Node" parent="CharacterManager/Dragon"]
+script = ExtResource("3")
+
+[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Dragon"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+
+[node name="Warrior" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("9")
+
+[node name="NeonPulse" type="Node" parent="CharacterManager/Warrior"]
+script = ExtResource("3")
+
+[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Warrior"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+
+[node name="Beyordeath" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("10")
+
+[node name="NeonPulse" type="Node" parent="CharacterManager/Beyordeath"]
+script = ExtResource("3")
+
+[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Beyordeath"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+
+[node name="Dummy1" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 3, -3)
+script = ExtResource("12")
+
+[node name="Dummy2" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 3, 2)
+script = ExtResource("12")
+
+[node name="Dummy3" type="CharacterBody3D" parent="CharacterManager"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, -5)
+script = ExtResource("12")
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("2")
+target_path = NodePath("../CharacterManager/Raptor")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+current = true
+
+[node name="TPCameraRig" type="Node3D" parent="."]
+script = ExtResource("5")
+target_path = NodePath("../CharacterManager/Raptor")
+
+[node name="Camera3D" type="Camera3D" parent="TPCameraRig"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+script = ExtResource("4")
+
+[node name="ExploreSystem" type="Node" parent="."]
+script = ExtResource("15")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+script = ExtResource("11")

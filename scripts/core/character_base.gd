@@ -9,6 +9,10 @@ signal damage_taken(amount: int, attacker: Node3D)
 signal died(attacker: Node3D)
 signal hp_changed(current: int, max_hp: int)
 signal shield_changed(current: int)
+signal mana_changed(current: int, max_mana: int)
+signal oxygen_changed(current: int, max_oxygen: int)
+signal level_up(new_level: int)
+signal submerged(underwater: bool)
 
 # ── Element system ─────────────────────────────────────────────────────────────
 enum Element { NONE, DIEN, BANG, DECAY, HOA, HAC_AM, ANH_SANG }
@@ -45,6 +49,23 @@ const ELEMENT_COLORS: Dictionary = {
 @export var q_cooldown:         float = 0.0
 @export var r_cooldown:         float = 0.0
 @export var cooldown_rate:      float = 1.0
+@export var sprint_mana_cost:   float = 0.5
+
+# ── Mana ──────────────────────────────────────────────────────────────────────
+@export var max_mana:            int   = 200
+@export var mana:                int   = 200
+@export var mp_regen:            float = 2.0
+@export var mp_refund:           int   = 5
+@export var mana_cost_lmb:       int   = 0
+@export var mana_cost_q:         int   = 0
+@export var mana_cost_r:         int   = 0
+@export var level:               int   = 1
+@export var exp:                 int   = 0
+@export var exp_to_next:         int   = 100
+@export var crit_rate:           float = 0.05
+@export var crit_dmg:            float = 0.50
+var _mana_regen_acc: float = 0.0
+var _sprint_mana_acc: float = 0.0
 
 var is_alive: bool = true
 var character_name: String = ""
@@ -52,8 +73,18 @@ var element: int = Element.NONE
 var shield: int = 0
 var _melee_hit_once: bool = false
 
+# ── Oxygen / Swimming ──────────────────────────────────────
+@export var max_oxygen: float = 100.0
+var oxygen: float = 100.0
+const OXYGEN_DEPLETE_RATE: float = 5.0
+const OXYGEN_REFILL_RATE: float = 20.0
+const DROWN_DAMAGE_INTERVAL: float = 1.5
+var _drown_timer: float = 0.0
+var _underwater: bool = false
+var _swim_jump_cd: float = 0.0
+
 # ── State machine ─────────────────────────────────────────────────────────────
-enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD }
+enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD, SWIM }
 var _state: State = State.IDLE
 
 # ── Timers ────────────────────────────────────────────────────────────────────
@@ -76,6 +107,8 @@ var _invul_timer:     float   = 0.0
 var _hit_timer:       float   = 0.0
 var _death_timer:     float   = 0.0
 var _aim_dir:         Vector3 = Vector3.FORWARD
+var _freeze_timer:    float   = 0.0
+var _han_bang_buff:    float   = 0.0
 
 # ── Physics internals ─────────────────────────────────────────────────────────
 var _jump_v:    float = 0.0
@@ -101,6 +134,7 @@ var _camera:  Camera3D
 var _iso_rig: Node3D
 var _tp_rig:  Node3D
 var _use_tp:  bool = false
+var _water_mgr: OpenWorldManager = null
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _ready() -> void:
@@ -109,6 +143,8 @@ func _ready() -> void:
 	_grav_fall = (2.0 * jump_height) / (jump_time_fall * jump_time_fall)
 	_build_character()
 	hp = max_hp
+	mana = max_mana
+	oxygen = max_oxygen
 	await get_tree().process_frame
 	if _is_player:
 		var root: Node = get_parent().get_parent()
@@ -117,7 +153,10 @@ func _ready() -> void:
 		_iso_rig = root.get_node_or_null("CameraRig")
 		_tp_rig  = root.get_node_or_null("TPCameraRig")
 		_camera  = get_viewport().get_camera_3d()
-	_add_world_hp_bar()
+	if not has_meta("no_world_hp_bar"):
+		_add_world_hp_bar()
+
+	_water_mgr = _find_water_manager()
 
 func _add_world_hp_bar() -> void:
 	var bar := WorldHPBar.new()
@@ -129,6 +168,42 @@ func _process(delta: float) -> void:
 		_invul_timer = max(_invul_timer - delta, 0.0)
 	if _hit_timer > 0.0:
 		_hit_timer = max(_hit_timer - delta, 0.0)
+	_freeze_timer = max(_freeze_timer - delta, 0.0)
+	_han_bang_buff = max(_han_bang_buff - delta, 0.0)
+
+	# Mana regen
+	_mana_regen_acc += mp_regen * delta
+	if _mana_regen_acc >= 1.0:
+		var gain: int = int(_mana_regen_acc)
+		_mana_regen_acc -= gain
+		add_mana(gain)
+
+	if not _active:
+		var cd_delta: float = delta * cooldown_rate
+		_lmb_cd = max(_lmb_cd - cd_delta, 0.0)
+		_q_cd = max(_q_cd - cd_delta, 0.0)
+		_r_cd = max(_r_cd - cd_delta, 0.0)
+		_dash_cd = max(_dash_cd - delta, 0.0)
+		_on_offline_tick(delta, cd_delta)
+		return
+
+	# Oxygen
+	if _underwater:
+		oxygen -= OXYGEN_DEPLETE_RATE * delta
+		if oxygen <= 0.0:
+			oxygen = 0.0
+			_drown_timer += delta
+			if _drown_timer >= DROWN_DAMAGE_INTERVAL:
+				_drown_timer = 0.0
+				take_damage(5)
+		oxygen_changed.emit(int(oxygen), int(max_oxygen))
+	else:
+		if oxygen < max_oxygen:
+			oxygen += OXYGEN_REFILL_RATE * delta
+			if oxygen > max_oxygen:
+				oxygen = max_oxygen
+			oxygen_changed.emit(int(oxygen), int(max_oxygen))
+		_drown_timer = 0.0
 
 # ── Overrideable interface ────────────────────────────────────────────────────
 func get_element() -> int:
@@ -136,15 +211,82 @@ func get_element() -> int:
 
 func _build_character() -> void:      pass
 func _animate(_delta: float) -> void: pass
+func _animate_swim(_delta: float) -> void: pass
 func _on_primary_attack() -> void:    pass
 func _on_secondary_attack() -> void:  pass
 func _on_show_animation() -> void:    pass
 func _on_dash() -> void:              pass
+func _on_offline_tick(_delta: float, _cd_delta: float) -> void: pass
+
+func apply_freeze(duration: float) -> void:
+	if not is_alive:
+		return
+	_freeze_timer = duration
+	_spawn_freeze_vfx()
+
+func add_han_bang_buff(duration: float) -> void:
+	_han_bang_buff = max(_han_bang_buff, duration)
+
+func is_han_bang_buffed() -> bool:
+	return _han_bang_buff > 0.0
+
+func is_frozen() -> bool:
+	return _freeze_timer > 0.0
+
+func _spawn_freeze_vfx() -> void:
+	if _rig == null:
+		return
+	# Ẩn VFX cũ nếu có
+	for c in _rig.get_children():
+		if c is Node and c.name == "_FreezeVFX":
+			c.queue_free()
+			break
+	var vfx := FreezeVFX.new()
+	vfx.name = "_FreezeVFX"
+	_rig.add_child(vfx)
+	vfx.setup(_freeze_timer)
+
+# ── Level / Exp ───────────────────────────────────────────────────────────────
+func add_exp(amount: int) -> void:
+	exp += amount
+	while exp >= exp_to_next:
+		exp -= exp_to_next
+		level += 1
+		exp_to_next = level * 100
+		level_up.emit(level)
+
+func calc_skill_damage(skill_power: int) -> int:
+	return maxi(1, skill_power * attack_power / 100)
+
+func calc_hp_skill_damage(percent: float) -> int:
+	return maxi(1, int(max_hp * percent / 100.0))
 
 # ── HP / Damage ───────────────────────────────────────────────────────────────
 func take_damage(amount: int, attacker: Node3D = null) -> void:
 	if not is_alive or _invul_timer > 0.0:
 		return
+	if attacker != null and "is_han_bang_buffed" in attacker and attacker.is_han_bang_buffed():
+		var saved_invul := _invul_timer
+		var ice_dmg: int = 15
+		if attacker.has_method("calc_hp_skill_damage"):
+			ice_dmg = attacker.calc_hp_skill_damage(2.0)
+		elif attacker.has_method("calc_skill_damage"):
+			ice_dmg = attacker.calc_skill_damage(15)
+		ice_dmg = maxi(1, ice_dmg - defense)
+		if shield > 0:
+			var absorbed := mini(shield, ice_dmg)
+			shield -= absorbed
+			ice_dmg -= absorbed
+			shield_changed.emit(shield)
+		if ice_dmg > 0:
+			hp = maxi(0, hp - ice_dmg)
+			_spawn_damage_number(ice_dmg, null)
+			hp_changed.emit(hp, max_hp)
+			damage_taken.emit(ice_dmg, null)
+		if hp <= 0:
+			_die(attacker)
+			return
+		_invul_timer = saved_invul
 	var dmg := maxi(1, amount - defense)
 	if shield > 0:
 		var absorbed := mini(shield, dmg)
@@ -168,6 +310,18 @@ func take_damage(amount: int, attacker: Node3D = null) -> void:
 func add_shield(amount: int) -> void:
 	shield += amount
 	shield_changed.emit(shield)
+
+func add_mana(amount: int) -> void:
+	mana = mini(mana + amount, max_mana)
+	mana_changed.emit(mana, max_mana)
+
+func try_skill(cost: int) -> bool:
+	if mana < cost:
+		return false
+	mana -= cost
+	mana = mini(mana + mp_refund, max_mana)
+	mana_changed.emit(mana, max_mana)
+	return true
 
 func heal(amount: int) -> void:
 	if not is_alive:
@@ -281,10 +435,12 @@ func set_active(value: bool) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not _active or not _is_player:
 		return
+	if _is_building_placing():
+		return
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
-			if k.keycode == KEY_SPACE:
+			if k.keycode == KEY_SPACE and _freeze_timer <= 0.0:
 				_jbuf = JUMP_BUFFER
 			if k.keycode == KEY_F1:
 				_toggle_camera()
@@ -292,7 +448,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				if _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
 					_on_show_animation()
 			if k.keycode == KEY_R:
-				if _r_cd <= 0.0 and _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
+				if _r_cd <= 0.0 and _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
+					if not try_skill(mana_cost_r):
+						return
 					_aim_dir = _calc_aim_dir()
 					var fwd := global_transform.basis.z
 					if _aim_dir.dot(fwd) < 0.99:
@@ -303,11 +461,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _active or not _is_player:
 		return
+	if _is_building_placing():
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
 			if mb.button_index == MOUSE_BUTTON_LEFT:
-				if _lmb_cd <= 0.0 and _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+				if _lmb_cd <= 0.0 and _freeze_timer <= 0.0 and _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+					if not try_skill(mana_cost_lmb):
+						return
 					_aim_dir = _calc_aim_dir()
 					var fwd := global_transform.basis.z
 					if _aim_dir.dot(fwd) < 0.99:
@@ -355,6 +517,34 @@ func _physics_process(delta: float) -> void:
 		_state = State.HIT
 		move_and_slide()
 		_animate(delta)
+		return
+
+	if _freeze_timer > 0.0:
+		_attack_timer  = max(_attack_timer - delta, 0.0)
+		_attack2_timer = max(_attack2_timer - delta, 0.0)
+		_dash_timer    = max(_dash_timer - delta, 0.0)
+		if _dash_timer <= 0.0 and _state == State.DASH:
+			_state = State.IDLE
+		velocity.x *= 0.2
+		velocity.z *= 0.2
+		move_and_slide()
+		_animate(delta)
+		return
+
+	# Water detection
+	var was_underwater := _underwater
+	if _water_mgr == null or not _water_mgr.is_inside_tree():
+		_water_mgr = _find_water_manager()
+	if _water_mgr != null:
+		_underwater = _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y)
+	else:
+		_underwater = false
+	if _underwater != was_underwater:
+		submerged.emit(_underwater)
+
+	# Underwater / swimming
+	if _underwater:
+		_swim_physics(delta)
 		return
 
 	var on_floor: bool = is_on_floor()
@@ -410,6 +600,17 @@ func _physics_process(delta: float) -> void:
 	var sprinting: bool
 	if _is_player:
 		sprinting = Input.is_key_pressed(KEY_SHIFT)
+		if sprinting and sprint_mana_cost > 0.0 and dir.length_squared() > 0.001:
+			_sprint_mana_acc += sprint_mana_cost * delta
+			if _sprint_mana_acc >= 1.0:
+				var drain: int = int(_sprint_mana_acc)
+				_sprint_mana_acc -= drain
+				mana = maxi(0, mana - drain)
+				if mana <= 0:
+					sprinting = false
+				mana_changed.emit(mana, max_mana)
+		else:
+			_sprint_mana_acc = 0.0
 	else:
 		sprinting = false
 
@@ -435,8 +636,10 @@ func _physics_process(delta: float) -> void:
 	# Dash trigger
 	var want_dash: bool = false
 	if _is_player:
-		want_dash = Input.is_key_pressed(KEY_Q) and _q_cd <= 0.0 and not attacking and not devouring
+		want_dash = Input.is_key_pressed(KEY_Q) and _q_cd <= 0.0 and _freeze_timer <= 0.0 and not attacking and not devouring
 	if want_dash:
+		if not try_skill(mana_cost_q):
+			return
 		var di := _read_input()
 		if di.length_squared() > 0.001:
 			_dash_dir = di.normalized()
@@ -489,7 +692,7 @@ func _do_melee_hit() -> void:
 			if dist <= melee_range:
 				var dot: float = fwd.dot(offset / dist)
 				if dot >= 0.4:
-					ch.take_damage(melee_damage, self)
+					ch.take_damage(calc_skill_damage(melee_damage), self)
 
 func _find_character_manager() -> Node:
 	var p := get_parent()
@@ -517,6 +720,41 @@ func _read_input() -> Vector3:
 		var rgt: Vector3 =  cb.x; rgt.y = 0.0; rgt = rgt.normalized()
 		return fwd * -rz + rgt * rx
 	return Vector3.ZERO
+
+func _swim_physics(delta: float) -> void:
+	var dir := _read_input()
+	var spd: float = move_speed * 0.55
+	var accel: float = acceleration * 0.6
+	var frict: float = friction * 0.5
+
+	var wants_jump: bool = _jbuf > 0.0 and _swim_jump_cd <= 0.0
+	_jbuf = 0.0
+	_swim_jump_cd = max(_swim_jump_cd - delta, 0.0)
+
+	if wants_jump:
+		velocity.y = _jump_v * 0.7
+		_swim_jump_cd = 0.6
+	elif _is_player and Input.is_key_pressed(KEY_SPACE):
+		if global_position.y < -0.7:
+			velocity.y = 4.0
+		else:
+			velocity.y = 7.0
+	else:
+		velocity.y -= 3.0 * delta
+
+	if dir.length_squared() > 0.001:
+		dir = dir.normalized()
+		velocity.x = move_toward(velocity.x, dir.x * spd, accel * delta)
+		velocity.z = move_toward(velocity.z, dir.z * spd, accel * delta)
+		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z), delta * 10.0)
+		_state = State.WALK
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, frict * delta)
+		velocity.z = move_toward(velocity.z, 0.0, frict * delta)
+		_state = State.IDLE
+
+	move_and_slide()
+	_animate(delta)
 
 func _calc_aim_dir() -> Vector3:
 	var target := _find_nearest_target()
@@ -572,3 +810,75 @@ func _toggle_camera() -> void:
 			_iso_rig.call("activate")
 	await get_tree().process_frame
 	_camera = get_viewport().get_camera_3d()
+
+func _is_building_placing() -> bool:
+	var tree := get_tree()
+	if tree == null:
+		return false
+	if not tree.root.has_meta("building_placement_active"):
+		return false
+	var val: Variant = tree.root.get_meta("building_placement_active")
+	return bool(val)
+
+func play_spawn_animation() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var col: Color = ELEMENT_COLORS.get(element, Color(0.5, 0.8, 1.0))
+	scale = Vector3.ZERO
+	var pos := global_position
+	var sphere_mat := StandardMaterial3D.new()
+	sphere_mat.albedo_color = col
+	sphere_mat.albedo_color.a = 0.0
+	sphere_mat.emission_enabled = true
+	sphere_mat.emission = col * 1.5
+	sphere_mat.emission.a = 0.0
+	sphere_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	sphere_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var sphere := MeshInstance3D.new()
+	var sph := SphereMesh.new()
+	sph.radius = 0.1
+	sph.height = 0.2
+	sphere.mesh = sph
+	sphere.material_override = sphere_mat
+	parent.add_child(sphere)
+	sphere.global_position = pos + Vector3(0, 0.8, 0)
+	var sph_tw := create_tween()
+	sph_tw.tween_property(sphere_mat, "albedo_color:a", 0.9, 0.15)
+	sph_tw.parallel().tween_property(sphere_mat, "emission:a", 0.8, 0.15)
+	sph_tw.parallel().tween_property(sphere, "scale", Vector3(8.0, 8.0, 8.0), 0.25).set_ease(Tween.EASE_OUT)
+	sph_tw.tween_interval(0.15)
+	sph_tw.tween_property(sphere_mat, "albedo_color:a", 0.0, 0.3)
+	sph_tw.parallel().tween_property(sphere_mat, "emission:a", 0.0, 0.3)
+	sph_tw.parallel().tween_property(sphere, "scale", Vector3(12.0, 12.0, 12.0), 0.3).set_ease(Tween.EASE_OUT)
+	sph_tw.tween_callback(sphere.queue_free)
+	var char_tw := create_tween()
+	char_tw.tween_interval(0.15)
+	char_tw.tween_property(self, "scale", Vector3.ONE, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+	var spark_mat := StandardMaterial3D.new()
+	spark_mat.albedo_color = col
+	spark_mat.emission_enabled = true
+	spark_mat.emission = col * 2.0
+	var spark_tw := create_tween()
+	spark_tw.tween_interval(0.25)
+	for k in range(16):
+		var sp := MeshInstance3D.new()
+		var ss := SphereMesh.new()
+		ss.radius = 0.05
+		ss.height = 0.1
+		sp.mesh = ss
+		sp.material_override = spark_mat
+		parent.add_child(sp)
+		sp.global_position = pos + Vector3(0, 0.8, 0)
+		var dir := Vector3(randf_range(-1, 1), randf_range(-0.5, 1.0), randf_range(-1, 1)).normalized()
+		var dist := 1.0 + randf() * 2.5
+		var st := create_tween()
+		st.tween_property(sp, "global_position", sp.global_position + dir * dist, 0.6).set_ease(Tween.EASE_OUT)
+		st.parallel().tween_property(sp, "scale", Vector3.ZERO, 0.6)
+		st.tween_callback(sp.queue_free)
+
+func _find_water_manager() -> OpenWorldManager:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return null
+	return scene.get_node_or_null("WorldManager") as OpenWorldManager

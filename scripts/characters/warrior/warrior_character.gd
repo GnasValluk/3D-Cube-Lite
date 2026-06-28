@@ -14,6 +14,10 @@ const BEAM_SHAKE_INTENSITY: float = 0.07
 const BEAM_SHAKE_DURATION: float = 0.10
 const STOMP_SHAKE_INTENSITY: float = 0.22
 const STOMP_SHAKE_DURATION: float = 0.20
+const ICE_STOMP_RADIUS: float = 15.0
+const ICE_STOMP_CD: float = 25.0
+const ICE_ZONE_DURATION: float = 10.0
+const HAN_BANG_DURATION: float = 10.0
 
 var _mesh: WarriorMesh
 var _anim: WarriorAnimator
@@ -23,18 +27,24 @@ var _stomp_impacted: bool = false
 var _stomp_start: Vector3 = Vector3.ZERO
 var _stomp_target: Vector3 = Vector3.ZERO
 var _stomp_ground_y: float = 0.0
+var _dash_hit_ids: Array[int] = []
 
 func _build_character() -> void:
-	move_speed = 4.6
+	move_speed = 3.2
 	sprint_speed = 7.4
 	jump_height = 1.2
 	dash_speed = 15.0
 	attack_duration = BEAM_ATTACK_DURATION
 	_attack2_duration = STOMP_DURATION
-	lmb_cooldown = 0.8
-	q_cooldown   = 1.8
-	r_cooldown   = 6.0
+	attack_power = 140
+	defense = 40
+	lmb_cooldown = 2.0
+	q_cooldown   = ICE_STOMP_CD
+	r_cooldown   = 10.0
 	max_hp = 800
+	mana_cost_lmb = 0
+	mana_cost_q   = 130
+	mana_cost_r   = 50
 	character_name = "Warrior"
 	element        = Element.BANG
 
@@ -54,10 +64,14 @@ func _build_character() -> void:
 	_anim.setup(_mesh, self)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if _is_building_placing():
+		return
 	super._unhandled_key_input(event)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _active:
+		return
+	if _is_building_placing():
 		return
 	super._unhandled_input(event)
 
@@ -65,12 +79,20 @@ func _physics_process(delta: float) -> void:
 	if _stomping:
 		_update_stomp(delta)
 		return
+	if _active and is_alive and _is_player and Input.is_key_pressed(KEY_Q) and _q_cd <= 0.0 and _freeze_timer <= 0.0:
+		_do_ice_stomp()
+		return
 	super._physics_process(delta)
+	if _state == State.DASH:
+		_check_dash_hit()
 	if _state == State.ATTACK and not _beam_spawned:
 		var elapsed: float = attack_duration - _attack_timer
 		if elapsed >= BEAM_FIRE_TIME:
 			_spawn_beam()
 			_beam_spawned = true
+
+func _on_dash() -> void:
+	_dash_hit_ids.clear()
 
 func _on_primary_attack() -> void:
 	attack_duration = BEAM_ATTACK_DURATION
@@ -185,6 +207,22 @@ func _shake_cameras(intensity: float, duration: float) -> void:
 	if is_instance_valid(_tp_rig) and _tp_rig.has_method("add_shake"):
 		_tp_rig.call("add_shake", intensity, duration)
 
+func _check_dash_hit() -> void:
+	var mgr: Node = _find_character_manager()
+	if mgr == null:
+		return
+	for ch_node in mgr.get_children():
+		if ch_node is CharacterBase and ch_node != self and ch_node.is_alive and ch_node._active:
+			var cid: int = ch_node.get_instance_id()
+			if cid in _dash_hit_ids:
+				continue
+			var off: Vector3 = global_position - ch_node.global_position
+			off.y = 0.0
+			if off.length() < 1.8:
+				_dash_hit_ids.append(cid)
+				ch_node.take_damage(calc_skill_damage(75), self)
+				ch_node.apply_freeze(2.0)
+
 func _do_stomp_damage() -> void:
 	var mgr: Node = _find_character_manager()
 	if mgr == null:
@@ -193,7 +231,7 @@ func _do_stomp_damage() -> void:
 		if ch_node is CharacterBase and ch_node != self and ch_node.is_alive and ch_node._active:
 			var d: float = global_position.distance_to(ch_node.global_position)
 			if d <= 4.0:
-				ch_node.take_damage(150, self)
+				ch_node.take_damage(calc_hp_skill_damage(22.0), self)
 	if mgr.has_method("get_party_characters"):
 		var party: Array[CharacterBase] = mgr.get_party_characters()
 		var shield_amount: int = max_hp * 20 / 100
@@ -206,6 +244,38 @@ func _do_stomp_damage() -> void:
 						pm.shield = max(pm.shield - applied, 0)
 						pm.shield_changed.emit(pm.shield)
 					)
+
+func _do_ice_stomp() -> void:
+	if not try_skill(mana_cost_q):
+		return
+	_q_cd = ICE_STOMP_CD
+	_do_ice_stomp_damage_buff()
+	_spawn_ice_zone()
+	_shake_cameras(STOMP_SHAKE_INTENSITY, STOMP_SHAKE_DURATION)
+
+func _spawn_ice_zone() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var zone := WarriorIceZone.new()
+	parent.add_child(zone)
+	zone.setup(global_position + Vector3(0.0, 0.02, 0.0))
+
+func _do_ice_stomp_damage_buff() -> void:
+	var mgr: Node = _find_character_manager()
+	if mgr == null:
+		return
+	for ch_node in mgr.get_children():
+		if ch_node is CharacterBase and ch_node != self and ch_node.is_alive:
+			var d: float = global_position.distance_to(ch_node.global_position)
+			if d <= ICE_STOMP_RADIUS:
+				ch_node.take_damage(calc_hp_skill_damage(30.0), self)
+	if mgr.has_method("get_party_characters"):
+		var party: Array[CharacterBase] = mgr.get_party_characters()
+		for pm in party:
+			if pm.is_alive:
+				pm.add_han_bang_buff(HAN_BANG_DURATION)
+	add_han_bang_buff(HAN_BANG_DURATION)
 
 func _find_character_manager() -> Node:
 	var p := get_parent()

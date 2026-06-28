@@ -20,17 +20,21 @@ const R_BUFF_DURATION: float = 3.0
 const R_BUFF_SPEED_MULT: float = 2.0
 
 func _build_character() -> void:
-	move_speed   = 5.5
+	move_speed   = 6.5
 	sprint_speed = 9.5
 	jump_height  = 1.4
 	attack_duration = 0.40
 	_attack2_duration = 0.90
 	melee_range  = 1.5
 	melee_damage = 10
+	attack_power = 135
+	defense = 26
 	lmb_cooldown = 0.6
 	q_cooldown   = 1.5
 	r_cooldown   = 5.0
 	max_hp = 340
+	mana_cost_q = 50
+	mana_cost_r = 50
 	character_name = "Raptor"
 	element = Element.DIEN
 	_base_move_speed = move_speed
@@ -99,7 +103,7 @@ func _on_secondary_attack() -> void:
 		if ch is CharacterBase and ch != self and ch.is_alive and ch._active:
 			var d: float = global_position.distance_to(ch.global_position)
 			if d <= 10.0:
-				ch.take_damage(75, self)
+				ch.take_damage(calc_skill_damage(75), self)
 				targets.append(ch.global_position)
 	if targets.size() > 0:
 		_activate_r_buff()
@@ -126,7 +130,7 @@ func _on_dash() -> void:
 func _strike(ch: CharacterBase, mgr: Node) -> void:
 	if not is_instance_valid(ch) or not ch.is_alive:
 		return
-	ch.take_damage(50, self)
+	ch.take_damage(calc_skill_damage(50), self)
 	_spawn_dash_bolt(global_position, ch.global_position, mgr)
 	var hit_mat := MeshBuilder.emit_mat(Color(1.0, 0.85, 0.20, 0.7), Color(1.0, 0.80, 0.10), 8.0)
 	var hit := MeshInstance3D.new()

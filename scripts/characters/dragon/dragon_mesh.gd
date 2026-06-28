@@ -54,14 +54,14 @@ func build(root: CharacterBody3D) -> void:
 	_tail()
 
 func _make_mats() -> void:
-	_mb    = MeshBuilder.emit_mat(Color(0.35,0.05,0.55), Color(0.55,0.05,0.90), 1.8)
-	_ms    = MeshBuilder.emit_mat(Color(0.55,0.10,0.80), Color(0.75,0.20,1.00), 2.4)
-	_mbelly= MeshBuilder.emit_mat(Color(0.70,0.30,0.60), Color(0.90,0.40,0.80), 1.4)
-	_mwing = MeshBuilder.emit_mat(Color(0.60,0.05,0.15), Color(0.95,0.10,0.30), 2.0)
-	_mhorn = MeshBuilder.emit_mat(Color(0.90,0.95,1.00), Color(0.70,0.90,1.00), 3.0)
-	_meye  = MeshBuilder.emit_mat(Color(1.00,0.70,0.10), Color(1.00,0.60,0.00), 4.0)
-	_mclaw = MeshBuilder.emit_mat(Color(0.12,0.02,0.20), Color(0.30,0.05,0.50), 1.0)
-	_mglow = MeshBuilder.emit_mat(Color(1.00,0.20,0.40), Color(1.00,0.10,0.30), 3.5)
+	_mb    = MeshBuilder.emit_mat(Color(0.35,0.05,0.55), Color(0,0,0), 0.0)
+	_ms    = MeshBuilder.emit_mat(Color(0.55,0.10,0.80), Color(0,0,0), 0.0)
+	_mbelly= MeshBuilder.emit_mat(Color(0.70,0.30,0.60), Color(0,0,0), 0.0)
+	_mwing = MeshBuilder.emit_mat(Color(0.60,0.05,0.15), Color(0,0,0), 0.0)
+	_mhorn = MeshBuilder.emit_mat(Color(0.90,0.95,1.00), Color(0,0,0), 0.0)
+	_meye  = MeshBuilder.emit_mat(Color(1.00,0.70,0.10), Color(0,0,0), 0.0)
+	_mclaw = MeshBuilder.emit_mat(Color(0.12,0.02,0.20), Color(0,0,0), 0.0)
+	_mglow = MeshBuilder.emit_mat(Color(1.00,0.20,0.40), Color(0,0,0), 0.0)
 
 # ── Torso ─────────────────────────────────────────────────────────────────────
 func _torso() -> void:

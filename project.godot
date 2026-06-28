@@ -11,10 +11,14 @@ config_version=5
 [application]
 
 config/name="3D Project CubeLite Zero Assets"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/loading_screen.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
-boot_splash/bg_color=Color(0.15, 0.15, 0.18, 1)
+boot_splash/bg_color=Color(0.06, 0.06, 0.1, 1)
 config/icon="res://icon.svg"
+
+[autoload]
+
+WorldSeed="*res://scripts/core/world_seed.gd"
 
 [display]
 

@@ -1,7 +1,7 @@
 ## core/character_manager.gd
 ## Quản lý danh sách nhân vật người chơi, điều phối switch, camera.
 ##
-## Phím:  Tab = tuần tự   1/2/3 = chọn nhân vật
+## Phím:  Tab = tuần tự   1/2/3 = chọn nhân vật   4 = Player
 
 extends Node3D
 class_name CharacterManager
@@ -21,6 +21,17 @@ func _ready() -> void:
 	for ch in get_children():
 		if ch is CharacterBase and ch._is_player:
 			_characters.append(ch as CharacterBase)
+
+	# Đưa "Player" lên đầu để là mặc định
+	var player_idx: int = -1
+	for i in range(_characters.size()):
+		if _characters[i].character_name == "Player":
+			player_idx = i
+			break
+	if player_idx > 0:
+		var player := _characters[player_idx]
+		_characters.erase(player)
+		_characters.insert(0, player)
 
 	if _characters.is_empty():
 		push_error("CharacterManager: không có CharacterBase nào cho người chơi!")
@@ -42,24 +53,49 @@ func _ready() -> void:
 		remove_child(_characters[i])
 
 	_characters[0].set_active(true)
+	_characters[0].play_spawn_animation()
 
 	_aim_cameras_at(_characters[0])
 	character_switched.emit(_characters[0])
+
+# ── Offline cooldown tick ─────────────────────────────────────────────────────
+func _process(delta: float) -> void:
+	for ch in _characters:
+		if ch != _characters[_current]:
+			var cd_delta: float = delta * ch.cooldown_rate
+			ch._lmb_cd = max(ch._lmb_cd - cd_delta, 0.0)
+			ch._q_cd = max(ch._q_cd - cd_delta, 0.0)
+			ch._r_cd = max(ch._r_cd - cd_delta, 0.0)
+			ch._dash_cd = max(ch._dash_cd - delta, 0.0)
+			ch._freeze_timer = max(ch._freeze_timer - delta, 0.0)
+			ch._han_bang_buff = max(ch._han_bang_buff - delta, 0.0)
+			# Mana regen for off-tree characters
+			ch._mana_regen_acc += ch.mp_regen * delta
+			if ch._mana_regen_acc >= 1.0:
+				var gain: int = int(ch._mana_regen_acc)
+				ch._mana_regen_acc -= gain
+				ch.mana = mini(ch.mana + gain, ch.max_mana)
+				ch.mana_changed.emit(ch.mana, ch.max_mana)
+			ch._on_offline_tick(delta, cd_delta)
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
+			var cur := get_current_character()
+			var is_player: bool = cur != null and cur.character_name == "Player"
 			match k.keycode:
 				KEY_TAB:
 					_switch_party_next()
 				KEY_1, KEY_KP_1:
-					_switch_to_party(0)
+					if not is_player: _switch_to_party(0)
 				KEY_2, KEY_KP_2:
-					_switch_to_party(1)
+					if not is_player: _switch_to_party(1)
 				KEY_3, KEY_KP_3:
-					_switch_to_party(2)
+					if not is_player: _switch_to_party(2)
+				KEY_4, KEY_KP_4:
+					_switch_to_player()
 
 func _switch_party_next() -> void:
 	var party := get_party_characters()
@@ -81,6 +117,12 @@ func _switch_to_party(idx: int) -> void:
 	if idx < party.size():
 		switch_by_name(party[idx].character_name)
 
+func _switch_to_player() -> void:
+	for i in range(_characters.size()):
+		if _characters[i].character_name == "Player":
+			_switch_to(i)
+			return
+
 func _switch_to(idx: int) -> void:
 	if idx == _current:
 		return
@@ -100,6 +142,7 @@ func _switch_to(idx: int) -> void:
 	next_ch.rotation        = saved_rot
 	next_ch.velocity        = Vector3.ZERO
 	next_ch.set_active(true)
+	next_ch.play_spawn_animation()
 
 	_aim_cameras_at(next_ch)
 	character_switched.emit(next_ch)
