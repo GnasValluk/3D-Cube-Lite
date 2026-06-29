@@ -70,3 +70,75 @@ static func pivot(p: Node3D, pos: Vector3) -> Node3D:
 	n.position = pos
 	p.add_child(n)
 	return n
+
+# ── Minecraft skin box (ArrayMesh with per-face UV) ──────────────────────
+static func skin_box(p: Node3D, pos: Vector3, sz: Vector3, mat: Material,
+		front: Vector4, back: Vector4, right: Vector4, left: Vector4, top: Vector4, bottom: Vector4) -> MeshInstance3D:
+	"""
+	Build a box from 6 faces with explicit UV mapping for Minecraft skin textures.
+	Each Vector4 is (pixel_x, pixel_y, pixel_w, pixel_h) on a 64×64 skin texture.
+	Vertex order: CCW from outside for each face.
+	"""
+	var tw := 64.0
+	var th := 64.0
+	var hw := sz.x * 0.5
+	var hh := sz.y * 0.5
+	var hd := sz.z * 0.5
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	# Helper: add one face (4 corners in BL→BR→TR→TL order, each face's own local UV space).
+	# Triangles (0,1,2) and (0,2,3) must be CCW when looking from outside.
+	var add_face := func(c0: Vector3, c1: Vector3, c2: Vector3, c3: Vector3,
+		u0: Vector2, u1: Vector2, u2: Vector2, u3: Vector2):
+		var n := (c1 - c0).cross(c2 - c0).normalized()
+		for v in range(6):
+			var vert := c0; var uv := u0
+			if v == 1: vert = c1; uv = u1
+			if v == 2 or v == 5: vert = c2; uv = u2
+			if v == 3: vert = c0; uv = u0
+			if v == 4: vert = c3; uv = u3
+			st.set_normal(n)
+			st.set_uv(uv / Vector2(tw, th))
+			st.add_vertex(vert)
+
+	# Each face: corners in BL→BR→TR→TL order
+	var F := front
+	add_face.call(
+		Vector3(-hw, -hh, +hd), Vector3(+hw, -hh, +hd), Vector3(+hw, +hh, +hd), Vector3(-hw, +hh, +hd),
+		Vector2(F.x, F.y+F.w), Vector2(F.x+F.z, F.y+F.w), Vector2(F.x+F.z, F.y), Vector2(F.x, F.y))
+
+	var B := back
+	add_face.call(
+		Vector3(+hw, -hh, -hd), Vector3(-hw, -hh, -hd), Vector3(-hw, +hh, -hd), Vector3(+hw, +hh, -hd),
+		Vector2(B.x, B.y+B.w), Vector2(B.x+B.z, B.y+B.w), Vector2(B.x+B.z, B.y), Vector2(B.x, B.y))
+
+	# Right face: local BL = front-bottom (+hw,-hh,+hd), BR = back-bottom (+hw,-hh,-hd)
+	var R := right
+	add_face.call(
+		Vector3(+hw, -hh, +hd), Vector3(+hw, -hh, -hd), Vector3(+hw, +hh, -hd), Vector3(+hw, +hh, +hd),
+		Vector2(R.x, R.y+R.w), Vector2(R.x+R.z, R.y+R.w), Vector2(R.x+R.z, R.y), Vector2(R.x, R.y))
+
+	# Left face: local BL = back-bottom (-hw,-hh,-hd), BR = front-bottom (-hw,-hh,+hd)
+	var L := left
+	add_face.call(
+		Vector3(-hw, -hh, -hd), Vector3(-hw, -hh, +hd), Vector3(-hw, +hh, +hd), Vector3(-hw, +hh, -hd),
+		Vector2(L.x, L.y+L.w), Vector2(L.x+L.z, L.y+L.w), Vector2(L.x+L.z, L.y), Vector2(L.x, L.y))
+
+	var T := top
+	add_face.call(
+		Vector3(-hw, +hh, +hd), Vector3(+hw, +hh, +hd), Vector3(+hw, +hh, -hd), Vector3(-hw, +hh, -hd),
+		Vector2(T.x, T.y+T.w), Vector2(T.x+T.z, T.y+T.w), Vector2(T.x+T.z, T.y), Vector2(T.x, T.y))
+
+	var Bo := bottom
+	add_face.call(
+		Vector3(-hw, -hh, -hd), Vector3(+hw, -hh, -hd), Vector3(+hw, -hh, +hd), Vector3(-hw, -hh, +hd),
+		Vector2(Bo.x, Bo.y+Bo.w), Vector2(Bo.x+Bo.z, Bo.y+Bo.w), Vector2(Bo.x+Bo.z, Bo.y), Vector2(Bo.x, Bo.y))
+
+	var mi := MeshInstance3D.new()
+	mi.mesh = st.commit()
+	mi.position = pos
+	mi.material_override = mat
+	p.add_child(mi)
+	return mi

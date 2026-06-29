@@ -143,7 +143,10 @@ func _spawn_zone() -> void:
 	zone.radius          = zone_radius
 	parent.add_child(zone)
 	zone.setup(global_position, _owner)
-	var gp: Vector3 = Vector3(global_position.x, 0.0, global_position.z)
+
+	var gp: Vector3 = global_position
+	var ground_y: float = _get_ground_y_at(gp)
+	gp.y = ground_y
 
 	var mat_exp: StandardMaterial3D = MeshBuilder.emit_mat(
 		Color(0.85, 0.0, 0.40, 0.8),
@@ -156,12 +159,17 @@ func _spawn_zone() -> void:
 	parent.add_child(sph)
 	sph.global_position = gp
 
-	var tween: Tween = create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(sph, "scale", Vector3(zone_radius * 2, 0.5, zone_radius * 2), 0.3)
-	tween.tween_property(mat_exp, "emission_energy_multiplier", 0.0, 0.4)
-	tween.tween_property(mat_exp, "albedo_color:a", 0.0, 0.4)
-	tween.tween_callback(_kill_node.bind(sph))
+	var st: SceneTreeTimer = get_tree().create_timer(0.5)
+	st.timeout.connect(func():
+		if is_instance_valid(sph):
+			sph.queue_free())
+
+	if parent is Node3D:
+		var tw: Tween = (parent as Node3D).create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(sph, "scale", Vector3(zone_radius * 2, 0.5, zone_radius * 2), 0.3)
+		tw.tween_property(mat_exp, "emission_energy_multiplier", 0.0, 0.4)
+		tw.tween_property(mat_exp, "albedo_color:a", 0.0, 0.4)
 
 	var flash: OmniLight3D = OmniLight3D.new()
 	flash.light_color = Color(0.80, 0.05, 0.55)
@@ -170,8 +178,19 @@ func _spawn_zone() -> void:
 	parent.add_child(flash)
 	flash.global_position = gp
 	var ft: SceneTreeTimer = get_tree().create_timer(0.15)
-	ft.timeout.connect(_kill_node.bind(flash))
+	ft.timeout.connect(func():
+		if is_instance_valid(flash):
+			flash.queue_free())
 
-func _kill_node(node: Node) -> void:
-	if is_instance_valid(node):
-		node.queue_free()
+func _get_ground_y_at(pos: Vector3) -> float:
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return pos.y
+	var query := PhysicsRayQueryParameters3D.new()
+	query.from = pos + Vector3(0, 20, 0)
+	query.to   = pos - Vector3(0, 20, 0)
+	query.collision_mask = 1
+	var result := space.intersect_ray(query)
+	if result.is_empty():
+		return pos.y
+	return result.position.y

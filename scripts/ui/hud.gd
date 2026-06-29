@@ -58,8 +58,8 @@ func _setup_ui() -> void:
 	_dummy_label = Label.new()
 	_dummy_label.position = Vector2(20, 56)
 	_dummy_label.add_theme_font_size_override("font_size", 14)
-	_dummy_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3, 0.7))
-	_dummy_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	_dummy_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5, 0.8))
+	_dummy_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
 	_dummy_label.add_theme_constant_override("shadow_offset_x", 1)
 	_dummy_label.add_theme_constant_override("shadow_offset_y", 1)
 	_dummy_label.text = ""
@@ -81,8 +81,8 @@ func _setup_ui() -> void:
 	_switch_hint = Label.new()
 	_switch_hint.position = Vector2(60, 16)
 	_switch_hint.add_theme_font_size_override("font_size", 11)
-	_switch_hint.add_theme_color_override("font_color", Color(0.5, 0.7, 0.6, 0.5))
-	_switch_hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	_switch_hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.55))
+	_switch_hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	_switch_hint.add_theme_constant_override("shadow_offset_x", 1)
 	_switch_hint.add_theme_constant_override("shadow_offset_y", 1)
 	_switch_hint.text = "Tab=Cycle  1/2/3=Pick  4=Player  I=Inventory  P=Team  M=Map  ESC=Settings  F1=Camera"
@@ -92,15 +92,15 @@ func _setup_ui() -> void:
 	dim_label.name = "DimensionLabel"
 	dim_label.position = Vector2(12, 40)
 	dim_label.add_theme_font_size_override("font_size", 10)
-	dim_label.add_theme_color_override("font_color", Color(0.3, 0.8, 0.7, 0.6))
-	dim_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.4))
+	dim_label.add_theme_color_override("font_color", Color(0.55, 0.55, 0.65, 0.65))
+	dim_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	dim_label.add_theme_constant_override("shadow_offset_x", 1)
 	dim_label.add_theme_constant_override("shadow_offset_y", 1)
 	var owm: OpenWorldManager = get_node_or_null("../WorldManager") as OpenWorldManager
 	if owm:
 		dim_label.text = owm.dimension_name
 	else:
-		dim_label.text = "THẾ GIỚI THỰC TẠI"
+		dim_label.text = "REAL WORLD"
 	add_child(dim_label)
 
 	_setup_settings_icon()
@@ -126,11 +126,11 @@ func _setup_ui() -> void:
 	_build_hint = Label.new()
 	_build_hint.position = Vector2(12, 56)
 	_build_hint.add_theme_font_size_override("font_size", 11)
-	_build_hint.add_theme_color_override("font_color", Color(0.4, 0.7, 1.0, 0.5))
+	_build_hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.6))
 	_build_hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	_build_hint.add_theme_constant_override("shadow_offset_x", 1)
 	_build_hint.add_theme_constant_override("shadow_offset_y", 1)
-	_build_hint.text = "B=Xây dựng"
+	_build_hint.text = "B=Build"
 	add_child(_build_hint)
 
 	_portal_btn = Button.new()
@@ -138,18 +138,18 @@ func _setup_ui() -> void:
 	_portal_btn.size = Vector2(220, 50)
 	_portal_btn.text = "ẤN/BƯỚC VÀO ĐỂ DỊCH CHUYỂN"
 	_portal_btn.add_theme_font_size_override("font_size", 18)
-	_portal_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	_portal_btn.add_theme_color_override("font_color", Color(0.90, 0.90, 0.95, 0.95))
 	var pb_bg := StyleBoxFlat.new()
-	pb_bg.bg_color = Color(0.12, 0.35, 0.60, 0.90)
+	pb_bg.bg_color = Color(0.10, 0.10, 0.18, 0.65)
 	pb_bg.corner_radius_top_left = 10; pb_bg.corner_radius_top_right = 10
 	pb_bg.corner_radius_bottom_left = 10; pb_bg.corner_radius_bottom_right = 10
-	pb_bg.border_width_left = 2; pb_bg.border_width_right = 2
-	pb_bg.border_width_top = 2; pb_bg.border_width_bottom = 2
-	pb_bg.border_color = Color(0.30, 0.70, 1.0, 0.7)
+	pb_bg.border_width_left = 1; pb_bg.border_width_right = 1
+	pb_bg.border_width_top = 1; pb_bg.border_width_bottom = 1
+	pb_bg.border_color = Color(1, 1, 1, 0.12)
 	_portal_btn.add_theme_stylebox_override("normal", pb_bg)
 	var pb_hover := pb_bg.duplicate()
-	pb_hover.bg_color = Color(0.18, 0.45, 0.75, 0.95)
-	pb_hover.border_color = Color(0.50, 0.90, 1.0, 0.9)
+	pb_hover.bg_color = Color(0.15, 0.18, 0.30, 0.75)
+	pb_hover.border_color = Color(0.40, 0.55, 0.90, 0.40)
 	_portal_btn.add_theme_stylebox_override("hover", pb_hover)
 	_portal_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_portal_btn.pressed.connect(_on_portal_click)
@@ -172,19 +172,20 @@ func _setup_loading_overlay() -> void:
 	_load_label = Label.new()
 	_load_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_load_label.add_theme_font_size_override("font_size", 18)
-	_load_label.add_theme_color_override("font_color", Color(0.35, 0.85, 1.0, 0.9))
-	_load_label.text = "ĐANG TẠO THẾ GIỚI..."
+	_load_label.add_theme_color_override("font_color", Color(0.70, 0.70, 0.80, 0.9))
+	_load_label.text = "Generating World..."
 	_load_label.visible = false
 	add_child(_load_label)
 
 	var bar_bg := ColorRect.new()
-	bar_bg.color = Color(0.12, 0.12, 0.18, 0.9)
+	bar_bg.color = Color(0.08, 0.08, 0.14, 0.70)
 	bar_bg.visible = false
 	bar_bg.name = "LoadingBarBg"
 	_load_overlay.add_child(bar_bg)
 
 	_load_bar_fill = ColorRect.new()
-	_load_bar_fill.color = Color(0.30, 0.85, 1.0, 0.85)
+	_load_bar_fill.color = Color(0.35, 0.55, 0.90, 0.80)
+	
 	_load_bar_fill.visible = false
 	_load_overlay.add_child(_load_bar_fill)
 
@@ -194,18 +195,18 @@ func _setup_settings_icon() -> void:
 	_settings_icon.size = Vector2(40, 40)
 	_settings_icon.text = "⚙"
 	_settings_icon.add_theme_font_size_override("font_size", 22)
-	_settings_icon.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 0.6))
+	_settings_icon.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.7))
 	var icon_bg := StyleBoxFlat.new()
-	icon_bg.bg_color = Color(0.06, 0.06, 0.10, 0.55)
+	icon_bg.bg_color = Color(0.08, 0.08, 0.14, 0.65)
 	icon_bg.corner_radius_top_left = 8; icon_bg.corner_radius_top_right = 8
 	icon_bg.corner_radius_bottom_left = 8; icon_bg.corner_radius_bottom_right = 8
 	icon_bg.border_width_left = 1; icon_bg.border_width_right = 1
 	icon_bg.border_width_top = 1; icon_bg.border_width_bottom = 1
-	icon_bg.border_color = Color(0.35, 0.35, 0.45, 0.4)
+	icon_bg.border_color = Color(1, 1, 1, 0.10)
 	_settings_icon.add_theme_stylebox_override("normal", icon_bg)
 	var hover_bg := icon_bg.duplicate()
-	hover_bg.bg_color = Color(0.1, 0.1, 0.18, 0.7)
-	hover_bg.border_color = Color(0.5, 0.5, 0.7, 0.6)
+	hover_bg.bg_color = Color(0.15, 0.18, 0.30, 0.75)
+	hover_bg.border_color = Color(0.40, 0.55, 0.90, 0.40)
 	_settings_icon.add_theme_stylebox_override("hover", hover_bg)
 	_settings_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_settings_icon.pressed.connect(_toggle_settings)
@@ -245,16 +246,16 @@ func _setup_party_hud() -> void:
 		_party_hud.add_child(panel)
 
 		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.06, 0.06, 0.10, 0.92)
-		bg.corner_radius_top_left = 10
-		bg.corner_radius_top_right = 0
-		bg.corner_radius_bottom_left = 10
-		bg.corner_radius_bottom_right = 0
-		bg.border_width_left = 3
-		bg.border_width_right = 0
-		bg.border_width_top = 2
-		bg.border_width_bottom = 2
-		bg.border_color = Color(0.5, 0.5, 0.6, 0.7)
+		bg.bg_color = Color(0.08, 0.08, 0.14, 0.70)
+		bg.corner_radius_top_left = 8
+		bg.corner_radius_top_right = 8
+		bg.corner_radius_bottom_left = 8
+		bg.corner_radius_bottom_right = 8
+		bg.border_width_left = 1
+		bg.border_width_right = 1
+		bg.border_width_top = 1
+		bg.border_width_bottom = 1
+		bg.border_color = Color(1, 1, 1, 0.12)
 		panel.add_theme_stylebox_override("panel", bg)
 
 		var icon := TextureRect.new()
@@ -267,25 +268,25 @@ func _setup_party_hud() -> void:
 		var hp_bg := ColorRect.new()
 		hp_bg.position = Vector2(6, 66)
 		hp_bg.size = Vector2(60, 6)
-		hp_bg.color = Color(0.04, 0.04, 0.08, 0.85)
+		hp_bg.color = Color(0.06, 0.06, 0.10, 0.60)
 		panel.add_child(hp_bg)
 
 		var hp_bar := ColorRect.new()
 		hp_bar.position = Vector2(6, 66)
 		hp_bar.size = Vector2(60, 6)
-		hp_bar.color = Color(0.3, 1.0, 0.3, 0.9)
+		hp_bar.color = Color(0.30, 0.85, 0.30, 0.85)
 		panel.add_child(hp_bar)
 
 		var shield_bar := ColorRect.new()
 		shield_bar.position = Vector2(6, 66)
 		shield_bar.size = Vector2(0, 6)
-		shield_bar.color = Color(1.0, 0.85, 0.0, 0.55)
+		shield_bar.color = Color(1.0, 0.80, 0.20, 0.55)
 		panel.add_child(shield_bar)
 
 		var mana_bar := ColorRect.new()
 		mana_bar.position = Vector2(6, 72)
 		mana_bar.size = Vector2(0, 4)
-		mana_bar.color = Color(0.20, 0.50, 1.0, 0.55)
+		mana_bar.color = Color(0.30, 0.55, 0.95, 0.60)
 		panel.add_child(mana_bar)
 
 		var lbl := Label.new()
@@ -293,7 +294,7 @@ func _setup_party_hud() -> void:
 		lbl.size = Vector2(76, 16)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.add_theme_font_size_override("font_size", 11)
-		lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
+		lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.90, 0.8))
 		lbl.text = "P" if i == 3 else str(i + 1)
 		panel.add_child(lbl)
 
@@ -325,10 +326,6 @@ func _process(delta: float) -> void:
 	if _mgr:
 		_refresh_party_hud()
 		_party_hud.position = Vector2(vp.x - 72, (vp.y - _party_hud.size.y) * 0.5)
-
-	if _inventory_open:
-		_inventory_ui.size = vp
-		_inventory_ui.position = Vector2.ZERO
 
 	if _mini_map:
 		_mini_map.visible = _explore_sys != null and get_parent().has_node("WorldManager")
@@ -446,19 +443,19 @@ func _refresh_party_hud() -> void:
 			d["icon"].modulate = Color(1, 1, 1, 1)
 
 			if active and ch.character_name == active.character_name:
-				bg.border_color = Color(1, 1, 1, 0.95)
+				bg.border_color = Color(1, 1, 1, 0.50)
 				bg.border_width_left = 2
 				bg.border_width_right = 2
 				bg.border_width_top = 2
 				bg.border_width_bottom = 2
-				bg.bg_color = Color(ec.r * 0.25, ec.g * 0.25, ec.b * 0.25, 0.9)
+				bg.bg_color = Color(ec.r * 0.15 + 0.08, ec.g * 0.15 + 0.08, ec.b * 0.15 + 0.14, 0.70)
 			else:
-				bg.border_color = Color(ec.r, ec.g, ec.b, 0.7)
-				bg.border_width_left = 2
-				bg.border_width_right = 2
-				bg.border_width_top = 2
-				bg.border_width_bottom = 2
-				bg.bg_color = Color(0.06, 0.06, 0.10, 0.85)
+				bg.border_color = Color(1, 1, 1, 0.12)
+				bg.border_width_left = 1
+				bg.border_width_right = 1
+				bg.border_width_top = 1
+				bg.border_width_bottom = 1
+				bg.bg_color = Color(0.08, 0.08, 0.14, 0.55)
 		elif i < party.size():
 			var ch: CharacterBase = party[i]
 			d["hp_bar"].visible = true
@@ -497,32 +494,32 @@ func _refresh_party_hud() -> void:
 			d["icon"].modulate = Color(1, 1, 1, 1)
 
 			if active and ch.character_name == active.character_name:
-				bg.border_color = Color(1, 1, 1, 0.95)
+				bg.border_color = Color(1, 1, 1, 0.50)
 				bg.border_width_left = 2
 				bg.border_width_right = 2
 				bg.border_width_top = 2
 				bg.border_width_bottom = 2
-				bg.bg_color = Color(ec.r * 0.25, ec.g * 0.25, ec.b * 0.25, 0.9)
+				bg.bg_color = Color(ec.r * 0.15 + 0.08, ec.g * 0.15 + 0.08, ec.b * 0.15 + 0.14, 0.70)
 			else:
-				bg.border_color = Color(ec.r, ec.g, ec.b, 0.7)
-				bg.border_width_left = 2
-				bg.border_width_right = 2
-				bg.border_width_top = 2
-				bg.border_width_bottom = 2
-				bg.bg_color = Color(0.06, 0.06, 0.10, 0.85)
+				bg.border_color = Color(1, 1, 1, 0.12)
+				bg.border_width_left = 1
+				bg.border_width_right = 1
+				bg.border_width_top = 1
+				bg.border_width_bottom = 1
+				bg.bg_color = Color(0.08, 0.08, 0.14, 0.55)
 		else:
 			d["hp_bar"].visible = false
 			d["shield_bar"].visible = false
 			d["mana_bar"].visible = false
 			d["icon"].texture = null
-			d["icon"].modulate = Color(0.15, 0.15, 0.2, 1)
+			d["icon"].modulate = Color(0.08, 0.08, 0.14, 0.7)
 			d["lbl"].text = "P" if i == 3 else str(i + 1)
-			bg.border_color = Color(0.2, 0.2, 0.3, 0.3)
+			bg.border_color = Color(1, 1, 1, 0.06)
 			bg.border_width_left = 1
 			bg.border_width_right = 1
 			bg.border_width_top = 1
 			bg.border_width_bottom = 1
-			bg.bg_color = Color(0.06, 0.06, 0.10, 0.6)
+			bg.bg_color = Color(0.06, 0.06, 0.10, 0.45)
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
@@ -538,8 +535,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			if _inventory_open:
 				if k.keycode == KEY_I or k.keycode == KEY_E or k.keycode == KEY_ESCAPE:
 					_toggle_inventory()
-				elif k.keycode == KEY_Q:
-					_drop_selected_item()
 				return
 
 			if _placement_sys and _placement_sys.is_placing():
@@ -753,23 +748,10 @@ func _on_build_selected(idx: int) -> void:
 func _on_build_menu_closed() -> void:
 	_build_hint.text = "B=Xây dựng"
 
-func _drop_selected_item() -> void:
-	var player := _find_player_character()
-	if player == null or player.inventory == null:
-		return
-	var idx: int = _inventory_ui._selected_slot
-	if idx >= 0 and idx < player.inventory.slots.size():
-		player.drop_item(idx)
-		_inventory_ui._selected_slot = -1
-		_inventory_ui._clear_selection()
-	else:
-		var hotbar_idx: int = _hotbar.get_selected()
-		player.drop_item(hotbar_idx)
-
 func _setup_world_clock() -> void:
 	_world_clock = Label.new()
 	_world_clock.add_theme_font_size_override("font_size", 14)
-	_world_clock.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0, 0.8))
+	_world_clock.add_theme_color_override("font_color", Color(0.60, 0.60, 0.70, 0.8))
 	_world_clock.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	_world_clock.add_theme_constant_override("shadow_offset_x", 1)
 	_world_clock.add_theme_constant_override("shadow_offset_y", 1)
@@ -778,13 +760,13 @@ func _setup_world_clock() -> void:
 
 func _setup_oxygen_bar() -> void:
 	_oxygen_bar_bg = ColorRect.new()
-	_oxygen_bar_bg.color = Color(0.06, 0.06, 0.10, 0.85)
+	_oxygen_bar_bg.color = Color(0.08, 0.08, 0.14, 0.70)
 	_oxygen_bar_bg.size = Vector2(160, 14)
 	_oxygen_bar_bg.visible = false
 	add_child(_oxygen_bar_bg)
 
 	_oxygen_bar_fill = ColorRect.new()
-	_oxygen_bar_fill.color = Color(0.20, 0.55, 0.80, 0.90)
+	_oxygen_bar_fill.color = Color(0.25, 0.55, 0.90, 0.80)
 	_oxygen_bar_fill.size = Vector2(160, 14)
 	_oxygen_bar_fill.visible = false
 	add_child(_oxygen_bar_fill)

@@ -3,6 +3,7 @@ class_name PlayerAnimator
 var walk_cycle_speed: float = 7.0
 var sprint_cycle_mult: float = 1.6
 var idle_breathe_speed: float = 1.0
+var swim_cycle_speed: float = 4.5
 
 var mesh: PlayerMesh
 var base: CharacterBase
@@ -20,12 +21,14 @@ func animate(delta: float) -> void:
 			_walk(delta, t, 1.0)
 		CharacterBase.State.SPRINT:
 			_walk(delta, t, sprint_cycle_mult)
+		CharacterBase.State.CROUCH:
+			_crouch(delta, t)
 		CharacterBase.State.DASH:
 			_dash(delta, t)
 		CharacterBase.State.JUMP:
-			_air(delta, t)
+			_air(delta, t, true)
 		CharacterBase.State.FALL:
-			_air(delta, t)
+			_air(delta, t, false)
 		CharacterBase.State.HIT:
 			_hit(delta, t)
 		CharacterBase.State.DEAD:
@@ -52,23 +55,35 @@ func _walk(delta: float, t: float, mult: float) -> void:
 	mesh.rig.rotation.z = sin(cyc) * (0.02 + mult * 0.01)
 	mesh.head.rotation.y = lerp(mesh.head.rotation.y, sin(cyc) * -0.06, delta * 6.0)
 	mesh.body.rotation.x = lerp(mesh.body.rotation.x, sin(cyc * 0.5) * 0.03, delta * 5.0)
+
 	mesh.arm_l.rotation.x = sin(cyc + PI) * (0.30 + mult * 0.10)
 	mesh.arm_r.rotation.x = sin(cyc) * (0.30 + mult * 0.10)
 	mesh.leg_l.rotation.x = sin(cyc) * (0.40 + mult * 0.10)
 	mesh.leg_r.rotation.x = sin(cyc + PI) * (0.40 + mult * 0.10)
+
+func _crouch(delta: float, t: float) -> void:
+	var cyc: float = t * walk_cycle_speed * 0.6
+	mesh.rig.position.y = lerp(mesh.rig.position.y, -0.18, delta * 10.0)
+	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.18, delta * 8.0)
+	mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.10, delta * 6.0)
+	mesh.head.rotation.y = lerp(mesh.head.rotation.y, sin(t * 0.2) * 0.08, delta * 4.0)
+	mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.08, delta * 6.0)
+	mesh.arm_l.rotation.x = sin(cyc + PI) * 0.20
+	mesh.arm_r.rotation.x = sin(cyc) * 0.20
+	mesh.leg_l.rotation.x = 0.30 + sin(cyc) * 0.20
+	mesh.leg_r.rotation.x = 0.30 + sin(cyc + PI) * 0.20
 
 func _dash(delta: float, _t: float) -> void:
 	mesh.rig.position.y = lerp(mesh.rig.position.y, 0.02, delta * 18.0)
 	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.30, delta * 18.0)
 	mesh.head.rotation.x = lerp(mesh.head.rotation.x, -0.15, delta * 14.0)
 	mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.20, delta * 16.0)
-	mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.30, delta * 16.0)
-	mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.30, delta * 16.0)
-	mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, -0.40, delta * 18.0)
-	mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, -0.40, delta * 18.0)
+	mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.40, delta * 16.0)
+	mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.40, delta * 16.0)
+	mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, -0.50, delta * 18.0)
+	mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, -0.50, delta * 18.0)
 
-func _air(delta: float, t: float) -> void:
-	var rising: bool = base._state == CharacterBase.State.JUMP
+func _air(delta: float, t: float, rising: bool) -> void:
 	var tuck: float
 	if rising:
 		tuck = clamp(base.velocity.y / base._jump_v, 0.0, 1.0)
@@ -84,14 +99,17 @@ func _air(delta: float, t: float) -> void:
 	mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, -0.20 - tuck * 0.40, delta * 10.0)
 
 func _swim(delta: float, t: float) -> void:
-	var cyc: float = t * 4.0
+	var cyc: float = t * swim_cycle_speed
 	mesh.rig.position.y = lerp(mesh.rig.position.y, 0.02, delta * 6.0)
-	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.15, delta * 8.0)
-	mesh.head.rotation.x = lerp(mesh.head.rotation.x, -0.10, delta * 6.0)
+	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.18, delta * 8.0)
+	mesh.head.rotation.x = lerp(mesh.head.rotation.x, -0.12, delta * 6.0)
+	mesh.body.rotation.x = sin(cyc * 0.5) * 0.06 + 0.10
 	mesh.arm_l.rotation.x = sin(cyc) * 0.60
 	mesh.arm_r.rotation.x = sin(cyc + PI) * 0.60
-	mesh.leg_l.rotation.x = sin(cyc + PI) * 0.40
-	mesh.leg_r.rotation.x = sin(cyc) * 0.40
+	mesh.leg_l.rotation.x = sin(cyc + PI * 0.5) * 0.50
+	mesh.leg_r.rotation.x = sin(cyc - PI * 0.5) * 0.50
+	var kick: float = abs(sin(cyc * 1.5))
+	mesh.rig.position.y += kick * 0.02
 
 func _hit(delta: float, _t: float) -> void:
 	var p: float = 1.0 - (base._hit_timer / 0.18)

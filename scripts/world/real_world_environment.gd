@@ -46,9 +46,7 @@ func _setup_lights() -> void:
 	for lt in all:
 		var l := lt as OmniLight3D
 		if l:
-			l.light_color  = Color(0.90, 0.85, 0.70)
-			l.light_energy = 0.4
-			l.omni_range   = 2.5
+			l.light_energy = 0.0
 
 func _process(delta: float) -> void:
 	_cycle_time += delta

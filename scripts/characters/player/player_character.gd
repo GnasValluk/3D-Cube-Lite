@@ -1,17 +1,16 @@
 extends CharacterBase
 class_name PlayerCharacter
 
-const _ChestScript = preload("res://scripts/items/chest.gd")
-
 var _mesh: PlayerMesh
 var _anim: PlayerAnimator
 var inventory: Inventory = null
 var _inventory_open: bool = false
 var _held_item: Dictionary = {}
 var equipped_weapon: ItemDef = null
-var equipped_armor: ItemDef = null
-var _start_chest = null
-
+var equipped_head: ItemDef = null
+var equipped_body: ItemDef = null
+var equipped_legs: ItemDef = null
+var equipped_feet: ItemDef = null
 func _build_character() -> void:
 	move_speed = 4.2
 	sprint_speed = 8.5
@@ -50,7 +49,6 @@ func _build_character() -> void:
 	Inventory.seed_inventory(inventory)
 
 	_setup_pickup_area()
-	call_deferred("_spawn_start_chest")
 
 func _setup_pickup_area() -> void:
 	var pickup := Area3D.new()
@@ -74,28 +72,14 @@ func _on_pickup_area_entered(area: Area3D) -> void:
 		else:
 			item.item_count = remaining
 
-func _spawn_start_chest() -> void:
+func interact_with_nearby() -> void:
 	var world := get_tree().current_scene
 	if world == null:
 		return
-	var chest := _ChestScript.new()
-	var forward: Vector3 = -global_transform.basis.z
-	chest.position = global_position + forward * 3.0 + Vector3(0, 0, 0)
-	chest.position.y = 0.0
-	world.add_child(chest)
-	_start_chest = chest
-
-	var db: Dictionary = Inventory.create_item_db()
-	var gate_def: ItemDef = db.get("twilight_gate")
-	if gate_def:
-		chest.inventory.add_item(gate_def, 1)
-
-func interact_with_nearby() -> void:
-	if _start_chest == null:
-		return
-	var dist: float = global_position.distance_to(_start_chest.global_position)
-	if dist < 3.0:
-		_start_chest.open_ui()
+	for child in world.get_children():
+		if child is Chest and child.is_player_nearby():
+			child.open_ui()
+			return
 
 func pickup_item(item_def: ItemDef, count: int) -> int:
 	if inventory == null:
@@ -109,8 +93,8 @@ func _scroll_inventory_message(msg: String) -> void:
 	var label := Label.new()
 	label.text = msg
 	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", Color(0.7, 1.0, 0.7, 0.9))
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	label.add_theme_color_override("font_color", Color(0.85, 0.95, 0.75, 0.9))
+	label.add_theme_color_override("font_shadow_color", Color(0.3, 0.2, 0.15, 0.7))
 	label.add_theme_constant_override("shadow_offset_x", 1)
 	label.add_theme_constant_override("shadow_offset_y", 1)
 	label.position = Vector2(300, 300)
@@ -164,8 +148,12 @@ func use_item_from_inventory(idx: int) -> void:
 				inventory.add_item(old, 1)
 			_scroll_inventory_message("Trang bị: " + item.name)
 		ItemDef.Type.ARMOR:
-			var old: ItemDef = equipped_armor
-			equipped_armor = item
+			var old: ItemDef
+			match item.armor_slot:
+				ItemDef.ArmorSlot.HEAD: old = equipped_head; equipped_head = item
+				ItemDef.ArmorSlot.BODY: old = equipped_body; equipped_body = item
+				ItemDef.ArmorSlot.LEGS: old = equipped_legs; equipped_legs = item
+				ItemDef.ArmorSlot.FEET: old = equipped_feet; equipped_feet = item
 			inventory.remove_item(idx, 1)
 			if old != null:
 				inventory.add_item(old, 1)
@@ -185,9 +173,8 @@ func _place_twilight_gate(idx: int) -> void:
 	inventory.remove_item(idx, 1)
 	var portal := PortalGate.new()
 	portal.name = "PortalGate"
-	var forward: Vector3 = -global_transform.basis.z
-	portal.position = global_position + forward * 2.5
-	portal.position.y = 0.0
+	portal.position = global_position + -global_transform.basis.z * 2.5
+	portal.position.y = 0.25
 	world.add_child(portal)
 	_scroll_inventory_message("Đã đặt Cổng Twilight!")
 
@@ -216,8 +203,9 @@ func get_total_atk() -> int:
 
 func get_total_def() -> int:
 	var base: int = defense
-	if equipped_armor != null:
-		base += equipped_armor.def_bonus
+	for slot in [equipped_head, equipped_body, equipped_legs, equipped_feet]:
+		if slot != null:
+			base += slot.def_bonus
 	return base
 
 func _unhandled_key_input(event: InputEvent) -> void:

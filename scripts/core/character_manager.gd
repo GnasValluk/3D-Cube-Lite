@@ -45,6 +45,9 @@ func _ready() -> void:
 		ch.set_physics_process(false)
 		ch.set_process_unhandled_input(false)
 		ch.set_process_unhandled_key_input(false)
+		var pl := ch.get_node_or_null("PlayerLight") as OmniLight3D
+		if pl:
+			pl.light_energy = 0.0
 
 	await get_tree().process_frame
 

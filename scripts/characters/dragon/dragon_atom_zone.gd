@@ -17,9 +17,23 @@ var _light: OmniLight3D
 var _mats: Array[StandardMaterial3D] = []
 var _fading: bool = false
 
+func _get_ground_y_at(pos: Vector3) -> float:
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return pos.y
+	var query := PhysicsRayQueryParameters3D.new()
+	query.from = pos + Vector3(0, 20, 0)
+	query.to   = pos - Vector3(0, 20, 0)
+	query.collision_mask = 1
+	var result := space.intersect_ray(query)
+	if result.is_empty():
+		return pos.y
+	return result.position.y
+
 func setup(pos: Vector3, owner: Node3D) -> void:
 	_owner = owner
-	global_position = Vector3(pos.x, 0.0, pos.z)
+	var ground_y: float = _get_ground_y_at(pos)
+	global_position = Vector3(pos.x, ground_y, pos.z)
 	_build()
 
 func _mat(c: Color, e: Color, en: float) -> StandardMaterial3D:

@@ -1,29 +1,71 @@
 class_name InventoryUI
 extends Control
 
-const SLOT_SIZE: float = 44.0
-const GAP: float = 4.0
+const SLOT_SIZE: float = 50.0
+const GAP: float = 5.0
 const COLS: int = 9
+const PAD: float = 18.0
+
+const GRID_W: float = COLS * (SLOT_SIZE + GAP) - GAP
+const STAT_W: float = 190.0
+const CONTENT_W: float = PAD + GRID_W + 12 + STAT_W + PAD
+const EQUIP_H: float = 154.0
+const CONTENT_H: float = PAD + 40 + 140 + 10 + EQUIP_H + PAD
 
 var _inventory: Inventory = null
 var _player_ref: PlayerCharacter = null
 var _slots: Array[Panel] = []
-var _slot_icons: Array[ColorRect] = []
+var _slot_faces: Array[ColorRect] = []
 var _slot_count_labels: Array[Label] = []
-var _slot_bg_styles: Array[StyleBoxFlat] = []
 var _selected_slot: int = -1
 var _tooltip: Label
+var _tooltip_bg: ColorRect
 var _hp_label: Label
 var _mp_label: Label
 var _atk_label: Label
 var _def_label: Label
 var _count_label: Label
-var _equip_weapon_icon: ColorRect
-var _equip_armor_icon: ColorRect
-var _equip_weapon_label: Label
-var _equip_armor_label: Label
+var _equip_faces: Array[ColorRect] = []
+var _equip_labels: Array[Label] = []
+var _equip_names: Array[String] = ["Head", "Body", "Legs", "Feet"]
+
+var _glass_style: StyleBoxFlat
+var _slot_style: StyleBoxFlat
+var _slot_hl_style: StyleBoxFlat
 
 func _ready() -> void:
+	size = Vector2(CONTENT_W, CONTENT_H)
+	set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	_glass_style = StyleBoxFlat.new()
+	_glass_style.bg_color = Color(0.10, 0.10, 0.16, 0.70)
+	_glass_style.corner_radius_top_left = 10
+	_glass_style.corner_radius_top_right = 10
+	_glass_style.corner_radius_bottom_left = 10
+	_glass_style.corner_radius_bottom_right = 10
+	_glass_style.border_width_left = 1
+	_glass_style.border_width_right = 1
+	_glass_style.border_width_top = 1
+	_glass_style.border_width_bottom = 1
+	_glass_style.border_color = Color(1, 1, 1, 0.12)
+
+	_slot_style = StyleBoxFlat.new()
+	_slot_style.bg_color = Color(0.08, 0.08, 0.14, 0.70)
+	_slot_style.corner_radius_top_left = 4
+	_slot_style.corner_radius_top_right = 4
+	_slot_style.corner_radius_bottom_left = 4
+	_slot_style.corner_radius_bottom_right = 4
+	_slot_style.border_width_left = 1
+	_slot_style.border_width_right = 1
+	_slot_style.border_width_top = 1
+	_slot_style.border_width_bottom = 1
+	_slot_style.border_color = Color(1, 1, 1, 0.10)
+
+	_slot_hl_style = _slot_style.duplicate()
+	_slot_hl_style.bg_color = Color(0.20, 0.22, 0.34, 0.75)
+	_slot_hl_style.border_color = Color(0.40, 0.55, 0.90, 0.40)
+
 	_setup_background()
 	_setup_title()
 	_setup_grid()
@@ -31,219 +73,213 @@ func _ready() -> void:
 	_setup_equipment_panel()
 	_setup_tooltip()
 	visible = false
-	mouse_filter = Control.MOUSE_FILTER_STOP
 
 func _setup_background() -> void:
-	var bg := ColorRect.new()
-	bg.color = Color(0.04, 0.04, 0.08, 0.92)
+	var bg := Panel.new()
+	bg.size = Vector2(CONTENT_W, CONTENT_H)
+	bg.add_theme_stylebox_override("panel", _glass_style)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bg)
-	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 func _setup_title() -> void:
 	var title := Label.new()
-	title.text = "TÚI ĐỒ"
+	title.text = "Inventory"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	title.add_theme_font_size_override("font_size", 22)
-	title.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0, 0.9))
-	title.position = Vector2(30, 20)
-	title.size = Vector2(200, 30)
+	title.add_theme_color_override("font_color", Color(1, 1, 1, 0.90))
+	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	title.add_theme_constant_override("shadow_offset_x", 1)
+	title.add_theme_constant_override("shadow_offset_y", 1)
+	title.position = Vector2(PAD, PAD - 2)
+	title.size = Vector2(200, 28)
 	add_child(title)
 
 	_count_label = Label.new()
 	_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	_count_label.add_theme_font_size_override("font_size", 11)
-	_count_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6, 0.6))
-	_count_label.position = Vector2(30, 44)
-	_count_label.size = Vector2(200, 16)
+	_count_label.add_theme_font_size_override("font_size", 12)
+	_count_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.35))
+	_count_label.position = Vector2(PAD + 220, PAD + 1)
+	_count_label.size = Vector2(180, 16)
 	add_child(_count_label)
 
 func _setup_grid() -> void:
-	var grid_w: float = COLS * (SLOT_SIZE + GAP) - GAP
-	var start_x: float = 30.0
-	var storage_rows: int = 4
-	var start_y: float = 70.0
+	var grid_y: float = PAD + 40
+	var rows: int = 4
 
-	for row in range(storage_rows):
+	for row in range(rows):
 		for col in range(COLS):
 			var i: int = row * COLS + col
-			var px: float = start_x + col * (SLOT_SIZE + GAP)
-			var py: float = start_y + row * (SLOT_SIZE + GAP)
+			var px: float = PAD + col * (SLOT_SIZE + GAP)
+			var py: float = grid_y + row * (SLOT_SIZE + GAP)
 
 			var panel := Panel.new()
 			panel.size = Vector2(SLOT_SIZE, SLOT_SIZE)
 			panel.position = Vector2(px, py)
+			panel.add_theme_stylebox_override("panel", _slot_style)
 			panel.mouse_filter = Control.MOUSE_FILTER_STOP
 			panel.gui_input.connect(_on_slot_gui_input.bind(i))
 			panel.mouse_entered.connect(_on_slot_mouse_entered.bind(i))
 			panel.mouse_exited.connect(_on_slot_mouse_exited)
 			add_child(panel)
 
-			var bg := StyleBoxFlat.new()
-			bg.bg_color = Color(0.08, 0.08, 0.12, 0.85)
-			bg.border_width_left = 1
-			bg.border_width_right = 1
-			bg.border_width_top = 1
-			bg.border_width_bottom = 1
-			bg.border_color = Color(0.2, 0.2, 0.3, 0.4)
-			panel.add_theme_stylebox_override("panel", bg)
-			_slot_bg_styles.append(bg)
-
-			var icon := ColorRect.new()
-			icon.position = Vector2(3, 3)
-			icon.size = Vector2(SLOT_SIZE - 6, SLOT_SIZE - 6)
-			icon.color = Color(0.15, 0.15, 0.20, 0.3)
-			panel.add_child(icon)
-			_slot_icons.append(icon)
+			var face := ColorRect.new()
+			face.position = Vector2(2, 2)
+			face.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
+			face.color = Color(0.15, 0.15, 0.22, 0.4)
+			panel.add_child(face)
+			_slot_faces.append(face)
 
 			var cnt := Label.new()
 			cnt.position = Vector2(2, SLOT_SIZE - 18)
 			cnt.size = Vector2(SLOT_SIZE - 4, 14)
 			cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			cnt.add_theme_font_size_override("font_size", 10)
-			cnt.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
+			cnt.add_theme_font_size_override("font_size", 11)
+			cnt.add_theme_color_override("font_color", Color(1, 1, 1, 0.70))
 			panel.add_child(cnt)
 			_slot_count_labels.append(cnt)
 
 			_slots.append(panel)
 
 func _setup_status_panel() -> void:
-	var sx: float = 30.0 + COLS * (SLOT_SIZE + GAP) + 20.0
-	var sy: float = 70.0
+	var sx: float = PAD + GRID_W + 12
+	var sy: float = PAD + 40
 
-	var stat_bg := ColorRect.new()
-	stat_bg.color = Color(0.06, 0.06, 0.10, 0.85)
-	stat_bg.position = Vector2(sx, sy)
-	stat_bg.size = Vector2(170, 140)
-	add_child(stat_bg)
+	var stat := Panel.new()
+	stat.position = Vector2(sx, sy)
+	stat.size = Vector2(STAT_W, 140)
+	var st_style := _glass_style.duplicate()
+	st_style.bg_color = Color(0.08, 0.08, 0.14, 0.45)
+	st_style.corner_radius_top_left = 8
+	st_style.corner_radius_top_right = 8
+	st_style.corner_radius_bottom_left = 8
+	st_style.corner_radius_bottom_right = 8
+	stat.add_theme_stylebox_override("panel", st_style)
+	add_child(stat)
 
 	var stat_title := Label.new()
-	stat_title.text = "THÔNG TIN"
-	stat_title.position = Vector2(sx + 8, sy + 8)
-	stat_title.add_theme_font_size_override("font_size", 12)
-	stat_title.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0, 0.8))
+	stat_title.text = "Stats"
+	stat_title.position = Vector2(sx + 12, sy + 8)
+	stat_title.add_theme_font_size_override("font_size", 15)
+	stat_title.add_theme_color_override("font_color", Color(1, 1, 1, 0.80))
 	add_child(stat_title)
 
 	_hp_label = Label.new()
-	_hp_label.position = Vector2(sx + 8, sy + 30)
-	_hp_label.add_theme_font_size_override("font_size", 11)
-	_hp_label.add_theme_color_override("font_color", Color(0.3, 1.0, 0.3, 0.8))
+	_hp_label.position = Vector2(sx + 12, sy + 34)
+	_hp_label.add_theme_font_size_override("font_size", 13)
+	_hp_label.add_theme_color_override("font_color", Color(0.30, 0.85, 0.30))
 	add_child(_hp_label)
 
 	_mp_label = Label.new()
-	_mp_label.position = Vector2(sx + 8, sy + 48)
-	_mp_label.add_theme_font_size_override("font_size", 11)
-	_mp_label.add_theme_color_override("font_color", Color(0.3, 0.6, 1.0, 0.8))
+	_mp_label.position = Vector2(sx + 12, sy + 54)
+	_mp_label.add_theme_font_size_override("font_size", 13)
+	_mp_label.add_theme_color_override("font_color", Color(0.30, 0.55, 0.95))
 	add_child(_mp_label)
 
 	_atk_label = Label.new()
-	_atk_label.position = Vector2(sx + 8, sy + 66)
-	_atk_label.add_theme_font_size_override("font_size", 11)
-	_atk_label.add_theme_color_override("font_color", Color(0.8, 0.6, 0.3, 0.8))
+	_atk_label.position = Vector2(sx + 12, sy + 74)
+	_atk_label.add_theme_font_size_override("font_size", 13)
+	_atk_label.add_theme_color_override("font_color", Color(0.85, 0.60, 0.25))
 	add_child(_atk_label)
 
 	_def_label = Label.new()
-	_def_label.position = Vector2(sx + 8, sy + 84)
-	_def_label.add_theme_font_size_override("font_size", 11)
-	_def_label.add_theme_color_override("font_color", Color(0.6, 0.8, 0.6, 0.8))
+	_def_label.position = Vector2(sx + 12, sy + 94)
+	_def_label.add_theme_font_size_override("font_size", 13)
+	_def_label.add_theme_color_override("font_color", Color(0.55, 0.80, 0.55))
 	add_child(_def_label)
 
-	var drop_hint := Label.new()
-	drop_hint.text = "Q = Vứt bỏ  |  Chuột Phải = Dùng"
-	drop_hint.position = Vector2(sx + 8, sy + 115)
-	drop_hint.add_theme_font_size_override("font_size", 9)
-	drop_hint.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5, 0.5))
-	add_child(drop_hint)
+	var dh := Label.new()
+	dh.text = "Q = Drop  |  Right-click = Use"
+	dh.position = Vector2(sx + 12, sy + 120)
+	dh.add_theme_font_size_override("font_size", 10)
+	dh.add_theme_color_override("font_color", Color(1, 1, 1, 0.30))
+	add_child(dh)
 
 func _setup_equipment_panel() -> void:
-	var sx: float = 30.0 + COLS * (SLOT_SIZE + GAP) + 20.0
-	var sy: float = 70.0 + 140 + 16
+	var sx: float = PAD + GRID_W + 12
+	var sy: float = PAD + 40 + 140 + 10
 
-	var eq_bg := ColorRect.new()
-	eq_bg.color = Color(0.06, 0.06, 0.10, 0.85)
-	eq_bg.position = Vector2(sx, sy)
-	eq_bg.size = Vector2(170, 110)
-	add_child(eq_bg)
+	var eq := Panel.new()
+	eq.position = Vector2(sx, sy)
+	eq.size = Vector2(STAT_W, EQUIP_H)
+	var eq_style := _glass_style.duplicate()
+	eq_style.bg_color = Color(0.08, 0.08, 0.14, 0.45)
+	eq_style.corner_radius_top_left = 8
+	eq_style.corner_radius_top_right = 8
+	eq_style.corner_radius_bottom_left = 8
+	eq_style.corner_radius_bottom_right = 8
+	eq.add_theme_stylebox_override("panel", eq_style)
+	add_child(eq)
 
 	var eq_title := Label.new()
-	eq_title.text = "TRANG BỊ"
-	eq_title.position = Vector2(sx + 8, sy + 8)
-	eq_title.add_theme_font_size_override("font_size", 12)
-	eq_title.add_theme_color_override("font_color", Color(0.7, 0.9, 1.0, 0.8))
+	eq_title.text = "Equipment"
+	eq_title.position = Vector2(sx + 12, sy + 8)
+	eq_title.add_theme_font_size_override("font_size", 15)
+	eq_title.add_theme_color_override("font_color", Color(1, 1, 1, 0.80))
 	add_child(eq_title)
 
-	var esize: float = 50.0
-	var egap: float = 8.0
-	var estart_x: float = sx + 8.0
-	var estart_y: float = sy + 30.0
+	var esize: float = 48.0
+	var gap: float = 6.0
+	var cols: int = 2
+	var gx: float = sx + 14.0
+	var gy: float = sy + 34.0
 
-	var weapon_panel := Panel.new()
-	weapon_panel.position = Vector2(estart_x, estart_y)
-	weapon_panel.size = Vector2(esize, esize)
-	var wbg := StyleBoxFlat.new()
-	wbg.bg_color = Color(0.08, 0.08, 0.12, 0.9)
-	wbg.border_width_left = 1; wbg.border_width_right = 1
-	wbg.border_width_top = 1; wbg.border_width_bottom = 1
-	wbg.border_color = Color(0.3, 0.3, 0.5, 0.5)
-	weapon_panel.add_theme_stylebox_override("panel", wbg)
-	add_child(weapon_panel)
-	var wlbl := Label.new()
-	wlbl.text = "VK"
-	wlbl.position = Vector2(estart_x, estart_y + esize + 1)
-	wlbl.size = Vector2(esize, 14)
-	wlbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	wlbl.add_theme_font_size_override("font_size", 8)
-	wlbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.5))
-	add_child(wlbl)
-	_equip_weapon_icon = ColorRect.new()
-	_equip_weapon_icon.position = Vector2(4, 4)
-	_equip_weapon_icon.size = Vector2(esize - 8, esize - 8)
-	_equip_weapon_icon.color = Color(0.15, 0.15, 0.20, 0.5)
-	weapon_panel.add_child(_equip_weapon_icon)
-	_equip_weapon_label = Label.new()
-	_equip_weapon_label.position = Vector2(estart_x + esize + egap, estart_y + 4)
-	_equip_weapon_label.size = Vector2(100, 20)
-	_equip_weapon_label.add_theme_font_size_override("font_size", 10)
-	_equip_weapon_label.add_theme_color_override("font_color", Color(0.8, 0.6, 0.3, 0.8))
-	add_child(_equip_weapon_label)
+	var equip_colors: Array[Color] = [
+		Color(0.40, 0.70, 0.95),
+		Color(0.55, 0.80, 0.55),
+		Color(0.75, 0.60, 0.85),
+		Color(0.90, 0.70, 0.40)
+	]
+	var lx: float = gx + 2 * (esize + gap) + 8
 
-	var armor_panel := Panel.new()
-	armor_panel.position = Vector2(estart_x, estart_y + esize + 16)
-	armor_panel.size = Vector2(esize, esize)
-	var abg := StyleBoxFlat.new()
-	abg.bg_color = Color(0.08, 0.08, 0.12, 0.9)
-	abg.border_width_left = 1; abg.border_width_right = 1
-	abg.border_width_top = 1; abg.border_width_bottom = 1
-	abg.border_color = Color(0.3, 0.3, 0.5, 0.5)
-	armor_panel.add_theme_stylebox_override("panel", abg)
-	add_child(armor_panel)
-	var albl := Label.new()
-	albl.text = "AP"
-	albl.position = Vector2(estart_x, estart_y + esize + 17 + esize)
-	albl.size = Vector2(esize, 14)
-	albl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	albl.add_theme_font_size_override("font_size", 8)
-	albl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.5))
-	add_child(albl)
-	_equip_armor_icon = ColorRect.new()
-	_equip_armor_icon.position = Vector2(4, 4)
-	_equip_armor_icon.size = Vector2(esize - 8, esize - 8)
-	_equip_armor_icon.color = Color(0.15, 0.15, 0.20, 0.5)
-	armor_panel.add_child(_equip_armor_icon)
-	_equip_armor_label = Label.new()
-	_equip_armor_label.position = Vector2(estart_x + esize + egap, estart_y + esize + 16 + 4)
-	_equip_armor_label.size = Vector2(100, 20)
-	_equip_armor_label.add_theme_font_size_override("font_size", 10)
-	_equip_armor_label.add_theme_color_override("font_color", Color(0.6, 0.8, 0.6, 0.8))
-	add_child(_equip_armor_label)
+	for i in range(4):
+		var row: int = i / cols
+		var col: int = i % cols
+		var px: float = gx + col * (esize + gap)
+		var py: float = gy + row * (esize + 18)
+
+		var panel := Panel.new()
+		panel.position = Vector2(px, py)
+		panel.size = Vector2(esize, esize)
+		panel.add_theme_stylebox_override("panel", _slot_style)
+		add_child(panel)
+
+		var face := ColorRect.new()
+		face.position = Vector2(2, 2)
+		face.size = Vector2(esize - 4, esize - 4)
+		face.color = Color(0.15, 0.15, 0.22, 0.4)
+		panel.add_child(face)
+		_equip_faces.append(face)
+
+		var name_lbl := Label.new()
+		name_lbl.text = _equip_names[i]
+		name_lbl.position = Vector2(px, py + esize + 1)
+		name_lbl.size = Vector2(esize, 14)
+		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		name_lbl.add_theme_font_size_override("font_size", 9)
+		name_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.35))
+		add_child(name_lbl)
+
+		var item_label := Label.new()
+		item_label.position = Vector2(lx, py + 4)
+		item_label.size = Vector2(STAT_W - (lx - sx), 18)
+		item_label.add_theme_font_size_override("font_size", 11)
+		item_label.add_theme_color_override("font_color", equip_colors[i])
+		add_child(item_label)
+		_equip_labels.append(item_label)
 
 func _setup_tooltip() -> void:
+	_tooltip_bg = ColorRect.new()
+	_tooltip_bg.color = Color(0.06, 0.06, 0.10, 0.90)
+	_tooltip_bg.visible = false
+	_tooltip_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_tooltip_bg)
+
 	_tooltip = Label.new()
 	_tooltip.position = Vector2.ZERO
-	_tooltip.size = Vector2(240, 60)
-	_tooltip.add_theme_font_size_override("font_size", 12)
+	_tooltip.size = Vector2(280, 80)
+	_tooltip.add_theme_font_size_override("font_size", 13)
 	_tooltip.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	_tooltip.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
+	_tooltip.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	_tooltip.add_theme_constant_override("shadow_offset_x", 1)
 	_tooltip.add_theme_constant_override("shadow_offset_y", 1)
 	_tooltip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -307,52 +343,41 @@ func _on_slot_mouse_entered(idx: int) -> void:
 	var slot: ItemSlot = _inventory.slots[idx]
 	if slot.is_empty():
 		_tooltip.visible = false
+		_tooltip_bg.visible = false
 		return
-	var tooltip_text: String = slot.item.name
+	var tt: String = slot.item.name
 	if slot.item.desc.length() > 0:
-		tooltip_text += "\n" + slot.item.desc
+		tt += "\n" + slot.item.desc
 	if slot.item.atk_bonus > 0:
-		tooltip_text += "\nTấn công: +" + str(slot.item.atk_bonus)
+		tt += "\nATK: +" + str(slot.item.atk_bonus)
 	if slot.item.def_bonus > 0:
-		tooltip_text += "\nPhòng thủ: +" + str(slot.item.def_bonus)
+		tt += "\nDEF: +" + str(slot.item.def_bonus)
 	if slot.item.heal_amount > 0:
-		tooltip_text += "\nHồi máu: " + str(slot.item.heal_amount)
-	var type_name: String = slot.item.get_type_name()
-	if type_name.length() > 0:
-		tooltip_text += "\n[" + type_name + "]"
-	_tooltip.text = tooltip_text
+		tt += "\nHeal: " + str(slot.item.heal_amount)
+	var tn: String = slot.item.get_type_name()
+	if tn.length() > 0:
+		tt += "\n[" + tn + "]"
+	if slot.item.type == ItemDef.Type.ARMOR:
+		tt += "\n[" + slot.item.get_armor_slot_name() + "]"
+	_tooltip.text = tt
+	_tooltip_bg.size = _tooltip.size + Vector2(8, 8)
+	_tooltip_bg.visible = true
 	_tooltip.visible = true
 
 func _on_slot_mouse_exited() -> void:
 	_tooltip.visible = false
+	_tooltip_bg.visible = false
 
 func _highlight_slot(idx: int) -> void:
-	for i in range(_slot_bg_styles.size()):
-		var bg: StyleBoxFlat = _slot_bg_styles[i]
+	for i in range(_slots.size()):
 		if i == idx:
-			bg.border_color = Color(1, 1, 1, 0.8)
-			bg.border_width_left = 2
-			bg.border_width_right = 2
-			bg.border_width_top = 2
-			bg.border_width_bottom = 2
-			bg.bg_color = Color(0.15, 0.15, 0.25, 0.9)
+			_slots[i].add_theme_stylebox_override("panel", _slot_hl_style)
 		else:
-			bg.border_color = Color(0.2, 0.2, 0.3, 0.4)
-			bg.border_width_left = 1
-			bg.border_width_right = 1
-			bg.border_width_top = 1
-			bg.border_width_bottom = 1
-			bg.bg_color = Color(0.08, 0.08, 0.12, 0.85)
+			_slots[i].add_theme_stylebox_override("panel", _slot_style)
 
 func _clear_selection() -> void:
-	for i in range(_slot_bg_styles.size()):
-		var bg: StyleBoxFlat = _slot_bg_styles[i]
-		bg.border_color = Color(0.2, 0.2, 0.3, 0.4)
-		bg.border_width_left = 1
-		bg.border_width_right = 1
-		bg.border_width_top = 1
-		bg.border_width_bottom = 1
-		bg.bg_color = Color(0.08, 0.08, 0.12, 0.85)
+	for i in range(_slots.size()):
+		_slots[i].add_theme_stylebox_override("panel", _slot_style)
 
 func set_inventory(inv: Inventory) -> void:
 	_inventory = inv
@@ -366,10 +391,11 @@ func _process(_delta: float) -> void:
 	for i in range(_inventory.slots.size()):
 		var slot: ItemSlot = _inventory.slots[i]
 		if slot.is_empty():
-			_slot_icons[i].color = Color(0.15, 0.15, 0.20, 0.3)
+			var col = Color(0.15, 0.15, 0.22, 0.4) if i != _selected_slot else Color(0.25, 0.28, 0.40, 0.5)
+			_slot_faces[i].color = col
 			_slot_count_labels[i].text = ""
 		else:
-			_slot_icons[i].color = slot.item.icon_color
+			_slot_faces[i].color = slot.item.icon_color
 			_slot_count_labels[i].text = str(slot.count) if slot.count > 1 else ""
 
 	if _player_ref:
@@ -380,23 +406,25 @@ func _process(_delta: float) -> void:
 		_update_equipment_display(_player_ref)
 
 	var filled: int = _inventory.count_filled_slots()
-	_count_label.text = "Đã dùng: %d / %d" % [filled, _inventory.slots.size()]
+	_count_label.text = "Used: %d / %d" % [filled, _inventory.slots.size()]
 
 	if _tooltip.visible:
 		var mp: Vector2 = get_global_mouse_position()
 		_tooltip.position = mp + Vector2(16, 16)
+		_tooltip_bg.position = mp + Vector2(14, 14)
 
 func _update_equipment_display(player: PlayerCharacter) -> void:
-	if player.equipped_weapon != null:
-		_equip_weapon_icon.color = player.equipped_weapon.icon_color
-		_equip_weapon_label.text = player.equipped_weapon.name
-	else:
-		_equip_weapon_icon.color = Color(0.15, 0.15, 0.20, 0.3)
-		_equip_weapon_label.text = ""
-
-	if player.equipped_armor != null:
-		_equip_armor_icon.color = player.equipped_armor.icon_color
-		_equip_armor_label.text = player.equipped_armor.name
-	else:
-		_equip_armor_icon.color = Color(0.15, 0.15, 0.20, 0.3)
-		_equip_armor_label.text = ""
+	var equipped: Array = [
+		player.equipped_head,
+		player.equipped_body,
+		player.equipped_legs,
+		player.equipped_feet
+	]
+	for i in range(4):
+		var item: ItemDef = equipped[i] as ItemDef
+		if item != null:
+			_equip_faces[i].color = item.icon_color
+			_equip_labels[i].text = item.name
+		else:
+			_equip_faces[i].color = Color(0.15, 0.15, 0.22, 0.4)
+			_equip_labels[i].text = ""

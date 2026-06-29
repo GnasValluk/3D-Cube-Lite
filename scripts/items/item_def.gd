@@ -1,6 +1,7 @@
 class_name ItemDef
 
 enum Type { BLOCK, TOOL, WEAPON, FOOD, MATERIAL, ARMOR }
+enum ArmorSlot { HEAD, BODY, LEGS, FEET }
 
 var id: String
 var name: String
@@ -13,10 +14,11 @@ var desc: String
 var heal_amount: int
 var atk_bonus: int
 var def_bonus: int
+var armor_slot: int = ArmorSlot.BODY
 
 func _init(p_id: String, p_name: String, p_type: int, p_color: Color, p_char: String,
 		   p_desc: String = "", p_stackable: bool = true, p_max: int = 64,
-		   p_heal: int = 0, p_atk: int = 0, p_def: int = 0):
+		   p_heal: int = 0, p_atk: int = 0, p_def: int = 0, p_armor_slot: int = -1):
 	id = p_id
 	name = p_name
 	type = p_type
@@ -28,6 +30,8 @@ func _init(p_id: String, p_name: String, p_type: int, p_color: Color, p_char: St
 	heal_amount = p_heal
 	atk_bonus = p_atk
 	def_bonus = p_def
+	if p_armor_slot >= 0:
+		armor_slot = p_armor_slot
 
 func get_type_name() -> String:
 	match type:
@@ -37,6 +41,14 @@ func get_type_name() -> String:
 		Type.FOOD:     return "Thức ăn"
 		Type.MATERIAL: return "Nguyên liệu"
 		Type.ARMOR:    return "Giáp"
+	return ""
+
+func get_armor_slot_name() -> String:
+	match armor_slot:
+		ArmorSlot.HEAD: return "Đầu"
+		ArmorSlot.BODY: return "Thân"
+		ArmorSlot.LEGS: return "Chân"
+		ArmorSlot.FEET: return "Bàn chân"
 	return ""
 
 func is_equippable() -> bool:

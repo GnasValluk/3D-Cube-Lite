@@ -20,7 +20,7 @@ var _initial_generated: bool = false
 
 func _ready() -> void:
 	dimension_name = _Dim.DIM_NAME.get(dimension_id, "Unknown")
-	_spawn_return_portal()
+	# _spawn_return_portal()
 
 func _find_player() -> void:
 	var mgr := get_node("../CharacterManager") as CharacterManager

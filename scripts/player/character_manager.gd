@@ -34,11 +34,13 @@ func _ready() -> void:
 	_iso_rig = scene_root.get_node_or_null("CameraRig")
 	_tp_rig  = scene_root.get_node_or_null("TPCameraRig")
 
-	# Tắt tất cả nhân vật trước, rồi bật nhân vật đầu tiên
 	for i in range(_characters.size()):
 		_characters[i].set_physics_process(false)
 		_characters[i].set_process_unhandled_input(false)
 		_characters[i].set_process_unhandled_key_input(false)
+		var pl := _characters[i].get_node_or_null("PlayerLight") as OmniLight3D
+		if pl:
+			pl.light_energy = 0.0
 
 	# Tạo HUD hiển thị tên nhân vật
 	_build_hud()

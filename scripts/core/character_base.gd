@@ -50,6 +50,7 @@ const ELEMENT_COLORS: Dictionary = {
 @export var r_cooldown:         float = 0.0
 @export var cooldown_rate:      float = 1.0
 @export var sprint_mana_cost:   float = 0.5
+@export var crouch_speed:       float = 2.5
 
 # ── Mana ──────────────────────────────────────────────────────────────────────
 @export var max_mana:            int   = 200
@@ -597,9 +598,11 @@ func _physics_process(delta: float) -> void:
 	var devouring: bool = _attack2_timer > 0.0
 	var lunging: bool = _action_lunge_timer > 0.0 and (attacking or devouring)
 	var dir: Vector3 = _read_input()
+	var crouching: bool
 	var sprinting: bool
 	if _is_player:
-		sprinting = Input.is_key_pressed(KEY_SHIFT)
+		crouching = Input.is_key_pressed(KEY_CTRL)
+		sprinting = Input.is_key_pressed(KEY_SHIFT) and not crouching
 		if sprinting and sprint_mana_cost > 0.0 and dir.length_squared() > 0.001:
 			_sprint_mana_acc += sprint_mana_cost * delta
 			if _sprint_mana_acc >= 1.0:
@@ -612,9 +615,10 @@ func _physics_process(delta: float) -> void:
 		else:
 			_sprint_mana_acc = 0.0
 	else:
+		crouching = false
 		sprinting = false
 
-	var spd: float = sprint_speed if sprinting else move_speed
+	var spd: float = crouch_speed if crouching else (sprint_speed if sprinting else move_speed)
 
 	if dir.length_squared() > 0.001 and not attacking and not devouring:
 		dir = dir.normalized()
@@ -667,6 +671,8 @@ func _physics_process(delta: float) -> void:
 			_state = State.JUMP
 		else:
 			_state = State.FALL
+	elif crouching:
+		_state = State.CROUCH
 	elif dir.length_squared() > 0.001:
 		if sprinting:
 			_state = State.SPRINT

@@ -73,10 +73,8 @@ func _setup_lights() -> void:
 		var o := omni as OmniLight3D
 		if o == null:
 			continue
-		o.light_color  = Color(0.40, 1.0, 0.85)
-		o.light_energy = 0.6
-		o.omni_range   = 2.0
-		_lights.append(o)
+		o.light_energy = 0.0
+		o.omni_range   = 0.1
 
 	var dir := get_parent().find_child("DirectionalLight3D", true, false) as DirectionalLight3D
 	if dir:
@@ -89,7 +87,7 @@ func _setup_lights() -> void:
 	var all := get_parent().find_children("*", "OmniLight3D", true, false)
 	for lt in all:
 		var l := lt as OmniLight3D
-		if l and not l in _lights:
+		if l and l.name != "PlayerLight" and not l in _lights:
 			_lights.append(l)
 
 

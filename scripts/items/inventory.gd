@@ -156,15 +156,21 @@ static func create_item_db() -> Dictionary:
 	_add(db, "iron_sword",   "Kiếm sắt",    ItemDef.Type.WEAPON,   Color(0.75, 0.75, 0.80), "K", "Sát thương +15", false, 1, 0, 15)
 	_add(db, "stone_pickaxe","Cúp đá",      ItemDef.Type.TOOL,     Color(0.50, 0.50, 0.55), "P", "Khai thác đá", false, 1)
 	_add(db, "iron_pickaxe", "Cúp sắt",     ItemDef.Type.TOOL,     Color(0.75, 0.75, 0.80), "P", "Khai thác nhanh", false, 1)
-	_add(db, "leather_chest","Áo da",       ItemDef.Type.ARMOR,    Color(0.60, 0.40, 0.20), "C", "Giáp +5", false, 1, 0, 0, 5)
-	_add(db, "iron_chest",   "Áo sắt",      ItemDef.Type.ARMOR,    Color(0.75, 0.75, 0.80), "C", "Giáp +12", false, 1, 0, 0, 12)
+	_add(db, "leather_helmet","Mũ da",      ItemDef.Type.ARMOR,    Color(0.60, 0.40, 0.20), "H", "Đầu +3", false, 1, 0, 0, 3, ItemDef.ArmorSlot.HEAD)
+	_add(db, "leather_chest", "Áo da",      ItemDef.Type.ARMOR,    Color(0.60, 0.40, 0.20), "C", "Thân +5", false, 1, 0, 0, 5, ItemDef.ArmorSlot.BODY)
+	_add(db, "leather_legs",  "Quần da",    ItemDef.Type.ARMOR,    Color(0.60, 0.40, 0.20), "L", "Chân +4", false, 1, 0, 0, 4, ItemDef.ArmorSlot.LEGS)
+	_add(db, "leather_boots", "Giày da",    ItemDef.Type.ARMOR,    Color(0.60, 0.40, 0.20), "B", "Chân +2", false, 1, 0, 0, 2, ItemDef.ArmorSlot.FEET)
+	_add(db, "iron_helmet",   "Mũ sắt",     ItemDef.Type.ARMOR,    Color(0.75, 0.75, 0.80), "H", "Đầu +7", false, 1, 0, 0, 7, ItemDef.ArmorSlot.HEAD)
+	_add(db, "iron_chest",    "Áo sắt",     ItemDef.Type.ARMOR,    Color(0.75, 0.75, 0.80), "C", "Thân +12", false, 1, 0, 0, 12, ItemDef.ArmorSlot.BODY)
+	_add(db, "iron_legs",     "Quần sắt",   ItemDef.Type.ARMOR,    Color(0.75, 0.75, 0.80), "L", "Chân +9", false, 1, 0, 0, 9, ItemDef.ArmorSlot.LEGS)
+	_add(db, "iron_boots",    "Giày sắt",   ItemDef.Type.ARMOR,    Color(0.75, 0.75, 0.80), "B", "Chân +5", false, 1, 0, 0, 5, ItemDef.ArmorSlot.FEET)
 	_add(db, "twilight_gate","Cổng Twilight",ItemDef.Type.TOOL,    Color(0.10, 0.50, 0.45), "T", "Đặt cổng Twilight ra thế giới", false, 1)
 	return db
 
 static func _add(db: Dictionary, id: String, name: String, type: int, color: Color, char: String,
 				 desc: String = "", stackable: bool = true, max_stack: int = 64,
-				 heal: int = 0, atk: int = 0, def_val: int = 0) -> void:
-	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val)
+				 heal: int = 0, atk: int = 0, def_val: int = 0, armor_slot: int = -1) -> void:
+	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot)
 
 static func seed_inventory(inv: Inventory) -> void:
 	pass

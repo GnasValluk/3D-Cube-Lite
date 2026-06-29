@@ -1,7 +1,6 @@
 extends CanvasLayer
 class_name LoadingScreen
 
-const MAIN_SCENE: String = "res://scenes/open_world_real.tscn"
 const MIN_DISPLAY_TIME: float = 2.0
 const FADE_IN_TIME: float = 0.7
 const FADE_OUT_TIME: float = 0.6
@@ -55,7 +54,10 @@ func _build() -> void:
 	add_child(_title)
 
 	_sub = Label.new()
-	_sub.text = "Seed: " + str(WorldSeed.seed_value)
+	if WorldSeed.world_name.length() > 0:
+		_sub.text = WorldSeed.world_name + "   |   Seed: " + str(WorldSeed.seed_value)
+	else:
+		_sub.text = "Seed: " + str(WorldSeed.seed_value)
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_sub.add_theme_font_size_override("font_size", 14)
 	_sub.add_theme_color_override("font_color", Color(0.45, 0.55, 0.70, 0.6))
@@ -141,17 +143,17 @@ func _process(delta: float) -> void:
 		var ease := t * t
 		_fade.color.a = ease
 		if t >= 1.0:
-			var res := ResourceLoader.load_threaded_get(MAIN_SCENE)
+			var res := ResourceLoader.load_threaded_get(WorldSeed.target_scene)
 			get_tree().change_scene_to_packed(res)
 		return
 
 	if not _started:
 		_started = true
-		ResourceLoader.load_threaded_request(MAIN_SCENE)
+		ResourceLoader.load_threaded_request(WorldSeed.target_scene)
 
 	if not _done:
 		var st: Array = []
-		var ret := ResourceLoader.load_threaded_get_status(MAIN_SCENE, st)
+		var ret := ResourceLoader.load_threaded_get_status(WorldSeed.target_scene, st)
 		if ret == ResourceLoader.THREAD_LOAD_LOADED:
 			_done = true
 			_progress = 1.0
