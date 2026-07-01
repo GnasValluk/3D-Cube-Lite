@@ -334,7 +334,7 @@ func _process(delta: float) -> void:
 
 	var env := get_parent().get_node_or_null("WorldEnvironment") as WorldEnvironment
 	if env and env.has_method("get_cycle_progress"):
-		var prog: float = env.get_cycle_progress()
+		var prog: float = fmod(env.get_cycle_progress(), 1.0)
 		var total_minutes: int = int(prog * 1440.0)
 		var hours: int = total_minutes / 60
 		var minutes: int = total_minutes % 60

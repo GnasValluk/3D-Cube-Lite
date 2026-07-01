@@ -6,7 +6,7 @@
 extends WorldEnvironment
 
 const CYCLE_DURATION: float = 600.0
-var _cycle_time: float = 0.0
+var _cycle_time: float = CYCLE_DURATION * 6.0 / 24.0
 var _lights: Array[Light3D] = []
 var _dir_light: DirectionalLight3D
 

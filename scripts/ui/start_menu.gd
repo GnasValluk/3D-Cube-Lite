@@ -163,12 +163,12 @@ func _on_delete_journey(idx: int) -> void:
 	if idx < 0 or idx >= saves.size():
 		return
 	var name: String = saves[idx].get("name", "Unknown")
-	var confirm := ConfirmationDialog.new()
+	var confirm := AcceptDialog.new()
 	confirm.dialog_text = "Xoá hành trình \"" + name + "\"?"
 	confirm.ok_button_text = "Xoá"
-	confirm.cancel_button_text = "Huỷ"
 	add_child(confirm)
 	confirm.popup_centered()
+	confirm.add_cancel_button("Huỷ")
 	confirm.confirmed.connect(_do_delete.bind(idx))
 
 func _do_delete(idx: int) -> void:

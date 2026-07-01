@@ -2,28 +2,70 @@ extends WorldEnvironment
 class_name RealWorldEnvironment
 
 const CYCLE_DURATION: float = 600.0
-var _cycle_time: float = 0.0
+var _cycle_time: float = CYCLE_DURATION * 6.0 / 24.0
 var _dir_light: DirectionalLight3D
 
-const DAY_BG         := Color(0.50, 0.65, 0.80)
-const DAY_AMBIENT    := Color(0.40, 0.55, 0.65)
-const DAY_AMB_ENERGY := 2.5
+# Day keyframes: { hour, bg, ambient, amb_energy, dir_color, dir_energy }
+var _keys: Array[Dictionary] = [
+	{ "h": 0.0, "bg": Color(0.03, 0.05, 0.12), "amb": Color(0.04, 0.06, 0.15), "ae": 0.05, "dc": Color(0.60, 0.65, 0.80), "de": 0.3 },
+	{ "h": 6.0, "bg": Color(0.70, 0.55, 0.45), "amb": Color(0.65, 0.50, 0.40), "ae": 0.8,  "dc": Color(1.0, 0.85, 0.60), "de": 2.5 },
+	{ "h": 8.0, "bg": Color(0.55, 0.75, 0.90), "amb": Color(0.55, 0.60, 0.65), "ae": 0.8, "dc": Color(0.98, 0.95, 0.88), "de": 7.0 },
+	{ "h": 14.0,"bg": Color(0.55, 0.75, 0.90), "amb": Color(0.55, 0.60, 0.65), "ae": 1.0, "dc": Color(0.98, 0.95, 0.88), "de": 8.0 },
+	{ "h": 15.0,"bg": Color(0.70, 0.60, 0.45), "amb": Color(0.65, 0.55, 0.40), "ae": 1.5, "dc": Color(1.0, 0.80, 0.50), "de": 5.0 },
+	{ "h": 18.0,"bg": Color(0.25, 0.18, 0.22), "amb": Color(0.20, 0.15, 0.18), "ae": 0.15,"dc": Color(0.80, 0.55, 0.35), "de": 0.6 },
+	{ "h": 24.0,"bg": Color(0.03, 0.05, 0.12), "amb": Color(0.04, 0.06, 0.15), "ae": 0.05,"dc": Color(0.60, 0.65, 0.80), "de": 0.3 },
+]
 
-const NIGHT_BG         := Color(0.02, 0.03, 0.05)
-const NIGHT_AMBIENT    := Color(0.03, 0.04, 0.06)
-const NIGHT_AMB_ENERGY := 0.10
+func _get_hour() -> float:
+	return fmod(_cycle_time / CYCLE_DURATION * 24.0, 24.0)
+
+func _lerp_key(a: Dictionary, b: Dictionary, t: float) -> Dictionary:
+	return {
+		"bg": a["bg"].lerp(b["bg"], t),
+		"amb": a["amb"].lerp(b["amb"], t),
+		"ae": lerp(a["ae"], b["ae"], t),
+		"dc": a["dc"].lerp(b["dc"], t),
+		"de": lerp(a["de"], b["de"], t),
+	}
+
+func _sample_lighting(h: float) -> Dictionary:
+	var nk: int = _keys.size()
+	for i in range(nk - 1):
+		if h >= _keys[i]["h"] and h < _keys[i + 1]["h"]:
+			var t: float = (h - _keys[i]["h"]) / (_keys[i + 1]["h"] - _keys[i]["h"])
+			return _lerp_key(_keys[i], _keys[i + 1], t)
+	return _keys[0].duplicate()
 
 func _ready() -> void:
 	var env := Environment.new()
 
 	env.background_mode  = Environment.BG_COLOR
-	env.background_color = DAY_BG
+	env.background_color = _keys[0]["bg"]
 
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color  = DAY_AMBIENT
-	env.ambient_light_energy = DAY_AMB_ENERGY
+	env.ambient_light_color  = _keys[0]["amb"]
+	env.ambient_light_energy = _keys[0]["ae"]
 
-	env.glow_enabled = false
+	env.glow_enabled = true
+	env.glow_normalized = true
+	env.glow_intensity = 0.3
+	env.glow_strength = 0.6
+	env.glow_bloom = 0.15
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+	env.glow_hdr_threshold = 1.0
+	env.glow_hdr_scale = 1.2
+	env.set_glow_level(0, false)
+	env.set_glow_level(1, true)
+	env.set_glow_level(2, true)
+	env.set_glow_level(3, false)
+	env.set_glow_level(4, false)
+	env.set_glow_level(5, false)
+	env.set_glow_level(6, false)
+
+	env.adjustment_enabled = true
+	env.adjustment_brightness = 1.0
+	env.adjustment_contrast = 1.1
+	env.adjustment_saturation = 1.3
 
 	env.tonemap_mode     = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.0
@@ -37,9 +79,6 @@ func _ready() -> void:
 func _setup_lights() -> void:
 	var dir := get_parent().find_child("DirectionalLight3D", true, false) as DirectionalLight3D
 	if dir:
-		dir.light_color  = Color(1.0, 0.95, 0.85)
-		dir.light_energy = 12.0
-		dir.shadow_enabled = false
 		_dir_light = dir
 
 	var all := get_parent().find_children("PlayerLight", "OmniLight3D", true, false)
@@ -50,15 +89,16 @@ func _setup_lights() -> void:
 
 func _process(delta: float) -> void:
 	_cycle_time += delta
-	var raw: float = sin(_cycle_time / CYCLE_DURATION * TAU)
-	var t: float = clamp(raw * 0.5 + 0.5, 0.0, 1.0)
+	var h: float = _get_hour()
+	var k: Dictionary = _sample_lighting(h)
 
-	environment.background_color = DAY_BG.lerp(NIGHT_BG, 1.0 - t)
-	environment.ambient_light_color = DAY_AMBIENT.lerp(NIGHT_AMBIENT, 1.0 - t)
-	environment.ambient_light_energy = lerp(DAY_AMB_ENERGY, NIGHT_AMB_ENERGY, 1.0 - t)
+	environment.background_color = k["bg"]
+	environment.ambient_light_color = k["amb"]
+	environment.ambient_light_energy = k["ae"]
 
 	if _dir_light:
-		_dir_light.light_energy = 12.0 * t
+		_dir_light.light_color = k["dc"]
+		_dir_light.light_energy = k["de"]
 
 func get_cycle_progress() -> float:
 	return _cycle_time / CYCLE_DURATION

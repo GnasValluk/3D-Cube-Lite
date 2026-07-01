@@ -13,10 +13,10 @@ const TILE_COLORS_TW: Array[Dictionary] = [
 ]
 
 const TILE_COLORS_RW: Array[Dictionary] = [
-	{ "base": Color(0.30, 0.65, 0.18), "emit": Color(0.0, 0.0, 0.0), "pow": 0.0 },
-	{ "base": Color(0.18, 0.48, 0.10), "emit": Color(0.0, 0.0, 0.0), "pow": 0.0 },
-	{ "base": Color(0.72, 0.64, 0.38), "emit": Color(0.0, 0.0, 0.0), "pow": 0.0 },
-	{ "base": Color(0.26, 0.15, 0.06), "emit": Color(0.0, 0.0, 0.0), "pow": 0.0 },
+	{ "base": Color(0.28, 0.48, 0.18), "emit": Color(0.0, 0.0, 0.0), "pow": 0.0 },
+	{ "base": Color(0.20, 0.35, 0.12), "emit": Color(0.0, 0.0, 0.0), "pow": 0.0 },
+	{ "base": Color(0.90, 0.80, 0.42), "emit": Color(0.0, 0.0, 0.0), "pow": 0.0 },
+	{ "base": Color(0.32, 0.18, 0.08), "emit": Color(0.0, 0.0, 0.0), "pow": 0.0 },
 ]
 
 const VOXEL: float = 1.0
@@ -68,6 +68,41 @@ func setup(cx: int, cz: int, size: int, dimension_id: int = _Dim.DimensionID.TWI
 	_init_materials()
 	_build()
 
+func _make_water_shader(dim_id: int) -> ShaderMaterial:
+	var s := Shader.new()
+	if dim_id == _Dim.DimensionID.REAL_WORLD:
+		s.code = """
+shader_type spatial;
+render_mode blend_mix;
+
+uniform vec4 water_color : source_color = vec4(0.08, 0.36, 0.68, 0.72);
+
+void fragment() {
+	ALBEDO = water_color.rgb;
+	ALPHA = water_color.a;
+	METALLIC = 0.05;
+	ROUGHNESS = 0.25;
+}
+"""
+	else:
+		s.code = """
+shader_type spatial;
+render_mode blend_mix, unshaded;
+
+uniform vec4 water_color : source_color = vec4(0.12, 0.60, 0.50, 0.75);
+uniform vec4 emit_color : source_color = vec4(0.10, 0.50, 0.40);
+
+void fragment() {
+	ALBEDO = water_color.rgb;
+	ALPHA = water_color.a;
+	EMISSION = emit_color.rgb * 1.2;
+}
+"""
+
+	var m := ShaderMaterial.new()
+	m.shader = s
+	return m
+
 func _init_materials() -> void:
 	if _mat_cache.has(_dimension_id):
 		return
@@ -75,25 +110,14 @@ func _init_materials() -> void:
 		var m_t := StandardMaterial3D.new()
 		m_t.vertex_color_use_as_albedo = true
 		m_t.roughness = 0.9; m_t.metallic_specular = 0.0
-		var m_w := StandardMaterial3D.new()
-		m_w.albedo_color = Color(0.06, 0.30, 0.60, 0.55)
-		m_w.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		m_w.cull_mode = BaseMaterial3D.CULL_DISABLED
-		m_w.roughness = 0.3; m_w.metallic_specular = 0.1
+		var m_w := _make_water_shader(_dimension_id)
 		_mat_cache[_dimension_id] = { "terrain": m_t, "water": m_w }
 		return
 
 	var m_t_cv := StandardMaterial3D.new()
 	m_t_cv.vertex_color_use_as_albedo = true
 	m_t_cv.roughness = 1.0; m_t_cv.metallic_specular = 0.0
-	var m_w_cv := StandardMaterial3D.new()
-	m_w_cv.albedo_color = Color(0.10, 0.55, 0.45, 0.65)
-	m_w_cv.emission_enabled = true
-	m_w_cv.emission = Color(0.08, 0.45, 0.35)
-	m_w_cv.emission_energy_multiplier = 2.0
-	m_w_cv.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m_w_cv.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m_w_cv.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var m_w_cv := _make_water_shader(_dimension_id)
 	_mat_cache[_dimension_id] = { "terrain": m_t_cv, "water": m_w_cv }
 
 func _biome_at(wx: float, wz: float) -> int:
@@ -198,16 +222,10 @@ func _build() -> void:
 			for ivz in range(_cols):
 				var pvz: int = ivz + PAD
 				var d: int = dst[pvx][pvz]
-				if biome_grid[ivx][ivz] == TileType.GRASS and d == 1:
+				if biome_grid[ivx][ivz] == TileType.GRASS:
 					biome_grid[ivx][ivz] = TileType.SAND
-					height_grid[ivx][ivz] = WATER_Y
-				elif biome_grid[ivx][ivz] == TileType.GRASS and d >= 2:
-					var wx: float = world_ox - half + (float(ivx) + 0.5) * VOXEL
-					var wz: float = world_oz - half + (float(ivz) + 0.5) * VOXEL
-					var nd: Dictionary = _noise_for_dim(_dimension_id)
-					var grv: float = (nd["biome"].get_noise_2d(wx + 300.0, wz + 300.0) + 1.0) * 0.5
-					if grv > 0.82:
-						biome_grid[ivx][ivz] = TileType.SAND
+					if d <= 1:
+						height_grid[ivx][ivz] = WATER_Y
 				elif biome_grid[ivx][ivz] == TileType.DARK_GRASS:
 					var wx: float = world_ox - half + (float(ivx) + 0.5) * VOXEL
 					var wz: float = world_oz - half + (float(ivz) + 0.5) * VOXEL
@@ -217,6 +235,7 @@ func _build() -> void:
 						biome_grid[ivx][ivz] = TileType.DIRT
 
 	var tile_cols: Array[Dictionary] = TILE_COLORS_TW if _dimension_id == _Dim.DimensionID.TWILIGHT else TILE_COLORS_RW
+	var sub_water_color: Color = tile_cols[TileType.SAND]["base"]
 
 	for vx in range(_cols):
 		for vz in range(_cols):
@@ -229,7 +248,7 @@ func _build() -> void:
 			var pos := Vector3(px, -h_vox + h, pz)
 			_add_quad(st, pos + Vector3(0, h_vox, 0), Vector3(1,0,0) * h_vox, Vector3(0,0,1) * h_vox, Vector3(0,1,0), top_col)
 
-			var side_col: Color = top_col * 0.5
+			var side_col := sub_water_color * 0.6 if (b == TileType.SAND) else top_col * 0.5
 
 			if vx == 0 or biome_grid[vx - 1][vz] != b or height_grid[vx - 1][vz] != h:
 				var lh: float
@@ -289,16 +308,16 @@ func _build() -> void:
 	for vx in range(_cols):
 		var vz := 0
 		while vz < _cols:
-			if biome_grid[vx][vz] != TileType.GRASS:
+			if biome_grid[vx][vz] != TileType.GRASS and biome_grid[vx][vz] != TileType.SAND:
 				vz += 1
 				continue
 			var start_vz := vz
-			while vz < _cols and biome_grid[vx][vz] == TileType.GRASS:
+			while vz < _cols and (biome_grid[vx][vz] == TileType.GRASS or biome_grid[vx][vz] == TileType.SAND):
 				vz += 1
 			var count: int = vz - start_vz
 			var px: float = -half + (float(vx) + 0.5) * VOXEL
 			var z_mid: float = -half + float(start_vz * 2 + count) * h_vox
-			_add_quad(st_water, Vector3(px, WATER_Y, z_mid), Vector3(1,0,0) * h_vox, Vector3(0,0,1) * (count * h_vox), Vector3(0,1,0), Color(1,1,1))
+			_add_quad(st_water, Vector3(px, WATER_Y - 0.04, z_mid), Vector3(1,0,0) * h_vox, Vector3(0,0,1) * (count * h_vox), Vector3(0,1,0), Color(1,1,1))
 
 	var mesh_water := st_water.commit()
 	if mesh_water:
@@ -322,9 +341,9 @@ func is_water_at(wx: float, wz: float, wy: float) -> bool:
 	var vz: int = int(lz)
 	if vx < 0 or vx >= _cols or vz < 0 or vz >= _cols:
 		return false
-	if _biome_grid[vx][vz] != TileType.GRASS:
+	if _biome_grid[vx][vz] != TileType.SAND:
 		return false
-	return wy < VOXEL * 0.5
+	return wy < VOXEL * 0.46
 
 func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3, n: Vector3, col: Color) -> void:
 	st.set_normal(n)
