@@ -122,6 +122,7 @@ func _build() -> void:
 	_light.light_color = Color(0.90, 0.20, 0.05)
 	_light.light_energy = 0.0
 	_light.omni_range = 15.0
+	_light.light_specular = 0.0
 	_light.position = Vector3(0, 0.3, 0)
 	add_child(_light)
 

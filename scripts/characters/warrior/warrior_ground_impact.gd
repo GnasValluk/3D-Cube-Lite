@@ -71,6 +71,7 @@ func _build_visual() -> void:
 	_light.light_color = Color(0.45, 0.92, 1.0)
 	_light.light_energy = 6.0
 	_light.omni_range = 7.0
+	_light.light_specular = 0.0
 	add_child(_light)
 
 func _process(delta: float) -> void:

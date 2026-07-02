@@ -333,22 +333,7 @@ func _process(delta: float) -> void:
 		_placement_sys.update_placement()
 		_build_hint.text = tr("BUILD_HINT_PLACING")
 
-	var b_down := Input.is_key_pressed(KEY_B)
-	if b_down and not _b_key_held:
-		_b_key_held = true
-		_switch_hint.text = tr("SWITCH_HINT")
-		if _build_menu and _build_menu.visible:
-			_build_menu.close()
-		else:
-			if _placement_sys == null:
-				_placement_sys = PlacementSystem.new()
-				_placement_sys.name = "PlacementSystem"
-				var p := get_parent()
-				if p:
-					p.add_child(_placement_sys)
-			_build_menu.open(_placement_sys)
-	elif not b_down:
-		_b_key_held = false
+	_b_key_held = Input.is_key_pressed(KEY_B)
 
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	if _mgr:
@@ -582,8 +567,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				return
 
 			if _placement_sys and _placement_sys.is_placing():
-				if k.keycode == KEY_ESCAPE:
+				if k.keycode == KEY_ESCAPE or k.keycode == k_build:
 					_placement_sys.cancel_placement()
+					_build_hint.text = tr("BUILD_HINT_B")
 				return
 
 			if k.keycode >= KEY_1 and k.keycode <= KEY_9:
@@ -617,8 +603,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			if k.keycode == k_build:
 				if _build_menu and _build_menu.visible:
 					_build_menu.close()
-				elif _placement_sys and not (_settings_ui and _settings_ui.visible) and not (_party_ui and _party_ui.visible):
-					_build_menu.open(_placement_sys)
+				else:
+					if _placement_sys == null:
+						_placement_sys = PlacementSystem.new()
+						_placement_sys.name = "PlacementSystem"
+						var p := get_parent()
+						if p:
+							p.add_child(_placement_sys)
+					if not (_settings_ui and _settings_ui.visible) and not (_party_ui and _party_ui.visible):
+						_build_menu.open(_placement_sys)
 				return
 			if k.keycode == k_party:
 				if _party_ui and _party_ui.visible:

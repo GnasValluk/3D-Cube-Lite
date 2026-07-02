@@ -61,7 +61,7 @@ const ELEMENT_COLORS: Dictionary = {
 @export var mana_cost_q:         int   = 0
 @export var mana_cost_r:         int   = 0
 @export var level:               int   = 1
-@export var xp:                  int   = 0
+@export var exp:                 int   = 0
 @export var exp_to_next:         int   = 100
 @export var crit_rate:           float = 0.05
 @export var crit_dmg:            float = 0.50
@@ -97,7 +97,7 @@ var _dash_timer:      float  = 0.0
 var _dash_cd:         float  = 0.0
 var _attack_timer:    float  = 0.0
 var _attack2_timer:   float  = 0.0
-
+var _attack2_duration: float = 0.70
 var _action_lunge_timer: float = 0.0
 var _action_lunge_speed: float = 0.0
 var _dash_dir:        Vector3 = Vector3.ZERO
@@ -249,16 +249,16 @@ func _spawn_freeze_vfx() -> void:
 
 # ── Level / Exp ───────────────────────────────────────────────────────────────
 func add_exp(amount: int) -> void:
-	xp += amount
-	while xp >= exp_to_next:
-		xp -= exp_to_next
+	exp += amount
+	while exp >= exp_to_next:
+		exp -= exp_to_next
 		level += 1
 		exp_to_next = level * 100
 		SFXManager.play_levelup()
 		level_up.emit(level)
 
 func calc_skill_damage(skill_power: int) -> int:
-	return maxi(1, int(skill_power * attack_power / 100.0))
+	return maxi(1, skill_power * attack_power / 100)
 
 func calc_hp_skill_damage(percent: float) -> int:
 	return maxi(1, int(max_hp * percent / 100.0))

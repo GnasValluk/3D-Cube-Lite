@@ -14,6 +14,8 @@
 [ext_resource type="Script" path="res://scripts/world/explore_system.gd" id="12"]
 [ext_resource type="Script" path="res://scripts/characters/player/player_character.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/building/placement_system.gd" id="14"]
+[ext_resource type="Script" path="res://scripts/characters/fish/fish_spawner.gd" id="15"]
+[ext_resource type="Script" path="res://scripts/world/lotus_light_manager.gd" id="16"]
 
 [node name="OpenWorldThucTe" type="Node3D"]
 
@@ -86,3 +88,13 @@ script = ExtResource("12")
 
 [node name="HUD" type="CanvasLayer" parent="."]
 script = ExtResource("9")
+
+[node name="FishSpawner" type="Node3D" parent="."]
+script = ExtResource("15")
+max_fish = 40
+spawn_check_radius = 48.0
+min_fish_spacing = 3.5
+check_interval = 4.0
+
+[node name="LotusLightManager" type="Node" parent="."]
+script = ExtResource("16")

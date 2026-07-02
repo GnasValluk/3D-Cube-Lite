@@ -89,6 +89,7 @@ func _build() -> void:
 	_light.light_color = Color(0.80, 0.0, 0.45)
 	_light.light_energy = 9.0
 	_light.omni_range = 10.0
+	_light.light_specular = 0.0
 	add_child(_light)
 
 func _process(delta: float) -> void:
@@ -175,6 +176,7 @@ func _spawn_zone() -> void:
 	flash.light_color = Color(0.80, 0.05, 0.55)
 	flash.light_energy = 20.0
 	flash.omni_range = 20.0
+	flash.light_specular = 0.0
 	parent.add_child(flash)
 	flash.global_position = gp
 	var ft: SceneTreeTimer = get_tree().create_timer(0.15)

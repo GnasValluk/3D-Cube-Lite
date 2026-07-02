@@ -94,6 +94,7 @@ func _build_visual() -> void:
 	light.light_color  = Color(0.30, 0.80, 1.0)
 	light.light_energy = 1.5
 	light.omni_range   = 1.5
+	light.light_specular = 0.0
 	add_child(light)
 
 func _process(delta: float) -> void:
@@ -178,6 +179,7 @@ func _explode() -> void:
 		flash.light_color  = Color(1.0, 0.80, 0.15)
 		flash.light_energy = 6.0 + i * 3.0
 		flash.omni_range   = 3.5 + i * 1.0
+		flash.light_specular = 0.0
 		parent.add_child(flash)
 		flash.global_position = global_position
 		get_tree().create_timer(0.04 * i).timeout.connect(

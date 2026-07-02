@@ -21,6 +21,7 @@ func _build(targets: Array[Vector3]) -> void:
 	_light.light_color = Color(1.0, 0.80, 0.10)
 	_light.light_energy = 18.0
 	_light.omni_range = 25.0
+	_light.light_specular = 0.0
 	add_child(_light)
 
 	var mat_flash: StandardMaterial3D = MeshBuilder.emit_mat(
