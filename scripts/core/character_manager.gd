@@ -34,7 +34,7 @@ func _ready() -> void:
 		_characters.insert(0, player)
 
 	if _characters.is_empty():
-		push_error("CharacterManager: không có CharacterBase nào cho người chơi!")
+		push_error(tr("ERR_NO_CHARACTER"))
 		return
 
 	var root := get_parent()

@@ -61,7 +61,7 @@ const ELEMENT_COLORS: Dictionary = {
 @export var mana_cost_q:         int   = 0
 @export var mana_cost_r:         int   = 0
 @export var level:               int   = 1
-@export var exp:                 int   = 0
+@export var xp:                  int   = 0
 @export var exp_to_next:         int   = 100
 @export var crit_rate:           float = 0.05
 @export var crit_dmg:            float = 0.50
@@ -97,7 +97,7 @@ var _dash_timer:      float  = 0.0
 var _dash_cd:         float  = 0.0
 var _attack_timer:    float  = 0.0
 var _attack2_timer:   float  = 0.0
-var _attack2_duration: float = 0.70
+
 var _action_lunge_timer: float = 0.0
 var _action_lunge_speed: float = 0.0
 var _dash_dir:        Vector3 = Vector3.ZERO
@@ -249,15 +249,16 @@ func _spawn_freeze_vfx() -> void:
 
 # ── Level / Exp ───────────────────────────────────────────────────────────────
 func add_exp(amount: int) -> void:
-	exp += amount
-	while exp >= exp_to_next:
-		exp -= exp_to_next
+	xp += amount
+	while xp >= exp_to_next:
+		xp -= exp_to_next
 		level += 1
 		exp_to_next = level * 100
+		SFXManager.play_levelup()
 		level_up.emit(level)
 
 func calc_skill_damage(skill_power: int) -> int:
-	return maxi(1, skill_power * attack_power / 100)
+	return maxi(1, int(skill_power * attack_power / 100.0))
 
 func calc_hp_skill_damage(percent: float) -> int:
 	return maxi(1, int(max_hp * percent / 100.0))
@@ -300,6 +301,7 @@ func take_damage(amount: int, attacker: Node3D = null) -> void:
 		_hit_timer = 0.18
 		_hit_flash()
 		_spawn_damage_number(dmg, attacker)
+		SFXManager.play_hurt()
 		_state = State.HIT
 		_attack_timer = 0.0
 		_attack2_timer = 0.0
@@ -351,6 +353,7 @@ func apply_dot(damage_per_tick: int, tick_interval: float, duration: float, atta
 func _die(_attacker: Node3D = null) -> void:
 	is_alive = false
 	_flash_restore()
+	SFXManager.play_death()
 	_death_timer = 1.8
 	_state = State.DEAD
 	_attack_timer = 0.0
@@ -582,9 +585,11 @@ func _physics_process(delta: float) -> void:
 		_jbuf = 0.0
 		_coyote = 0.0
 		_sy_tgt = 1.22
+		SFXManager.play_pop()
 
 	if on_floor and not _was_floor:
 		_sy_tgt = 0.76
+		SFXManager.play_fall_small()
 	_was_floor = on_floor
 
 	_sy_cur = lerp(_sy_cur, _sy_tgt, delta * 18.0)
@@ -657,6 +662,7 @@ func _physics_process(delta: float) -> void:
 		_state       = State.DASH
 		_sy_tgt      = 1.15
 		_on_dash()
+		SFXManager.play_sweep()
 		move_and_slide()
 		_animate(delta)
 		return
@@ -698,6 +704,7 @@ func _do_melee_hit() -> void:
 			if dist <= melee_range:
 				var dot: float = fwd.dot(offset / dist)
 				if dot >= 0.4:
+					SFXManager.play_damage_hit()
 					ch.take_damage(calc_skill_damage(melee_damage), self)
 
 func _find_character_manager() -> Node:

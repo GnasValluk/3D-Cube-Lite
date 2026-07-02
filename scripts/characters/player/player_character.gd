@@ -86,7 +86,8 @@ func pickup_item(item_def: ItemDef, count: int) -> int:
 		return count
 	var remaining: int = inventory.add_item(item_def, count)
 	if remaining < count:
-		_scroll_inventory_message("Nhặt: " + item_def.name + (" x%d" % (count - remaining)))
+		SFXManager.play_orb()
+		_scroll_inventory_message(tr("PICKUP_MSG").format({"s": item_def.name, "n": count - remaining}))
 	return remaining
 
 func _scroll_inventory_message(msg: String) -> void:
@@ -139,14 +140,14 @@ func use_item_from_inventory(idx: int) -> void:
 			if item.heal_amount > 0:
 				heal(item.heal_amount)
 				inventory.remove_item(idx, 1)
-				_scroll_inventory_message("Đã ăn " + item.name + " (+%d HP)" % item.heal_amount)
+				_scroll_inventory_message(tr("ATE_FOOD").format({"s": item.name, "d": item.heal_amount}))
 		ItemDef.Type.WEAPON:
 			var old: ItemDef = equipped_weapon
 			equipped_weapon = item
 			inventory.remove_item(idx, 1)
 			if old != null:
 				inventory.add_item(old, 1)
-			_scroll_inventory_message("Trang bị: " + item.name)
+			_scroll_inventory_message(tr("EQUIP_MSG").format({"s": item.name}))
 		ItemDef.Type.ARMOR:
 			var old: ItemDef
 			match item.armor_slot:
@@ -157,14 +158,14 @@ func use_item_from_inventory(idx: int) -> void:
 			inventory.remove_item(idx, 1)
 			if old != null:
 				inventory.add_item(old, 1)
-			_scroll_inventory_message("Mặc: " + item.name)
+			_scroll_inventory_message(tr("WEAR_MSG").format({"s": item.name}))
 		ItemDef.Type.TOOL:
 			var old: ItemDef = equipped_weapon
 			equipped_weapon = item
 			inventory.remove_item(idx, 1)
 			if old != null:
 				inventory.add_item(old, 1)
-			_scroll_inventory_message("Trang bị: " + item.name)
+			_scroll_inventory_message(tr("EQUIP_MSG").format({"s": item.name}))
 
 func _place_twilight_gate(idx: int) -> void:
 	var world := get_tree().current_scene
@@ -176,7 +177,7 @@ func _place_twilight_gate(idx: int) -> void:
 	portal.position = global_position + -global_transform.basis.z * 2.5
 	portal.position.y = 0.25
 	world.add_child(portal)
-	_scroll_inventory_message("Đã đặt Cổng Twilight!")
+	_scroll_inventory_message(tr("PORTAL_PLACED"))
 
 func drop_item(idx: int) -> void:
 	if inventory == null:
@@ -193,7 +194,7 @@ func drop_item(idx: int) -> void:
 
 	inventory.remove_item(idx, count)
 	DroppedItem.spawn(world, item_def, global_position + global_transform.basis.z * (-1.5), count)
-	_scroll_inventory_message("Vứt bỏ: " + item_def.name + (" x%d" % count))
+	_scroll_inventory_message(tr("DROP_MSG").format({"s": item_def.name, "n": count}))
 
 func get_total_atk() -> int:
 	var base: int = melee_damage

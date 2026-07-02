@@ -2,7 +2,7 @@ keys,en,vi
 SETTINGS_TITLE,Settings,CÀI ĐẶT
 CLOSE,Close,ĐÓNG
 LANGUAGE,Language,Ngôn ngữ
-VIETNAMESE,Vietnamese,Tiếng Việt
+VIETNAMESE,Tiếng Việt,Tiếng Việt
 ENGLISH,English,English
 PARTY_TITLE,Party,ĐỘI HÌNH
 ROSTER,Roster,THƯ VIỆN
@@ -11,3 +11,117 @@ DEPLOY,Deploy,RA SÂN
 QUICK_DEPLOY,Quick Deploy,RA SÂN NHANH
 ON,ON,BẬT
 OFF,OFF,TẮT
+NEW_JOURNEY,New Journey,Hành trình mới
+PREVIOUS_JOURNEYS,Previous Journeys,Các hành trình đã chơi
+NO_SAVES,No saves yet,Chưa có hành trình nào
+QUIT_GAME,Quit Game,Thoát game
+DELETE,DELETE,XOÁ
+CANCEL,Cancel,Huỷ
+NEW_JOURNEY_TITLE,New Journey,Hành trình mới
+WORLD_NAME,World Name,Tên thế giới
+WORLD_NAME_PLACEHOLDER,Enter world name...,Nhập tên thế giới...
+ADVANCED_SETTINGS,"Advanced Settings  ▸","Cài đặt nâng cao  ▸"
+SEED_WORLD,World Seed,Seed thế giới
+CREATE_JOURNEY,Create Journey,Tạo hành trình
+BACK,Back,Trở lại
+PORTAL_BUTTON,PRESS/STEP IN TO TELEPORT,ẤN/BƯỚC VÀO ĐỂ DỊCH CHUYỂN
+BUILD_HINT_PLACING,"Left Click=Place  |  Right Click=Cancel","Chuột Trái=Đặt  |  Chuột Phải=Hủy"
+REAL_WORLD_BTN,REAL WORLD,THẾ GIỚI THỰC TẠI
+TWILIGHT_BTN,TWILIGHT,CHẠNG VẠNG
+ENTER_WORLD,ENTERING WORLD...,VÀO THẾ GIỚI...
+BUILD_HINT_B,B=Build,B=Xây dựng
+GENERATING_WORLD,GENERATING WORLD...,ĐANG TẠO THẾ GIỚI...
+SWITCH_HINT,"Tab=Cycle  1/2/3=Pick  4=Player  I=Inventory  P=Team  M=Map  ESC=Settings  F1=Camera","Tab=Cycle  1/2/3=Pick  4=Player  I=Inventory  P=Team  M=Map  ESC=Settings  F1=Camera"
+LOADING_TEXT,LOADING...,ĐANG TẢI...
+READY_TEXT,READY,SẴN SÀNG
+BUILD_TITLE,BUILD,XÂY DỰNG
+EMPTY_BUILD,No buildable items,Không có vật phẩm xây dựng
+MAP_TITLE,MAP,BẢN ĐỒ
+ITEM_LIBRARY_TITLE,"📦 Item Library","📦 Thư Viện Vật Phẩm"
+LIB_CLICK_HINT,Click = +1 to inventory,Click = +1 vào kho
+FILTER_ALL,All,Tất cả
+FILTER_BLOCK,Block,Khối
+FILTER_WEAPON,Weapon,Vũ khí
+FILTER_ARMOR,Armor,Giáp
+FILTER_FOOD,Food,Thức ăn
+FILTER_MATERIAL,Mat,NL
+FILTER_TOOL,Tool,Dụng cụ
+TOOLTIP_CLICK_ADD,"→ Click to add 1 to inventory","→ Click để thêm 1 vào kho"
+INVENTORY_TITLE,Inventory,Inventory
+STATS_TITLE,Stats,Stats
+EQUIPMENT_TITLE,Equipment,Equipment
+DROP_HINT,"Q = Drop  |  Right-click = Use","Q = Drop  |  Right-click = Use"
+HEAL_VN,Heal: +{d} HP,"Hồi: +{d} HP"
+DIM_TWILIGHT,Twilight,Chạng Vạng
+DIM_REAL_WORLD,Real World,Thế Giới Thực Tại
+DIM_TWILIGHT_DESC,"Twilight World — a mystical land with eternal purple light","Thế giới Chạng Vạng — vùng đất huyền bí với ánh sáng tím vĩnh cửu"
+DIM_REAL_DESC,"Real World — a vast land with beautiful natural scenery","Thế Giới Thực Tại — vùng đất rộng lớn với khung cảnh thiên nhiên tươi đẹp"
+TYPE_BLOCK,Block,Khối
+TYPE_TOOL,Tool,Công cụ
+TYPE_WEAPON,Weapon,Vũ khí
+TYPE_FOOD,Food,Thức ăn
+TYPE_MATERIAL,Material,Nguyên liệu
+TYPE_ARMOR,Armor,Giáp
+SLOT_HEAD,Head,Đầu
+SLOT_BODY,Body,Thân
+SLOT_LEGS,Legs,Chân
+SLOT_FEET,Feet,Bàn chân
+ITEM_CHEST_NAME,Chest,Rương đồ
+ITEM_CHEST_DESC,Storage chest,Rương chứa đồ
+ITEM_TWILIGHT_GATE_NAME,Twilight Gate,Cổng Twilight
+ITEM_TWILIGHT_GATE_DESC,"Place Twilight Gate into the world","Đặt cổng Twilight ra thế giới"
+CHEST_LABEL,Chest,Rương
+CHEST_INTERACT,F: Open chest,F: Mở rương
+PORTAL_TWILIGHT_NAME,Twilight World Gate,Cổng Thế Giới Chạng Vạng
+PORTAL_TWILIGHT_DESC,"Open gate to the Twilight World","Mở cổng đến thế giới Chạng Vạng"
+PORTAL_REAL_NAME,Real World Gate,Cổng Thế Giới Thực Tại
+PORTAL_REAL_DESC,"Open gate to the Real World","Mở cổng đến Thế Giới Thực Tại"
+TILE_GRASS_NAME,Twilight Grass Platform,Thềm Cỏ Chạng Vạng
+TILE_GRASS_DESC,Purple glowing grass platform,Thềm cỏ phát quang tím
+TILE_DARK_GRASS_NAME,Dark Grass Platform,Thềm Cỏ Xanh Đậm
+TILE_DARK_GRASS_DESC,Twilight dark green grass platform,Thềm cỏ xanh đậm chạng vạng
+TILE_FLOWER_NAME,Twilight Flower Platform,Thềm Hoa Chạng Vạng
+TILE_FLOWER_DESC,Glowing flower platform,Thềm hoa phát quang
+TILE_MUSHROOM_NAME,Twilight Mushroom Platform,Thềm Nấm Chạng Vạng
+TILE_MUSHROOM_DESC,Glowing mushroom platform,Thềm nấm phát quang
+TILE_GREEN_NAME,Green Platform,Thềm Xanh Lục
+TILE_GREEN_DESC,Twilight green platform,Thềm xanh lục chạng vạng
+SEED,"Seed: %d","Seed: %d"
+DELETE_JOURNEY,"Delete journey ""%s""?","Xoá hành trình ""%s""?"
+PICKUP_MSG,Picked up: {s} x{n},"Nhặt: {s} x{n}"
+ATE_FOOD,"Ate {s} (+{d} HP)","Đã ăn {s} (+{d} HP)"
+PORTAL_PLACED,Twilight Gate placed!,Đã đặt Cổng Twilight!
+EQUIP_MSG,Equipped: {s},"Trang bị: {s}"
+WEAR_MSG,Worn: {s},"Mặc: {s}"
+DROP_MSG,"Dropped: {s} x{n}","Vứt bỏ: {s} x{n}"
+ERR_NO_CHARACTER,"CharacterManager: no CharacterBase for player!","CharacterManager: không có CharacterBase nào cho người chơi!"
+ERR_NO_CHARACTER2,"CharacterManager: no CharacterBase found!","CharacterManager: không tìm thấy CharacterBase nào!"
+TAB_HINT,"  [Tab] switch character","  [Tab] chuyển nhân vật"
+CHARACTER_FMT,"Character %d","Nhân vật %d"
+PICKUP_MSG_SIMPLE,Picked up: {s},"Nhặt: {s}"
+GENERATE_LABEL,Generating World...,Đang tạo thế giới...
+SETTINGS_GRAPHICS,Graphics,Đồ hoạ
+SETTINGS_AUDIO,Audio,Âm thanh
+SETTINGS_CONTROLS,Controls,Điều khiển
+SETTINGS_GENERAL,General,Cơ bản
+SETTINGS_SAVE,Save Settings,Lưu Cài Đặt
+SETTINGS_DISCARD,Discard,Huỷ
+FULLSCREEN,Fullscreen,Toàn màn hình
+VSYNC,VSync,VSync
+RESOLUTION,Resolution,Độ phân giải
+DISPLAY,Display,Màn hình
+BRIGHTNESS,Brightness,Độ sáng
+MASTER_VOLUME,Master Volume,Âm lượng chính
+MUSIC_VOLUME,Music Volume,Âm lượng nhạc
+SFX_VOLUME,SFX Volume,Âm lượng hiệu ứng
+MOUSE_SENSITIVITY,Mouse Sensitivity,Độ nhạy chuột
+INVERT_Y,Invert Y,Đảo ngược Y
+BINDING_KEY,Key,Phím
+BINDING_ACTION,Action,Hành động
+DUMMY_FORMAT,"DUMMY: %d / %d","DUMMY: %d / %d"
+SETTINGS_MOBILE,Mobile,Di động
+TOUCH_CONTROLS,Touch Controls,Điều khiển chạm
+TOUCH_ENABLED,Enabled,Bật
+JOYSTICK,Joystick Sensitivity,Độ nhạy cần
+BUTTON_SIZE,Button Scale,Kích thước nút
+KEY_BINDINGS,Key Bindings,Phím tắt

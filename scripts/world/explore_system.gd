@@ -92,32 +92,49 @@ func _sample_color(wx: float, wz: float) -> Color:
 	var wx_off: float = _noise_warp.get_noise_2d(wx, wz + 100.0) * 18.0
 	var wz_off: float = _noise_warp.get_noise_2d(wx + 100.0, wz) * 18.0
 	var n: float = (_noise_biome.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
+	var threshold: float = 0.40 if _dimension_id == _Dim.DimensionID.REAL_WORLD else 0.50
+	var is_dark: bool = n >= threshold
+
+	# Road on land only (not underwater)
+	if _dimension_id == _Dim.DimensionID.REAL_WORLD and _is_road(wx, wz):
+		return Color(0.68, 0.52, 0.26)
 
 	if _dimension_id == _Dim.DimensionID.REAL_WORLD:
-		var colors_rw: Array = [
-			Color(0.20, 0.48, 0.14),
-			Color(0.30, 0.60, 0.18),
-			Color(0.40, 0.32, 0.16),
-		]
-		var idx: int = 0
-		if n < 0.33:
-			idx = 0
-		elif n < 0.66:
-			idx = 1
-		else:
-			idx = 2
-		return colors_rw[idx] as Color
+		if is_dark:
+			var dn: float = (_noise_biome.get_noise_2d(wx + 500.0, wz + 500.0) + 1.0) * 0.5
+			if dn > 0.78:
+				return Color(0.32, 0.18, 0.08)
+			return Color(0.20, 0.35, 0.12)
 
-	var colors_tw: Array = [
-		Color(0.05, 0.18, 0.16),
-		Color(0.10, 0.32, 0.26),
-		Color(0.04, 0.20, 0.28),
-	]
-	var idx: int = 0
-	if n < 0.33:
-		idx = 0
-	elif n < 0.66:
-		idx = 1
-	else:
-		idx = 2
-	return colors_tw[idx] as Color
+		# GRASS → approximate distance-field: check expanding rings for DARK_GRASS
+		var found_dark: bool = false
+		var nearest_ring: int = 999
+		var rings: Array[int] = [2, 4, 6, 8, 10]
+		for ri in range(rings.size()):
+			var r: int = rings[ri]
+			for off in [Vector2(r, 0), Vector2(-r, 0), Vector2(0, r), Vector2(0, -r)]:
+				var ox: float = wx + off.x
+				var oz: float = wz + off.y
+				var ox_off: float = _noise_warp.get_noise_2d(ox, oz + 100.0) * 18.0
+				var oz_off: float = _noise_warp.get_noise_2d(ox + 100.0, oz) * 18.0
+				var nn: float = (_noise_biome.get_noise_2d(ox + ox_off, oz + oz_off) + 1.0) * 0.5
+				if nn >= threshold:
+					found_dark = true
+					nearest_ring = ri
+					break
+			if found_dark:
+				break
+
+		if not found_dark:
+			return Color(0.06, 0.25, 0.55)
+		if nearest_ring == 0:
+			return Color(0.90, 0.80, 0.42)
+		var t: float = float(nearest_ring) / 4.0
+		return Color(0.08, 0.36 - t * 0.18, 0.68 - t * 0.18)
+
+	if is_dark:
+		return Color(0.03, 0.12, 0.08)
+	return Color(0.06, 0.22, 0.16)
+
+func _is_road(wx: float, wz: float) -> bool:
+	return WorldChunk._is_on_road(wx, wz)

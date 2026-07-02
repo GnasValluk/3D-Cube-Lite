@@ -1,15 +1,15 @@
 [gd_scene format=3 uid="uid://main001"]
 
-[ext_resource type="Script" uid="uid://csxnhmx33erb" path="res://scripts/world/world_generator.gd" id="2_worldgen"]
+[ext_resource type="Script" uid="uid://csxnhmx33erb" path="res://scripts/world/generation/world_generator.gd" id="2_worldgen"]
 [ext_resource type="Script" uid="uid://cmb6cfumjgen4" path="res://scripts/camera/iso_camera.gd" id="3_camera"]
 [ext_resource type="Script" uid="uid://cgk83lsgccw4s" path="res://scripts/player/neon_pulse.gd" id="4_pulse"]
-[ext_resource type="Script" uid="uid://cellwybu4sab6" path="res://scripts/world/twilight_environment.gd" id="5_env"]
+[ext_resource type="Script" uid="uid://cellwybu4sab6" path="res://scripts/world/environment/twilight_environment.gd" id="5_env"]
 [ext_resource type="Script" uid="uid://ex08qqw2wr71" path="res://scripts/camera/third_person_camera.gd" id="6_tpcamera"]
 [ext_resource type="Script" uid="uid://lovun7bimwf2" path="res://scripts/core/character_manager.gd" id="7_manager"]
 [ext_resource type="Script" uid="uid://den6kxko002et" path="res://scripts/characters/raptor/raptor_character.gd" id="8_raptor"]
 [ext_resource type="Script" uid="uid://bb6reyoc40wal" path="res://scripts/characters/dragon/dragon_character.gd" id="9_dragon"]
 [ext_resource type="Script" uid="uid://bvbthgld4avv8" path="res://scripts/characters/warrior/warrior_character.gd" id="10_warrior"]
-[ext_resource type="Script" uid="uid://va0j6wkrprqo" path="res://scripts/ui/hud.gd" id="11_hud"]
+[ext_resource type="Script" uid="uid://va0j6wkrprqo" path="res://scripts/ui/hud/hud.gd" id="11_hud"]
 [ext_resource type="Script" uid="uid://bnckt8krws5uq" path="res://scripts/characters/dummy/dummy_character.gd" id="12_dummy"]
 [ext_resource type="Script" uid="uid://beyordeath" path="res://scripts/characters/beyordeath/beyordeath_character.gd" id="13_beyordeath"]
 
