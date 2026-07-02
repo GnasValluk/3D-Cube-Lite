@@ -11,11 +11,11 @@
 [ext_resource type="Script" path="res://scripts/ui/hud/hud.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/characters/dummy/dummy_character.gd" id="10"]
 [ext_resource type="Script" path="res://scripts/world/open_world_manager.gd" id="11"]
-[ext_resource type="Script" path="res://scripts/world/explore_system.gd" id="12"]
+[ext_resource type="Script" path="res://scripts/world/explore/explore_system.gd" id="12"]
 [ext_resource type="Script" path="res://scripts/characters/player/player_character.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/building/placement_system.gd" id="14"]
 [ext_resource type="Script" path="res://scripts/characters/fish/fish_spawner.gd" id="15"]
-[ext_resource type="Script" path="res://scripts/world/lotus_light_manager.gd" id="16"]
+[ext_resource type="Script" path="res://scripts/world/lighting/lotus_light_manager.gd" id="16"]
 
 [node name="OpenWorldThucTe" type="Node3D"]
 
