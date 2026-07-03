@@ -173,6 +173,32 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	_build_terrain_mesh(st, bd, cols, dim_id)
+
+	# ── 6b. Detail mesh — đường mòn, sỏi cát, hoạ tiết đất ──────────────────
+	# Render các chi tiết nổi phía trên top surface, dùng biome_grid + road_grid
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var b: int  = biome_grid[vx][vz]
+				var h: float = height_grid[vx][vz]
+				var px: float = -half + (float(vx) + 0.5) * _Data.VOXEL
+				var pz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
+				# pos.y = top edge của block = height value
+				var pos := Vector3(px, h, pz)
+
+				var is_road: bool = road_grid.size() > 0 and road_grid[vx * cols + vz] != 0
+
+				# Đường mòn + hoạ tiết trên đường
+				if is_road and b != _Data.TileType.SAND and b != _Data.TileType.SILT:
+					_Detail.add_trail_detail(st, cx, cz, size, vx, vz, pos, 0.0)
+
+				# Sỏi trên cát (chỉ cát nổi gần mép nước)
+				if b == _Data.TileType.SAND and h > _Data.WATER_Y - 0.04:
+					_Detail.add_sand_gravel(st, cx, cz, size, vx, vz, pos, 0.0)
+
+				# Hoạ tiết gò đất
+				if b == _Data.TileType.DIRT:
+					_Detail.add_dirt_mounds(st, cx, cz, size, vx, vz, pos, 0.0)
 	var mesh := st.commit()
 	if mesh == null:
 		return { "mesh": null, "water_mesh": null, "biome_grid": biome_grid,
@@ -250,13 +276,17 @@ static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 				_Data.TileType.DIRT:       top_block = B.DIRT
 				_Data.TileType.SILT:       top_block = B.SILT
 
-			# Road override — dùng PackedByteArray index
-			if road_grid.size() > 0 and road_grid[x * cols + z] != 0 \
-					and biome != _Data.TileType.SAND and biome != _Data.TileType.SILT:
-				top_block = B.DIRT
+			# Road override — TRAIL block, cùng chiều cao block bình thường
+			var is_trail: bool = road_grid.size() > 0 and road_grid[x * cols + z] != 0 \
+					and biome != _Data.TileType.SAND and biome != _Data.TileType.SILT
+			if is_trail:
+				top_block = B.TRAIL
 
 			# top_slab: slab index của block mặt trên cùng
 			var top_slab: int = floori((h - SLAB) / SLAB) - Y_MIN
+
+			# TRAIL KHÔNG thay đổi top_slab — cùng layer với terrain
+			# Mặt trên thấp hơn vài pixel được xử lý ở mesh build (TRAIL_SINK)
 
 			# water_top_slab: water fill đến đây
 			var water_top_slab: int = floori((_Data.WATER_Y - SLAB) / SLAB) - Y_MIN

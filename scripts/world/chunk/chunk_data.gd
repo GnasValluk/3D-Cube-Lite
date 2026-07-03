@@ -16,6 +16,7 @@ enum BlockID {
 	DARK_DIRT   = 8,
 	SAND_DEEP   = 9,
 	BEDROCK     = 10,  # Tầng đáy thế giới — không thể phá vỡ
+	TRAIL       = 11,  # Đường mòn — vàng đất
 }
 
 const VOXEL: float = 1.0
@@ -52,6 +53,7 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.22, 0.14, 0.06),           # 8 DARK_DIRT (sub-surface under dark grass)
 	Color(0.78, 0.68, 0.34),           # 9 SAND_DEEP
 	Color(0.18, 0.16, 0.18),           # 10 BEDROCK (dark, near-black)
+	Color(0.82, 0.68, 0.28),           # 11 TRAIL — vàng đất đậm hơn cát, nén chặt
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -66,7 +68,12 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.03, 0.10, 0.06),           # 8 DARK_DIRT
 	Color(0.05, 0.13, 0.08),           # 9 SAND_DEEP
 	Color(0.06, 0.05, 0.07),           # 10 BEDROCK (twilight dark)
+	Color(0.08, 0.10, 0.05),           # 11 TRAIL (twilight — đất nén tối)
 ]
+
+## TRAIL_SINK bỏ — không dùng nữa để tránh void
+## TRAIL phân biệt với terrain bằng màu, không bằng height
+const TRAIL_SINK: float = 0.0
 
 ## Side màu tối hơn top (nhân 0.6)
 static func block_side_color(top_col: Color) -> Color:

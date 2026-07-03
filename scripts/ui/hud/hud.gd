@@ -48,6 +48,7 @@ var _debug_hour_slider: HSlider
 var _debug_speed_slider: HSlider
 var _debug_weather_btn: Button
 var _time_label: Label
+var _coords_label: Label
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _ChestUI = preload("res://scripts/items/ui/chest_ui.gd")
@@ -360,6 +361,19 @@ func _process(delta: float) -> void:
 			_world_clock.text = "%02d:%02d" % [hours, minutes]
 	_world_clock.position = Vector2(vp.x - _world_clock.size.x - 12, 12)
 	_time_label.position = Vector2(vp.x - _time_label.size.x - 12, 30)
+
+	# Tọa độ XYZ — lấy từ nhân vật đang được điều khiển
+	if _coords_label:
+		var player := _find_player_character()
+		var tracked_ch: CharacterBase = _mgr.get_current_character() if _mgr else null
+		var pos_src: Node3D = player if player else tracked_ch
+		if pos_src and is_instance_valid(pos_src):
+			var p := pos_src.global_position
+			_coords_label.text = "X %.1f  Y %.1f  Z %.1f" % [p.x, p.y, p.z]
+		else:
+			_coords_label.text = ""
+		_coords_label.size = Vector2(220, 18)
+		_coords_label.position = Vector2(vp.x - _coords_label.size.x - 12, 46)
 
 	if _debug_open:
 		_debug_panel.position = Vector2(vp.x * 0.5 - 175, vp.y * 0.5 - 130)
@@ -816,6 +830,16 @@ func _setup_time_label() -> void:
 	_time_label.add_theme_constant_override("shadow_offset_y", 1)
 	_time_label.text = ""
 	add_child(_time_label)
+
+	_coords_label = Label.new()
+	_coords_label.add_theme_font_size_override("font_size", 11)
+	_coords_label.add_theme_color_override("font_color", Color(0.65, 0.80, 0.65, 0.75))
+	_coords_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	_coords_label.add_theme_constant_override("shadow_offset_x", 1)
+	_coords_label.add_theme_constant_override("shadow_offset_y", 1)
+	_coords_label.text = ""
+	_coords_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(_coords_label)
 
 func _setup_debug_menu() -> void:
 	_debug_panel = Panel.new()

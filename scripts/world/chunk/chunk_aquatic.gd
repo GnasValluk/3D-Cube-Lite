@@ -3,7 +3,7 @@ extends RefCounted
 const _Data = preload("chunk_data.gd")
 
 static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
-		vx: int, vz: int, pos: Vector3, h_vox: float, has_silt: bool,
+		vx: int, vz: int, pos: Vector3, _h_vox: float, has_silt: bool,
 		lotus_lights: Array[Vector3] = []) -> void:
 	var wx: int = cx * size + vx
 	var wz: int = cz * size + vz
@@ -29,8 +29,8 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 			_add_lotus_plant(st, wx, wz, pos, r1, r2, r3, r4, h1, lotus_lights)
 
 # ── Rong nước ngọt nhiệt đới (rong đuôi chó voxel) ──────────────────────────
-static func _add_tropical_weed(st: SurfaceTool, wx: int, wz: int, pos: Vector3,
-		r1: float, r2: float, r3: float, r4: float, h1: int, h2: int,
+static func _add_tropical_weed(st: SurfaceTool, _wx: int, _wz: int, pos: Vector3,
+		r1: float, r2: float, r3: float, r4: float, h1: int, _h2: int,
 		water_gap: float, has_silt: bool, lotus_lights: Array[Vector3]) -> void:
 
 	var chance: float = 0.18 if has_silt else 0.08
@@ -196,7 +196,7 @@ static func _draw_flower(st: SurfaceTool, s: int, cur_x: float, cur_z: float, cu
 
 # ── Sen thạch anh ─────────────────────────────────────────────────────────────
 static func _add_lotus_plant(st: SurfaceTool, wx: int, wz: int, pos: Vector3,
-		r1: float, r2: float, r3: float, r4: float, h1: int,
+		_r1: float, _r2: float, _r3: float, _r4: float, _h1: int,
 		lotus_lights: Array[Vector3]) -> void:
 	var h5: int = wx * 912347189 + wz * 678451237 + 119988771
 	h5 = (h5 ^ (h5 >> 13)) * 1174126183; h5 = h5 ^ (h5 >> 16)
