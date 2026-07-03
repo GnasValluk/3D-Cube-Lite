@@ -127,3 +127,21 @@ BUTTON_SIZE,Button Scale,Kích thước nút
 KEY_BINDINGS,Key Bindings,Phím tắt
 ABOUT_US,About Us,Về chúng tôi
 CONTINUE_JOURNEY,Continue Journey,Tiếp tục hành trình
+DEVICE_TAB,Device,Thiết Bị
+DEVICE_TYPE,Device Type,Loại Thiết Bị
+DEVICE_DESC,"Choose your device for optimized controls and UI","Chọn thiết bị để tối ưu điều khiển và giao diện"
+DEVICE_AUTO,Auto Detect,Tự Động
+DEVICE_PC,PC / Desktop,PC / Máy Tính
+DEVICE_MOBILE,Mobile / Phone,Điện Thoại
+DEVICE_CURRENT,"Active: %s  |  Detected: %s","Hiện tại: %s  |  Phát hiện: %s"
+DEVICE_CURRENT,Active: %s | Detected: %s,Hiện tại: %s | Phát hiện: %s
+MOBILE_FEATURES,Mobile Optimizations,Tối Ưu Điện Thoại
+PC_FEATURES,PC Optimizations,Tối Ưu Máy Tính
+FEAT_JOYSTICK,Virtual joystick (left side),Joystick ảo (bên trái)
+FEAT_CAM_DRAG,Drag to rotate camera,Kéo để xoay camera
+FEAT_TOUCH_BTNS,Touch buttons: Jump / Attack / Interact,Nút chạm: Nhảy / Tấn công / Tương tác
+FEAT_CHUNK_LOW,Reduced view distance for performance,Giảm tầm nhìn để tăng hiệu suất
+FEAT_WASD,WASD / Arrow keys movement,Di chuyển WASD / phím mũi tên
+FEAT_MOUSE_CAM,Mouse to rotate camera,Chuột xoay camera
+FEAT_KEYBOARD,Full keyboard shortcuts,Phím tắt bàn phím đầy đủ
+FEAT_CHUNK_HIGH,Full view distance,Tầm nhìn đầy đủ

@@ -720,10 +720,22 @@ func _read_input() -> Vector3:
 	if _is_player:
 		var rx: float = 0.0
 		var rz: float = 0.0
+
+		# Keyboard input (PC)
 		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    rz -= 1.0
 		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  rz += 1.0
 		if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  rx -= 1.0
 		if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): rx += 1.0
+
+		# Virtual joystick input (Mobile) — ưu tiên nếu có tín hiệu
+		if DeviceManager and DeviceManager.is_mobile():
+			var mob_ctrl := _find_mobile_controls()
+			if mob_ctrl and mob_ctrl.has_method("get") and mob_ctrl.joystick != null:
+				var jv: Vector2 = mob_ctrl.joystick.call("get_vector")
+				if jv.length_squared() > 0.001:
+					rx = jv.x
+					rz = jv.y
+
 		if rx == 0.0 and rz == 0.0:
 			return Vector3.ZERO
 		if _camera == null:
@@ -733,6 +745,15 @@ func _read_input() -> Vector3:
 		var rgt: Vector3 =  cb.x; rgt.y = 0.0; rgt = rgt.normalized()
 		return fwd * -rz + rgt * rx
 	return Vector3.ZERO
+
+## Tìm MobileControls node trong scene (nếu có)
+func _find_mobile_controls() -> Node:
+	var root := get_tree().current_scene
+	if root == null: return null
+	for ch in root.get_children():
+		if ch.get_script() and ch.get_script().resource_path.ends_with("mobile_controls.gd"):
+			return ch
+	return null
 
 func _swim_physics(delta: float) -> void:
 	var dir := _read_input()

@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 WorldSeed="*res://scripts/core/world_seed.gd"
+DeviceManager="*res://scripts/core/device_manager.gd"
 TimeSystem="*res://scripts/core/time_system.gd"
 SFXManager="*res://scripts/audio/sfx_manager.gd"
 

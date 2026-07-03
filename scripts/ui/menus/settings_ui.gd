@@ -1,7 +1,7 @@
 extends Control
 class_name SettingsUI
 
-enum Tab { GENERAL, GRAPHICS, AUDIO, CONTROLS, MOBILE }
+enum Tab { GENERAL, GRAPHICS, AUDIO, CONTROLS, MOBILE, DEVICE }
 
 var _current_tab: int = Tab.GENERAL
 var _rebinding_action: String = ""
@@ -90,12 +90,12 @@ func _build() -> void:
 	_bg.add_child(line)
 
 	# Tab buttons
-	var tab_w: float = 116.0
-	var tab_names: Array[String] = ["SETTINGS_GENERAL", "SETTINGS_GRAPHICS", "SETTINGS_AUDIO", "SETTINGS_CONTROLS", "SETTINGS_MOBILE"]
-	for i in range(5):
+	var tab_w: float = 96.0
+	var tab_names: Array[String] = ["SETTINGS_GENERAL", "SETTINGS_GRAPHICS", "SETTINGS_AUDIO", "SETTINGS_CONTROLS", "SETTINGS_MOBILE", "DEVICE_TAB"]
+	for i in range(6):
 		var btn := Button.new()
 		btn.text = tr(tab_names[i])
-		btn.position = Vector2(14 + i * (tab_w + 4), 58)
+		btn.position = Vector2(14 + i * (tab_w + 3), 58)
 		btn.size = Vector2(tab_w, 28)
 		btn.add_theme_font_size_override("font_size", 12)
 		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
@@ -167,6 +167,7 @@ func _show_tab(tab: int) -> void:
 		Tab.AUDIO: _build_audio_tab()
 		Tab.CONTROLS: _build_controls_tab()
 		Tab.MOBILE: _build_mobile_tab()
+		Tab.DEVICE: _build_device_tab()
 
 func _make_section_label(text: String, y: float) -> Label:
 	var lbl := Label.new()
@@ -453,7 +454,7 @@ func _on_set_language(locale: String) -> void:
 func _rebuild_texts() -> void:
 	_title_lbl.text = tr("SETTINGS_TITLE")
 	_close_btn.text = tr("CLOSE")
-	var tab_names: Array[String] = ["SETTINGS_GENERAL", "SETTINGS_GRAPHICS", "SETTINGS_AUDIO", "SETTINGS_CONTROLS", "SETTINGS_MOBILE"]
+	var tab_names: Array[String] = ["SETTINGS_GENERAL", "SETTINGS_GRAPHICS", "SETTINGS_AUDIO", "SETTINGS_CONTROLS", "SETTINGS_MOBILE", "DEVICE_TAB"]
 	for i in range(min(_tab_btns.size(), tab_names.size())):
 		_tab_btns[i].text = tr(tab_names[i])
 	_show_tab(_current_tab)
@@ -624,3 +625,123 @@ func _cancel_rebind() -> void:
 		_rebinding_btn.disabled = false
 		_rebinding_btn = null
 		_rebinding_action = ""
+
+# ── Device Tab ────────────────────────────────────────────────────────────────
+func _build_device_tab() -> void:
+	var y: float = 0
+
+	# ── Tiêu đề mô tả ────────────────────────────────────────────────────────
+	_make_section_label(tr("DEVICE_TYPE"), y); y += 28
+
+	var desc := Label.new()
+	desc.text = tr("DEVICE_DESC")
+	desc.add_theme_font_size_override("font_size", 12)
+	desc.add_theme_color_override("font_color", Color(0.60, 0.65, 0.75, 0.70))
+	desc.position = Vector2(0, y)
+	desc.size = Vector2(_content.size.x, 36)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_content.add_child(desc)
+	y += 42
+
+	# ── 3 nút chọn: Auto / PC / Mobile ───────────────────────────────────────
+	var cur_device: int = DeviceManager.get_device() if DeviceManager else 0
+	var btn_data: Array[Dictionary] = [
+		{ "label": tr("DEVICE_AUTO"), "mode": 0, "col": Color(0.35, 0.55, 0.80, 0.75) },
+		{ "label": "💻  " + tr("DEVICE_PC"),   "mode": 1, "col": Color(0.30, 0.70, 0.50, 0.75) },
+		{ "label": "📱  " + tr("DEVICE_MOBILE"), "mode": 2, "col": Color(0.80, 0.45, 0.20, 0.75) },
+	]
+
+	var btn_w: float = (_content.size.x - 16.0) / 3.0
+	var device_btns: Array[Button] = []
+
+	for i in range(3):
+		var d: Dictionary = btn_data[i]
+		var btn := Button.new()
+		btn.text = d["label"]
+		btn.position = Vector2(i * (btn_w + 8.0), y)
+		btn.size = Vector2(btn_w, 52)
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.90))
+		var sty := StyleBoxFlat.new()
+		sty.bg_color = d["col"] if cur_device == d["mode"] \
+			else Color(d["col"].r * 0.4, d["col"].g * 0.4, d["col"].b * 0.4, 0.55)
+		sty.corner_radius_top_left    = 8
+		sty.corner_radius_top_right   = 8
+		sty.corner_radius_bottom_left = 8
+		sty.corner_radius_bottom_right = 8
+		sty.border_width_left   = 2; sty.border_width_right  = 2
+		sty.border_width_top    = 2; sty.border_width_bottom = 2
+		sty.border_color = Color(1, 1, 1, 0.30) if cur_device == d["mode"] else Color(1, 1, 1, 0.10)
+		btn.add_theme_stylebox_override("normal", sty)
+		var sty_h := sty.duplicate() as StyleBoxFlat
+		sty_h.bg_color = d["col"]
+		sty_h.border_color = Color(1, 1, 1, 0.55)
+		btn.add_theme_stylebox_override("hover", sty_h)
+		var mode_val: int = d["mode"]
+		btn.pressed.connect(func():
+			if DeviceManager:
+				DeviceManager.set_device(mode_val)
+			# Refresh toàn bộ tab để highlight nút mới
+			_show_tab(Tab.DEVICE)
+		)
+		_content.add_child(btn)
+		device_btns.append(btn)
+	y += 68
+
+	# ── Trạng thái hiện tại ───────────────────────────────────────────────────
+	var status_lbl := Label.new()
+	var is_mob: bool = DeviceManager.is_mobile() if DeviceManager else false
+	var detected: String = tr("DEVICE_MOBILE") if DeviceManager._detect_mobile() else tr("DEVICE_PC")
+	status_lbl.text = tr("DEVICE_CURRENT") % [
+		tr("DEVICE_MOBILE") if is_mob else tr("DEVICE_PC"),
+		detected
+	]
+	status_lbl.add_theme_font_size_override("font_size", 12)
+	status_lbl.add_theme_color_override("font_color", Color(0.70, 0.85, 0.70, 0.85))
+	status_lbl.position = Vector2(0, y)
+	status_lbl.size = Vector2(_content.size.x, 22)
+	_content.add_child(status_lbl)
+	y += 30
+
+	# ── Divider ───────────────────────────────────────────────────────────────
+	var div := ColorRect.new()
+	div.color = Color(0.30, 0.40, 0.60, 0.20)
+	div.position = Vector2(0, y); div.size = Vector2(_content.size.x, 1)
+	_content.add_child(div)
+	y += 14
+
+	# ── Tóm tắt tối ưu theo thiết bị ─────────────────────────────────────────
+	if is_mob:
+		_make_section_label("📱 " + tr("MOBILE_FEATURES"), y); y += 26
+		var features: Array[String] = [
+			"✓  " + tr("FEAT_JOYSTICK"),
+			"✓  " + tr("FEAT_CAM_DRAG"),
+			"✓  " + tr("FEAT_TOUCH_BTNS"),
+			"✓  " + tr("FEAT_CHUNK_LOW"),
+		]
+		for ft in features:
+			var fl := Label.new()
+			fl.text = ft
+			fl.add_theme_font_size_override("font_size", 12)
+			fl.add_theme_color_override("font_color", Color(0.65, 0.90, 0.65, 0.80))
+			fl.position = Vector2(8, y); fl.size = Vector2(_content.size.x - 8, 20)
+			_content.add_child(fl)
+			y += 22
+	else:
+		_make_section_label("💻 " + tr("PC_FEATURES"), y); y += 26
+		var features: Array[String] = [
+			"✓  " + tr("FEAT_WASD"),
+			"✓  " + tr("FEAT_MOUSE_CAM"),
+			"✓  " + tr("FEAT_KEYBOARD"),
+			"✓  " + tr("FEAT_CHUNK_HIGH"),
+		]
+		for ft in features:
+			var fl := Label.new()
+			fl.text = ft
+			fl.add_theme_font_size_override("font_size", 12)
+			fl.add_theme_color_override("font_color", Color(0.65, 0.80, 0.90, 0.80))
+			fl.position = Vector2(8, y); fl.size = Vector2(_content.size.x - 8, 20)
+			_content.add_child(fl)
+			y += 22
+
+	_content.size.y = y + 20

@@ -173,6 +173,23 @@ func _setup_ui() -> void:
 	_setup_oxygen_bar()
 	_setup_time_label()
 	_setup_debug_menu()
+	_setup_mobile_controls()
+
+func _setup_mobile_controls() -> void:
+	const _MobCtrl = preload("res://scripts/ui/mobile/mobile_controls.gd")
+	var mob: Node = _MobCtrl.new()
+	mob.name = "MobileControls"
+	get_parent().call_deferred("add_child", mob)
+	mob.inventory_pressed.connect(func():
+		var cur := _mgr.get_current_character() if _mgr else null
+		if cur is PlayerCharacter:
+			_toggle_inventory()
+	)
+	mob.interact_pressed.connect(func():
+		var player := _find_player_character()
+		if player:
+			player.interact_with_nearby()
+	)
 
 func _setup_loading_overlay() -> void:
 	_load_overlay = ColorRect.new()
