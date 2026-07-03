@@ -3,8 +3,8 @@ class_name OpenWorldManager
 
 const CHUNK_SIZE: int = 32
 const VIEW_RADIUS: int = 2
-const PRELOAD_RADIUS: int = 4
-const MAX_LOADING_PER_FRAME: int = 8
+const PRELOAD_RADIUS: int = 3    # giảm từ 4 → 3: 7×7=49 chunks thay vì 9×9=81
+const MAX_LOADING_PER_FRAME: int = 2  # giảm từ 8 → 2: tránh spike CPU mỗi frame
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 
@@ -154,3 +154,31 @@ func is_in_water(wx: float, wz: float, wy: float) -> bool:
 	if not _chunks.has(key):
 		return false
 	return _chunks[key].is_water_at(wx, wz, wy)
+
+## ── Block API (Minecraft-style) ───────────────────────────────────────────────
+func get_chunk_at(wx: float, wz: float) -> WorldChunk:
+	var half: float = CHUNK_SIZE * 0.5
+	var cx: int = int(floor((wx + half) / CHUNK_SIZE))
+	var cz: int = int(floor((wz + half) / CHUNK_SIZE))
+	var key := Vector2i(cx, cz)
+	return _chunks.get(key, null) as WorldChunk
+
+## Phá block tại vị trí world. Trả về block_id đã phá (0 = không có gì).
+func break_block(wx: float, wy: float, wz: float) -> int:
+	var chunk := get_chunk_at(wx, wz)
+	if chunk == null: return 0
+	return chunk.break_block_at(wx, wy, wz)
+
+## Đặt block tại vị trí world. Trả về true nếu thành công.
+func place_block(wx: float, wy: float, wz: float, block_id: int) -> bool:
+	var chunk := get_chunk_at(wx, wz)
+	if chunk == null: return false
+	return chunk.place_block_at(wx, wy, wz, block_id)
+
+## Lấy block ID tại vị trí world.
+func get_block(wx: float, wy: float, wz: float) -> int:
+	var chunk := get_chunk_at(wx, wz)
+	if chunk == null: return 0
+	if chunk.block_data == null: return 0
+	var blk := chunk.world_to_local_block(wx, wy, wz)
+	return chunk.block_data.get_block(blk.x, blk.y, blk.z)

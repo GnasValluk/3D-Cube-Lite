@@ -26,7 +26,7 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 	_add_tropical_weed(st, wx, wz, pos, r1, r2, r3, r4, h1, h2, water_gap, has_silt, lotus_lights)
 
 	if has_silt:
-		_add_lotus_plant(st, wx, wz, pos, r1, r2, r3, r4, h1, lotus_lights)
+			_add_lotus_plant(st, wx, wz, pos, r1, r2, r3, r4, h1, lotus_lights)
 
 # ── Rong nước ngọt nhiệt đới (rong đuôi chó voxel) ──────────────────────────
 static func _add_tropical_weed(st: SurfaceTool, wx: int, wz: int, pos: Vector3,

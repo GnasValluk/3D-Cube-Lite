@@ -11,10 +11,16 @@ static func _intersection(gx: int, gz: int) -> Vector2:
 	var key: Vector2i = Vector2i(gx, gz)
 	if _int_cache.has(key):
 		return _int_cache[key]
+	# Hash function nhanh thay vì RandomNumberGenerator.new()
 	var h: int = WorldSeed.seed_value + 7777 + gx * 73856093 + gz * 19349663
-	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-	rng.seed = h
-	var res: Vector2 = Vector2(gx * _Data.ROAD_GRID + rng.randf_range(-_Data.ROAD_OFFSET, _Data.ROAD_OFFSET), gz * _Data.ROAD_GRID + rng.randf_range(-_Data.ROAD_OFFSET, _Data.ROAD_OFFSET))
+	h = (h ^ (h >> 13)) * 1274126177; h = h ^ (h >> 16)
+	var rx: float = float(h & 0x7FFFFFFF) / 2147483648.0
+	h = h * 16807 + 1
+	var rz: float = float(h & 0x7FFFFFFF) / 2147483648.0
+	var res: Vector2 = Vector2(
+		gx * _Data.ROAD_GRID + (rx - 0.5) * 2.0 * _Data.ROAD_OFFSET,
+		gz * _Data.ROAD_GRID + (rz - 0.5) * 2.0 * _Data.ROAD_OFFSET
+	)
 	_int_cache[key] = res
 	return res
 
@@ -40,6 +46,25 @@ static func _make_curve(a: Vector2, b: Vector2, rng: RandomNumberGenerator) -> P
 		var t: float = float(i) / float(steps)
 		var u: float = 1.0 - t
 		wp.append(u * u * u * a + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * b)
+	return wp
+
+## Phiên bản không dùng RNG object — chỉ dùng hash integer
+static func _make_curve_hash(a: Vector2, b: Vector2, h: int) -> PackedVector2Array:
+	var dir: Vector2 = (b - a).normalized()
+	var perp: Vector2 = Vector2(-dir.y, dir.x)
+	var dist: float = a.distance_to(b)
+	var h2: int = h * 16807 + 1
+	var r1: float = float(h  & 0x7FFFFFFF) / 2147483648.0 - 0.5
+	var r2: float = float(h2 & 0x7FFFFFFF) / 2147483648.0 - 0.5
+	var p1: Vector2 = a + dir * dist * 0.3 + perp * (r1 * 2.0 * dist * 0.28)
+	var p2: Vector2 = b - dir * dist * 0.3 + perp * (r2 * 2.0 * dist * 0.28)
+	var steps: int = maxi(6, int(dist / 6.0))
+	var wp: PackedVector2Array = PackedVector2Array()
+	wp.resize(steps + 1)
+	for i in range(steps + 1):
+		var t: float = float(i) / float(steps)
+		var u: float = 1.0 - t
+		wp[i] = u*u*u*a + 3*u*u*t*p1 + 3*u*t*t*p2 + t*t*t*b
 	return wp
 
 static func _index_curves() -> void:
@@ -78,10 +103,14 @@ static func _ensure_roads() -> void:
 
 	for gx in range(-_Data.ROAD_GRID_R, _Data.ROAD_GRID_R + 1):
 		for gz in range(-_Data.ROAD_GRID_R, _Data.ROAD_GRID_R + 1):
+			# Dùng hash thay vì RandomNumberGenerator.new() để tránh 13K object alloc
 			var h: int = seed_base + gx * 40009 + gz * 70003
-			var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-			rng.seed = h
-			var has: Array = [rng.randf() < 0.40, rng.randf() < 0.40, rng.randf() < 0.15, rng.randf() < 0.15]
+			h = (h ^ (h >> 13)) * 1274126177; h = h ^ (h >> 16)
+			var r0: float = float(h & 0x7FFFFFFF) / 2147483648.0
+			h = h * 16807 + 1; var r1: float = float(h & 0x7FFFFFFF) / 2147483648.0
+			h = h * 16807 + 1; var r2: float = float(h & 0x7FFFFFFF) / 2147483648.0
+			h = h * 16807 + 1; var r3: float = float(h & 0x7FFFFFFF) / 2147483648.0
+			var has: Array = [r0 < 0.40, r1 < 0.40, r2 < 0.15, r3 < 0.15]
 			var cnt: int = 0
 			for v in has:
 				if v: cnt += 1
@@ -117,10 +146,10 @@ static func _ensure_roads() -> void:
 		var bp: PackedStringArray = parts[1].split(",")
 		var ak: Vector2i = Vector2i(int(ap[0]), int(ap[1]))
 		var bk: Vector2i = Vector2i(int(bp[0]), int(bp[1]))
+		# Hash thay vì RandomNumberGenerator.new()
 		var h: int = seed_base + ak.x * 100003 + ak.y * 200003 + bk.x * 300007 + bk.y * 500009
-		var rng: RandomNumberGenerator = RandomNumberGenerator.new()
-		rng.seed = h
-		_road_curves.append(_make_curve(inters[ak], inters[bk], rng))
+		h = (h ^ (h >> 13)) * 1274126177; h = h ^ (h >> 16)
+		_road_curves.append(_make_curve_hash(inters[ak], inters[bk], h))
 
 	_index_curves()
 
