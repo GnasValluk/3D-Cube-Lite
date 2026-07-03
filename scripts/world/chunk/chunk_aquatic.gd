@@ -208,7 +208,7 @@ static func _add_lotus_plant(st: SurfaceTool, wx: int, wz: int, pos: Vector3,
 	var lily_r: float = 0.22 + r5 * 0.14
 	var ox3: float = (r5 - 0.5) * 0.4
 	var oz3: float = (r6 - 0.5) * 0.4
-	var lily_y: float = _Data.WATER_Y - 0.02
+	var lily_y: float = _Data.WATER_Y + 0.005
 	var col_lily := Color(0.08, 0.38 + r6 * 0.16, 0.10, 1.0)
 	_add_quad(st, Vector3(pos.x+ox3, lily_y, pos.z+oz3),
 		Vector3(lily_r,0,0), Vector3(0,0,lily_r), Vector3(0,1,0), col_lily)

@@ -10,7 +10,7 @@ config_version=5
 
 [application]
 
-config/name="3D Project CubeLite Zero Assets"
+config/name="CUPY Cozy Daily"
 run/main_scene="res://scenes/start_menu.tscn"
 config/features=PackedStringArray("4.7", "Mobile")
 boot_splash/bg_color=Color(0.06, 0.06, 0.1, 1)

@@ -404,17 +404,36 @@ shader_type spatial;
 render_mode blend_mix, cull_disabled, unshaded;
 
 uniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-uniform float sway_speed  : hint_range(0.1, 5.0) = 1.4;
-uniform float sway_amount : hint_range(0.0, 0.5) = 0.055;
-uniform float sway_freq   : hint_range(0.1, 8.0) = 2.2;
+uniform float sway_speed  : hint_range(0.1, 5.0) = 1.6;
+uniform float sway_amount : hint_range(0.0, 0.5) = 0.07;
+uniform float sway_freq   : hint_range(0.1, 8.0) = 2.8;
 
 void vertex() {
-	// Đung đưa theo sin wave — biên độ tăng theo chiều cao (gốc không đung đưa)
-	float height_factor = max(0.0, VERTEX.y + 0.5) * 0.6;
-	float wave = sin(TIME * sway_speed + VERTEX.x * sway_freq + VERTEX.z * sway_freq * 0.7) * sway_amount * height_factor;
-	float wave2 = sin(TIME * sway_speed * 0.7 + VERTEX.z * sway_freq + 0.8) * sway_amount * 0.5 * height_factor;
-	VERTEX.x += wave;
-	VERTEX.z += wave2;
+	// height_factor: chỉ áp dụng sway cho thân rong đứng, lá sen nằm ngang (y ~ WATER_Y) không bị ảnh hưởng
+	// WATER_Y = 0.25 — lá sen ở y ≈ 0.23, thân rong bắt đầu từ đáy (y âm) lên trên
+	float h = VERTEX.y;
+	// Lá sen nằm ngang: normal.y gần 1.0 → không sway
+	float is_flat = step(0.85, abs(NORMAL.y));
+	float height_factor = max(0.0, h + 0.5) * 0.7 * (1.0 - is_flat);
+
+	// Phase offset độc lập theo vị trí để mỗi cây đung đưa lệch pha nhau
+	float phase_x = VERTEX.x * 3.7 + VERTEX.z * 1.3;
+	float phase_z = VERTEX.z * 3.1 + VERTEX.x * 1.7;
+
+	// Lớp sóng chính — chậm, biên độ lớn
+	float w1 = sin(TIME * sway_speed + phase_x) * sway_amount * height_factor;
+	float w1z = sin(TIME * sway_speed * 0.73 + phase_z + 1.1) * sway_amount * 0.6 * height_factor;
+
+	// Lớp sóng phụ — nhanh hơn, biên độ nhỏ, tạo rung rinh tự nhiên
+	float w2 = sin(TIME * sway_speed * 2.1 + phase_x * 0.5 + 0.4) * sway_amount * 0.3 * height_factor;
+	float w2z = sin(TIME * sway_speed * 1.85 + phase_z * 0.6 + 2.2) * sway_amount * 0.25 * height_factor;
+
+	// Lớp sóng vi mô — rất nhanh, biên độ rất nhỏ (giả lập dòng nước nhỏ)
+	float w3 = sin(TIME * sway_speed * 4.3 + phase_x * 1.2) * sway_amount * 0.12 * height_factor;
+
+	VERTEX.x += w1 + w2 + w3;
+	VERTEX.z += w1z + w2z;
+	// KHÔNG dịch VERTEX.y để lá sen không bị chìm
 }
 
 void fragment() {

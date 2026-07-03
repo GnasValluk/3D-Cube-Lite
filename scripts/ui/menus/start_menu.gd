@@ -1,6 +1,9 @@
 extends Control
 
-var _new_journey_ui: Control = null
+var _new_journey_ui: Control  = null
+var _journey_list_ui: Control = null
+var _settings_ui: Control     = null
+var _about_ui: Control        = null
 
 func _ready() -> void:
 	_load_translations()
@@ -31,136 +34,160 @@ func _load_translations() -> void:
 
 func _setup_ui() -> void:
 	var vp := get_viewport().get_visible_rect().size
+	var cx: float = vp.x * 0.5
+	var cy: float = vp.y * 0.5
 
+	# ── Background ────────────────────────────────────────────────────────────
 	var bg := ColorRect.new()
-	bg.color = Color(0.06, 0.06, 0.10)
+	bg.color = Color(0.06, 0.07, 0.12)
 	bg.size = vp
 	add_child(bg)
 
 	var grid := ColorRect.new()
-	grid.color = Color(0.10, 0.10, 0.16, 0.4)
+	grid.color = Color(0.10, 0.10, 0.16, 0.35)
 	grid.size = vp
 	grid.material = _make_grid_mat(vp)
 	add_child(grid)
 
-	var cx: float = vp.x * 0.5
-	var cy: float = vp.y * 0.5
+	# ── Tiêu đề game ──────────────────────────────────────────────────────────
+	var title_block := Control.new()
+	title_block.position = Vector2(0, cy - 210)
+	title_block.size = Vector2(vp.x, 100)
+	add_child(title_block)
 
-	var title := Label.new()
-	title.text = "CubeLife Zero"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 48)
-	title.add_theme_color_override("font_color", Color(0.35, 0.85, 1.0, 0.95))
-	title.add_theme_color_override("font_shadow_color", Color(0, 0.3, 0.6, 0.6))
-	title.add_theme_constant_override("shadow_offset_x", 3)
-	title.add_theme_constant_override("shadow_offset_y", 3)
-	title.position = Vector2(0, cy - 200)
-	title.size = Vector2(vp.x, 50)
-	add_child(title)
+	var title_main := Label.new()
+	title_main.text = "CUPY"
+	title_main.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_main.add_theme_font_size_override("font_size", 72)
+	title_main.add_theme_color_override("font_color", Color(0.35, 0.88, 1.0))
+	title_main.add_theme_color_override("font_shadow_color", Color(0.0, 0.3, 0.6, 0.7))
+	title_main.add_theme_constant_override("shadow_offset_x", 3)
+	title_main.add_theme_constant_override("shadow_offset_y", 4)
+	title_main.size = Vector2(vp.x, 80)
+	title_main.position = Vector2(0, 0)
+	title_block.add_child(title_main)
 
-	var btn_w: float = 320.0
-	var btn_h: float = 48.0
-	var btn_gap: float = 14.0
+	var title_sub := Label.new()
+	title_sub.text = "Cozy Daily"
+	title_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_sub.add_theme_font_size_override("font_size", 22)
+	title_sub.add_theme_color_override("font_color", Color(0.72, 0.88, 0.95, 0.80))
+	title_sub.add_theme_color_override("font_shadow_color", Color(0, 0.2, 0.4, 0.5))
+	title_sub.add_theme_constant_override("shadow_offset_x", 1)
+	title_sub.add_theme_constant_override("shadow_offset_y", 2)
+	title_sub.size = Vector2(vp.x, 30)
+	title_sub.position = Vector2(0, 72)
+	title_block.add_child(title_sub)
+
+	# ── Divider ───────────────────────────────────────────────────────────────
+	var div := ColorRect.new()
+	div.color = Color(0.35, 0.70, 0.95, 0.18)
+	div.size = Vector2(200, 1)
+	div.position = Vector2(cx - 100, cy - 100)
+	add_child(div)
+
+	# ── Nút menu chính ────────────────────────────────────────────────────────
+	var btn_w: float = 300.0
+	var btn_h: float = 52.0
+	var btn_gap: float = 12.0
 	var btn_x: float = cx - btn_w * 0.5
-	var btn_start_y: float = cy - 60.0
+	var btn_y: float = cy - 82.0
 
-	var new_btn := _make_button(tr("NEW_JOURNEY"), btn_x, btn_start_y, btn_w, btn_h, Color(0.35, 0.85, 1.0, 0.15), Color(0.35, 0.85, 1.0, 0.30))
+	# 1. New Journey
+	var new_btn := _make_button(tr("NEW_JOURNEY"), btn_x, btn_y, btn_w, btn_h,
+		Color(0.30, 0.80, 1.0, 0.14), Color(0.30, 0.80, 1.0, 0.28),
+		Color(0.30, 0.80, 1.0, 0.35))
 	new_btn.pressed.connect(_on_new_journey)
 	add_child(new_btn)
+	btn_y += btn_h + btn_gap
 
-	var sep := ColorRect.new()
-	sep.color = Color(1, 1, 1, 0.08)
-	sep.size = Vector2(btn_w, 1)
-	sep.position = Vector2(btn_x, btn_start_y + btn_h + btn_gap * 0.5)
-	add_child(sep)
+	# 2. Journey List
+	var list_btn := _make_button(tr("CONTINUE_JOURNEY"), btn_x, btn_y, btn_w, btn_h,
+		Color(1.0, 1.0, 1.0, 0.06), Color(1.0, 1.0, 1.0, 0.13),
+		Color(1.0, 1.0, 1.0, 0.18))
+	list_btn.pressed.connect(_on_journey_list)
+	add_child(list_btn)
+	btn_y += btn_h + btn_gap
 
-	var list_y: float = btn_start_y + btn_h + btn_gap + 8
-	var saves_label := Label.new()
-	saves_label.text = tr("PREVIOUS_JOURNEYS")
-	saves_label.add_theme_font_size_override("font_size", 13)
-	saves_label.add_theme_color_override("font_color", Color(0.45, 0.55, 0.70, 0.7))
-	saves_label.position = Vector2(btn_x, list_y)
-	saves_label.size = Vector2(btn_w, 20)
-	add_child(saves_label)
-	list_y += 24
+	# 3. Settings
+	var set_btn := _make_button(tr("SETTINGS_TITLE"), btn_x, btn_y, btn_w, btn_h,
+		Color(1.0, 1.0, 1.0, 0.06), Color(1.0, 1.0, 1.0, 0.13),
+		Color(1.0, 1.0, 1.0, 0.18))
+	set_btn.pressed.connect(_on_settings)
+	add_child(set_btn)
+	btn_y += btn_h + btn_gap
 
-	var saves: Array = WorldSeed.get_saves()
-	if saves.size() == 0:
-		var empty_lbl := Label.new()
-		empty_lbl.text = tr("NO_SAVES")
-		empty_lbl.add_theme_font_size_override("font_size", 12)
-		empty_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.20))
-		empty_lbl.position = Vector2(btn_x, list_y)
-		empty_lbl.size = Vector2(btn_w, 20)
-		add_child(empty_lbl)
-		list_y += 24
-	else:
-		for i in range(min(saves.size(), 6)):
-			var s: Dictionary = saves[i]
-			var s_btn := _make_button(s.get("name", "Unknown"), btn_x, list_y, btn_w, 36, Color(1, 1, 1, 0.04), Color(1, 1, 1, 0.10))
-			var idx: int = i
-			s_btn.pressed.connect(_on_load_journey.bind(idx))
-			add_child(s_btn)
+	# 4. About Us
+	var about_btn := _make_button(tr("ABOUT_US"), btn_x, btn_y, btn_w, btn_h,
+		Color(1.0, 1.0, 1.0, 0.06), Color(1.0, 1.0, 1.0, 0.13),
+		Color(1.0, 1.0, 1.0, 0.18))
+	about_btn.pressed.connect(_on_about)
+	add_child(about_btn)
+	btn_y += btn_h + btn_gap + 4
 
-			var seed_lbl := Label.new()
-			seed_lbl.text = tr("SEED") % s.get("seed", 0)
-			seed_lbl.add_theme_font_size_override("font_size", 10)
-			seed_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.15))
-			seed_lbl.position = Vector2(btn_x + 12, list_y + 20)
-			seed_lbl.size = Vector2(btn_w - 24, 14)
-			add_child(seed_lbl)
+	# ── Separator trước Exit ──────────────────────────────────────────────────
+	var sep2 := ColorRect.new()
+	sep2.color = Color(1, 1, 1, 0.07)
+	sep2.size = Vector2(btn_w, 1)
+	sep2.position = Vector2(btn_x, btn_y)
+	add_child(sep2)
+	btn_y += 12
 
-			var del_btn := Button.new()
-			del_btn.text = "×"
-			del_btn.position = Vector2(btn_x + btn_w - 32, list_y + 4)
-			del_btn.size = Vector2(28, 28)
-			del_btn.add_theme_font_size_override("font_size", 16)
-			del_btn.add_theme_color_override("font_color", Color(1, 0.35, 0.35, 0.60))
-			del_btn.add_theme_color_override("font_hover_color", Color(1, 0.35, 0.35, 1.0))
-			var del_bg := StyleBoxFlat.new()
-			del_bg.bg_color = Color(0, 0, 0, 0.0)
-			del_bg.corner_radius_top_left = 4
-			del_bg.corner_radius_top_right = 4
-			del_bg.corner_radius_bottom_left = 4
-			del_bg.corner_radius_bottom_right = 4
-			del_btn.add_theme_stylebox_override("normal", del_bg)
-			var del_hover := del_bg.duplicate()
-			del_hover.bg_color = Color(1, 0.20, 0.20, 0.15)
-			del_btn.add_theme_stylebox_override("hover", del_hover)
-			del_btn.pressed.connect(_on_delete_journey.bind(idx))
-			add_child(del_btn)
-
-			list_y += 36 + 4
-
-	var quit_btn := _make_button(tr("QUIT_GAME"), btn_x, list_y + 16, btn_w, btn_h, Color(1, 0.30, 0.30, 0.08), Color(1, 0.30, 0.30, 0.18))
+	# 5. Exit
+	var quit_btn := _make_button(tr("QUIT_GAME"), btn_x, btn_y, btn_w, btn_h,
+		Color(1.0, 0.28, 0.28, 0.08), Color(1.0, 0.28, 0.28, 0.18),
+		Color(1.0, 0.28, 0.28, 0.28))
 	quit_btn.pressed.connect(_on_quit)
 	add_child(quit_btn)
 
-func _make_button(text: String, x: float, y: float, w: float, h: float, normal_color: Color, hover_color: Color) -> Button:
+	# ── Version label ─────────────────────────────────────────────────────────
+	var ver_lbl := Label.new()
+	ver_lbl.text = "v0.1.0"
+	ver_lbl.add_theme_font_size_override("font_size", 11)
+	ver_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.18))
+	ver_lbl.position = Vector2(vp.x - 60, vp.y - 24)
+	ver_lbl.size = Vector2(52, 18)
+	ver_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(ver_lbl)
+
+# ── Button factory ────────────────────────────────────────────────────────────
+func _make_button(text: String, x: float, y: float, w: float, h: float,
+		normal_color: Color, hover_color: Color, pressed_color: Color) -> Button:
 	var btn := Button.new()
 	btn.text = text
 	btn.position = Vector2(x, y)
 	btn.size = Vector2(w, h)
-	btn.add_theme_font_size_override("font_size", 16)
-	btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = normal_color
-	bg.corner_radius_top_left = 6
-	bg.corner_radius_top_right = 6
-	bg.corner_radius_bottom_left = 6
-	bg.corner_radius_bottom_right = 6
-	bg.border_width_left = 1
-	bg.border_width_right = 1
-	bg.border_width_top = 1
-	bg.border_width_bottom = 1
-	bg.border_color = Color(1, 1, 1, 0.08)
-	btn.add_theme_stylebox_override("normal", bg)
-	var h_bg := bg.duplicate()
-	h_bg.bg_color = hover_color
-	h_bg.border_color = Color(1, 1, 1, 0.20)
-	btn.add_theme_stylebox_override("hover", h_bg)
+	btn.add_theme_font_size_override("font_size", 17)
+	btn.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, 0.90))
+	btn.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0, 1.0))
+	btn.add_theme_color_override("font_pressed_color", Color(1.0, 1.0, 1.0, 1.0))
+
+	var sty := StyleBoxFlat.new()
+	sty.bg_color = normal_color
+	sty.corner_radius_top_left    = 8
+	sty.corner_radius_top_right   = 8
+	sty.corner_radius_bottom_left = 8
+	sty.corner_radius_bottom_right = 8
+	sty.border_width_left   = 1
+	sty.border_width_right  = 1
+	sty.border_width_top    = 1
+	sty.border_width_bottom = 1
+	sty.border_color = Color(1.0, 1.0, 1.0, 0.10)
+	btn.add_theme_stylebox_override("normal", sty)
+
+	var sty_h := sty.duplicate()
+	sty_h.bg_color = hover_color
+	sty_h.border_color = Color(0.40, 0.85, 1.0, 0.30)
+	btn.add_theme_stylebox_override("hover", sty_h)
+
+	var sty_p := sty.duplicate()
+	sty_p.bg_color = pressed_color
+	sty_p.border_color = Color(0.40, 0.85, 1.0, 0.50)
+	btn.add_theme_stylebox_override("pressed", sty_p)
+
 	return btn
 
+# ── Grid background ───────────────────────────────────────────────────────────
 func _make_grid_mat(vp: Vector2) -> Material:
 	var m := ShaderMaterial.new()
 	m.shader = _grid_shader()
@@ -174,31 +201,15 @@ shader_type canvas_item;
 uniform vec2 vp;
 void fragment() {
 	vec2 uv = FRAGCOORD.xy / vp;
-	vec2 g = fract(uv * 30.0);
+	vec2 g = fract(uv * 28.0);
 	float l = min(g.x, g.y);
-	float a = smoothstep(0.04, 0.02, l) * 0.15;
-	COLOR = vec4(0.2, 0.6, 1.0, a);
+	float a = smoothstep(0.05, 0.02, l) * 0.12;
+	COLOR = vec4(0.25, 0.65, 1.0, a);
 }
 """
 	return s
 
-func _on_delete_journey(idx: int) -> void:
-	var saves: Array = WorldSeed.get_saves()
-	if idx < 0 or idx >= saves.size():
-		return
-	var save_name: String = saves[idx].get("name", "Unknown")
-	var confirm := AcceptDialog.new()
-	confirm.dialog_text = tr("DELETE_JOURNEY") % save_name
-	confirm.ok_button_text = tr("DELETE")
-	add_child(confirm)
-	confirm.popup_centered()
-	confirm.add_cancel_button(tr("CANCEL"))
-	confirm.confirmed.connect(_do_delete.bind(idx))
-
-func _do_delete(idx: int) -> void:
-	WorldSeed.delete_save(idx)
-	get_tree().change_scene_to_file("res://scenes/start_menu.tscn")
-
+# ── Handlers ──────────────────────────────────────────────────────────────────
 func _on_new_journey() -> void:
 	if _new_journey_ui == null:
 		_new_journey_ui = preload("res://scripts/ui/menus/new_journey_ui.gd").new()
@@ -206,9 +217,23 @@ func _on_new_journey() -> void:
 	_new_journey_ui.visible = true
 	_new_journey_ui.setup()
 
-func _on_load_journey(idx: int) -> void:
-	if WorldSeed.load_journey(idx):
-		get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")
+func _on_journey_list() -> void:
+	if _journey_list_ui == null:
+		_journey_list_ui = preload("res://scripts/ui/menus/journey_list_ui.gd").new()
+		add_child(_journey_list_ui)
+	(_journey_list_ui as Control).call("open")
+
+func _on_settings() -> void:
+	if _settings_ui == null:
+		_settings_ui = preload("res://scripts/ui/menus/settings_ui.gd").new()
+		add_child(_settings_ui)
+	(_settings_ui as SettingsUI).show_settings()
+
+func _on_about() -> void:
+	if _about_ui == null:
+		_about_ui = preload("res://scripts/ui/menus/about_us_ui.gd").new()
+		add_child(_about_ui)
+	_about_ui.visible = true
 
 func _on_quit() -> void:
 	get_tree().quit()
