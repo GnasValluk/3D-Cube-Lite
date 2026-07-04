@@ -126,8 +126,9 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		# Hoist noise dict ra ngoài loop — tránh dictionary lookup 2048 lần
 		var nd: Dictionary = _Noise._noise_for_dim(dim_id)
-		var n_lake: FastNoiseLite = nd["lake"]
-		var n_biome: FastNoiseLite = nd["biome"]
+		var n_lake: FastNoiseLite      = nd["lake"]
+		var n_lake_type: FastNoiseLite = nd["lake_type"]
+		var n_biome: FastNoiseLite     = nd["biome"]
 		for ivx in range(cols):
 			var pvx: int = ivx + _Data.PAD
 			for ivz in range(cols):
@@ -137,13 +138,32 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
 					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
 					var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+
 					if lake_val > 0.50:
-						if d <= 1:
-							biome_grid[ivx][ivz] = _Data.TileType.SAND
-							height_grid[ivx][ivz] = _Data.WATER_Y
+						# Đây là vùng hồ — phân loại hồ bùn hay hồ cát
+						# n_lake_type > 0.5 → hồ bùn, ngược lại → hồ cát
+						var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
+						var is_silt_lake: bool = lake_type_val > 0.50
+
+						if is_silt_lake:
+							# ── Hồ bùn: ≥60% diện tích là SILT ────────────────────────
+							# d=0,1,2,3 → SILT (phần lớn + thành trong)
+							# d>=4 → SAND (chỉ mép ngoài 1-2 voxel)
+							if d <= 3:
+								biome_grid[ivx][ivz] = _Data.TileType.SILT
+								if d <= 1:
+									height_grid[ivx][ivz] = _Data.WATER_Y
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.SAND
+								if d <= 1:
+									height_grid[ivx][ivz] = _Data.WATER_Y
 						else:
-							biome_grid[ivx][ivz] = _Data.TileType.SILT
+							# ── Hồ cát: toàn bộ là SAND ─────────────────────────────────
+							biome_grid[ivx][ivz] = _Data.TileType.SAND
+							if d <= 1:
+								height_grid[ivx][ivz] = _Data.WATER_Y
 					else:
+						# Không phải hồ — vùng cỏ bình thường ven nước
 						biome_grid[ivx][ivz] = _Data.TileType.SAND
 						if d <= 1:
 							height_grid[ivx][ivz] = _Data.WATER_Y

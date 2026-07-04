@@ -138,8 +138,17 @@ func has_item(item_id: String) -> bool:
 
 static func create_item_db() -> Dictionary:
 	var db: Dictionary = {}
-	_add(db, "chest",        "Rương đồ",  ItemDef.Type.BLOCK, Color(0.50, 0.32, 0.10), "C", "Rương chứa đồ", false, 1)
-	_add(db, "twilight_gate","Cổng Twilight", ItemDef.Type.TOOL, Color(0.10, 0.50, 0.45), "T", "Đặt cổng Twilight ra thế giới", false, 1)
+	_add(db, "chest",         "Rương đồ",     ItemDef.Type.BLOCK,  Color(0.50, 0.32, 0.10), "C",  "Rương chứa đồ",          false, 1)
+	_add(db, "twilight_gate", "Cổng Twilight", ItemDef.Type.TOOL,   Color(0.10, 0.50, 0.45), "T",  "Đặt cổng Twilight ra thế giới", false, 1)
+
+	# ── Công cụ ────────────────────────────────────────────────────────────────
+	_add(db, "cuoc",  "Cuốc",  ItemDef.Type.TOOL,   Color(0.60, 0.55, 0.50), "⛏", "Đào đất, khai thác tài nguyên",   false, 1, 0, 8,  0)
+	_add(db, "xeng",  "Xẻng",  ItemDef.Type.TOOL,   Color(0.70, 0.65, 0.55), "🔨", "Xúc đất, di chuyển vật liệu",     false, 1, 0, 6,  0)
+	_add(db, "riu",   "Rìu",   ItemDef.Type.TOOL,   Color(0.50, 0.45, 0.40), "🪓", "Chặt cây, phá gỗ",                false, 1, 0, 14, 0)
+
+	# ── Vũ khí ─────────────────────────────────────────────────────────────────
+	_add(db, "kiem",  "Kiếm",  ItemDef.Type.WEAPON, Color(0.75, 0.80, 0.90), "⚔",  "Tấn công nhanh, sát thương cao",  false, 1, 0, 22, 0)
+
 	return db
 
 static func _add(db: Dictionary, id: String, name: String, type: int, color: Color, char: String,
@@ -148,4 +157,9 @@ static func _add(db: Dictionary, id: String, name: String, type: int, color: Col
 	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot)
 
 static func seed_inventory(inv: Inventory) -> void:
-	pass
+	## Thêm vật phẩm mẫu vào slot 0-3 của hotbar để test
+	var db := create_item_db()
+	inv.add_item(db["kiem"],  1)
+	inv.add_item(db["cuoc"],  1)
+	inv.add_item(db["xeng"],  1)
+	inv.add_item(db["riu"],   1)

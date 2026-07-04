@@ -798,6 +798,7 @@ func _track_character(ch: CharacterBase) -> void:
 		player_ch._held_item = {}
 		if player_ch.inventory:
 			_hotbar.set_inventory(player_ch.inventory)
+			_hotbar.set_player(player_ch)
 			_inventory_ui.set_inventory(player_ch.inventory)
 			_inventory_ui.set_player(player_ch)
 	else:

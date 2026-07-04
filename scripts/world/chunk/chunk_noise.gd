@@ -30,7 +30,13 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_lake.seed = base_seed + 5555
 	n_lake.frequency = 0.018
 
-	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake }
+	## n_lake_type: xác định hồ bùn hay hồ cát — tần số thấp hơn để patch lớn hơn
+	var n_lake_type := FastNoiseLite.new()
+	n_lake_type.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_lake_type.seed = base_seed + 8888
+	n_lake_type.frequency = 0.008
+
+	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake, "lake_type": n_lake_type }
 	_noise_cache[dim_id] = result
 	return result
 

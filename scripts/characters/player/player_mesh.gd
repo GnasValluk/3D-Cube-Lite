@@ -11,6 +11,7 @@ var arm_l:   Node3D
 var arm_r:   Node3D
 var leg_l:   Node3D
 var leg_r:   Node3D
+var weapon_pivot: Node3D   # điểm gắn weapon vào tay phải
 
 # ── Materials ─────────────────────────────────────────────────────────────────
 ## Skin
@@ -212,6 +213,14 @@ func _build_arms() -> void:
 		MeshBuilder.box(arm, Vector3(0, -0.20, 0), Vector3(0.10, 0.06, 0.10), _sk)
 		# Bàn tay
 		MeshBuilder.box(arm, Vector3(0, -0.26, 0), Vector3(0.10, 0.06, 0.08), _sk)
+
+	# Weapon pivot — cầm từ lòng bàn tay, đầu chỉa ra trước (-Z character)
+	# Model weapon build theo trục +Y (cán ở gốc, đầu ở Y dương)
+	# arm_r trục Y = xuống → xoay X=+90 để +Y pivot = -Z world = ra trước
+	weapon_pivot = MeshBuilder.pivot(arm_r, Vector3(0.0, -0.28, 0.0))
+	weapon_pivot.name = "WeaponPivot"
+	weapon_pivot.rotation_degrees = Vector3(90, 0, 0)
+	weapon_pivot.scale = Vector3(1.8, 1.8, 1.8)
 
 # ── Legs – chân ngắn chibi + tất trắng + giày ────────────────────────────────
 func _build_legs() -> void:

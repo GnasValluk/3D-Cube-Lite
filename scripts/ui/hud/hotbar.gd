@@ -2,6 +2,7 @@ class_name Hotbar
 extends Control
 
 var _inventory: Inventory = null
+var _player_ref: PlayerCharacter = null   # direct reference, không cần find
 var _selected: int = 0
 var _slots: Array[Panel] = []
 var _slot_faces: Array[ColorRect] = []
@@ -119,8 +120,7 @@ func _on_slot_gui_input(event: InputEvent, idx: int) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			_select(idx)
 			_handle_left_click(idx)
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_use_item(idx)
+		# Right-click đã bỏ — không drop/equip bằng right-click nữa
 
 func _on_slot_mouse_entered(idx: int) -> void:
 	if _inventory == null:
@@ -140,7 +140,7 @@ func _on_slot_mouse_exited() -> void:
 	_tooltip_bg.visible = false
 
 func _handle_left_click(idx: int) -> void:
-	var player: PlayerCharacter = _find_player()
+	var player: PlayerCharacter = _player_ref
 	if player == null:
 		return
 	if not player._inventory_open:
@@ -161,16 +161,25 @@ func _handle_left_click(idx: int) -> void:
 			_inventory.swap(from_idx, idx)
 		player._held_item = {}
 
-func _use_item(idx: int) -> void:
-	var slot: ItemSlot = _inventory.slots[idx]
+func _auto_equip_selected() -> void:
+	var player: PlayerCharacter = _player_ref
+	print("[Hotbar] _auto_equip slot=%d player=%s" % [_selected, str(player != null)])
+	if player == null or _inventory == null:
+		return
+	var slot: ItemSlot = _inventory.slots[_selected]
 	if slot.is_empty():
+		player.equip_weapon_direct(null)
 		return
-	var player: PlayerCharacter = _find_player()
-	if player == null:
-		return
-	player.use_item_from_inventory(idx)
+	var item: ItemDef = slot.item
+	print("[Hotbar] equipping item: ", item.id, " type=", item.type)
+	if item.type == ItemDef.Type.WEAPON or item.type == ItemDef.Type.TOOL:
+		player.equip_weapon_direct(item)
+	else:
+		player.equip_weapon_direct(null)
 
 func _find_player() -> PlayerCharacter:
+	if _player_ref != null:
+		return _player_ref
 	var tree := get_tree()
 	if tree == null:
 		return null
@@ -183,6 +192,12 @@ func _find_player() -> PlayerCharacter:
 
 func set_inventory(inv: Inventory) -> void:
 	_inventory = inv
+	if inv != null:
+		_auto_equip_selected()
+
+func set_player(player: PlayerCharacter) -> void:
+	_player_ref = player
+	print("[Hotbar] set_player called: ", player != null)
 
 func select_slot(idx: int) -> void:
 	if idx >= 0 and idx < 9:
@@ -204,6 +219,8 @@ func _select(idx: int) -> void:
 		return
 	_selected = idx
 	_update_highlight()
+	# Auto-equip: khi chọn slot có weapon/tool → tự cầm; slot trống/khác → bỏ
+	_auto_equip_selected()
 
 func _update_highlight() -> void:
 	for i in range(_slots.size()):

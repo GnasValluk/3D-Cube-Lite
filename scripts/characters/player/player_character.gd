@@ -48,6 +48,14 @@ func _build_character() -> void:
 	inventory = Inventory.new()
 	Inventory.seed_inventory(inventory)
 
+	# Auto-equip item ở slot 0 của hotbar nếu là weapon/tool
+	if not inventory.slots[0].is_empty():
+		var first: ItemDef = inventory.slots[0].item
+		if first.type == ItemDef.Type.WEAPON or first.type == ItemDef.Type.TOOL:
+			equipped_weapon = first
+			# Build weapon mesh ngay sau khi rig đã trong tree (deferred)
+			call_deferred("_update_weapon_mesh")
+
 	_setup_pickup_area()
 
 func _setup_pickup_area() -> void:
@@ -147,6 +155,7 @@ func use_item_from_inventory(idx: int) -> void:
 			inventory.remove_item(idx, 1)
 			if old != null:
 				inventory.add_item(old, 1)
+			_update_weapon_mesh()
 			_scroll_inventory_message(tr("EQUIP_MSG").format({"s": item.name}))
 		ItemDef.Type.ARMOR:
 			var old: ItemDef
@@ -165,6 +174,7 @@ func use_item_from_inventory(idx: int) -> void:
 			inventory.remove_item(idx, 1)
 			if old != null:
 				inventory.add_item(old, 1)
+			_update_weapon_mesh()
 			_scroll_inventory_message(tr("EQUIP_MSG").format({"s": item.name}))
 
 func _place_twilight_gate(idx: int) -> void:
@@ -195,6 +205,23 @@ func drop_item(idx: int) -> void:
 	inventory.remove_item(idx, count)
 	DroppedItem.spawn(world, item_def, global_position + global_transform.basis.z * (-1.5), count)
 	_scroll_inventory_message(tr("DROP_MSG").format({"s": item_def.name, "n": count}))
+
+func _update_weapon_mesh() -> void:
+	print("[WM] _update_weapon_mesh mesh=", _mesh != null)
+	if _mesh == null or _mesh.weapon_pivot == null:
+		print("[WM] SKIP: mesh=", _mesh != null, " pivot=", _mesh != null and _mesh.weapon_pivot != null)
+		return
+	var item_id: String = equipped_weapon.id if equipped_weapon != null else ""
+	print("[WM] building '", item_id, "' in_tree=", _mesh.weapon_pivot.is_inside_tree())
+	var wm_script = preload("res://scripts/characters/player/weapon_mesh.gd")
+	wm_script.build(_mesh.weapon_pivot, item_id)
+	print("[WM] done, child_count=", _mesh.weapon_pivot.get_child_count())
+
+## Cầm weapon trực tiếp từ hotbar (không remove khỏi inventory)
+func equip_weapon_direct(item: ItemDef) -> void:
+	print("[Player] equip_weapon_direct: ", item.id if item != null else "null")
+	equipped_weapon = item
+	call_deferred("_update_weapon_mesh")
 
 func get_total_atk() -> int:
 	var base: int = melee_damage

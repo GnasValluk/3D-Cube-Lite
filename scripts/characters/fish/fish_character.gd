@@ -18,6 +18,9 @@ enum FishVariant {
 @export var fish_variant: int = FishVariant.CHEP
 @export var fish_scale: float = 1.0
 
+func _init() -> void:
+	show_world_hp_bar = false   # Cá là sinh vật passive — không hiện HP bar
+
 # Màu theo biến thể [body, belly, fin]
 const VARIANT_COLORS: Array = [
 	# CHEP
