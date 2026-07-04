@@ -11,16 +11,23 @@ var equipped_head: ItemDef = null
 var equipped_body: ItemDef = null
 var equipped_legs: ItemDef = null
 var equipped_feet: ItemDef = null
+
+var combo_step: int = 0
+var combo_timer: float = 0.0
+const COMBO_WINDOW: float = 0.55
+
 func _build_character() -> void:
+	combo_step = 0
+	combo_timer = 0.0
 	move_speed = 4.2
 	sprint_speed = 8.5
 	jump_height = 1.3
 	dash_speed = 16.0
-	attack_duration = 0.4
+	attack_duration = 0.35
 	attack_power = 80
 	defense = 20
 	melee_damage = 12
-	lmb_cooldown = 1.2
+	lmb_cooldown = 0.0
 	q_cooldown = 1.0
 	r_cooldown = 1.0
 	max_hp = 500
@@ -257,16 +264,28 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			if _lmb_cd <= 0.0 and _freeze_timer <= 0.0 and _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+			if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+				if combo_timer > 0.0 and combo_step < 2:
+					combo_step += 1
+				elif _attack_timer <= 0.0:
+					combo_step = 0
+				else:
+					return
+				combo_timer = COMBO_WINDOW
+				if not try_skill(mana_cost_lmb):
+					return
 				_aim_dir = _calc_aim_dir()
 				var fwd := global_transform.basis.z
 				if _aim_dir.dot(fwd) < 0.99:
 					rotation.y = atan2(_aim_dir.x, _aim_dir.z)
-				_lmb_cd = lmb_cooldown
+				_lmb_cd = 0.0
 				_attack_timer = attack_duration
 				_state = State.ATTACK
 				_melee_hit_once = false
-				_on_primary_attack()
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	combo_timer = max(combo_timer - delta, 0.0)
 
 func _animate(delta: float) -> void:
 	_anim.animate(delta)

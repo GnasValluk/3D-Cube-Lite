@@ -43,43 +43,43 @@ static func _cyl(p: Node3D, pos: Vector3, r: float, h: float, mat: StandardMater
 	p.add_child(mi)
 
 # ── CUỐC ─────────────────────────────────────────────────────────────────────
-# Cán dọc Y, đầu cuốc ở trên (Y dương), 2 răng cong xuống
+# Cán dọc Y, đầu cuốc xoay 90° quanh cán (roll) → thanh ngang dọc Z
 static func _build_cuoc(p: Node3D) -> void:
 	var wood   := _mat(Color(0.55, 0.32, 0.10))
 	var iron   := _mat(Color(0.62, 0.62, 0.68))
 	var iron_d := _mat(Color(0.40, 0.40, 0.46))
 	_cyl(p, Vector3(0, 0.18, 0),        0.04, 0.36, wood)               # cán
-	_box(p, Vector3(0, 0.38, 0),        Vector3(0.28, 0.07, 0.07), iron) # thanh ngang
-	_box(p, Vector3(-0.10, 0.30, 0.04), Vector3(0.05, 0.16, 0.05), iron_d) # răng trái
-	_box(p, Vector3( 0.10, 0.30, 0.04), Vector3(0.05, 0.16, 0.05), iron_d) # răng phải
+	_box(p, Vector3(0, 0.38, 0),        Vector3(0.07, 0.07, 0.28), iron) # thanh ngang dọc Z
+	_box(p, Vector3(0.04, 0.30, 0.10), Vector3(0.05, 0.16, 0.05), iron_d) # răng trái
+	_box(p, Vector3(0.04, 0.30, -0.10), Vector3(0.05, 0.16, 0.05), iron_d) # răng phải
 	_box(p, Vector3(0, 0.36, 0),        Vector3(0.07, 0.07, 0.07), iron) # cổ nối
 
 # ── XẺNG ─────────────────────────────────────────────────────────────────────
-# Cán dọc Y, lưỡi xẻng hình chữ nhật ở trên
+# Cán dọc Y, lưỡi xẻng xoay 90° quanh cán → rộng theo Z
 static func _build_xeng(p: Node3D) -> void:
 	var wood   := _mat(Color(0.55, 0.32, 0.10))
 	var iron   := _mat(Color(0.68, 0.65, 0.55))
 	var iron_d := _mat(Color(0.45, 0.42, 0.35))
 	_cyl(p, Vector3(0, 0.18, 0), 0.04, 0.36, wood)
-	_box(p, Vector3(0, 0.44, 0), Vector3(0.24, 0.30, 0.025), iron)      # lưỡi
-	_box(p, Vector3(0, 0.30, 0), Vector3(0.28, 0.035, 0.030), iron_d)   # viền đáy
-	_box(p, Vector3(0, 0.37, 0), Vector3(0.07, 0.10, 0.05), iron)       # cổ nối
+	_box(p, Vector3(0, 0.44, 0), Vector3(0.025, 0.30, 0.24), iron)      # lưỡi dọc Z
+	_box(p, Vector3(0, 0.30, 0), Vector3(0.030, 0.035, 0.28), iron_d)   # viền đáy dọc Z
+	_box(p, Vector3(0, 0.37, 0), Vector3(0.05, 0.10, 0.07), iron)       # cổ nối
 
 # ── RÌU ──────────────────────────────────────────────────────────────────────
-# Cán dọc Y, lưỡi rìu lệch sang -X
+# Cán dọc Y, lưỡi rìu xoay 90° quanh cán → lưỡi hướng +Z
 static func _build_riu(p: Node3D) -> void:
 	var wood  := _mat(Color(0.48, 0.28, 0.08))
 	var iron  := _mat(Color(0.58, 0.58, 0.62))
 	var edge  := _mat(Color(0.80, 0.82, 0.88))
 	_cyl(p, Vector3(0, 0.15, 0),        0.05, 0.30, wood)
-	_box(p, Vector3(-0.08, 0.36, 0),    Vector3(0.18, 0.20, 0.09), iron)
-	_box(p, Vector3(-0.16, 0.37, 0),    Vector3(0.10, 0.18, 0.07), iron)
-	_box(p, Vector3(-0.24, 0.37, 0),    Vector3(0.07, 0.26, 0.035), edge)  # lưỡi bén
-	_box(p, Vector3( 0.07, 0.37, 0),    Vector3(0.05, 0.09, 0.05), iron)   # mũi sau
+	_box(p, Vector3(0, 0.36, 0.08),     Vector3(0.09, 0.20, 0.18), iron)   # thân rìu
+	_box(p, Vector3(0, 0.37, 0.16),     Vector3(0.07, 0.18, 0.10), iron)   # phần rộng
+	_box(p, Vector3(0, 0.37, 0.24),     Vector3(0.035, 0.26, 0.07), edge)  # lưỡi bén
+	_box(p, Vector3(0, 0.37, -0.07),    Vector3(0.05, 0.09, 0.05), iron)   # mũi sau
 	_box(p, Vector3(0, 0.32, 0),        Vector3(0.07, 0.10, 0.07), iron)   # cổ nối
 
 # ── KIẾM ─────────────────────────────────────────────────────────────────────
-# Cán ở Y thấp, lưỡi dài hướng lên Y
+# Cán ở Y thấp, lưỡi dài hướng lên Y, xoay 90° quanh cán → lưỡi dẹp theo Z
 static func _build_kiem(p: Node3D) -> void:
 	var grip   := _mat(Color(0.28, 0.16, 0.08))
 	var guard  := _mat(Color(0.75, 0.62, 0.18))
@@ -87,9 +87,9 @@ static func _build_kiem(p: Node3D) -> void:
 	var edge   := _mat(Color(0.96, 0.98, 1.00))
 	var fuller := _mat(Color(0.68, 0.70, 0.78))
 	_cyl(p, Vector3(0, 0.06, 0),      0.045, 0.12, grip)                # cán
-	_box(p, Vector3(0, 0.13, 0),      Vector3(0.32, 0.045, 0.045), guard) # crossguard
-	_box(p, Vector3(0, 0.34, 0),      Vector3(0.048, 0.42, 0.022), blade) # thân lưỡi
-	_box(p, Vector3(-0.020, 0.34, 0), Vector3(0.009, 0.40, 0.013), edge)  # cạnh trái
-	_box(p, Vector3( 0.020, 0.34, 0), Vector3(0.009, 0.40, 0.013), edge)  # cạnh phải
-	_box(p, Vector3(0, 0.54, 0),      Vector3(0.030, 0.10, 0.018), edge)  # mũi nhọn
-	_box(p, Vector3(0, 0.32, 0),      Vector3(0.011, 0.36, 0.026), fuller) # fuller
+	_box(p, Vector3(0, 0.13, 0),      Vector3(0.045, 0.045, 0.32), guard) # crossguard dọc Z
+	_box(p, Vector3(0, 0.34, 0),      Vector3(0.022, 0.42, 0.048), blade) # thân lưỡi
+	_box(p, Vector3(0, 0.34, 0.020),  Vector3(0.013, 0.40, 0.009), edge)  # cạnh trước
+	_box(p, Vector3(0, 0.34, -0.020), Vector3(0.013, 0.40, 0.009), edge)  # cạnh sau
+	_box(p, Vector3(0, 0.54, 0),      Vector3(0.018, 0.10, 0.030), edge)  # mũi nhọn
+	_box(p, Vector3(0, 0.32, 0),      Vector3(0.026, 0.36, 0.011), fuller) # fuller

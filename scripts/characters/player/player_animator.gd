@@ -7,10 +7,12 @@ var swim_cycle_speed: float = 4.5
 
 var mesh: PlayerMesh
 var base: CharacterBase
+var player: PlayerCharacter
 
 func setup(m: PlayerMesh, b: CharacterBase) -> void:
 	mesh = m
 	base = b
+	player = b as PlayerCharacter
 
 func animate(delta: float) -> void:
 	var t: float = base._time
@@ -167,50 +169,74 @@ func _dead(delta: float, t: float) -> void:
 		mesh.rig.position.y = lerp(mesh.rig.position.y, -0.10, delta * 6.0)
 
 func _attack(delta: float, _t: float) -> void:
-	## Animation đánh thường — tay phải vung từ sau ra trước
-	## attack_timer đếm ngược từ attack_duration (0.4s) về 0
 	var dur: float = base.attack_duration
 	var remaining: float = base._attack_timer
-	var prog: float = 1.0 - clamp(remaining / dur, 0.0, 1.0)   # 0 → 1 trong suốt đòn
+	var prog: float = 1.0 - clamp(remaining / dur, 0.0, 1.0)
+	var step: int = player.combo_step if player != null else 0
 
-	# ── Giai đoạn 1: chuẩn bị (0..0.25) — kéo tay ra sau ─────────────────────
-	if prog < 0.25:
-		var p: float = prog / 0.25
-		# Người hơi ngả về sau
-		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.10 * p, delta * 22.0)
-		mesh.body.rotation.x = lerp(mesh.body.rotation.x, -0.08 * p, delta * 20.0)
-		# Tay phải kéo ra sau + lên cao
-		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -1.20 * p, delta * 28.0)
-		mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.20 * p, delta * 24.0)
-		# Tay trái giữ thăng bằng nhẹ ra trước
-		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.25 * p, delta * 18.0)
-		# Chân trụ
-		mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.05, delta * 14.0)
-		mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.05, delta * 14.0)
-		# Đầu hướng về phía trước mục tiêu
-		mesh.head.rotation.x = lerp(mesh.head.rotation.x, -0.06, delta * 14.0)
+	var wp := mesh.weapon_pivot
+	const IDLE_WP: Vector3 = Vector3(90, 0, 0)
 
-	# ── Giai đoạn 2: vung đòn (0.25..0.60) — tay phải đánh xuống nhanh ────────
-	elif prog < 0.60:
-		var p: float = (prog - 0.25) / 0.35
-		var swing: float = sin(p * PI)
-		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.18 * p, delta * 32.0)
-		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.08 * swing, delta * 30.0)
-		mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.14 * p, delta * 28.0)
-		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 1.55 * p - 1.20 * (1.0 - p), delta * 38.0)
-		mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.10 * swing, delta * 32.0)
-		# weapon_pivot KHÔNG xoay thêm — đã có rotation cố định từ build
-		mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.12 * p, delta * 22.0)
+	# ── Wind-up (0.0 → 0.35) ──────────────────────────────────────────────────
+	if prog < 0.35:
+		var p: float = prog / 0.35
+		match step:
+			0:  # Hit 1: vung chéo phải→trái
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 75.0, delta * 20.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 25.0, delta * 20.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -12.0, delta * 20.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.60 * p, delta * 24.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.18 * p, delta * 20.0)
+			1:  # Hit 2: vung chéo trái→phải
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 75.0, delta * 20.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -25.0, delta * 20.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 12.0, delta * 20.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.60 * p, delta * 24.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.18 * p, delta * 20.0)
+			2:  # Hit 3: vung ngang
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 85.0, delta * 20.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 40.0, delta * 20.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -6.0, delta * 20.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.30 * p, delta * 24.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.30 * p, delta * 20.0)
+		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.06 * p, delta * 18.0)
+		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.15 * p, delta * 14.0)
 
-	# ── Giai đoạn 3: hồi phục (0.60..1.0) ────────────────────────────────────
+	# ── Strike (0.35 → 0.75) ─────────────────────────────────────────────────
+	elif prog < 0.75:
+		var p: float = (prog - 0.35) / 0.40
+		match step:
+			0:  # Chém xuống trái
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 105.0, delta * 32.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -20.0, delta * 32.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 32.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.80 * p - 0.60 * (1.0 - p), delta * 34.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.10 * sin(p * PI), delta * 28.0)
+			1:  # Chém xuống phải
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 105.0, delta * 32.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 20.0, delta * 32.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -14.0, delta * 32.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.80 * p - 0.60 * (1.0 - p), delta * 34.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 28.0)
+			2:  # Vung ngang
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 95.0, delta * 32.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -35.0, delta * 32.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 8.0, delta * 32.0)
+				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.25 * sin(p * PI), delta * 18.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.50 * p - 0.30 * (1.0 - p), delta * 34.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.15 * sin(p * PI), delta * 28.0)
+		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.10 * p, delta * 24.0)
+		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.04 * sin(p * PI), delta * 22.0)
+		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.08 * p, delta * 18.0)
+
+	# ── Recovery (0.75 → 1.0) ────────────────────────────────────────────────
 	else:
-		mesh.rig.rotation.x    = lerp(mesh.rig.rotation.x,    0.0,  delta * 14.0)
-		mesh.rig.rotation.z    = lerp(mesh.rig.rotation.z,    0.0,  delta * 12.0)
-		mesh.body.rotation.x   = lerp(mesh.body.rotation.x,   0.0,  delta * 12.0)
-		mesh.head.rotation.x   = lerp(mesh.head.rotation.x,   0.0,  delta * 12.0)
-		mesh.arm_r.rotation.x  = lerp(mesh.arm_r.rotation.x, -0.06, delta * 12.0)
-		mesh.arm_r.rotation.z  = lerp(mesh.arm_r.rotation.z, -0.04, delta * 12.0)
-		mesh.arm_l.rotation.x  = lerp(mesh.arm_l.rotation.x, -0.06, delta * 12.0)
-		mesh.leg_l.rotation.x  = lerp(mesh.leg_l.rotation.x,  0.02, delta * 10.0)
-		mesh.leg_r.rotation.x  = lerp(mesh.leg_r.rotation.x,  0.02, delta * 10.0)
-		# weapon_pivot KHÔNG reset — giữ nguyên rotation cố định
+		wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 12.0)
+		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 12.0)
+		mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 12.0)
+		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 12.0)
+		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 12.0)
+		mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 12.0)
+		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 12.0)
+		if remaining <= 0.0 and player and player.combo_timer <= 0.0:
+			player.combo_step = 0
