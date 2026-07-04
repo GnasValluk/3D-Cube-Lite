@@ -4,9 +4,16 @@ extends RefCounted
 const DEFAULT_SIZE: int = 36
 const HOTBAR_SIZE: int = 9
 
+static var items_db: Dictionary = {}
+
+static func ensure_db() -> void:
+	if items_db.is_empty():
+		items_db = create_item_db()
+
 var slots: Array[ItemSlot] = []
 
 func _init(size: int = DEFAULT_SIZE):
+	ensure_db()
 	slots.resize(size)
 	for i in range(size):
 		slots[i] = ItemSlot.new()
@@ -149,6 +156,17 @@ static func create_item_db() -> Dictionary:
 	# ── Vũ khí ─────────────────────────────────────────────────────────────────
 	_add(db, "kiem",  "Kiếm",  ItemDef.Type.WEAPON, Color(0.75, 0.80, 0.90), "⚔",  "Tấn công nhanh, sát thương cao",  false, 1, 0, 22, 0)
 
+	# ── Câu cá ────────────────────────────────────────────────────────────────
+	_add(db, "can_cau", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0)
+
+	# ── Cá (thức ăn) ──────────────────────────────────────────────────────────
+	_add(db, "ca_chep", "Cá Chép", ItemDef.Type.FOOD, Color(0.28, 0.42, 0.22), "🐟", "Cá chép tươi ngon", true, 16, 30)
+	_add(db, "ca_ro",   "Cá Rô",   ItemDef.Type.FOOD, Color(0.18, 0.38, 0.20), "🐟", "Cá rô đồng béo", true, 16, 20)
+	_add(db, "ca_tram", "Cá Trắm", ItemDef.Type.FOOD, Color(0.32, 0.40, 0.35), "🐟", "Cá trắm to, nhiều thịt", true, 16, 40)
+	_add(db, "ca_mong", "Cá Mòng", ItemDef.Type.FOOD, Color(0.55, 0.65, 0.70), "🐟", "Cá mòng nhỏ, thịt ngọt", true, 16, 15)
+	_add(db, "ca_vang", "Cá Vàng", ItemDef.Type.FOOD, Color(0.88, 0.55, 0.12), "🐟", "Cá vàng cảnh, ăn được", true, 16, 25)
+	_add(db, "ca_linh", "Cá Linh", ItemDef.Type.FOOD, Color(0.70, 0.72, 0.75), "🐟", "Cá linh non, chiên giòn", true, 16, 12)
+
 	return db
 
 static func _add(db: Dictionary, id: String, name: String, type: int, color: Color, char: String,
@@ -156,10 +174,30 @@ static func _add(db: Dictionary, id: String, name: String, type: int, color: Col
 				 heal: int = 0, atk: int = 0, def_val: int = 0, armor_slot: int = -1) -> void:
 	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot)
 
-static func seed_inventory(inv: Inventory) -> void:
-	## Thêm vật phẩm mẫu vào slot 0-3 của hotbar để test
-	var db := create_item_db()
-	inv.add_item(db["kiem"],  1)
-	inv.add_item(db["cuoc"],  1)
-	inv.add_item(db["xeng"],  1)
-	inv.add_item(db["riu"],   1)
+func to_dict() -> Array:
+	var arr: Array = []
+	for slot in slots:
+		if slot.is_empty():
+			arr.append(null)
+		else:
+			arr.append({"id": slot.item.id, "count": slot.count})
+	return arr
+
+func from_dict(data: Array) -> void:
+	ensure_db()
+	var db := items_db
+	for i in range(mini(data.size(), slots.size())):
+		if data[i] != null:
+			var item_id: String = data[i]["id"]
+			var count: int = data[i]["count"]
+			if db.has(item_id):
+				slots[i].item = db[item_id]
+				slots[i].count = count
+			else:
+				slots[i].item = null
+				slots[i].count = 0
+		else:
+			slots[i].item = null
+			slots[i].count = 0
+
+

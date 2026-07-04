@@ -243,6 +243,25 @@ func cancel_placement() -> void:
 	get_tree().root.set_meta("building_placement_active", false)
 	_remove_ghost()
 
+func serialize() -> Array:
+	var out: Array = []
+	for b in _buildings:
+		var entry: Dictionary = {"key": b.key, "type": b.type, "placed": b.get("placed", false)}
+		if b.has("tile_type"):
+			entry["tile_type"] = b.tile_type
+		if b.has("dest_dim"):
+			entry["dest_dim"] = b.dest_dim
+		out.append(entry)
+	return out
+
+func deserialize(data: Array) -> void:
+	for entry in data:
+		var key: String = entry.get("key", "")
+		for b in _buildings:
+			if b.key == key:
+				b["placed"] = entry.get("placed", false)
+				break
+
 func _remove_ghost() -> void:
 	if _ghost != null and is_instance_valid(_ghost):
 		_ghost.queue_free()

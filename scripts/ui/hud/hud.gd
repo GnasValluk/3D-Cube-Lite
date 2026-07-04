@@ -17,6 +17,7 @@ var _switch_hint: Label
 var _party_ui
 var _settings_ui
 var _settings_icon: Button
+var _save_btn: Button
 var _party_hud: Control
 var _party_indicators: Array[Panel] = []
 var _mgr: CharacterManager
@@ -114,6 +115,7 @@ func _setup_ui() -> void:
 	add_child(dim_label)
 
 	_setup_settings_icon()
+	_setup_save_button()
 	_setup_party_hud()
 
 	_party_ui = _PartyUI.new()
@@ -240,6 +242,36 @@ func _setup_settings_icon() -> void:
 	_settings_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_settings_icon.pressed.connect(_toggle_settings)
 	add_child(_settings_icon)
+
+func _setup_save_button() -> void:
+	_save_btn = Button.new()
+	_save_btn.position = Vector2(58, 10)
+	_save_btn.size = Vector2(40, 40)
+	_save_btn.text = "💾"
+	_save_btn.add_theme_font_size_override("font_size", 18)
+	_save_btn.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.7))
+	var sb_bg := StyleBoxFlat.new()
+	sb_bg.bg_color = Color(0.08, 0.08, 0.14, 0.65)
+	sb_bg.corner_radius_top_left = 8; sb_bg.corner_radius_top_right = 8
+	sb_bg.corner_radius_bottom_left = 8; sb_bg.corner_radius_bottom_right = 8
+	sb_bg.border_width_left = 1; sb_bg.border_width_right = 1
+	sb_bg.border_width_top = 1; sb_bg.border_width_bottom = 1
+	sb_bg.border_color = Color(1, 1, 1, 0.10)
+	_save_btn.add_theme_stylebox_override("normal", sb_bg)
+	var sb_hover := sb_bg.duplicate()
+	sb_hover.bg_color = Color(0.15, 0.18, 0.30, 0.75)
+	sb_hover.border_color = Color(0.40, 0.55, 0.90, 0.40)
+	_save_btn.add_theme_stylebox_override("hover", sb_hover)
+	_save_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_save_btn.pressed.connect(_on_save_pressed)
+	add_child(_save_btn)
+
+func _on_save_pressed() -> void:
+	if SaveManager:
+		SaveManager.save_game()
+	var player := _find_player_character()
+	if player:
+		player._scroll_inventory_message(tr("GAME_SAVED"))
 
 func _toggle_settings() -> void:
 	if _settings_ui and _settings_ui.visible:

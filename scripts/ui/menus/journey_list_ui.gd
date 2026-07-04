@@ -148,7 +148,9 @@ func _make_save_row(s: Dictionary, idx: int, row_w: float) -> Control:
 
 	# Seed info
 	var seed_lbl := Label.new()
-	seed_lbl.text = tr("SEED") % s.get("seed", 0)
+	var save_name: String = s.get("name", "Unknown")
+	var has_data: bool = SaveManager and SaveManager.save_exists(save_name)
+	seed_lbl.text = tr("SEED") % s.get("seed", 0) + ("  ●" if has_data else "  ○")
 	seed_lbl.position = Vector2(12, 30)
 	seed_lbl.size = Vector2(row_w - 100, 16)
 	seed_lbl.add_theme_font_size_override("font_size", 11)

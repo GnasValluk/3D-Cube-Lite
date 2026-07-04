@@ -589,6 +589,12 @@ func _physics_process(delta: float) -> void:
 		_sy_tgt = 1.22
 		SFXManager.play_pop()
 
+	# Void protection: if fallen below world bottom (bedrock at y=-3), warp back
+	if global_position.y < -5.0:
+		global_position.y = 3.0
+		velocity = Vector3.ZERO
+		on_floor = false
+
 	if on_floor and not _was_floor:
 		_sy_tgt = 0.76
 		SFXManager.play_fall_small()

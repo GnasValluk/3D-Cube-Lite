@@ -11,10 +11,11 @@ static func build(pivot: Node3D, item_id: String) -> void:
 	if item_id.is_empty():
 		return
 	match item_id:
-		"cuoc": _build_cuoc(pivot)
-		"xeng": _build_xeng(pivot)
-		"riu":  _build_riu(pivot)
-		"kiem": _build_kiem(pivot)
+		"cuoc":    _build_cuoc(pivot)
+		"xeng":    _build_xeng(pivot)
+		"riu":     _build_riu(pivot)
+		"kiem":    _build_kiem(pivot)
+		"can_cau": _build_can_cau(pivot)
 
 static func _mat(col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -93,3 +94,17 @@ static func _build_kiem(p: Node3D) -> void:
 	_box(p, Vector3(0, 0.34, -0.020), Vector3(0.013, 0.40, 0.009), edge)  # cạnh sau
 	_box(p, Vector3(0, 0.54, 0),      Vector3(0.018, 0.10, 0.030), edge)  # mũi nhọn
 	_box(p, Vector3(0, 0.32, 0),      Vector3(0.026, 0.36, 0.011), fuller) # fuller
+
+# ── CẦN CÂU ───────────────────────────────────────────────────────────────────
+# Cán ngắn ở Y thấp, thân cần dài vươn lên Y, dây câu mảnh chạy dọc theo
+static func _build_can_cau(p: Node3D) -> void:
+	var wood  := _mat(Color(0.50, 0.35, 0.15))
+	var bark  := _mat(Color(0.42, 0.28, 0.10))
+	var tip   := _mat(Color(0.75, 0.70, 0.60))
+	var line  := _mat(Color(0.50, 0.50, 0.55))
+	_cyl(p, Vector3(0, 0.10, 0),      0.040, 0.20, wood)               # cán
+	_cyl(p, Vector3(0, 0.22, 0),      0.030, 0.14, bark)               # đốt cần giữa
+	_cyl(p, Vector3(0, 0.32, 0),      0.020, 0.16, bark)               # đốt cần trên
+	_cyl(p, Vector3(0, 0.44, 0),      0.012, 0.12, bark)               # ngọn cần
+	_cyl(p, Vector3(0, 0.52, 0),      0.005, 0.06, tip)                # đầu ngọn
+	_box(p, Vector3(0, 0.52, 0.020),  Vector3(0.002, 0.02, 0.04), line) # dây câu

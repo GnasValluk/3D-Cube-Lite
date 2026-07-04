@@ -46,6 +46,26 @@ func is_dirty() -> bool:
 	_dirty = false
 	return d
 
+func serialize() -> Dictionary:
+	var out: Dictionary = {}
+	for key in _explored:
+		var c: Color = _explored[key]
+		out["%d,%d" % [key.x, key.y]] = [c.r, c.g, c.b, c.a]
+	return {"dimension": _dimension_id, "cells": out}
+
+func deserialize(data: Dictionary) -> void:
+	if data.has("dimension"):
+		_dimension_id = data["dimension"]
+	var cells: Dictionary = data.get("cells", {})
+	for key_str in cells:
+		var parts = key_str.split(",")
+		if parts.size() == 2:
+			var v := Vector2i(int(parts[0]), int(parts[1]))
+			var c_arr: Array = cells[key_str]
+			if c_arr.size() == 4:
+				_explored[v] = Color(c_arr[0], c_arr[1], c_arr[2], c_arr[3])
+	_dirty = true
+
 func mark_all_explored_in_rect(x_min: float, x_max: float, z_min: float, z_max: float, color: Color) -> void:
 	var cmin_x: int = int(floor(x_min / CELL_SIZE))
 	var cmax_x: int = int(floor(x_max / CELL_SIZE))

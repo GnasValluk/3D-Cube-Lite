@@ -47,6 +47,8 @@ const S_BLOCK_PLACE:  Array[String] = ["res://assets/sfx/block/calcite/place1.og
 const S_DROWN:        Array[String] = ["res://assets/sfx/entity/player/hurt/drown1.ogg","res://assets/sfx/entity/player/hurt/drown2.ogg","res://assets/sfx/entity/player/hurt/drown3.ogg","res://assets/sfx/entity/player/hurt/drown4.ogg"]
 const S_FIRE_HURT:    Array[String] = ["res://assets/sfx/entity/player/hurt/fire_hurt1.ogg","res://assets/sfx/entity/player/hurt/fire_hurt2.ogg","res://assets/sfx/entity/player/hurt/fire_hurt3.ogg"]
 const S_BREATH:       Array[String] = ["res://assets/sfx/random/breath.ogg"]
+const S_CAST:         Array[String] = ["res://assets/sfx/entity/bobber/castfast.ogg"]
+const S_RETRIEVE:     Array[String] = ["res://assets/sfx/entity/bobber/retrieve1.ogg","res://assets/sfx/entity/bobber/retrieve2.ogg","res://assets/sfx/entity/bobber/retrieve3.ogg"]
 const S_PLANT_CROP:   Array[String] = ["res://assets/sfx/item/crop1.ogg","res://assets/sfx/item/crop2.ogg","res://assets/sfx/item/crop3.ogg","res://assets/sfx/item/crop4.ogg","res://assets/sfx/item/crop5.ogg","res://assets/sfx/item/crop6.ogg"]
 
 var _cache: Dictionary = {}
@@ -114,6 +116,9 @@ func play_step_stone() -> void:    play_arr_var(S_STEP_STONE, -6.0)
 func play_step_wood() -> void:     play_arr_var(S_STEP_WOOD, -6.0)
 func play_step_snow() -> void:     play_arr_var(S_STEP_SNOW, -6.0)
 func play_breath() -> void:        play_arr_var(S_BREATH)
+func play_cast() -> void:          play_arr_var(S_CAST)
+func play_retrieve() -> void:      play_arr_var(S_RETRIEVE)
+func play_paddle_land() -> void:   play_arr_var(S_PADDLE_LAND)
 func play_plant_crop() -> void:    play_arr_var(S_PLANT_CROP)
 
 func set_muted(val: bool) -> void:

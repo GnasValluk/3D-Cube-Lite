@@ -27,21 +27,11 @@ func _ready() -> void:
 	WorldChunk._noise_for_dim(_Dim.DimensionID.TWILIGHT)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.REAL_WORLD)
 
-func _find_player() -> void:
-	var mgr := get_node("../CharacterManager") as CharacterManager
-	if mgr:
-		_player = mgr.get_current_character()
-	else:
-		_player = get_node_or_null("Player")
-
-func _generate_all_initial() -> void:
-	if not _player:
-		return
-	var cx: int = int(floor(_player.global_position.x / CHUNK_SIZE))
-	var cz: int = int(floor(_player.global_position.z / CHUNK_SIZE))
+	# Generate center chunk immediately so ground collision exists
+	# before any physics frame runs (player spawns at (0,3,0) → chunk (0,0))
+	var cx := 0
+	var cz := 0
 	_last_chunk = Vector2i(cx, cz)
-
-	# Center chunk sync — player needs ground collision immediately
 	_start_loading(Vector2i(cx, cz), true)
 
 	for dx in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
@@ -51,12 +41,20 @@ func _generate_all_initial() -> void:
 				_pending.append(key)
 	_pending.sort_custom(_sort_chunks)
 
-	# Submit first batch immediately so nearby chunks appear next frame
 	var to_submit: int = mini(MAX_LOADING_PER_FRAME, _pending.size())
 	for _i in range(to_submit):
 		var key: Vector2i = _pending.pop_front()
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading(key, false)
+
+	_initial_generated = true
+
+func _find_player() -> void:
+	var mgr := get_node("../CharacterManager") as CharacterManager
+	if mgr:
+		_player = mgr.get_current_character()
+	else:
+		_player = get_node_or_null("Player")
 
 func _process(_delta: float) -> void:
 	if _player == null or not is_instance_valid(_player) or not _player.is_inside_tree():
@@ -71,12 +69,8 @@ func _process(_delta: float) -> void:
 		if chunk._built:
 			_loading.erase(ck)
 			_chunks[ck] = chunk
-
-	if not _initial_generated:
-		_initial_generated = true
-		_generate_all_initial()
-		_last_pos = ppos
-		return
+			if SaveManager:
+				SaveManager.apply_block_modifications_for_chunk(chunk, ck.x, ck.y)
 
 	var cx: int = int(floor(ppos.x / CHUNK_SIZE))
 	var cz: int = int(floor(ppos.z / CHUNK_SIZE))
@@ -130,6 +124,8 @@ func _start_loading(key: Vector2i, sync: bool) -> void:
 	if sync and chunk._built:
 		_loading.erase(key)
 		_chunks[key] = chunk
+		if SaveManager:
+			SaveManager.apply_block_modifications_for_chunk(chunk, key.x, key.y)
 
 func _sort_chunks(a: Vector2i, b: Vector2i) -> bool:
 	var da := (a - _last_chunk).length_squared()

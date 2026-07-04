@@ -140,6 +140,11 @@ PC_FEATURES,PC Optimizations,Tối Ưu Máy Tính
 FEAT_JOYSTICK,Virtual joystick (left side),Joystick ảo (bên trái)
 FEAT_CAM_DRAG,Drag to rotate camera,Kéo để xoay camera
 FEAT_TOUCH_BTNS,Touch buttons: Jump / Attack / Interact,Nút chạm: Nhảy / Tấn công / Tương tác
+FISH_CAST,"Fishing line cast","Đã thả cần câu"
+FISH_REEL,"Line retrieved","Đã thu cần"
+FISH_MISS,"No bite — cast again","Cá chưa cắn câu"
+INVENTORY_FULL,"Inventory full!","Túi đồ đầy!"
+GAME_SAVED,Game saved!,Đã lưu game!
 FEAT_CHUNK_LOW,Reduced view distance for performance,Giảm tầm nhìn để tăng hiệu suất
 FEAT_WASD,WASD / Arrow keys movement,Di chuyển WASD / phím mũi tên
 FEAT_MOUSE_CAM,Mouse to rotate camera,Chuột xoay camera

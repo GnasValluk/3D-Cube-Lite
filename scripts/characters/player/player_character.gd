@@ -15,24 +15,25 @@ var equipped_feet: ItemDef = null
 var combo_step: int = 0
 var combo_timer: float = 0.0
 const COMBO_WINDOW: float = 0.55
+var _bobber: Node3D = null
 
 func _build_character() -> void:
 	combo_step = 0
 	combo_timer = 0.0
-	move_speed = 4.2
-	sprint_speed = 8.5
-	jump_height = 1.3
+	move_speed = 3.6
+	sprint_speed = 6.8
+	jump_height = 1.1
 	dash_speed = 16.0
-	attack_duration = 0.35
+	attack_duration = 0.50
 	attack_power = 80
 	defense = 20
 	melee_damage = 12
 	lmb_cooldown = 0.0
-	q_cooldown = 1.0
+	q_cooldown = 0.60
 	r_cooldown = 1.0
 	max_hp = 500
 	mana_cost_lmb = 0
-	mana_cost_q = 9999
+	mana_cost_q = 0
 	mana_cost_r = 9999
 	character_name = "Player"
 	element = Element.ANH_SANG
@@ -53,16 +54,6 @@ func _build_character() -> void:
 	_anim.setup(_mesh, self)
 
 	inventory = Inventory.new()
-	Inventory.seed_inventory(inventory)
-
-	# Auto-equip item ở slot 0 của hotbar nếu là weapon/tool
-	if not inventory.slots[0].is_empty():
-		var first: ItemDef = inventory.slots[0].item
-		if first.type == ItemDef.Type.WEAPON or first.type == ItemDef.Type.TOOL:
-			equipped_weapon = first
-			# Build weapon mesh ngay sau khi rig đã trong tree (deferred)
-			call_deferred("_update_weapon_mesh")
-
 	_setup_pickup_area()
 
 func _setup_pickup_area() -> void:
@@ -255,6 +246,10 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_jbuf = JUMP_BUFFER
 			if k.keycode == KEY_F1:
 				_toggle_camera()
+			if k.keycode == KEY_F5:
+				if SaveManager:
+					SaveManager.save_game()
+					_scroll_inventory_message(tr("GAME_SAVED"))
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _active:
@@ -264,6 +259,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			if equipped_weapon != null and equipped_weapon.id == "can_cau":
+				_fishing_action()
+				return
 			if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
 				if combo_timer > 0.0 and combo_step < 2:
 					combo_step += 1
@@ -282,6 +280,43 @@ func _unhandled_input(event: InputEvent) -> void:
 				_attack_timer = attack_duration
 				_state = State.ATTACK
 				_melee_hit_once = false
+
+func _fishing_action() -> void:
+	var holding_rod := equipped_weapon != null and equipped_weapon.id == "can_cau"
+	if holding_rod:
+		if _bobber != null:
+			if _bobber.reel_in():
+				SFXManager.play_retrieve()
+		else:
+			_cast_fishing_line()
+	elif _bobber != null:
+		_bobber.reel_in()
+
+func _cast_fishing_line() -> void:
+	var target := _calc_aim_dir() * 8.0 + global_position
+	target.y = 0.46
+	var bob := preload("res://scripts/items/fishing/bobber_3d.gd").new()
+	var root := get_tree().current_scene
+	if root:
+		root.add_child(bob)
+	else:
+		add_child(bob)
+	var pivot: Node3D = _mesh.weapon_pivot if _mesh != null else null
+	bob.setup(self, target, pivot)
+	_bobber = bob
+	SFXManager.play_cast()
+
+func _on_bobber_done(item_id: String) -> void:
+	_bobber = null
+	if item_id != "":
+		Inventory.ensure_db()
+		var def: ItemDef = Inventory.items_db.get(item_id)
+		if def and inventory.add_item(def, 1) == 0:
+			_scroll_inventory_message("+1 " + def.name)
+		else:
+			_scroll_inventory_message(tr("INVENTORY_FULL"))
+	else:
+		_scroll_inventory_message(tr("FISHING_MISS"))
 
 func _process(delta: float) -> void:
 	super._process(delta)

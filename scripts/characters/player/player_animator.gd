@@ -173,70 +173,97 @@ func _attack(delta: float, _t: float) -> void:
 	var remaining: float = base._attack_timer
 	var prog: float = 1.0 - clamp(remaining / dur, 0.0, 1.0)
 	var step: int = player.combo_step if player != null else 0
-
 	var wp := mesh.weapon_pivot
 	const IDLE_WP: Vector3 = Vector3(90, 0, 0)
 
-	# ── Wind-up (0.0 → 0.35) ──────────────────────────────────────────────────
-	if prog < 0.35:
-		var p: float = prog / 0.35
+	# ── Wind-up (0.0 → 0.25) ──────────────────────────────────────────────────
+	if prog < 0.25:
+		var p: float = prog / 0.25
 		match step:
 			0:  # Hit 1: vung chéo phải→trái
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 75.0, delta * 20.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 25.0, delta * 20.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -12.0, delta * 20.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.60 * p, delta * 24.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.18 * p, delta * 20.0)
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 72.0, delta * 18.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 28.0, delta * 18.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -14.0, delta * 18.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.55 * p, delta * 22.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.20 * p, delta * 18.0)
+				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.12 * p, delta * 16.0)
+				mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.18 * p, delta * 14.0)
+				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.12 * p, delta * 14.0)
 			1:  # Hit 2: vung chéo trái→phải
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 75.0, delta * 20.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -25.0, delta * 20.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 12.0, delta * 20.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.60 * p, delta * 24.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.18 * p, delta * 20.0)
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 72.0, delta * 18.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -28.0, delta * 18.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 18.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.55 * p, delta * 22.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.20 * p, delta * 18.0)
+				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.12 * p, delta * 16.0)
+				mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.18 * p, delta * 14.0)
+				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.12 * p, delta * 14.0)
 			2:  # Hit 3: vung ngang
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 85.0, delta * 20.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 40.0, delta * 20.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -6.0, delta * 20.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.30 * p, delta * 24.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.30 * p, delta * 20.0)
-		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.06 * p, delta * 18.0)
-		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.15 * p, delta * 14.0)
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 82.0, delta * 18.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 42.0, delta * 18.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -7.0, delta * 18.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.28 * p, delta * 22.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.32 * p, delta * 18.0)
+				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.20 * p, delta * 16.0)
+				mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.25 * p, delta * 14.0)
+				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.16 * p, delta * 14.0)
+		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.08 * p, delta * 16.0)
+		mesh.body.rotation.x = lerp(mesh.body.rotation.x, -0.05 * p, delta * 14.0)
 
-	# ── Strike (0.35 → 0.75) ─────────────────────────────────────────────────
-	elif prog < 0.75:
-		var p: float = (prog - 0.35) / 0.40
+	# ── Strike (0.25 → 0.70) ─────────────────────────────────────────────────
+	elif prog < 0.70:
+		var p: float = (prog - 0.25) / 0.45
 		match step:
-			0:  # Chém xuống trái
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 105.0, delta * 32.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -20.0, delta * 32.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 32.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.80 * p - 0.60 * (1.0 - p), delta * 34.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.10 * sin(p * PI), delta * 28.0)
-			1:  # Chém xuống phải
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 105.0, delta * 32.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 20.0, delta * 32.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -14.0, delta * 32.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.80 * p - 0.60 * (1.0 - p), delta * 34.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 28.0)
+			0:  # Chéo phải→trái
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 112.0, delta * 30.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -22.0, delta * 30.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 16.0, delta * 30.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.75 * p - 0.55 * (1.0 - p), delta * 32.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.10 * sin(p * PI), delta * 26.0)
+				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.18 * sin(p * PI), delta * 20.0)
+				mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.22 * sin(p * PI), delta * 18.0)
+				mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
+				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.18 * sin(p * PI), delta * 16.0)
+				mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
+			1:  # Chéo trái→phải
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 112.0, delta * 30.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 22.0, delta * 30.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -16.0, delta * 30.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.75 * p - 0.55 * (1.0 - p), delta * 32.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 26.0)
+				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.18 * sin(p * PI), delta * 20.0)
+				mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.22 * sin(p * PI), delta * 18.0)
+				mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
+				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.18 * sin(p * PI), delta * 16.0)
+				mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
 			2:  # Vung ngang
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 95.0, delta * 32.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -35.0, delta * 32.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 8.0, delta * 32.0)
-				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.25 * sin(p * PI), delta * 18.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.50 * p - 0.30 * (1.0 - p), delta * 34.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.15 * sin(p * PI), delta * 28.0)
-		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.10 * p, delta * 24.0)
-		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.04 * sin(p * PI), delta * 22.0)
-		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.08 * p, delta * 18.0)
+				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 97.0, delta * 30.0)
+				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -42.0, delta * 30.0)
+				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 11.0, delta * 30.0)
+				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.45 * p - 0.28 * (1.0 - p), delta * 32.0)
+				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.14 * sin(p * PI), delta * 26.0)
+				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.45 * sin(p * PI), delta * 22.0)
+				mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.38 * sin(p * PI), delta * 20.0)
+				mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.06 * sin(p * PI), delta * 16.0)
+				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.22 * sin(p * PI), delta * 16.0)
+				mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.22 * sin(p * PI), delta * 14.0)
+		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.12 * p, delta * 22.0)
+		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.05 * sin(p * PI), delta * 20.0)
+		mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.08 * p, delta * 18.0)
 
-	# ── Recovery (0.75 → 1.0) ────────────────────────────────────────────────
+	# ── Recovery (0.70 → 1.0) ────────────────────────────────────────────────
 	else:
-		wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 12.0)
-		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 12.0)
-		mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 12.0)
-		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 12.0)
-		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 12.0)
-		mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 12.0)
-		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 12.0)
+		wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
+		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
+		mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
+		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
+		mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
+		mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
+		mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
+		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
+		mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
+		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
+		mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
+		mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
 		if remaining <= 0.0 and player and player.combo_timer <= 0.0:
 			player.combo_step = 0
