@@ -16,6 +16,7 @@
 [ext_resource type="Script" path="res://scripts/building/placement_system.gd" id="14"]
 [ext_resource type="Script" path="res://scripts/characters/fish/fish_spawner.gd" id="15"]
 [ext_resource type="Script" path="res://scripts/world/lighting/lotus_light_manager.gd" id="16"]
+[ext_resource type="Script" path="res://scripts/world/lighting/road_lamp_manager.gd" id="17"]
 
 [node name="OpenWorldThucTe" type="Node3D"]
 
@@ -98,3 +99,6 @@ check_interval = 4.0
 
 [node name="LotusLightManager" type="Node" parent="."]
 script = ExtResource("16")
+
+[node name="RoadLampManager" type="Node" parent="."]
+script = ExtResource("17")

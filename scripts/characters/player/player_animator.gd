@@ -8,6 +8,8 @@ var swim_cycle_speed: float = 4.5
 var mesh: PlayerMesh
 var base: CharacterBase
 var player: PlayerCharacter
+var _slash_spawned: bool = false
+var _last_remaining: float = 0.0
 
 func setup(m: PlayerMesh, b: CharacterBase) -> void:
 	mesh = m
@@ -176,6 +178,10 @@ func _attack(delta: float, _t: float) -> void:
 	var wp := mesh.weapon_pivot
 	const IDLE_WP: Vector3 = Vector3(90, 0, 0)
 
+	if remaining > _last_remaining + 0.001:
+		_slash_spawned = false
+	_last_remaining = remaining
+
 	# ── Wind-up (0.0 → 0.25) ──────────────────────────────────────────────────
 	if prog < 0.25:
 		var p: float = prog / 0.25
@@ -212,6 +218,9 @@ func _attack(delta: float, _t: float) -> void:
 
 	# ── Strike (0.25 → 0.70) ─────────────────────────────────────────────────
 	elif prog < 0.70:
+		if not _slash_spawned:
+			_slash_spawned = true
+			_spawn_slash(step)
 		var p: float = (prog - 0.25) / 0.45
 		match step:
 			0:  # Chéo phải→trái
@@ -267,3 +276,20 @@ func _attack(delta: float, _t: float) -> void:
 		mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
 		if remaining <= 0.0 and player and player.combo_timer <= 0.0:
 			player.combo_step = 0
+
+func _spawn_slash(step: int) -> void:
+	if not is_instance_valid(mesh) or not is_instance_valid(mesh.weapon_pivot):
+		return
+	if not player or not player.equipped_weapon or player.equipped_weapon.id != "kiem":
+		return
+	var wp := mesh.weapon_pivot
+	var vfx := SlashVFX.new()
+	wp.add_child(vfx)
+	vfx.position = Vector3(0, 0.40, 0)
+	match step:
+		0:
+			vfx.rotation_degrees = Vector3(0, 0, 30)
+		1:
+			vfx.rotation_degrees = Vector3(0, 0, -30)
+		2:
+			vfx.rotation_degrees = Vector3(85, 0, 0)

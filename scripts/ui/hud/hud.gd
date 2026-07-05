@@ -416,7 +416,7 @@ func _process(delta: float) -> void:
 		var player := _find_player_character()
 		var tracked_ch: CharacterBase = _mgr.get_current_character() if _mgr else null
 		var pos_src: Node3D = player if player else tracked_ch
-		if pos_src and is_instance_valid(pos_src):
+		if pos_src and is_instance_valid(pos_src) and pos_src.is_inside_tree():
 			var p := pos_src.global_position
 			_coords_label.text = "X %.1f  Y %.1f  Z %.1f" % [p.x, p.y, p.z]
 		else:

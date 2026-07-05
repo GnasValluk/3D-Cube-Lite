@@ -11,7 +11,7 @@ static func build(pivot: Node3D, item_id: String) -> void:
 	if item_id.is_empty():
 		return
 	match item_id:
-		"cuoc":    _build_cuoc(pivot)
+		"cup":     _build_cup(pivot)
 		"xeng":    _build_xeng(pivot)
 		"riu":     _build_riu(pivot)
 		"kiem":    _build_kiem(pivot)
@@ -43,9 +43,9 @@ static func _cyl(p: Node3D, pos: Vector3, r: float, h: float, mat: StandardMater
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	p.add_child(mi)
 
-# ── CUỐC ─────────────────────────────────────────────────────────────────────
-# Cán dọc Y, đầu cuốc xoay 90° quanh cán (roll) → thanh ngang dọc Z
-static func _build_cuoc(p: Node3D) -> void:
+# ── CÚP ──────────────────────────────────────────────────────────────────────
+# Cán dọc Y, đầu cúp xoay 90° quanh cán (roll) → thanh ngang dọc Z
+static func _build_cup(p: Node3D) -> void:
 	var wood   := _mat(Color(0.55, 0.32, 0.10))
 	var iron   := _mat(Color(0.62, 0.62, 0.68))
 	var iron_d := _mat(Color(0.40, 0.40, 0.46))

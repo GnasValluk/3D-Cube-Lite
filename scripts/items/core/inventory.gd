@@ -149,7 +149,7 @@ static func create_item_db() -> Dictionary:
 	_add(db, "twilight_gate", "Cổng Twilight", ItemDef.Type.TOOL,   Color(0.10, 0.50, 0.45), "T",  "Đặt cổng Twilight ra thế giới", false, 1)
 
 	# ── Công cụ ────────────────────────────────────────────────────────────────
-	_add(db, "cuoc",  "Cuốc",  ItemDef.Type.TOOL,   Color(0.60, 0.55, 0.50), "⛏", "Đào đất, khai thác tài nguyên",   false, 1, 0, 8,  0)
+	_add(db, "cup",   "Cúp",   ItemDef.Type.TOOL,   Color(0.60, 0.55, 0.50), "⛏", "Đào đất, khai thác tài nguyên",   false, 1, 0, 8,  0)
 	_add(db, "xeng",  "Xẻng",  ItemDef.Type.TOOL,   Color(0.70, 0.65, 0.55), "🔨", "Xúc đất, di chuyển vật liệu",     false, 1, 0, 6,  0)
 	_add(db, "riu",   "Rìu",   ItemDef.Type.TOOL,   Color(0.50, 0.45, 0.40), "🪓", "Chặt cây, phá gỗ",                false, 1, 0, 14, 0)
 

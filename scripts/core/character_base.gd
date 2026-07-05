@@ -131,6 +131,8 @@ var _active: bool = true
 var _is_player: bool = true
 ## false = ẩn WorldHPBar (dùng cho sinh vật passive như cá, thú rừng)
 @export var show_world_hp_bar: bool = true
+## true = hiển thị world HP bar ngay trên đầu character
+var _world_hp_enabled: bool = false
 
 # ── Camera refs ───────────────────────────────────────────────────────────────
 var _camera:  Camera3D
@@ -156,7 +158,7 @@ func _ready() -> void:
 		_iso_rig = root.get_node_or_null("CameraRig")
 		_tp_rig  = root.get_node_or_null("TPCameraRig")
 		_camera  = get_viewport().get_camera_3d()
-	if not has_meta("no_world_hp_bar") and not _is_player and show_world_hp_bar:
+	if not has_meta("no_world_hp_bar") and _world_hp_enabled and show_world_hp_bar:
 		_add_world_hp_bar()
 
 	_water_mgr = _find_water_manager()

@@ -4,8 +4,8 @@ const CYCLE_DURATION: float = 600.0
 var _lights: Array[Light3D] = []
 var _dir_light: DirectionalLight3D
 
-const DAY_BG         := Color(0.40, 0.60, 0.65)
-const DAY_AMBIENT    := Color(0.50, 0.65, 0.70)
+const DAY_BG         := Color(0.42, 0.62, 0.72)
+const DAY_AMBIENT    := Color(0.50, 0.62, 0.74)
 const DAY_AMB_ENERGY := 1.0
 
 const NIGHT_BG         := Color(0.04, 0.06, 0.10)
@@ -63,7 +63,7 @@ func _setup_lights() -> void:
 
 	var dir := get_parent().find_child("DirectionalLight3D", true, false) as DirectionalLight3D
 	if dir:
-		dir.light_color  = Color(1.0, 0.90, 0.70)
+		dir.light_color  = Color(1.0, 0.95, 0.82)
 		dir.light_energy = 5.0
 		dir.shadow_enabled = false
 		_dir_light = dir

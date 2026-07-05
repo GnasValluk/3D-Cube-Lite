@@ -1,6 +1,9 @@
 extends CharacterBase
 class_name PlayerCharacter
 
+const _BlockHighlight := preload("res://scripts/items/block_highlight.gd")
+const _BlockData := preload("res://scripts/world/chunk/chunk_block_data.gd")
+
 var _mesh: PlayerMesh
 var _anim: PlayerAnimator
 var inventory: Inventory = null
@@ -16,6 +19,18 @@ var combo_step: int = 0
 var combo_timer: float = 0.0
 const COMBO_WINDOW: float = 0.55
 var _bobber: Node3D = null
+var _block_highlight: Node3D = null
+var _target_block: Vector3 = Vector3.ZERO
+var _has_target: bool = false
+
+func _init_highlight() -> void:
+	_block_highlight = _BlockHighlight.new()
+	_block_highlight.visible = false
+	var root := get_tree().current_scene
+	if root:
+		root.add_child(_block_highlight)
+	else:
+		add_child(_block_highlight)
 
 func _build_character() -> void:
 	combo_step = 0
@@ -66,6 +81,7 @@ func _setup_pickup_area() -> void:
 	pickup.add_child(shape)
 	pickup.area_entered.connect(_on_pickup_area_entered)
 	add_child(pickup)
+	_world_hp_enabled = true
 
 func _on_pickup_area_entered(area: Area3D) -> void:
 	if area is DroppedItem:
@@ -256,8 +272,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _is_building_placing():
 		return
+	if event is InputEventMouseMotion:
+		_update_block_target()
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			if equipped_weapon != null and equipped_weapon.id == "cup" and _has_target:
+				_open_world_manager().break_block(_target_block.x, _target_block.y, _target_block.z)
+				SFXManager.play_block_break()
+			return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			if equipped_weapon != null and equipped_weapon.id == "can_cau":
 				_fishing_action()
@@ -318,9 +342,66 @@ func _on_bobber_done(item_id: String) -> void:
 	else:
 		_scroll_inventory_message(tr("FISHING_MISS"))
 
+func _open_world_manager() -> OpenWorldManager:
+	var ch: Node = self
+	while ch:
+		if ch is OpenWorldManager:
+			return ch
+		ch = ch.get_parent()
+	# Fallback — OpenWorldManager might be a sibling node
+	var tree := get_tree()
+	if tree == null: return null
+	var root := tree.current_scene
+	if root == null: return null
+	for child in root.get_children():
+		if child is OpenWorldManager:
+			return child
+	return null
+
+func _update_block_target() -> void:
+	if _block_highlight == null:
+		return
+	var holding_cup := equipped_weapon != null and equipped_weapon.id == "cup"
+	if not holding_cup:
+		_block_highlight.visible = false
+		_has_target = false
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam == null: return
+	var mouse_pos := get_viewport().get_mouse_position()
+	var from := cam.project_ray_origin(mouse_pos)
+	var dir := cam.project_ray_normal(mouse_pos)
+	var space := get_world_3d().direct_space_state
+	if space == null: return
+	var query := PhysicsRayQueryParameters3D.new()
+	query.from = from
+	query.to = from + dir * 200.0
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	query.exclude = [self]
+	var hit := space.intersect_ray(query)
+	if hit.is_empty():
+		_block_highlight.visible = false
+		_has_target = false
+		return
+	var hit_pos: Vector3 = hit.position
+	var normal: Vector3 = hit.normal
+	var bx := floorf(hit_pos.x - normal.x * 0.001) + 0.5
+	var bz := floorf(hit_pos.z - normal.z * 0.001) + 0.5
+	var ly := _BlockData.world_y_to_layer(hit_pos.y - normal.y * 0.001)
+	var by := _BlockData.layer_to_world_y(ly)
+	_target_block = Vector3(bx, by, bz)
+	_has_target = true
+	_block_highlight.show_at(_target_block)
+
 func _process(delta: float) -> void:
 	super._process(delta)
 	combo_timer = max(combo_timer - delta, 0.0)
+	_update_block_target()
+
+func _ready() -> void:
+	await super._ready()
+	_init_highlight()
 
 func _animate(delta: float) -> void:
 	_anim.animate(delta)

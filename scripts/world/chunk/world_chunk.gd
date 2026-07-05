@@ -8,6 +8,13 @@ const _Detail = preload("chunk_detail.gd")
 const _Aquatic = preload("chunk_aquatic.gd")
 const _BlockData = preload("chunk_block_data.gd")
 
+## Khoảng cách giữa 2 đèn đường dọc theo curve (world units) — thưa
+const LAMP_SPACING: float = 28.0
+## Offset ngang từ tâm đường ra lề — đủ xa để không trùng mặt đường
+const LAMP_SIDE_OFFSET: float = 2.8
+## Xác suất bỏ qua mỗi vị trí hợp lệ (để thêm ngẫu nhiên, tỉ lệ spawn thấp)
+const LAMP_SKIP_CHANCE: float = 0.45
+
 var _cx: int = 0
 var _cz: int = 0
 var _size: int = 0
@@ -19,6 +26,11 @@ var _built: bool = false
 
 ## Block data — cho phép set_block / get_block sau này (build/mine)
 var block_data: _BlockData = null
+
+## References to non-terrain meshes (preserved across rebuilds)
+var _water_mesh_instance: MeshInstance3D = null
+var _aquatic_mesh_instance: MeshInstance3D = null
+var _lotus_lights: Array[OmniLight3D] = []
 
 static var _mesh_cache: Dictionary = {}
 static var _pending_chunks: Dictionary = {}
@@ -536,6 +548,7 @@ func apply_chunk(data: Dictionary) -> void:
 		mi_w.mesh = water_mesh
 		mi_w.material_override = _mat_cache[_dimension_id]["water"]
 		add_child(mi_w)
+		_water_mesh_instance = mi_w
 
 	var aquatic_mesh = data.get("aquatic_mesh")
 	if aquatic_mesh:
@@ -546,9 +559,10 @@ func apply_chunk(data: Dictionary) -> void:
 		mi_aq.material_override = _mat_cache[_dimension_id]["aquatic"]
 		mi_aq.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi_aq)
+		_aquatic_mesh_instance = mi_aq
 
-	var lotus_lights: Array[Vector3] = data.get("lotus_lights", [] as Array[Vector3])
-	for lpos in lotus_lights:
+	var lotus_positions: Array[Vector3] = data.get("lotus_lights", [] as Array[Vector3])
+	for lpos in lotus_positions:
 		var is_weed_light: bool = lpos.x > 400.0
 		var real_pos := Vector3(lpos.x - (500.0 if is_weed_light else 0.0), lpos.y, lpos.z)
 		var light := OmniLight3D.new()
@@ -558,9 +572,9 @@ func apply_chunk(data: Dictionary) -> void:
 		light.omni_attenuation = 2.5
 		light.shadow_enabled   = false
 		light.light_specular   = 0.0
-		light.set_meta("max_energy", 0.25 if is_weed_light else 0.6)
 		light.position         = real_pos + Vector3(0, 0.15, 0)
 		add_child(light)
+		_lotus_lights.append(light)
 		LotusLightManager.register(light)
 
 	# Collision: build trimesh shape trên thread, apply trên main thread
@@ -570,6 +584,11 @@ func apply_chunk(data: Dictionary) -> void:
 		var shape: Shape3D = mesh_ref.create_trimesh_shape()
 		call_deferred("_apply_collision", shape)
 	, false, "collision")
+
+	# Spawn đèn đường dọc theo các road curve đi qua chunk này
+	if _dimension_id == _Data._Dim.DimensionID.REAL_WORLD:
+		_spawn_road_lamps()
+
 	_built = true
 
 func _apply_collision(shape: Shape3D) -> void:
@@ -585,10 +604,17 @@ func _apply_collision(shape: Shape3D) -> void:
 func rebuild_mesh() -> void:
 	if block_data == null: return
 
-	# Xóa terrain mesh instance + static body cũ
+	# Xóa static body cũ (collision)
 	for ch in get_children():
-		if ch is MeshInstance3D or ch is StaticBody3D:
+		if ch is StaticBody3D:
 			ch.queue_free()
+
+	# Xóa terrain mesh cũ (giữ lại water / aquatic / lights)
+	for ch in get_children():
+		if ch is MeshInstance3D:
+			var mi := ch as MeshInstance3D
+			if mi != _water_mesh_instance and mi != _aquatic_mesh_instance:
+				mi.queue_free()
 
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -683,6 +709,94 @@ func is_water_at(wx: float, wz: float, wy: float) -> bool:
 	if _biome_grid[vx][vz] != _Data.TileType.SAND \
 	and _biome_grid[vx][vz] != _Data.TileType.SILT: return false
 	return wy < _Data.VOXEL * 0.46
+
+## ── _spawn_road_lamps: đặt đèn đường dọc theo road curves trong chunk ────────
+## - Spawn bên lề đường (offset đủ xa khỏi mặt đường ROAD_HALF_W)
+## - Hướng cánh tay đèn quay vào lòng đường theo từng đoạn curve
+## - Tỉ lệ spawn thưa, có random skip
+func _spawn_road_lamps() -> void:
+	_Road._ensure_roads()
+
+	var half:     float = _size * 0.5
+	var cx_world: float = _cx * _size
+	var cz_world: float = _cz * _size
+	var min_x:    float = cx_world - half
+	var max_x:    float = cx_world + half
+	var min_z:    float = cz_world - half
+	var max_z:    float = cz_world + half
+
+	var pad: float = LAMP_SPACING
+
+	# RNG deterministic theo chunk để không thay đổi mỗi lần load
+	var rng := RandomNumberGenerator.new()
+	rng.seed = WorldSeed.seed_value + _cx * 100003 + _cz * 200003 + 54321
+
+	var placed_positions: Array[Vector2] = []
+
+	for curve in _Road._road_curves:
+		if curve.size() < 2:
+			continue
+
+		# AABB check nhanh
+		var c_min_x: float = curve[0].x; var c_max_x: float = curve[0].x
+		var c_min_z: float = curve[0].y; var c_max_z: float = curve[0].y
+		for pt in curve:
+			c_min_x = min(c_min_x, pt.x); c_max_x = max(c_max_x, pt.x)
+			c_min_z = min(c_min_z, pt.y); c_max_z = max(c_max_z, pt.y)
+		if c_max_x < min_x - pad or c_min_x > max_x + pad: continue
+		if c_max_z < min_z - pad or c_min_z > max_z + pad: continue
+
+		var dist_acc:       float = 0.0
+		# Offset ngẫu nhiên cho đèn đầu tiên trên mỗi curve
+		var next_lamp_dist: float = rng.randf_range(LAMP_SPACING * 0.3, LAMP_SPACING * 0.7)
+
+		for i in range(curve.size() - 1):
+			var a: Vector2 = curve[i]
+			var b: Vector2 = curve[i + 1]
+			var seg_len: float = a.distance_to(b)
+			if seg_len < 0.001:
+				continue
+
+			var seg_dir:  Vector2 = (b - a) / seg_len
+			# Lề phải chiều đi (đèn spawn bên này)
+			var seg_perp: Vector2 = Vector2(seg_dir.y, -seg_dir.x)
+
+			var t_end: float = dist_acc + seg_len
+
+			while next_lamp_dist <= t_end:
+				var frac:    float   = (next_lamp_dist - dist_acc) / seg_len
+				var road_pt: Vector2 = a.lerp(b, frac)
+				# Vị trí đèn = lề phải, đủ xa mặt đường
+				var lamp_2d: Vector2 = road_pt + seg_perp * LAMP_SIDE_OFFSET
+
+				var lx: float = lamp_2d.x
+				var lz: float = lamp_2d.y
+
+				if lx >= min_x and lx < max_x and lz >= min_z and lz < max_z:
+					# Random skip để tỉ lệ thưa
+					if rng.randf() < LAMP_SKIP_CHANCE:
+						next_lamp_dist += LAMP_SPACING
+						continue
+
+					# Kiểm tra không đặt đèn trùng chỗ
+					var too_close: bool = false
+					var min_dist2: float = (LAMP_SPACING * 0.55) * (LAMP_SPACING * 0.55)
+					for prev in placed_positions:
+						if prev.distance_squared_to(lamp_2d) < min_dist2:
+							too_close = true
+							break
+					if not too_close:
+						placed_positions.append(lamp_2d)
+						var local_x: float = lx - cx_world
+						var local_z: float = lz - cz_world
+						var lamp := WoodLamp.new()
+						lamp.position = Vector3(local_x, 1.0, local_z)
+						lamp.road_dir = seg_dir
+						add_child(lamp)
+
+				next_lamp_dist += LAMP_SPACING
+
+			dist_acc = t_end
 
 ## ── _add_quad (shared helper) ────────────────────────────────────────────────
 static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,
