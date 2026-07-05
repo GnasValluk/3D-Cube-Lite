@@ -50,6 +50,8 @@ var _debug_speed_slider: HSlider
 var _debug_weather_btn: Button
 var _time_label: Label
 var _coords_label: Label
+# Cache texture để tránh load() blocking mỗi frame trong _refresh_party_hud
+var _icon_cache: Dictionary = {}
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _ChestUI = preload("res://scripts/items/ui/chest_ui.gd")
@@ -478,6 +480,14 @@ func _process(delta: float) -> void:
 			var packed := ResourceLoader.load_threaded_get(_load_scene)
 			get_tree().change_scene_to_packed(packed)
 
+func _load_icon(character_name: String) -> Texture2D:
+	if _icon_cache.has(character_name):
+		return _icon_cache[character_name]
+	var tex_path: String = "res://assets/icon_character/" + character_name.to_lower() + ".png"
+	var tex: Texture2D = load(tex_path) as Texture2D
+	_icon_cache[character_name] = tex
+	return tex
+
 func _refresh_party_hud() -> void:
 	var party: Array[CharacterBase] = _mgr.get_party_characters()
 	var active: CharacterBase = _mgr.get_current_character()
@@ -525,8 +535,7 @@ func _refresh_party_hud() -> void:
 				var tmp: Variant = CharacterBase.ELEMENT_COLORS.get(elem as int)
 				if tmp is Color:
 					ec = tmp as Color
-			var tex_path: String = "res://assets/icon_character/" + ch.character_name.to_lower() + ".png"
-			d["icon"].texture = load(tex_path) as Texture2D
+			d["icon"].texture = _load_icon(ch.character_name)
 			d["icon"].modulate = Color(1, 1, 1, 1)
 
 			if active and ch.character_name == active.character_name:
@@ -576,8 +585,7 @@ func _refresh_party_hud() -> void:
 				var tmp: Variant = CharacterBase.ELEMENT_COLORS.get(elem as int)
 				if tmp is Color:
 					ec = tmp as Color
-			var tex_path: String = "res://assets/icon_character/" + ch.character_name.to_lower() + ".png"
-			d["icon"].texture = load(tex_path) as Texture2D
+			d["icon"].texture = _load_icon(ch.character_name)
 			d["icon"].modulate = Color(1, 1, 1, 1)
 
 			if active and ch.character_name == active.character_name:

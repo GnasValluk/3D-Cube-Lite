@@ -11,6 +11,7 @@ var _explored: Dictionary = {}
 var _dirty: bool = false
 var _player: Node3D = null
 
+var _explore_timer: float = 0.0
 var _dimension_id: int = _Dim.DimensionID.TWILIGHT
 
 var _noise_biome: FastNoiseLite
@@ -82,7 +83,11 @@ func _process(delta: float) -> void:
 	if _player == null:
 		_find_player()
 		return
-	_update_explored()
+	# Chỉ update explore mỗi 0.3s — không cần mỗi frame
+	_explore_timer -= delta
+	if _explore_timer <= 0.0:
+		_explore_timer = 0.3
+		_update_explored()
 
 func _find_player() -> void:
 	var mgr := get_node("../CharacterManager") as CharacterManager

@@ -8,9 +8,9 @@ const CYCLE_DURATION: float = 600.0
 var _keys: Array[Dictionary] = [
 	{ "h": 0.0, "bg": Color(0.03, 0.05, 0.12), "amb": Color(0.04, 0.06, 0.15), "ae": 0.05, "dc": Color(0.60, 0.65, 0.80), "de": 0.3 },
 	{ "h": 6.0, "bg": Color(0.70, 0.55, 0.45), "amb": Color(0.65, 0.50, 0.40), "ae": 0.8,  "dc": Color(1.0, 0.85, 0.60), "de": 2.5 },
-	{ "h": 8.0, "bg": Color(0.55, 0.78, 0.88), "amb": Color(0.58, 0.60, 0.62), "ae": 1.0, "dc": Color(1.0, 0.95, 0.82), "de": 8.0 },
-	{ "h": 14.0,"bg": Color(0.55, 0.78, 0.88), "amb": Color(0.58, 0.60, 0.62), "ae": 1.2, "dc": Color(1.0, 0.95, 0.82), "de": 9.0 },
-	{ "h": 15.0,"bg": Color(0.70, 0.60, 0.45), "amb": Color(0.65, 0.55, 0.40), "ae": 1.5, "dc": Color(1.0, 0.80, 0.50), "de": 5.0 },
+	{ "h": 8.0, "bg": Color(0.55, 0.78, 0.88), "amb": Color(0.58, 0.60, 0.62), "ae": 1.0, "dc": Color(1.0, 0.95, 0.82), "de": 5.0 },
+	{ "h": 14.0,"bg": Color(0.55, 0.78, 0.88), "amb": Color(0.58, 0.60, 0.62), "ae": 1.2, "dc": Color(1.0, 0.95, 0.82), "de": 5.5 },
+	{ "h": 15.0,"bg": Color(0.70, 0.60, 0.45), "amb": Color(0.65, 0.55, 0.40), "ae": 1.5, "dc": Color(1.0, 0.80, 0.50), "de": 3.5 },
 	{ "h": 18.0,"bg": Color(0.25, 0.18, 0.22), "amb": Color(0.20, 0.15, 0.18), "ae": 0.15,"dc": Color(0.80, 0.55, 0.35), "de": 0.6 },
 	{ "h": 24.0,"bg": Color(0.03, 0.05, 0.12), "amb": Color(0.04, 0.06, 0.15), "ae": 0.05,"dc": Color(0.60, 0.65, 0.80), "de": 0.3 },
 ]
@@ -47,26 +47,9 @@ func _ready() -> void:
 	env.ambient_light_color  = _keys[0]["amb"]
 	env.ambient_light_energy = _keys[0]["ae"]
 
-	env.glow_enabled = true
-	env.glow_normalized = true
-	env.glow_intensity = 0.3
-	env.glow_strength = 0.6
-	env.glow_bloom = 0.15
-	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
-	env.glow_hdr_threshold = 1.0
-	env.glow_hdr_scale = 1.2
-	env.set_glow_level(0, false)
-	env.set_glow_level(1, true)
-	env.set_glow_level(2, true)
-	env.set_glow_level(3, false)
-	env.set_glow_level(4, false)
-	env.set_glow_level(5, false)
-	env.set_glow_level(6, false)
+	env.glow_enabled = false
 
-	env.adjustment_enabled = true
-	env.adjustment_brightness = 1.0
-	env.adjustment_contrast = 1.1
-	env.adjustment_saturation = 1.3
+	env.adjustment_enabled = false
 
 	env.tonemap_mode     = Environment.TONE_MAPPER_FILMIC
 	env.tonemap_exposure = 1.0

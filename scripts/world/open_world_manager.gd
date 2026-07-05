@@ -63,14 +63,18 @@ func _process(_delta: float) -> void:
 
 	var ppos := _player.global_position
 
-	# Promote completed async chunks
+	# Promote completed async chunks — tối đa 1 chunk/frame để tránh spike
+	var promoted: int = 0
 	for ck in _loading.keys().duplicate():
+		if promoted >= 1:
+			break
 		var chunk: WorldChunk = _loading[ck] as WorldChunk
 		if chunk._built:
 			_loading.erase(ck)
 			_chunks[ck] = chunk
 			if SaveManager:
 				SaveManager.apply_block_modifications_for_chunk(chunk, ck.x, ck.y)
+			promoted += 1
 
 	var cx: int = int(floor(ppos.x / CHUNK_SIZE))
 	var cz: int = int(floor(ppos.z / CHUNK_SIZE))

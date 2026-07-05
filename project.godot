@@ -23,6 +23,7 @@ SaveManager="*res://scripts/core/save_manager.gd"
 DeviceManager="*res://scripts/core/device_manager.gd"
 TimeSystem="*res://scripts/core/time_system.gd"
 SFXManager="*res://scripts/audio/sfx_manager.gd"
+CollisionQueue="*res://scripts/core/collision_queue.gd"
 
 [display]
 

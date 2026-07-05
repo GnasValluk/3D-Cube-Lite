@@ -1,16 +1,16 @@
-## world/props/moon_crystal_lamp.gd
+## world/props/wood_lamp.gd
 ## Đèn đường gỗ phong cách làng quê đồng bằng — cột gỗ vuông + đèn lồng vàng.
-## Thiết kế theo ảnh tham chiếu: cột vuông dày, cánh tay cong chữ L,
-## thanh chống xiên, đèn lồng vuông treo ở đầu.
 ## Chỉ phát sáng ban đêm thông qua RoadLampManager.
 ##
-## Cách dùng:
-##   var lamp := WoodLamp.new()
-##   lamp.road_dir = Vector2(dx, dz)   # hướng dọc con đường
-##   parent_node.add_child(lamp)
+## Tối ưu: share ShaderMaterial (1 draw call cho toàn bộ kính),
+## range nhỏ hơn trên mobile, tự unregister khi bị xóa.
 
 extends Node3D
 class_name WoodLamp
+
+# ── Shared materials (tạo 1 lần, tất cả đèn dùng chung) ──────────────────────
+static var _shared_wood_mat:   StandardMaterial3D = null
+static var _shared_glass_mat:  ShaderMaterial     = null
 
 # ── Màu sắc gỗ ───────────────────────────────────────────────────────────────
 const C_WOOD_DARK:  Color = Color(0.22, 0.13, 0.07)
@@ -43,8 +43,12 @@ const LIGHT_ENERGY_MAX: float = 3.5
 var road_dir: Vector2 = Vector2(1.0, 0.0)
 
 var _light: OmniLight3D = null
+var _crystal_mi: MeshInstance3D = null
 
 func _ready() -> void:
+	# Đọc road_dir từ meta nếu được set bởi spawner (tránh type issue cross-script)
+	if has_meta("road_dir_x"):
+		road_dir = Vector2(get_meta("road_dir_x"), get_meta("road_dir_y"))
 	var perp    := Vector2(-road_dir.y, road_dir.x).normalized()
 	var arm_dir := Vector3(perp.x, 0.0, perp.y)
 	_build_mesh(arm_dir)
@@ -90,23 +94,25 @@ func _build_mesh(arm_dir: Vector3) -> void:
 	var lantern_c: Vector3 = arm_dir * ARM_OUT + Vector3(0, arm_base_y - ARM_H * 0.5 - LANTERN_H * 0.5, 0)
 	_build_lantern(st, stg, lantern_c)
 
-	# Commit mesh gỗ
+	# Commit mesh gỗ — dùng shared material để giảm draw call
 	var mesh_main := st.commit()
 	if mesh_main:
 		var mi := MeshInstance3D.new()
 		mi.mesh = mesh_main
-		mi.material_override = _mat_wood()
+		mi.material_override = _get_shared_wood_mat()
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
 
-	# Commit mesh kính
+	# Commit mesh kính — dùng shared material, emit_energy điều khiển qua uniform
 	var mesh_glass := stg.commit()
 	if mesh_glass:
 		var mi_g := MeshInstance3D.new()
 		mi_g.mesh = mesh_glass
-		mi_g.material_override = _mat_glass()
+		# QUAN TRỌNG: mỗi đèn cần instance riêng của material để emit_energy độc lập
+		mi_g.material_override = _get_shared_glass_mat().duplicate()
 		mi_g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi_g)
+		_crystal_mi = mi_g
 		RoadLampManager.register_crystal(mi_g)
 
 # ── Đèn lồng vuông ───────────────────────────────────────────────────────────
@@ -170,26 +176,39 @@ func _setup_light(arm_dir: Vector3) -> void:
 	_light.position         = arm_dir * ARM_OUT + Vector3(0, lantern_y - 0.05, 0)
 	_light.light_color      = LIGHT_COLOR
 	_light.light_energy     = 0.0
-	_light.omni_range       = LIGHT_RANGE
+	# Mobile: giảm range để hạn chế overdraw và số fragment bị ảnh hưởng
+	_light.omni_range       = 6.0 if DeviceManager.is_mobile() else LIGHT_RANGE
 	_light.omni_attenuation = 1.4
 	_light.shadow_enabled   = false
-	_light.light_specular   = 0.2
+	_light.light_specular   = 0.0
 	add_child(_light)
 	RoadLampManager.register_light(_light)
 
-# ── Vật liệu ──────────────────────────────────────────────────────────────────
-func _mat_wood() -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.roughness = 0.95
-	m.metallic  = 0.0
-	m.metallic_specular = 0.05
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	return m
+## Tự unregister khi node bị xóa khỏi scene (chunk unload)
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		if _light != null:
+			RoadLampManager.unregister_light(_light)
+		if _crystal_mi != null:
+			RoadLampManager.unregister_crystal(_crystal_mi)
 
-func _mat_glass() -> ShaderMaterial:
-	var s := Shader.new()
-	s.code = """
+# ── Shared material helpers ───────────────────────────────────────────────────
+## Trả về StandardMaterial3D dùng chung (tạo 1 lần cho toàn bộ session)
+static func _get_shared_wood_mat() -> StandardMaterial3D:
+	if _shared_wood_mat == null:
+		_shared_wood_mat = StandardMaterial3D.new()
+		_shared_wood_mat.vertex_color_use_as_albedo = true
+		# Unshaded: vertex color đã encode baked lighting, không cần dynamic light
+		# tác động → loại bỏ hoàn toàn specular highlight và phản quang trắng
+		_shared_wood_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_shared_wood_mat.cull_mode = BaseMaterial3D.CULL_BACK
+	return _shared_wood_mat
+
+## Trả về ShaderMaterial gốc (mỗi đèn sẽ .duplicate() để có emit_energy riêng)
+static func _get_shared_glass_mat() -> ShaderMaterial:
+	if _shared_glass_mat == null:
+		var s := Shader.new()
+		s.code = """
 shader_type spatial;
 render_mode blend_mix, cull_disabled, unshaded;
 uniform vec4  glass_color : source_color = vec4(1.0, 0.82, 0.40, 0.55);
@@ -202,9 +221,16 @@ void fragment() {
 	EMISSION = emit_color.rgb * emit_energy;
 }
 """
-	var m := ShaderMaterial.new()
-	m.shader = s
-	return m
+		_shared_glass_mat = ShaderMaterial.new()
+		_shared_glass_mat.shader = s
+	return _shared_glass_mat
+
+# ── Vật liệu (deprecated — giữ lại để tương thích, dùng shared helpers trên) ─
+func _mat_wood() -> StandardMaterial3D:
+	return _get_shared_wood_mat()
+
+func _mat_glass() -> ShaderMaterial:
+	return _get_shared_glass_mat().duplicate()
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 func _box(st: SurfaceTool, center: Vector3, size: Vector3, col: Color) -> void:
