@@ -8,9 +8,9 @@ const DAY_BG         := Color(0.42, 0.62, 0.72)
 const DAY_AMBIENT    := Color(0.50, 0.62, 0.74)
 const DAY_AMB_ENERGY := 1.0
 
-const NIGHT_BG         := Color(0.04, 0.06, 0.10)
-const NIGHT_AMBIENT    := Color(0.04, 0.08, 0.10)
-const NIGHT_AMB_ENERGY := 0.15
+const NIGHT_BG         := Color(0.10, 0.12, 0.20)
+const NIGHT_AMBIENT    := Color(0.10, 0.14, 0.20)
+const NIGHT_AMB_ENERGY := 0.35
 
 func _ready() -> void:
 	var env := Environment.new()
