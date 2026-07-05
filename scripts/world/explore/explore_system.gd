@@ -131,6 +131,15 @@ func _sample_color(wx: float, wz: float) -> Color:
 				return Color(0.32, 0.18, 0.08)
 			return Color(0.20, 0.35, 0.12)
 
+		# Kiểm tra continent noise — biển hiển thị màu xanh đậm trên minimap
+		var cv: float = (_noise_biome.get_noise_2d(wx * 0.0008 / 0.012, wz * 0.0008 / 0.012) + 1.0) * 0.5
+		if cv < 0.38:
+			# Biển sâu
+			return Color(0.04, 0.22, 0.52)
+		elif cv < 0.48:
+			# Biển nông / bãi biển
+			return Color(0.72, 0.82, 0.55)
+
 		# GRASS → approximate distance-field: check expanding rings for DARK_GRASS
 		var found_dark: bool = false
 		var nearest_ring: int = 999

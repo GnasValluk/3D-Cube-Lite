@@ -36,7 +36,19 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_lake_type.seed = base_seed + 8888
 	n_lake_type.frequency = 0.008
 
-	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake, "lake_type": n_lake_type }
+	## n_continent: noise tần số rất thấp xác định lục địa vs biển
+	## Chỉ dùng cho REAL_WORLD — Twilight không có biển
+	var n_continent := FastNoiseLite.new()
+	n_continent.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_continent.seed = base_seed + 31337
+	n_continent.frequency = _Data.CONTINENT_FREQ
+	# FractalOctaves cao hơn để tạo đường bờ biển tự nhiên, không phẳng
+	n_continent.fractal_octaves = 4
+	n_continent.fractal_lacunarity = 2.2
+	n_continent.fractal_gain = 0.5
+
+	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
+		"lake_type": n_lake_type, "continent": n_continent }
 	_noise_cache[dim_id] = result
 	return result
 

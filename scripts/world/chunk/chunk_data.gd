@@ -1,6 +1,6 @@
 extends RefCounted
 
-enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT }
+enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP }
 
 ## ── Block IDs cho hệ thống voxel Minecraft-style ────────────────────────────
 ## 0 = AIR luôn luôn, giá trị khớp với TileType để map dễ dàng
@@ -15,8 +15,10 @@ enum BlockID {
 	STONE       = 7,
 	DARK_DIRT   = 8,
 	SAND_DEEP   = 9,
-	BEDROCK     = 10,  # Tầng đáy thế giới — không thể phá vỡ
-	TRAIL       = 11,  # Đường mòn — vàng đất
+	BEDROCK     = 10,
+	TRAIL       = 11,
+	OCEAN_FLOOR = 12,  # Đáy biển — cát thô màu xám xanh
+	OCEAN_SAND  = 13,  # Cát bãi biển — sáng hơn SAND nội địa
 }
 
 const VOXEL: float = 1.0
@@ -27,6 +29,16 @@ const ROAD_COLOR: Color = Color(0.45, 0.45, 0.45)
 const ROAD_SIDE: Color = Color(0.30, 0.30, 0.30)
 const TRAIL_COLOR: Color = Color(0.68, 0.52, 0.26)
 const TRAIL_SIDE: Color = Color(0.46, 0.36, 0.18)
+
+## ── Hằng số biển ──────────────────────────────────────────────────────────────
+## Continent noise tần số rất thấp — 1 "lục địa" rộng ~800-1200 world units
+const CONTINENT_FREQ:      float = 0.0008
+const CONTINENT_THRESHOLD: float = 0.38   # < threshold = biển, >= = đất liền
+## Bề rộng bãi biển (voxels) — transition SAND trước khi vào nước biển
+const BEACH_WIDTH:         int   = 5
+## Độ sâu biển nông (OCEAN_SHALLOW) và sâu (OCEAN_DEEP) tính theo slab layers
+const OCEAN_SHALLOW_DEPTH: float = -1.0   # world Y = -1.0 (dưới WATER_Y)
+const OCEAN_DEEP_DEPTH:    float = -3.0   # world Y = -3.0 (đáy)
 
 const PAD: int = 5
 const WATER_Y: float = VOXEL * 0.5
@@ -40,20 +52,22 @@ const ROAD_GRID_R: int = 40
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 
 ## ── Màu sắc theo block ID ────────────────────────────────────────────────────
-## Index = BlockID value
+## Index = BlockID value — màu đậm, bão hòa cao cho unshaded renderer
 const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0, 0, 0, 0),                 # 0 AIR
-	Color(0.28, 0.52, 0.18),           # 1 GRASS top
-	Color(0.20, 0.38, 0.12),           # 2 DARK_GRASS top
-	Color(0.90, 0.80, 0.42),           # 3 SAND
-	Color(0.32, 0.18, 0.08),           # 4 DIRT
-	Color(0.14, 0.14, 0.13),           # 5 SILT
-	Color(0.08, 0.36, 0.68, 0.70),     # 6 WATER (semi-transparent)
-	Color(0.45, 0.45, 0.48),           # 7 STONE
-	Color(0.22, 0.14, 0.06),           # 8 DARK_DIRT (sub-surface under dark grass)
-	Color(0.78, 0.68, 0.34),           # 9 SAND_DEEP
-	Color(0.18, 0.16, 0.18),           # 10 BEDROCK (dark, near-black)
-	Color(0.82, 0.68, 0.28),           # 11 TRAIL — vàng đất đậm hơn cát, nén chặt
+	Color(0.22, 0.58, 0.14),           # 1 GRASS
+	Color(0.14, 0.40, 0.08),           # 2 DARK_GRASS
+	Color(0.92, 0.78, 0.32),           # 3 SAND (hồ nội địa)
+	Color(0.42, 0.22, 0.08),           # 4 DIRT
+	Color(0.16, 0.15, 0.13),           # 5 SILT
+	Color(0.08, 0.36, 0.68, 0.70),     # 6 WATER (hồ)
+	Color(0.42, 0.42, 0.46),           # 7 STONE
+	Color(0.28, 0.16, 0.06),           # 8 DARK_DIRT
+	Color(0.80, 0.66, 0.28),           # 9 SAND_DEEP
+	Color(0.14, 0.12, 0.14),           # 10 BEDROCK
+	Color(0.76, 0.58, 0.22),           # 11 TRAIL
+	Color(0.22, 0.28, 0.32),           # 12 OCEAN_FLOOR — cát thô xám xanh đáy biển
+	Color(0.94, 0.88, 0.62),           # 13 OCEAN_SAND  — cát bãi biển sáng vàng nhạt
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -67,17 +81,19 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.04, 0.08, 0.06),           # 7 STONE
 	Color(0.03, 0.10, 0.06),           # 8 DARK_DIRT
 	Color(0.05, 0.13, 0.08),           # 9 SAND_DEEP
-	Color(0.06, 0.05, 0.07),           # 10 BEDROCK (twilight dark)
-	Color(0.08, 0.10, 0.05),           # 11 TRAIL (twilight — đất nén tối)
+	Color(0.06, 0.05, 0.07),           # 10 BEDROCK
+	Color(0.08, 0.10, 0.05),           # 11 TRAIL
+	Color(0.04, 0.08, 0.10),           # 12 OCEAN_FLOOR (TW không có nhưng cần tránh crash)
+	Color(0.06, 0.10, 0.08),           # 13 OCEAN_SAND
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
 ## TRAIL phân biệt với terrain bằng màu, không bằng height
 const TRAIL_SINK: float = 0.0
 
-## Side màu tối hơn top (nhân 0.6)
+## Side màu tối hơn top — unshaded cần chênh lệch rõ để tạo cảm giác 3D
 static func block_side_color(top_col: Color) -> Color:
-	return Color(top_col.r * 0.62, top_col.g * 0.62, top_col.b * 0.62, top_col.a)
+	return Color(top_col.r * 0.50, top_col.g * 0.50, top_col.b * 0.50, top_col.a)
 
 ## Block nào là solid (player không đi xuyên qua)
 static func is_solid(block_id: int) -> bool:

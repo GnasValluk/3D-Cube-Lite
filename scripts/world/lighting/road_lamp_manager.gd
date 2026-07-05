@@ -86,7 +86,9 @@ func _process(delta: float) -> void:
 
 	var night_t: float = _night_factor(_get_hour())
 
-	if absf(night_t - _last_night_t) < 0.005:
+	# Skip nếu không đổi đáng kể — nhưng dùng threshold nhỏ hơn
+	# vì mưa có thể thay đổi nhanh hơn chu kỳ ngày/đêm
+	if absf(night_t - _last_night_t) < 0.003:
 		return
 	_last_night_t = night_t
 
@@ -115,12 +117,27 @@ func _get_hour() -> float:
 		return TimeSystem.get_hour()
 	return 12.0
 
+## Trả về 0.0 (tắt hoàn toàn) → 1.0 (sáng tối đa)
+## Bật khi: đêm (theo giờ) HOẶC trời mưa (weather_intensity > 0)
 func _night_factor(h: float) -> float:
+	# ── Phần đêm/ngày ─────────────────────────────────────────────────────────
+	var night_t: float
 	if h >= DAWN_END and h <= DUSK_START:
-		return 0.0
+		night_t = 0.0                                          # ban ngày hoàn toàn
 	elif h >= DUSK_END or h < DAWN_START:
-		return 1.0
+		night_t = 1.0                                          # đêm sâu
 	elif h >= DUSK_START and h < DUSK_END:
-		return smoothstep(0.0, 1.0, (h - DUSK_START) / (DUSK_END - DUSK_START))
+		night_t = smoothstep(0.0, 1.0, (h - DUSK_START) / (DUSK_END - DUSK_START))
 	else:
-		return smoothstep(0.0, 1.0, 1.0 - (h - DAWN_START) / (DAWN_END - DAWN_START))
+		night_t = smoothstep(0.0, 1.0, 1.0 - (h - DAWN_START) / (DAWN_END - DAWN_START))
+
+	# ── Phần mưa — đèn bật thêm khi trời tối do mưa ──────────────────────────
+	# weather_intensity: 0.0 = nắng, 1.0 = mưa nặng
+	# Mưa nhẹ (0.3+) bắt đầu bật đèn, mưa nặng (1.0) = bật như đêm
+	var rain_t: float = 0.0
+	if TimeSystem:
+		var wi: float = TimeSystem.get_weather_intensity()
+		rain_t = smoothstep(0.3, 1.0, wi)   # chỉ bật khi mưa đủ nặng
+
+	# Lấy giá trị lớn hơn: đêm hay mưa
+	return maxf(night_t, rain_t)

@@ -187,6 +187,62 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					if dn > 0.70:
 						biome_grid[ivx][ivz] = _Data.TileType.DIRT
 
+		# ── 3d. Ocean / continent overlay ─────────────────────────────────────
+		# Continent noise tần số rất thấp quyết định ô nào là biển.
+		# Chỉ áp dụng cho GRASS (không ghi đè DARK_GRASS / đồi cao).
+		# Vùng biển gần bờ (dist nhỏ) → bãi biển OCEAN_SAND.
+		# Vùng biển sâu → OCEAN_DEEP với height thấp hơn.
+		var n_continent: FastNoiseLite = nd["continent"]
+		# PackedByteArray lưu ocean_dist per voxel để tính bãi biển
+		var ocean_mask: PackedByteArray
+		ocean_mask.resize(cols * cols)
+		ocean_mask.fill(0)
+
+		for ivx in range(cols):
+			for ivz in range(cols):
+				if biome_grid[ivx][ivz] != _Data.TileType.GRASS:
+					continue
+				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+				var cv: float = (n_continent.get_noise_2d(wx, wz) + 1.0) * 0.5
+				if cv < _Data.CONTINENT_THRESHOLD:
+					# Biển — depth tỉ lệ với khoảng cách từ ngưỡng
+					var depth_t: float = clamp(
+						(_Data.CONTINENT_THRESHOLD - cv) / _Data.CONTINENT_THRESHOLD, 0.0, 1.0)
+					if depth_t < 0.25:
+						# Vùng nông — bãi biển OCEAN_SAND
+						biome_grid[ivx][ivz] = _Data.TileType.OCEAN_SHALLOW
+						height_grid[ivx][ivz] = _Data.WATER_Y - 0.5
+					else:
+						# Biển sâu
+						biome_grid[ivx][ivz] = _Data.TileType.OCEAN_DEEP
+						var deep_y: float = lerp(_Data.OCEAN_SHALLOW_DEPTH,
+							_Data.OCEAN_DEEP_DEPTH, (depth_t - 0.25) / 0.75)
+						height_grid[ivx][ivz] = deep_y
+					ocean_mask[ivx * cols + ivz] = 1
+
+		# Bãi biển (OCEAN_SAND) — các ô GRASS sát cạnh ô biển
+		for ivx in range(cols):
+			for ivz in range(cols):
+				if biome_grid[ivx][ivz] != _Data.TileType.GRASS:
+					continue
+				var is_beach: bool = false
+				for ox in range(-_Data.BEACH_WIDTH, _Data.BEACH_WIDTH + 1):
+					for oz in range(-_Data.BEACH_WIDTH, _Data.BEACH_WIDTH + 1):
+						var nx: int = ivx + ox
+						var nz: int = ivz + oz
+						if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
+							continue
+						if ocean_mask[nx * cols + nz] == 1:
+							is_beach = true
+							break
+					if is_beach:
+						break
+				if is_beach:
+					biome_grid[ivx][ivz] = _Data.TileType.OCEAN_SHALLOW
+					# Bãi biển phẳng nhẹ, hơi thấp hơn đồng cỏ
+					height_grid[ivx][ivz] = _Data.WATER_Y + 0.5
+
 	# ── 4. Road grid — PackedByteArray thay Array[Array] để tiết kiệm memory ──
 	var road_grid: PackedByteArray
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
@@ -237,20 +293,26 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 		return { "mesh": null, "water_mesh": null, "biome_grid": biome_grid,
 				"cols": cols, "block_data_bytes": bd.to_bytes() }
 
-	# ── 7. Water mesh (giữ nguyên logic cũ) ───────────────────────────────────
+	# ── 7. Water mesh — hồ nội địa + biển ────────────────────────────────────
 	var st_water := SurfaceTool.new()
 	st_water.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	# 7a. Nước hồ (GRASS/SAND/SILT) — greedy strip theo Z như cũ
 	for vx in range(cols):
 		var vz := 0
 		while vz < cols:
-			if biome_grid[vx][vz] != _Data.TileType.GRASS \
-			and biome_grid[vx][vz] != _Data.TileType.SAND \
-			and biome_grid[vx][vz] != _Data.TileType.SILT:
+			var b: int = biome_grid[vx][vz]
+			if b != _Data.TileType.GRASS \
+			and b != _Data.TileType.SAND \
+			and b != _Data.TileType.SILT:
 				vz += 1; continue
 			var start_vz := vz
-			while vz < cols and (biome_grid[vx][vz] == _Data.TileType.GRASS \
-			or biome_grid[vx][vz] == _Data.TileType.SAND \
-			or biome_grid[vx][vz] == _Data.TileType.SILT):
+			while vz < cols:
+				var bb: int = biome_grid[vx][vz]
+				if bb != _Data.TileType.GRASS \
+				and bb != _Data.TileType.SAND \
+				and bb != _Data.TileType.SILT:
+					break
 				vz += 1
 			var count: int = vz - start_vz
 			var px: float = -half + (float(vx) + 0.5) * _Data.VOXEL
@@ -258,6 +320,29 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 			_add_quad(st_water, Vector3(px, _Data.WATER_Y - 0.04, z_mid),
 				Vector3(1,0,0) * h_vox, Vector3(0,0,1) * (count * h_vox),
 				Vector3(0,1,0), Color(1,1,1))
+
+	# 7b. Nước biển (OCEAN_SHALLOW + OCEAN_DEEP) — greedy strip, mặt nước cao hơn
+	# Biển dùng màu khác (xanh đậm hơn hồ) truyền qua vertex color
+	for vx in range(cols):
+		var vz := 0
+		while vz < cols:
+			var b: int = biome_grid[vx][vz]
+			if b != _Data.TileType.OCEAN_SHALLOW and b != _Data.TileType.OCEAN_DEEP:
+				vz += 1; continue
+			var start_vz := vz
+			while vz < cols:
+				var bb: int = biome_grid[vx][vz]
+				if bb != _Data.TileType.OCEAN_SHALLOW and bb != _Data.TileType.OCEAN_DEEP:
+					break
+				vz += 1
+			var count: int = vz - start_vz
+			var px: float = -half + (float(vx) + 0.5) * _Data.VOXEL
+			var z_mid: float = -half + float(start_vz * 2 + count) * h_vox
+			# Mặt nước biển cùng Y với hồ để liền mạch nhìn từ xa
+			_add_quad(st_water, Vector3(px, _Data.WATER_Y - 0.04, z_mid),
+				Vector3(1,0,0) * h_vox, Vector3(0,0,1) * (count * h_vox),
+				Vector3(0,1,0), Color(0.55, 0.82, 1.0))   # tint xanh biển
+
 	var mesh_water := st_water.commit()
 
 	# ── 8. Aquatic mesh (giữ nguyên) ──────────────────────────────────────────
@@ -282,7 +367,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	# ── 9. Lamp positions — tính trên worker thread, trả về data ───────────────
 	var lamp_positions: Array = []
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		lamp_positions = _compute_lamp_positions_static(cx, cz, size)
+		lamp_positions = _compute_lamp_positions_static(cx, cz, size, biome_grid, cols)
 
 	return {
 		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
@@ -309,14 +394,19 @@ static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 			# Top surface block theo biome
 			var top_block: int = B.GRASS
 			match biome:
-				_Data.TileType.DARK_GRASS: top_block = B.DARK_GRASS
-				_Data.TileType.SAND:       top_block = B.SAND
-				_Data.TileType.DIRT:       top_block = B.DIRT
-				_Data.TileType.SILT:       top_block = B.SILT
+				_Data.TileType.DARK_GRASS:     top_block = B.DARK_GRASS
+				_Data.TileType.SAND:           top_block = B.SAND
+				_Data.TileType.DIRT:           top_block = B.DIRT
+				_Data.TileType.SILT:           top_block = B.SILT
+				_Data.TileType.OCEAN_SHALLOW:  top_block = B.OCEAN_SAND
+				_Data.TileType.OCEAN_DEEP:     top_block = B.OCEAN_FLOOR
 
-			# Road override — TRAIL block, cùng chiều cao block bình thường
+			# Road override — KHÔNG áp dụng cho biển và bãi biển
 			var is_trail: bool = road_grid.size() > 0 and road_grid[x * cols + z] != 0 \
-					and biome != _Data.TileType.SAND and biome != _Data.TileType.SILT
+					and biome != _Data.TileType.SAND \
+					and biome != _Data.TileType.SILT \
+					and biome != _Data.TileType.OCEAN_SHALLOW \
+					and biome != _Data.TileType.OCEAN_DEEP
 			if is_trail:
 				top_block = B.TRAIL
 
@@ -428,7 +518,7 @@ static func _build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 
 	# Bước 3: SIDE FACES — chỉ render khi kế bên thấp hơn hoặc là void
 	# Không greedy để tránh phức tạp — side faces hiếm trên terrain phẳng
-	var side_mul: float = 0.62
+	var side_mul: float = 0.50
 	for x in range(cols):
 		for z in range(cols):
 			var ly: int  = top_ly[x * cols + z]
@@ -489,13 +579,20 @@ static func _build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 func _make_water_shader(dim_id: int) -> ShaderMaterial:
 	var s := Shader.new()
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		# Vertex color tint: hồ = Color(1,1,1) → lake_color, biển = Color(0.55,0.82,1) → ocean_color
 		s.code = """
 shader_type spatial;
 render_mode blend_mix;
-uniform vec4 water_color : source_color = vec4(0.08, 0.36, 0.68, 0.72);
+uniform vec4 lake_color  : source_color = vec4(0.08, 0.38, 0.72, 0.75);
+uniform vec4 ocean_color : source_color = vec4(0.04, 0.28, 0.62, 0.82);
 void fragment() {
-	ALBEDO = water_color.rgb; ALPHA = water_color.a;
-	METALLIC = 0.05; ROUGHNESS = 0.25;
+	float is_ocean = step(COLOR.r, 0.8);
+	vec4 base = mix(lake_color, ocean_color, is_ocean);
+	ALBEDO    = base.rgb;
+	ALPHA     = base.a;
+	ROUGHNESS = 0.15;
+	METALLIC  = 0.0;
+	SPECULAR  = 0.0;
 }
 """
 	else:
@@ -742,7 +839,10 @@ func is_water_at(wx: float, wz: float, wy: float) -> bool:
 
 ## ── _compute_lamp_positions_static: chạy trên worker thread ─────────────────
 ## Static version — không truy cập instance state, an toàn từ thread
-static func _compute_lamp_positions_static(cx: int, cz: int, size: int) -> Array:
+## biome_grid + cols được truyền vào để skip vị trí nước/hồ/sông
+static func _compute_lamp_positions_static(
+		cx: int, cz: int, size: int,
+		biome_grid: Array, cols: int) -> Array:
 	_Road._ensure_roads()
 
 	var half:     float = size * 0.5
@@ -795,6 +895,37 @@ static func _compute_lamp_positions_static(cx: int, cz: int, size: int) -> Array
 					if rng.randf() < LAMP_SKIP_CHANCE:
 						next_lamp_dist += LAMP_SPACING
 						continue
+
+					# ── Check địa hình — không spawn trên nước/hồ/sông ──────
+					var skip_water: bool = false
+					if cols > 0 and biome_grid.size() > 0:
+						# Chuyển world pos → voxel index trong chunk
+						var vx: int = int((lx - min_x) / _Data.VOXEL)
+						var vz: int = int((lz - min_z) / _Data.VOXEL)
+						vx = clampi(vx, 0, cols - 1)
+						vz = clampi(vz, 0, cols - 1)
+						var biome: int = biome_grid[vx][vz]
+						# GRASS và SAND/SILT gần nước = không đặt đèn
+						match biome:
+							_Data.TileType.SAND, _Data.TileType.SILT:
+								skip_water = true
+						# Kiểm tra thêm ô xung quanh bán kính 1 voxel — tránh đặt đèn sát mép hồ
+						if not skip_water:
+							for ox in [-1, 0, 1]:
+								for oz in [-1, 0, 1]:
+									var nx: int = clampi(vx + ox, 0, cols - 1)
+									var nz: int = clampi(vz + oz, 0, cols - 1)
+									var nb: int = biome_grid[nx][nz]
+									if nb == _Data.TileType.SAND or nb == _Data.TileType.SILT:
+										skip_water = true
+										break
+								if skip_water:
+									break
+
+					if skip_water:
+						next_lamp_dist += LAMP_SPACING
+						continue
+
 					var too_close: bool = false
 					var min_dist2: float = (LAMP_SPACING * 0.55) * (LAMP_SPACING * 0.55)
 					for prev in placed_positions:

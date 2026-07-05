@@ -12,13 +12,13 @@ class_name WoodLamp
 static var _shared_wood_mat:   StandardMaterial3D = null
 static var _shared_glass_mat:  ShaderMaterial     = null
 
-# ── Màu sắc gỗ ───────────────────────────────────────────────────────────────
-const C_WOOD_DARK:  Color = Color(0.22, 0.13, 0.07)
-const C_WOOD_MID:   Color = Color(0.30, 0.18, 0.09)
-const C_WOOD_LIGHT: Color = Color(0.42, 0.26, 0.13)
+# ── Màu sắc gỗ — đậm hơn để rõ trên unshaded renderer ──────────────────────
+const C_WOOD_DARK:  Color = Color(0.18, 0.10, 0.04)
+const C_WOOD_MID:   Color = Color(0.32, 0.19, 0.08)
+const C_WOOD_LIGHT: Color = Color(0.52, 0.32, 0.14)
 
 # ── Màu đèn lồng ──────────────────────────────────────────────────────────────
-const C_FRAME:      Color = Color(0.18, 0.11, 0.05)
+const C_FRAME:      Color = Color(0.14, 0.08, 0.03)
 const C_GLASS:      Color = Color(1.00, 0.82, 0.40)
 
 # ── Thông số hình học ─────────────────────────────────────────────────────────
@@ -198,10 +198,10 @@ static func _get_shared_wood_mat() -> StandardMaterial3D:
 	if _shared_wood_mat == null:
 		_shared_wood_mat = StandardMaterial3D.new()
 		_shared_wood_mat.vertex_color_use_as_albedo = true
-		# Unshaded: vertex color đã encode baked lighting, không cần dynamic light
-		# tác động → loại bỏ hoàn toàn specular highlight và phản quang trắng
+		# Unshaded: vertex color đã encode baked lighting
 		_shared_wood_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		_shared_wood_mat.cull_mode = BaseMaterial3D.CULL_BACK
+		# CULL_DISABLED: render cả 2 mặt để iso camera luôn thấy đủ
+		_shared_wood_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return _shared_wood_mat
 
 ## Trả về ShaderMaterial gốc (mỗi đèn sẽ .duplicate() để có emit_energy riêng)
@@ -237,10 +237,11 @@ func _box(st: SurfaceTool, center: Vector3, size: Vector3, col: Color) -> void:
 	var hx: float = size.x * 0.5
 	var hy: float = size.y * 0.5
 	var hz: float = size.z * 0.5
-	var c_top  := Color(minf(col.r * 1.12, 1.0), minf(col.g * 1.12, 1.0), minf(col.b * 1.10, 1.0))
-	var c_bot  := Color(col.r * 0.55, col.g * 0.55, col.b * 0.52)
-	var c_side := Color(col.r * 0.75, col.g * 0.75, col.b * 0.72)
-	var c_frnt := Color(col.r * 0.88, col.g * 0.88, col.b * 0.85)
+	# Unshaded: tăng contrast giữa các mặt để tạo cảm giác 3D
+	var c_top  := Color(minf(col.r * 1.25, 1.0), minf(col.g * 1.25, 1.0), minf(col.b * 1.20, 1.0))
+	var c_bot  := Color(col.r * 0.35, col.g * 0.35, col.b * 0.33)
+	var c_side := Color(col.r * 0.60, col.g * 0.60, col.b * 0.58)
+	var c_frnt := Color(col.r * 0.80, col.g * 0.80, col.b * 0.78)
 	# top
 	_quad_st(st, center+Vector3(-hx,hy,-hz), center+Vector3(hx,hy,-hz),
 		center+Vector3(hx,hy,hz), center+Vector3(-hx,hy,hz), Vector3(0,1,0), c_top)
