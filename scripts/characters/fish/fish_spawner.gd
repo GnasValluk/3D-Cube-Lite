@@ -82,6 +82,14 @@ func _try_spawn_batch() -> void:
 		if not _world_mgr.is_in_water(wx, wz, wy):
 			continue
 
+		# Không spawn cá trong biển — chỉ spawn ở hồ nội địa
+		var nd: Dictionary = WorldChunk._noise_for_dim(1)
+		if nd.has("ocean"):
+			var n_oc: FastNoiseLite = nd["ocean"]
+			var ov: float = (n_oc.get_noise_2d(wx, wz) + 1.0) * 0.5
+			if ov > 0.48:  # gần hoặc trong biển → skip
+				continue
+
 		# Kiểm tra khoảng cách với cá khác
 		var too_close := false
 		for existing in _fish_list:

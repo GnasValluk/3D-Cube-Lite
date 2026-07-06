@@ -31,14 +31,11 @@ const TRAIL_COLOR: Color = Color(0.68, 0.52, 0.26)
 const TRAIL_SIDE: Color = Color(0.46, 0.36, 0.18)
 
 ## ── Hằng số biển ──────────────────────────────────────────────────────────────
-## Continent noise tần số rất thấp — 1 "lục địa" rộng ~800-1200 world units
-const CONTINENT_FREQ:      float = 0.0008
-const CONTINENT_THRESHOLD: float = 0.38   # < threshold = biển, >= = đất liền
-## Bề rộng bãi biển (voxels) — transition SAND trước khi vào nước biển
-const BEACH_WIDTH:         int   = 5
-## Độ sâu biển nông (OCEAN_SHALLOW) và sâu (OCEAN_DEEP) tính theo slab layers
-const OCEAN_SHALLOW_DEPTH: float = -1.0   # world Y = -1.0 (dưới WATER_Y)
-const OCEAN_DEEP_DEPTH:    float = -3.0   # world Y = -3.0 (đáy)
+## n_ocean freq = 0.0018 (n_lake/10) → biển to ~10x hồ
+const OCEAN_THRESHOLD:     float = 0.50
+const BEACH_WIDTH:         int   = 5      # vừa đủ — rộng hơn tạo gradient mượt
+const OCEAN_SHALLOW_DEPTH: float = -1.0
+const OCEAN_DEEP_DEPTH:    float = -3.0
 
 const PAD: int = 5
 const WATER_Y: float = VOXEL * 0.5

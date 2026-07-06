@@ -50,6 +50,7 @@ var _debug_speed_slider: HSlider
 var _debug_weather_btn: Button
 var _time_label: Label
 var _coords_label: Label
+var _biome_label: Label  # hiển thị tên biome + continent value góc trái
 # Cache texture để tránh load() blocking mỗi frame trong _refresh_party_hud
 var _icon_cache: Dictionary = {}
 
@@ -421,8 +422,14 @@ func _process(delta: float) -> void:
 		if pos_src and is_instance_valid(pos_src) and pos_src.is_inside_tree():
 			var p := pos_src.global_position
 			_coords_label.text = "X %.1f  Y %.1f  Z %.1f" % [p.x, p.y, p.z]
+			# Cập nhật biome label — throttle 0.25s để không gọi noise mỗi frame
+			if _biome_label:
+				_biome_label.text = _get_biome_name_at(p.x, p.z)
+				_biome_label.position = Vector2(12, 62)
 		else:
 			_coords_label.text = ""
+			if _biome_label:
+				_biome_label.text = ""
 		_coords_label.size = Vector2(220, 18)
 		_coords_label.position = Vector2(vp.x - _coords_label.size.x - 12, 46)
 
@@ -899,6 +906,16 @@ func _setup_time_label() -> void:
 	_coords_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(_coords_label)
 
+	# Biome label — góc trái, dưới coords
+	_biome_label = Label.new()
+	_biome_label.add_theme_font_size_override("font_size", 11)
+	_biome_label.add_theme_color_override("font_color", Color(0.90, 0.85, 0.55, 0.85))
+	_biome_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	_biome_label.add_theme_constant_override("shadow_offset_x", 1)
+	_biome_label.add_theme_constant_override("shadow_offset_y", 1)
+	_biome_label.text = ""
+	add_child(_biome_label)
+
 func _setup_debug_menu() -> void:
 	_debug_panel = Panel.new()
 	_debug_panel.visible = false
@@ -917,8 +934,8 @@ func _setup_debug_menu() -> void:
 	_debug_panel.add_theme_stylebox_override("panel", bg)
 
 	var vp := get_viewport().get_visible_rect().size
-	_debug_panel.position = Vector2(vp.x * 0.5 - 175, vp.y * 0.5 - 130)
-	_debug_panel.size = Vector2(350, 260)
+	_debug_panel.position = Vector2(vp.x * 0.5 - 175, vp.y * 0.5 - 160)
+	_debug_panel.size = Vector2(350, 320)
 
 	var title := Label.new()
 	title.position = Vector2(12, 8)
@@ -1010,6 +1027,33 @@ func _setup_debug_menu() -> void:
 	_debug_weather_btn.text = "Clear"
 	_debug_weather_btn.pressed.connect(_on_debug_weather_toggle)
 	_debug_panel.add_child(_debug_weather_btn)
+	y += line_h
+
+	# ── Teleport to Biome ─────────────────────────────────────────────────────
+	var tp_lbl := Label.new()
+	tp_lbl.position = Vector2(12, y)
+	tp_lbl.size = Vector2(326, 20)
+	tp_lbl.add_theme_font_size_override("font_size", 13)
+	tp_lbl.add_theme_color_override("font_color", Color(0.60, 0.60, 0.75, 0.85))
+	tp_lbl.text = "Teleport to Biome:"
+	_debug_panel.add_child(tp_lbl)
+	y += 24
+
+	var tp_plains_btn := Button.new()
+	tp_plains_btn.position = Vector2(12, y - 2)
+	tp_plains_btn.size = Vector2(155, 26)
+	tp_plains_btn.add_theme_font_size_override("font_size", 13)
+	tp_plains_btn.text = "🌿 Đồng Bằng"
+	tp_plains_btn.pressed.connect(_on_teleport_biome.bind("plains"))
+	_debug_panel.add_child(tp_plains_btn)
+
+	var tp_ocean_btn := Button.new()
+	tp_ocean_btn.position = Vector2(176, y - 2)
+	tp_ocean_btn.size = Vector2(155, 26)
+	tp_ocean_btn.add_theme_font_size_override("font_size", 13)
+	tp_ocean_btn.text = "🌊 Biển Khơi"
+	tp_ocean_btn.pressed.connect(_on_teleport_biome.bind("ocean"))
+	_debug_panel.add_child(tp_ocean_btn)
 
 	add_child(_debug_panel)
 
@@ -1036,6 +1080,99 @@ func _on_debug_weather_toggle() -> void:
 	else:
 		TimeSystem.force_weather(TimeSystem.Weather.CLEAR)
 		_debug_weather_btn.text = "Clear"
+
+func _on_teleport_biome(biome_type: String) -> void:
+	var player := _find_player_character()
+	if player == null:
+		return
+
+	var origin: Vector2 = Vector2(player.global_position.x, player.global_position.z)
+	const STEP:  float = 120.0
+	const MAX_R: float = 15000.0
+
+	var found: Vector2 = Vector2.ZERO
+	var found_ok: bool = false
+	var nd: Dictionary = WorldChunk._noise_for_dim(1)
+
+	var r: float = STEP
+	while r <= MAX_R and not found_ok:
+		var samples: int = max(8, int(r / STEP * TAU))
+		for i in range(samples):
+			var angle: float = float(i) / float(samples) * TAU
+			var wx: float = origin.x + cos(angle) * r
+			var wz: float = origin.y + sin(angle) * r
+
+			match biome_type:
+				"plains":
+					var n_ocean: FastNoiseLite = nd.get("ocean")
+					var n_lake: FastNoiseLite  = nd.get("lake")
+					var n_bio: FastNoiseLite   = nd.get("biome")
+					var n_warp: FastNoiseLite  = nd.get("warp")
+					var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0 if n_warp else 0.0
+					var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0 if n_warp else 0.0
+					var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5 if n_bio else 0.0
+					var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5 if n_ocean else 0.0
+					var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5 if n_lake else 0.0
+					# GRASS, không phải biển, không phải hồ
+					if bio_n < 0.40 and ov <= 0.50 and lv <= 0.45:
+						found = Vector2(wx, wz); found_ok = true; break
+				"ocean":
+					var n_ocean: FastNoiseLite = nd.get("ocean")
+					var n_bio: FastNoiseLite   = nd.get("biome")
+					var n_warp: FastNoiseLite  = nd.get("warp")
+					if n_ocean and n_bio and n_warp:
+						var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0
+						var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0
+						var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
+						var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
+						# GRASS + ocean noise cao — đây mới thực sự là biển
+						if bio_n < 0.40 and ov > 0.55:
+							found = Vector2(wx, wz); found_ok = true; break
+		r += STEP
+
+	if found_ok:
+		player.global_position = Vector3(found.x, 5.0, found.y)
+		player._scroll_inventory_message("Teleport → " + ("Đồng Bằng" if biome_type == "plains" else "Biển Khơi"))
+	else:
+		player._scroll_inventory_message("Không tìm thấy " + biome_type + " trong bán kính 6km!")
+
+## Trả về tên biome tại world pos — dùng đúng logic giống compute_chunk
+func _get_biome_name_at(wx: float, wz: float) -> String:
+	var nd: Dictionary = WorldChunk._noise_for_dim(1)
+	if nd.is_empty():
+		return ""
+
+	# Phải check theo đúng thứ tự pipeline của compute_chunk:
+	# 1. biome_at → GRASS hay DARK_GRASS?
+	# 2. Nếu GRASS → check ocean, rồi lake
+	var n_bio: FastNoiseLite  = nd.get("biome")
+	var n_warp: FastNoiseLite = nd.get("warp")
+	if n_bio == null:
+		return ""
+
+	var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0 if n_warp else 0.0
+	var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0 if n_warp else 0.0
+	var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
+
+	# DARK_GRASS (threshold = 0.40) → đồi, không thể là biển/hồ
+	if bio_n >= 0.40:
+		return "🌿 Đồng Bằng (đồi)"
+
+	# GRASS — check ocean trước (patch to hơn hồ)
+	var n_ocean: FastNoiseLite = nd.get("ocean")
+	if n_ocean:
+		var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
+		if ov > 0.50:
+			return "🌊 Biển"
+
+	# GRASS — check lake
+	var n_lake: FastNoiseLite = nd.get("lake")
+	if n_lake:
+		var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+		if lv > 0.50:
+			return "🏞 Hồ / Sông"
+
+	return "🌿 Đồng Bằng"
 
 func _update_debug_menu() -> void:
 	if not _debug_open or not TimeSystem:

@@ -4,6 +4,10 @@ const _Data = preload("chunk_data.gd")
 
 static var _noise_cache: Dictionary = {}
 
+## Gọi để buộc tạo lại noise (vd: khi WorldSeed thay đổi)
+static func clear_cache() -> void:
+	_noise_cache.clear()
+
 static func _noise_for_dim(dim_id: int) -> Dictionary:
 	if _noise_cache.has(dim_id):
 		return _noise_cache[dim_id]
@@ -41,14 +45,24 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	var n_continent := FastNoiseLite.new()
 	n_continent.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_continent.seed = base_seed + 31337
-	n_continent.frequency = _Data.CONTINENT_FREQ
-	# FractalOctaves cao hơn để tạo đường bờ biển tự nhiên, không phẳng
-	n_continent.fractal_octaves = 4
-	n_continent.fractal_lacunarity = 2.2
-	n_continent.fractal_gain = 0.5
+	n_continent.frequency = 0.00038  # giữ lại để biomes tham chiếu không bị lỗi
+	n_continent.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_continent.fractal_octaves = 5
+	n_continent.fractal_lacunarity = 2.0
+	n_continent.fractal_gain = 0.45
+
+	## n_ocean: noise tần số thấp ~10x n_lake → patch biển to ~10x hồ
+	var n_ocean := FastNoiseLite.new()
+	n_ocean.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_ocean.seed = base_seed + 77777
+	n_ocean.frequency = 0.00036   # n_lake = 0.018, chia 50 → biển ~50x hồ
+	n_ocean.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_ocean.fractal_octaves = 4
+	n_ocean.fractal_lacunarity = 2.0
+	n_ocean.fractal_gain = 0.5
 
 	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
-		"lake_type": n_lake_type, "continent": n_continent }
+		"lake_type": n_lake_type, "continent": n_continent, "ocean": n_ocean }
 	_noise_cache[dim_id] = result
 	return result
 

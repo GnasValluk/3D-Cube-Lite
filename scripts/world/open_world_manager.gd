@@ -23,6 +23,8 @@ var _initial_generated: bool = false
 
 func _ready() -> void:
 	dimension_name = tr(_Dim.DIM_NAME_KEY.get(dimension_id, ""))
+	# Xóa noise cache để buộc rebuild với frequency mới nhất từ chunk_data.gd
+	WorldChunk.clear_noise_cache()
 	WorldChunk._noise_for_dim(dimension_id)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.TWILIGHT)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.REAL_WORLD)
