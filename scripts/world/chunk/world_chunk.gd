@@ -164,14 +164,15 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var wz: float = world_oz - half + (float(pvz - _Data.PAD) + 0.5) * _Data.VOXEL
 				oct[pvx][pvz] = (n_ocean_pre.get_noise_2d(wx, wz) + 1.0) * 0.5 > _Data.OCEAN_THRESHOLD
 
-		# BFS distance từ ocean ra ngoài — trên padded grid
+		# BFS distance từ ocean ra ngoài — cover đủ buffer zone cho hồ
+		const OCEAN_BUFFER: int = 20  # buffer để hồ không spawn gần biển
 		var odst: Array[Array] = []
 		odst.resize(total)
 		for pvx in range(total):
 			odst[pvx] = []; odst[pvx].resize(total)
 			for pvz in range(total):
 				odst[pvx][pvz] = 0 if oct[pvx][pvz] else _Data.CONST_INF
-		for d in range(1, _Data.BEACH_WIDTH + _Data.PAD + 1):
+		for d in range(1, _Data.BEACH_WIDTH + OCEAN_BUFFER + 2):
 			for pvx in range(total):
 				for pvz in range(total):
 					if odst[pvx][pvz] != _Data.CONST_INF: continue
@@ -227,28 +228,34 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				elif od <= _Data.BEACH_WIDTH:
 					var beach_t: float = float(od - 1) / float(maxi(_Data.BEACH_WIDTH - 1, 1))
 					biome_grid[ivx][ivz] = _Data.TileType.SAND
-					height_grid[ivx][ivz] = lerp(_Data.WATER_Y, _Data.VOXEL, beach_t)
-					beach_mask[ivx * cols + ivz] = 1  # đánh dấu là bãi biển
+					# Thêm noise warp để bờ biển không đều như răng cưa
+					var wx2: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+					var wz2: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+					var warp_n: float = (nd["warp"].get_noise_2d(wx2 * 3.0, wz2 * 3.0) + 1.0) * 0.5
+					# Nhiễu ±0.3 voxel để bờ gồ ghề tự nhiên
+					var noise_offset: float = (warp_n - 0.5) * 0.3
+					height_grid[ivx][ivz] = clamp(
+						lerp(_Data.WATER_Y, _Data.VOXEL, beach_t) + noise_offset,
+						_Data.WATER_Y - 0.1, _Data.VOXEL)
+					beach_mask[ivx * cols + ivz] = 1
 
 		for ivx in range(cols):
 			var pvx: int = ivx + _Data.PAD
 			for ivz in range(cols):
 				var pvz: int = ivz + _Data.PAD
 				var d: int = dst[pvx][pvz]
-				# Skip ô đã là OCEAN hoặc bãi biển từ ocean BFS
+				# Skip ô đã là OCEAN
 				if biome_grid[ivx][ivz] == _Data.TileType.OCEAN_DEEP:
 					continue
-				# SAND từ beach — giữ nguyên height gradient, không để lake ghi đè
-				# (beach SAND có height khác với lake SAND)
+				# Trong vùng buffer gần biển — cho phép cát ven hồ nhưng không tạo hồ mới
 				var _od: int = odst[ivx + _Data.PAD][ivz + _Data.PAD]
-				if _od > 0 and _od <= _Data.BEACH_WIDTH:
-					continue
+				var in_ocean_buffer: bool = _od != _Data.CONST_INF and _od <= _Data.BEACH_WIDTH + 15
 				if biome_grid[ivx][ivz] == _Data.TileType.GRASS:
 					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
 					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
 					var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
 
-					if lake_val > 0.50:
+					if lake_val > 0.50 and not in_ocean_buffer:
 						# Đây là vùng hồ — phân loại hồ bùn hay hồ cát
 						# n_lake_type > 0.5 → hồ bùn, ngược lại → hồ cát
 						var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
@@ -323,9 +330,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				if is_road and b != _Data.TileType.SAND and b != _Data.TileType.SILT:
 					_Detail.add_trail_detail(st, cx, cz, size, vx, vz, pos, 0.0)
 
-				# Sỏi: cát hồ nội địa — không phải bãi biển (beach_mask) và h > WATER_Y
-				var is_beach_sand: bool = beach_mask.size() > 0 and beach_mask[vx * cols + vz] == 1
-				if b == _Data.TileType.SAND and h > _Data.WATER_Y and not is_beach_sand:
+				# Sỏi trên cát:
+				# - Cát hồ nội địa: h > WATER_Y (nổi trên mặt nước)
+				# - Bãi biển: spawn sỏi nhưng chỉ khi h > WATER_Y (không lơ lửng)
+				if b == _Data.TileType.SAND and h > _Data.WATER_Y:
 					_Detail.add_sand_gravel(st, cx, cz, size, vx, vz, pos, 0.0)
 
 				if b == _Data.TileType.DIRT:
@@ -402,10 +410,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					b == _Data.TileType.SILT, lotus_lights)
 		mesh_aquatic = st_aq.commit()
 
-	# ── 9. Lamp positions — tính trên worker thread, trả về data ───────────────
+	# ── 9. Lamp positions ──────────────────────────────────────────────────────
 	var lamp_positions: Array = []
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		lamp_positions = _compute_lamp_positions_static(cx, cz, size, biome_grid, cols)
+		lamp_positions = _compute_lamp_positions_static(cx, cz, size, biome_grid, height_grid, cols)
 
 	return {
 		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
@@ -882,7 +890,7 @@ func is_water_at(wx: float, wz: float, wy: float) -> bool:
 ## biome_grid + cols được truyền vào để skip vị trí nước/hồ/sông
 static func _compute_lamp_positions_static(
 		cx: int, cz: int, size: int,
-		biome_grid: Array, cols: int) -> Array:
+		biome_grid: Array, height_grid: Array, cols: int) -> Array:
 	_Road._ensure_roads()
 
 	var half:     float = size * 0.5
@@ -942,18 +950,23 @@ static func _compute_lamp_positions_static(
 						var vx: int = clampi(int((lx - min_x) / _Data.VOXEL), 0, cols - 1)
 						var vz: int = clampi(int((lz - min_z) / _Data.VOXEL), 0, cols - 1)
 						var biome: int = biome_grid[vx][vz]
+						var h: float = height_grid[vx][vz] if height_grid.size() > 0 else 1.0
+						# Skip nếu: biome nước, biển, hoặc height âm (dưới mực nước)
 						match biome:
 							_Data.TileType.SAND, _Data.TileType.SILT, \
 							_Data.TileType.OCEAN_DEEP:
 								skip_water = true
+						if not skip_water and h < _Data.WATER_Y:
+							skip_water = true
 						if not skip_water:
 							for ox in [-1, 0, 1]:
 								for oz in [-1, 0, 1]:
 									var nx: int = clampi(vx + ox, 0, cols - 1)
 									var nz: int = clampi(vz + oz, 0, cols - 1)
 									var nb: int = biome_grid[nx][nz]
+									var nh: float = height_grid[nx][nz] if height_grid.size() > 0 else 1.0
 									if nb == _Data.TileType.SAND or nb == _Data.TileType.SILT \
-									or nb == _Data.TileType.OCEAN_DEEP:
+									or nb == _Data.TileType.OCEAN_DEEP or nh < _Data.WATER_Y:
 										skip_water = true
 										break
 								if skip_water:
