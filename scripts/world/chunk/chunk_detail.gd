@@ -30,7 +30,7 @@ static func add_sand_gravel(st: SurfaceTool, cx: int, cz: int, size: int, vx: in
 		var ox: float = (rx - 0.5) * 0.6
 		var oz: float = (rz - 0.5) * 0.6
 		var psize: float = rs * 0.06 + 0.03
-		var col: Color = Color(0.50 + rs * 0.15, 0.48 + rs * 0.12, 0.45 + rs * 0.10, 1.0)
+		var col: Color = Color(0.42 + rs * 0.20, 0.38 + rs * 0.18, 0.32 + rs * 0.16, 1.0)
 		var pc := pos + Vector3(ox, h_vox + 0.015, oz)
 		_add_quad(st, pc, Vector3(psize, 0, 0), Vector3(0, 0, psize), Vector3(0, 1, 0), col)
 

@@ -1,6 +1,6 @@
 extends RefCounted
 
-enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP }
+enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE }
 
 ## ── Block IDs cho hệ thống voxel Minecraft-style ────────────────────────────
 ## 0 = AIR luôn luôn, giá trị khớp với TileType để map dễ dàng
@@ -64,7 +64,7 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.14, 0.12, 0.14),           # 10 BEDROCK
 	Color(0.76, 0.58, 0.22),           # 11 TRAIL
 	Color(0.22, 0.28, 0.32),           # 12 OCEAN_FLOOR — cát thô xám xanh đáy biển
-	Color(0.94, 0.88, 0.62),           # 13 OCEAN_SAND  — cát bãi biển sáng vàng nhạt
+	Color(0.86, 0.78, 0.52),           # 13 OCEAN_SAND  — cát bãi biển sáng vừa
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
