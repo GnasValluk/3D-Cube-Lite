@@ -121,40 +121,28 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				or (vz < total-1 and dst[vx][vz+1] == d-1):
 					dst[vx][vz] = d
 
-	# ── 3. biome_grid + height_grid (giống cũ) ─────────────────────────────────
+	# ── 3. biome_grid + height_grid: biển trước → lục địa → hồ ──────────────
 	var biome_grid: Array[Array] = []
 	biome_grid.resize(cols)
 	var height_grid: Array[Array] = []
 	height_grid.resize(cols)
-	for ivx in range(cols):
-		biome_grid[ivx] = []; biome_grid[ivx].resize(cols)
-		height_grid[ivx] = []; height_grid[ivx].resize(cols)
-		var pvx: int = ivx + _Data.PAD
-		for ivz in range(cols):
-			var pvz: int = ivz + _Data.PAD
-			biome_grid[ivx][ivz] = bio[pvx][pvz]
-			if bio[pvx][pvz] == _Data.TileType.DARK_GRASS:
-				height_grid[ivx][ivz] = _Data.VOXEL
-			else:
-				var d: int = dst[pvx][pvz]
-				if d == _Data.CONST_INF: d = _Data.PAD
-				height_grid[ivx][ivz] = _Data.WATER_Y - min(d, _Data.PAD) * _Data.VOXEL
 
-	# beach_mask: đánh dấu ô bãi biển (ocean BFS) được gán SAND_WHITE
 	var beach_mask: PackedByteArray
 	beach_mask.resize(cols * cols)
 	beach_mask.fill(0)
 
+	for ivx in range(cols):
+		biome_grid[ivx] = []; biome_grid[ivx].resize(cols)
+		height_grid[ivx] = []; height_grid[ivx].resize(cols)
+
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		# Hoist noise dict ra ngoài loop — tránh dictionary lookup 2048 lần
 		var nd: Dictionary = _Noise._noise_for_dim(dim_id)
 		var n_lake: FastNoiseLite      = nd["lake"]
 		var n_lake_type: FastNoiseLite = nd["lake_type"]
 		var n_biome: FastNoiseLite     = nd["biome"]
 		var n_ocean_pre: FastNoiseLite = nd["ocean"]
 
-		# ── Pre-mark ocean với padded BFS — smooth bờ qua biên chunk ─────────
-		# Dùng padding lớn hơn (25) để BFS reach đủ xa cho lake buffer
+		# ── Ocean mask (BFS padded) ──────────────────────────────────────────
 		const OCEAN_PAD: int = 26
 		var oct_total: int = cols + 2 * OCEAN_PAD
 		var oct: Array[Array] = []
@@ -166,7 +154,6 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var wz: float = world_oz - half + (float(pvz - OCEAN_PAD) + 0.5) * _Data.VOXEL
 				oct[pvx][pvz] = (n_ocean_pre.get_noise_2d(wx, wz) + 1.0) * 0.5 > _Data.OCEAN_THRESHOLD
 
-		# BFS distance từ ocean trên grid lớn
 		var ocean_near: PackedByteArray
 		ocean_near.resize(cols * cols)
 		ocean_near.fill(0)
@@ -191,7 +178,6 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				if od2 != _Data.CONST_INF and od2 <= 25:
 					ocean_near[ivx * cols + ivz] = 1
 
-		# oct và odst cho beach BFS dùng PAD thường
 		var oct_small: Array[Array] = []
 		oct_small.resize(total)
 		for pvx in range(total):
@@ -199,8 +185,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 			for pvz in range(total):
 				oct_small[pvx][pvz] = oct[pvx + OCEAN_PAD - _Data.PAD][pvz + OCEAN_PAD - _Data.PAD]
 
-		# BFS distance từ ocean ra ngoài — cover đủ buffer zone cho hồ
-		const OCEAN_BUFFER: int = 30  # BFS range đủ lớn để cover buffer 25 block
+		const OCEAN_BUFFER: int = 30
 		var odst: Array[Array] = []
 		odst.resize(total)
 		for pvx in range(total):
@@ -217,14 +202,11 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					or (pvz < total-1 and odst[pvx][pvz+1] == d-1):
 						odst[pvx][pvz] = d
 
-		# BFS distance từ bờ biển vào trong biển — để tạo đáy thoải dần
-		# shore_dst = 0 ở ranh giới biển/bờ, tăng dần vào trong
 		var shore_dst: Array[Array] = []
 		shore_dst.resize(total)
 		for pvx in range(total):
 			shore_dst[pvx] = []; shore_dst[pvx].resize(total)
 			for pvz in range(total):
-				# Ô biển tiếp giáp ô không phải biển → distance 1
 				var is_oc: bool = oct_small[pvx][pvz]
 				if is_oc:
 					var adj_land: bool = false
@@ -247,13 +229,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					or (pvz < total-1 and shore_dst[pvx][pvz+1] == d-1):
 						shore_dst[pvx][pvz] = d
 
-		# Áp dụng: ocean deep với depth gradient thoải + beach gradient
-		# Gán SAND_WHITE cho bãi biển, đánh dấu beach_mask để dễ phân biệt
+		# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────────
 		for ivx in range(cols):
 			var pvx: int = ivx + _Data.PAD
 			for ivz in range(cols):
 				var pvz: int = ivz + _Data.PAD
+				var base_bio: int = bio[pvx][pvz]
 				var od: int = odst[pvx][pvz]
+
 				if od == 0:
 					biome_grid[ivx][ivz] = _Data.TileType.OCEAN_DEEP
 					var sd: int = shore_dst[pvx][pvz]
@@ -271,58 +254,51 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 						lerp(_Data.WATER_Y, _Data.VOXEL - 0.15, beach_t) + noise_offset,
 						_Data.WATER_Y - 0.1, _Data.VOXEL - 0.08)
 					beach_mask[ivx * cols + ivz] = 1
+				else:
+					# ── LỤC ĐỊA ──
+					if base_bio == _Data.TileType.DARK_GRASS:
+						biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
+						height_grid[ivx][ivz] = _Data.VOXEL
+						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+						var dn: float = (n_biome.get_noise_2d((wx+500.0)*0.7, (wz+500.0)*0.7) + 1.0) * 0.5
+						if dn > 0.70:
+							biome_grid[ivx][ivz] = _Data.TileType.DIRT
+					else:
+						var in_ocean_buffer: bool = ocean_near[ivx * cols + ivz] == 1
+						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+						var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+						var d: int = dst[pvx][pvz]
 
+						if lake_val > 0.50 and not in_ocean_buffer:
+							var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
+							if lake_type_val > 0.50:
+								biome_grid[ivx][ivz] = _Data.TileType.SILT if d <= _Data.PAD else _Data.TileType.SAND
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.SAND
+							height_grid[ivx][ivz] = _Data.WATER_Y if d <= 1 else _Data.WATER_Y - min(d, _Data.PAD) * _BlockData.SLAB_HEIGHT
+						else:
+							biome_grid[ivx][ivz] = _Data.TileType.SAND
+							if d <= 1:
+								height_grid[ivx][ivz] = _Data.WATER_Y
+							else:
+								if d == _Data.CONST_INF: d = _Data.PAD
+								height_grid[ivx][ivz] = _Data.WATER_Y - min(d, _Data.PAD) * _BlockData.SLAB_HEIGHT
+
+	else:
+		# ── Non-REAL_WORLD: giữ logic cũ ────────────────────────────────────
 		for ivx in range(cols):
 			var pvx: int = ivx + _Data.PAD
 			for ivz in range(cols):
 				var pvz: int = ivz + _Data.PAD
-				var d: int = dst[pvx][pvz]
-				# Skip ô đã là OCEAN
-				if biome_grid[ivx][ivz] == _Data.TileType.OCEAN_DEEP:
-					continue
-				# Không tạo hồ trong vùng 25 block từ biển
-				var in_ocean_buffer: bool = ocean_near[ivx * cols + ivz] == 1
-				if biome_grid[ivx][ivz] == _Data.TileType.GRASS:
-					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-					var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-
-					if lake_val > 0.50 and not in_ocean_buffer:
-						# Đây là vùng hồ — phân loại hồ bùn hay hồ cát
-						# n_lake_type > 0.5 → hồ bùn, ngược lại → hồ cát
-						var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
-						var is_silt_lake: bool = lake_type_val > 0.50
-
-						if is_silt_lake:
-							# ── Hồ bùn: ≥60% diện tích là SILT ────────────────────────
-							# d=0,1,2,3 → SILT (phần lớn + thành trong)
-							# d>=4 → SAND (chỉ mép ngoài 1-2 voxel)
-							if d <= 3:
-								biome_grid[ivx][ivz] = _Data.TileType.SILT
-								if d <= 1:
-									height_grid[ivx][ivz] = _Data.WATER_Y
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.SAND
-								if d <= 1:
-									height_grid[ivx][ivz] = _Data.WATER_Y
-						else:
-							# ── Hồ cát: toàn bộ là SAND ─────────────────────────────────
-							biome_grid[ivx][ivz] = _Data.TileType.SAND
-							if d <= 1:
-								height_grid[ivx][ivz] = _Data.WATER_Y
-					else:
-						# Không phải hồ — vùng cỏ bình thường ven nước
-						biome_grid[ivx][ivz] = _Data.TileType.SAND
-						if d <= 1:
-							height_grid[ivx][ivz] = _Data.WATER_Y
-				elif biome_grid[ivx][ivz] == _Data.TileType.DARK_GRASS:
-					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-					var dn: float = (n_biome.get_noise_2d((wx+500.0)*0.7, (wz+500.0)*0.7) + 1.0) * 0.5
-					if dn > 0.70:
-						biome_grid[ivx][ivz] = _Data.TileType.DIRT
-
-		# ── 3d. Ocean BFS đã xử lý ở pre-mark trên ─────────────────────────────
+				biome_grid[ivx][ivz] = bio[pvx][pvz]
+				if bio[pvx][pvz] == _Data.TileType.DARK_GRASS:
+					height_grid[ivx][ivz] = _Data.VOXEL
+				else:
+					var d: int = dst[pvx][pvz]
+					if d == _Data.CONST_INF: d = _Data.PAD
+					height_grid[ivx][ivz] = _Data.WATER_Y - min(d, _Data.PAD) * _Data.VOXEL
 
 	# ── 4. Road grid ──────────────────────────────────────────────────────────
 	var road_grid: PackedByteArray

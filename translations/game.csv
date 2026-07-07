@@ -150,3 +150,6 @@ FEAT_WASD,WASD / Arrow keys movement,Di chuyển WASD / phím mũi tên
 FEAT_MOUSE_CAM,Mouse to rotate camera,Chuột xoay camera
 FEAT_KEYBOARD,Full keyboard shortcuts,Phím tắt bàn phím đầy đủ
 FEAT_CHUNK_HIGH,Full view distance,Tầm nhìn đầy đủ
+CREATURE_LIBRARY_TITLE,🧬 Creature Library,🧬 Thư Viện Sinh Vật
+CREATURE_3D_VIEW,3D Preview,Xem 3D
+CREATURE_BUTTON,Library,Thư viện

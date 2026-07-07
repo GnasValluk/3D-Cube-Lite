@@ -7,15 +7,15 @@ class_name FishCharacter
 
 # Biến thể cá — quyết định màu sắc và kích thước
 enum FishVariant {
-	CHEP,       # Cá chép — xanh ô liu đậm, lớn
-	RO,         # Cá rô — xanh lá đậm, vừa
-	TRAM,       # Cá trắm — xám xanh, lớn
-	MONG,       # Cá mòng — bạc ánh xanh, nhỏ
-	VANG,       # Cá vàng — cam vàng, nhỏ đến vừa
-	LINH,       # Cá linh — trắng bạc, nhỏ
+	CARP,       # Cá chép cảnh (Koi) — cam vàng nổi bật, vảy khoang
+	PERCH,      # Cá rô (Climbing Perch) — xám đen, vừa
+	TILAPIA,    # Cá điêu hồng (Red Tilapia) — hồng đỏ, vừa
+	SNAKEHEAD,  # Cá lóc (Snakehead) — nâu đen, dài
+	FLOWERHORN, # Cá la hán (Flowerhorn) — đỏ rực, săn mồi
+	SHRIMP,     # Tôm nước ngọt — nâu xám, đáy
 }
 
-@export var fish_variant: int = FishVariant.CHEP
+@export var fish_variant: int = FishVariant.CARP
 @export var fish_scale: float = 1.0
 
 func _init() -> void:
@@ -23,24 +23,37 @@ func _init() -> void:
 
 # Màu theo biến thể [body, belly, fin]
 const VARIANT_COLORS: Array = [
-	# CHEP
-	[Color(0.28, 0.42, 0.22), Color(0.78, 0.80, 0.65), Color(0.22, 0.35, 0.18)],
-	# RO
-	[Color(0.18, 0.38, 0.20), Color(0.72, 0.78, 0.60), Color(0.15, 0.30, 0.16)],
-	# TRAM
-	[Color(0.32, 0.40, 0.35), Color(0.75, 0.80, 0.72), Color(0.25, 0.35, 0.28)],
-	# MONG
-	[Color(0.55, 0.65, 0.70), Color(0.85, 0.90, 0.88), Color(0.45, 0.55, 0.62)],
-	# VANG
-	[Color(0.88, 0.55, 0.12), Color(0.95, 0.88, 0.55), Color(0.75, 0.40, 0.08)],
-	# LINH
-	[Color(0.70, 0.72, 0.75), Color(0.90, 0.92, 0.90), Color(0.60, 0.62, 0.65)],
+	# CARP (Koi — cam vàng nổi bật + vảy đen)
+	[Color(0.95, 0.70, 0.10), Color(0.98, 0.95, 0.80), Color(0.85, 0.55, 0.05)],
+	# PERCH (Climbing Perch — xám đen)
+	[Color(0.30, 0.30, 0.30), Color(0.65, 0.65, 0.65), Color(0.20, 0.20, 0.20)],
+	# TILAPIA (Red Tilapia — hồng đỏ)
+	[Color(0.88, 0.55, 0.45), Color(0.95, 0.80, 0.70), Color(0.85, 0.40, 0.30)],
+	# SNAKEHEAD (Cá lóc — nâu đen, thân dài)
+	[Color(0.30, 0.25, 0.15), Color(0.65, 0.60, 0.50), Color(0.20, 0.18, 0.10)],
+	# FLOWERHORN (Cá la hán — đỏ rực, chấm đen)
+	[Color(0.92, 0.25, 0.15), Color(0.90, 0.55, 0.45), Color(0.75, 0.15, 0.10)],
+	# SHRIMP (Tôm nước ngọt — cam đỏ)
+	[Color(0.85, 0.35, 0.20), Color(0.92, 0.55, 0.35), Color(0.75, 0.25, 0.15)],
 ]
 
-const VARIANT_NAMES: Array[String] = ["Cá Chép", "Cá Rô", "Cá Trắm", "Cá Mòng", "Cá Vàng", "Cá Linh"]
-const VARIANT_HP: Array[int]       = [60,         40,       80,         25,         20,         15]
-const VARIANT_SPEED: Array[float]  = [1.6,        2.0,      1.4,        2.5,        1.8,        2.2]
-const VARIANT_SCALE: Array[float]  = [1.0,        0.75,     1.2,        0.55,       0.50,       0.45]
+# Màu pattern dọc thân [alpha=0 → không pattern]
+const VARIANT_PATTERN: Array[Color] = [
+	Color(0.15, 0.10, 0.05),  # CARP: vảy đen
+	Color(0, 0, 0, 0),        # PERCH: không pattern
+	Color(0, 0, 0, 0),        # TILAPIA: không pattern
+	Color(0, 0, 0, 0),        # SNAKEHEAD: không pattern
+	Color(0.15, 0.10, 0.08),  # FLOWERHORN: chấm đen
+	Color(0, 0, 0, 0),        # SHRIMP: không pattern
+]
+
+# Tỉ lệ dài thân (body_z_scale)
+const VARIANT_BODY_Z: Array[float] = [1.0, 1.0, 1.0, 1.8, 1.0, 1.0]
+
+const VARIANT_NAMES: Array[String] = ["Carp", "Climbing Perch", "Red Tilapia", "Snakehead", "Flowerhorn", "Freshwater Shrimp"]
+const VARIANT_HP: Array[int]       = [60,         40,               50,             70,           70,           15]
+const VARIANT_SPEED: Array[float]  = [1.4,        2.0,              1.8,            1.5,          1.2,          0.8]
+const VARIANT_SCALE: Array[float]  = [1.2,        0.75,             0.70,           1.0,          1.3,          0.7]
 
 var _fish_mesh: FishMesh
 var _fish_anim: FishAnimator
@@ -66,6 +79,12 @@ var _wall_memory_timer: float = 0.0
 var _neighbors: Array[Node] = []
 var _scan_timer: float = 0.0
 
+# Hunting (Flowerhorn)
+var _hunt_target: Node = null
+var _orbit_angle: float = 0.0
+var _hunt_cooldown: float = 0.0
+var _hunt_scan_timer: float = 0.0
+
 const HOME_RADIUS: float = 20.0
 const FLEE_SPEED_MULT: float = 2.2
 
@@ -77,6 +96,15 @@ const SEP_FORCE: float = 2.5
 const ALIGN_FORCE: float = 1.2
 const COHESION_FORCE: float = 0.6
 const ALERT_RADIUS: float = 6.0
+
+# Hunting (Flowerhorn)
+const HUNT_RADIUS: float = 14.0
+const HUNT_ATTACK_DIST: float = 0.4
+const ORBIT_RADIUS: float = 6.0
+const ORBIT_SPEED: float = 0.6
+const HUNT_CHASE_SPEED_MULT: float = 1.5
+const BURST_DIST: float = 1.5
+const PREY_ALONE_RADIUS: float = 5.0
 
 func _build_character() -> void:
 	_is_player = false
@@ -91,9 +119,9 @@ func _build_character() -> void:
 	hp           = max_hp
 	move_speed   = VARIANT_SPEED[fish_variant] * _speed_mod
 	sprint_speed = move_speed * FLEE_SPEED_MULT
-	defense      = 0
-	attack_power = 0
-	melee_damage = 0
+	defense      = 5 if _is_predator() else 0
+	attack_power = 25 if _is_predator() else 0
+	melee_damage = attack_power
 	jump_height  = 0.3
 
 	var sc: float = VARIANT_SCALE[fish_variant] * fish_scale
@@ -113,6 +141,13 @@ func _build_character() -> void:
 	_fish_mesh.color_belly = colors[1] as Color
 	_fish_mesh.color_fin   = colors[2] as Color
 	_fish_mesh.color_tail  = (colors[0] as Color) * 0.8
+	_fish_mesh.color_pattern = VARIANT_PATTERN[fish_variant]
+	_fish_mesh.body_z_scale  = VARIANT_BODY_Z[fish_variant]
+	if fish_variant == FishVariant.FLOWERHORN:
+		_fish_mesh.body_triangular = true
+		_fish_mesh.has_horns = true
+	elif fish_variant == FishVariant.SHRIMP:
+		_fish_mesh.body_shape = FishMesh.BodyShape.SHRIMP
 	_fish_mesh.build(self)
 	_rig = _fish_mesh.rig
 
@@ -141,28 +176,33 @@ func _physics_process(delta: float) -> void:
 	if _alert_timer > 0.0:
 		_alert_timer -= delta
 
-	# Scan neighbors periodically
-	if _scan_timer <= 0.0:
-		_scan_neighbors()
-
-	# Compute boids flocking force
-	var boids_dir := _compute_boids()
-
-	# Alert propagation — hoảng loạn lây lan
-	if _alert_timer <= 0.0:
-		_check_alert()
-
-	# Determine target direction
-	if _flee_timer > 0.0:
-		pass  # _target_dir already set by take_damage
-	elif _alert_timer > 0.0:
-		# Hoảng loạn — chạy theo đàn
-		_alert_flee()
+	if _is_solitary():
+		# Hunting AI cho predator, wander cho solitary thường
+		_target_dir = _hunt_behavior(delta) if _is_predator() else _wander_dir()
+		if not _is_predator() and _wall_cooldown <= 0.0:
+			_avoid_walls()
 	else:
-		_target_dir = boids_dir
+		# Scan neighbors periodically
+		if _scan_timer <= 0.0:
+			_scan_neighbors()
 
-	# Wall avoidance raycast
-	if _wall_cooldown <= 0.0:
+		# Compute boids flocking force
+		var boids_dir := _compute_boids()
+
+		# Alert propagation — hoảng loạn lây lan
+		if _alert_timer <= 0.0:
+			_check_alert()
+
+		# Determine target direction
+		if _flee_timer > 0.0:
+			pass  # _target_dir already set by take_damage
+		elif _alert_timer > 0.0:
+			_alert_flee()
+		else:
+			_target_dir = boids_dir
+
+	# Wall avoidance raycast — solitary tự xử lý bên trong
+	if not _is_solitary() and _wall_cooldown <= 0.0:
 		_avoid_walls()
 
 	# Smooth steering
@@ -176,9 +216,33 @@ func _physics_process(delta: float) -> void:
 	)
 	var move_dir := (_swim_dir + perturb).normalized()
 
-	var spd: float = sprint_speed if _flee_timer > 0.0 else move_speed
+	var spd: float
+	if _is_predator() and _hunt_target != null and is_instance_valid(_hunt_target):
+		var to_prey := (_hunt_target as Node3D).global_position - global_position
+		to_prey.y = 0.0
+		if to_prey.length() < BURST_DIST:
+			spd = move_speed * HUNT_CHASE_SPEED_MULT
+		else:
+			spd = move_speed
+	elif _flee_timer > 0.0:
+		spd = sprint_speed
+	else:
+		spd = move_speed
 
-	var water_y: float = 0.2
+	var water_y: float
+	if fish_variant == FishVariant.SNAKEHEAD:
+		# Cá lóc: tầng đáy, thỉnh thoảng nổi lên mặt nước rồi lặn xuống
+		var dive_k := sin(_bob_phase * 0.12)
+		if dive_k > 0.70:
+			water_y = 0.38  # nổi gần mặt
+		else:
+			water_y = 0.05  # đáy hồ
+	elif fish_variant == FishVariant.FLOWERHORN:
+		water_y = 0.15  # tầng giữa
+	elif fish_variant == FishVariant.SHRIMP:
+		water_y = 0.06  # đáy hồ
+	else:
+		water_y = 0.2
 	var y_offset := sin(_bob_phase * 0.9) * 0.15 + cos(_bob_phase * 0.5) * 0.08
 	var target_y := water_y + y_offset
 	var vy := (target_y - global_position.y) * 3.0
@@ -215,12 +279,33 @@ func _physics_process(delta: float) -> void:
 	if _fish_anim:
 		_fish_anim.animate(delta)
 
+func _is_solitary() -> bool:
+	return fish_variant == FishVariant.SNAKEHEAD or fish_variant == FishVariant.FLOWERHORN
+
+func _is_predator() -> bool:
+	return fish_variant == FishVariant.FLOWERHORN
+
+func _wander_dir() -> Vector3:
+	# Đổi hướng liên tục theo thời gian — bơi vòng quanh hồ
+	var a := sin(_bob_phase * 0.3) * 2.0 + sin(_bob_phase * 0.7) * 1.5
+	var result := Vector3(cos(a), 0, sin(a))
+	# Biên mềm — nếu xa home quá thì quay về
+	var to_home := _home - global_position
+	to_home.y = 0.0
+	if to_home.length_squared() > 225.0:
+		result = result.lerp(to_home.normalized(), 0.3)
+	# Tránh tường đã va gần đây
+	if _wall_memory_timer > 0.0:
+		result += _wall_memory * 3.0
+	return result.normalized()
+
 func _scan_neighbors() -> void:
 	_scan_timer = randf_range(0.3, 0.8)
 	_neighbors = get_tree().get_nodes_in_group("fish")
-	# Filter out self and far ones
+	# Filter out self, far ones, and predators
 	_neighbors = _neighbors.filter(func(n):
 		return n != self and is_instance_valid(n) and n is FishCharacter \
+			and not (n as FishCharacter)._is_predator() \
 			and global_position.distance_squared_to(n.global_position) < COHESION_RADIUS * COHESION_RADIUS
 	)
 
@@ -266,16 +351,7 @@ func _compute_boids() -> Vector3:
 	var shyness: float = 1.0 - _boldness
 	var result := (sep * 0.4 + align * (0.3 + shyness * 0.3) + cohesion * (0.2 + shyness * 0.3))
 	if result.length_squared() < 0.001:
-		# Không có bạn — bơi tự do với thiên hướng về home
-		var to_home := _home - global_position
-		to_home.y = 0.0
-		if to_home.length_squared() > 0.01:
-			result = to_home.normalized() * 0.5
-		else:
-			result = _swim_dir
-		# Thêm nhiễu
-		var a := randf_range(0.0, TAU) + sin(_bob_phase) * 0.5
-		result += Vector3(cos(a), 0, sin(a)) * 0.5
+		result = _wander_dir()
 
 	return result.normalized()
 
@@ -345,9 +421,77 @@ func _avoid_walls() -> void:
 		if back.length_squared() > 0.01 and _flee_timer <= 0.0 and _alert_timer <= 0.0:
 			_target_dir = _target_dir.lerp(back.normalized(), 0.3).normalized()
 
+func _is_prey(variant: int) -> bool:
+	return variant == FishVariant.TILAPIA or variant == FishVariant.PERCH
+
+func _scan_prey() -> void:
+	var all_fish := get_tree().get_nodes_in_group("fish")
+	var nearest_dist_sq := HUNT_RADIUS * HUNT_RADIUS
+	_hunt_target = null
+	for f in all_fish:
+		if f == self or not is_instance_valid(f):
+			continue
+		var other := f as FishCharacter
+		if not _is_prey(other.fish_variant):
+			continue
+		var d_sq := global_position.distance_squared_to(other.global_position)
+		if d_sq < nearest_dist_sq:
+			nearest_dist_sq = d_sq
+			_hunt_target = other
+
+func _is_prey_alone(prey: FishCharacter) -> bool:
+	var prey_pos := prey.global_position
+	var radius_sq := PREY_ALONE_RADIUS * PREY_ALONE_RADIUS
+	for f in get_tree().get_nodes_in_group("fish"):
+		if f == self or f == prey or not is_instance_valid(f):
+			continue
+		var other := f as FishCharacter
+		if not _is_prey(other.fish_variant):
+			continue
+		if prey_pos.distance_squared_to(other.global_position) < radius_sq:
+			return false
+	return true
+
+func _hunt_behavior(delta: float) -> Vector3:
+	_hunt_scan_timer -= delta
+	if _hunt_scan_timer <= 0.0:
+		_hunt_scan_timer = randf_range(0.5, 1.5)
+		_scan_prey()
+	_hunt_cooldown -= delta
+
+	if _hunt_target != null and is_instance_valid(_hunt_target):
+		var prey := _hunt_target as FishCharacter
+		if not prey.is_alive:
+			_hunt_target = null
+			return _wander_dir()
+
+		var to_prey := prey.global_position - global_position
+		to_prey.y = 0.0
+		var dist := to_prey.length()
+
+		if dist < HUNT_ATTACK_DIST:
+			if _hunt_cooldown <= 0.0:
+				_hunt_cooldown = 1.0
+				prey.take_damage(attack_power, self)
+			return to_prey.normalized()
+		elif _is_prey_alone(prey):
+			# Rượt đuổi khi con mồi đi lẻ
+			return to_prey.normalized()
+		else:
+			# Quay vòng quanh đàn, chờ cơ hội
+			_orbit_angle += delta * ORBIT_SPEED
+			var orbit_offset := Vector3(cos(_orbit_angle), 0, sin(_orbit_angle)) * ORBIT_RADIUS
+			var target_pos := prey.global_position + orbit_offset
+			var orbit_dir := (target_pos - global_position).normalized()
+			return orbit_dir
+	else:
+		return _wander_dir()
+
 func take_damage(dmg: int, attacker: Node3D = null) -> void:
 	super.take_damage(dmg, attacker)
 	if is_alive:
+		if _is_predator():
+			_hunt_target = null
 		_flee_timer = randf_range(2.5, 4.5)
 		_alert_timer = _flee_timer
 		if attacker:

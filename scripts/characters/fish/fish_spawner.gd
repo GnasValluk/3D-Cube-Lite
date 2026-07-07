@@ -109,26 +109,25 @@ func _spawn_fish(wx: float, wy: float, wz: float, has_silt: bool) -> void:
 	var fish := CharacterBody3D.new() as CharacterBody3D
 	fish.set_script(_FishChar)
 
-	# Vùng phù sa: đa dạng loài — chép, rô, trắm, mòng, vàng, linh
-	# Vùng không phù sa: chủ yếu loài nhỏ — mòng, linh
+	# Vùng phù sa: chép, rô, điêu hồng, lóc, la hán
+	# Vùng không phù sa: chủ yếu điêu hồng, lóc
 	var variant: int
 	if has_silt:
-		# Phân bố đa dạng — có trọng số nhẹ về loài lớn hơn
 		var r := _rng.randf()
-		if r < 0.22:   variant = FishCharacter.FishVariant.CHEP   # 22%
-		elif r < 0.40: variant = FishCharacter.FishVariant.RO     # 18%
-		elif r < 0.55: variant = FishCharacter.FishVariant.TRAM   # 15%
-		elif r < 0.70: variant = FishCharacter.FishVariant.MONG   # 15%
-		elif r < 0.85: variant = FishCharacter.FishVariant.VANG   # 15%
-		else:          variant = FishCharacter.FishVariant.LINH   # 15%
+		if r < 0.18:   variant = FishCharacter.FishVariant.CARP       # 18%
+		elif r < 0.32: variant = FishCharacter.FishVariant.PERCH      # 14%
+		elif r < 0.46: variant = FishCharacter.FishVariant.TILAPIA    # 14%
+		elif r < 0.63: variant = FishCharacter.FishVariant.SNAKEHEAD  # 17%
+		elif r < 0.85: variant = FishCharacter.FishVariant.SHRIMP     # 22%
+		else:          variant = FishCharacter.FishVariant.FLOWERHORN  # 15%
 	else:
-		# Vùng nghèo: chủ yếu cá nhỏ
 		var r := _rng.randf()
-		if r < 0.15:   variant = FishCharacter.FishVariant.CHEP   # 15%
-		elif r < 0.35: variant = FishCharacter.FishVariant.RO     # 20%
-		elif r < 0.50: variant = FishCharacter.FishVariant.MONG   # 15%
-		elif r < 0.75: variant = FishCharacter.FishVariant.VANG   # 25%
-		else:          variant = FishCharacter.FishVariant.LINH   # 25%
+		if r < 0.07:   variant = FishCharacter.FishVariant.CARP       # 7%
+		elif r < 0.20: variant = FishCharacter.FishVariant.PERCH      # 13%
+		elif r < 0.46: variant = FishCharacter.FishVariant.TILAPIA    # 26%
+		elif r < 0.63: variant = FishCharacter.FishVariant.SNAKEHEAD  # 17%
+		elif r < 0.85: variant = FishCharacter.FishVariant.SHRIMP     # 22%
+		else:          variant = FishCharacter.FishVariant.FLOWERHORN  # 15%
 
 	fish.set("fish_variant", variant)
 	fish.set("fish_scale", _rng.randf_range(0.85, 1.15))

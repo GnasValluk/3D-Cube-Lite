@@ -6,7 +6,7 @@ const CATEGORY_NAMES := ["Blocks", "Items", "Characters", "Environment"]
 const BLOCK_IDS := [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]
 const ITEM_IDS := ["cup", "xeng", "riu", "kiem", "can_cau", "chest", "twilight_gate"]
 const CHAR_NAMES := ["Player", "Raptor", "Dragon", "Warrior", "Beyordeath", "Dummy",
-	"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh"]
+	"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh", "Ca La Han", "Tom"]
 const ENV_NAMES := ["Rong Nhiet Doi", "Sen Thach Anh"]
 
 const CHAR_ANIMS := {
@@ -22,6 +22,8 @@ const CHAR_ANIMS := {
 	"Ca Mong": ["SWIM", "IDLE"],
 	"Ca Vang": ["SWIM", "IDLE"],
 	"Ca Linh": ["SWIM", "IDLE"],
+	"Ca La Han": ["SWIM", "IDLE"],
+	"Tom": ["SWIM", "IDLE"],
 }
 
 const ITEM_ANIMS := {
@@ -40,13 +42,24 @@ const _FishAnim = preload("res://scripts/characters/fish/fish_animator.gd")
 const _Aquatic = preload("res://scripts/world/chunk/chunk_aquatic.gd")
 
 const FISH_COLORS := [
-	[Color(0.28, 0.42, 0.22), Color(0.78, 0.80, 0.65), Color(0.22, 0.35, 0.18)],
-	[Color(0.18, 0.38, 0.20), Color(0.72, 0.78, 0.60), Color(0.15, 0.30, 0.16)],
-	[Color(0.32, 0.40, 0.35), Color(0.75, 0.80, 0.72), Color(0.25, 0.35, 0.28)],
-	[Color(0.55, 0.65, 0.70), Color(0.85, 0.90, 0.88), Color(0.45, 0.55, 0.62)],
-	[Color(0.88, 0.55, 0.12), Color(0.95, 0.88, 0.55), Color(0.75, 0.40, 0.08)],
-	[Color(0.70, 0.72, 0.75), Color(0.90, 0.92, 0.90), Color(0.60, 0.62, 0.65)],
+	[Color(0.95, 0.70, 0.10), Color(0.98, 0.95, 0.80), Color(0.85, 0.55, 0.05)],
+	[Color(0.30, 0.30, 0.30), Color(0.65, 0.65, 0.65), Color(0.20, 0.20, 0.20)],
+	[Color(0.88, 0.55, 0.45), Color(0.95, 0.80, 0.70), Color(0.85, 0.40, 0.30)],
+	[Color(0.30, 0.25, 0.15), Color(0.65, 0.60, 0.50), Color(0.20, 0.18, 0.10)],
+	[Color(0.92, 0.25, 0.15), Color(0.90, 0.55, 0.45), Color(0.75, 0.15, 0.10)],
+	[Color(0.85, 0.35, 0.20), Color(0.92, 0.55, 0.35), Color(0.75, 0.25, 0.15)],
 ]
+
+const FISH_PATTERN := [
+	Color(0.15, 0.10, 0.05),
+	Color(0, 0, 0, 0),
+	Color(0, 0, 0, 0),
+	Color(0, 0, 0, 0),
+	Color(0.15, 0.10, 0.08),
+	Color(0, 0, 0, 0),
+]
+
+const FISH_BODY_Z := [1.0, 1.0, 1.0, 1.8, 1.0, 1.0]
 
 var _category: int = Category.BLOCKS
 var _index: int = 0
@@ -482,7 +495,7 @@ func _show_character() -> void:
 				mi.position = Vector3(0, 1.0, 0)
 				mi.rotation = Vector3(deg_to_rad(90), 0, deg_to_rad(i * 90))
 				root.add_child(mi)
-		"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh":
+		"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh", "Ca La Han", "Tom":
 			_build_fish_variant(root)
 
 func _build_fish_variant(root: Node3D) -> void:
@@ -492,6 +505,13 @@ func _build_fish_variant(root: Node3D) -> void:
 	fm.color_body  = cols[0]
 	fm.color_belly = cols[1]
 	fm.color_fin   = cols[2]
+	fm.color_pattern = FISH_PATTERN[idx]
+	fm.body_z_scale  = FISH_BODY_Z[idx]
+	if idx == 4:
+		fm.body_triangular = true
+		fm.has_horns = true
+	elif idx == 5:
+		fm.body_shape = _FishMesh.BodyShape.SHRIMP
 	fm.build(root)
 
 	var driver := Node.new()

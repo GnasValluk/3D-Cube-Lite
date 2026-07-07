@@ -160,12 +160,12 @@ static func create_item_db() -> Dictionary:
 	_add(db, "can_cau", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0)
 
 	# ── Cá (thức ăn) ──────────────────────────────────────────────────────────
-	_add(db, "ca_chep", "Cá Chép", ItemDef.Type.FOOD, Color(0.28, 0.42, 0.22), "🐟", "Cá chép tươi ngon", true, 16, 30)
-	_add(db, "ca_ro",   "Cá Rô",   ItemDef.Type.FOOD, Color(0.18, 0.38, 0.20), "🐟", "Cá rô đồng béo", true, 16, 20)
-	_add(db, "ca_tram", "Cá Trắm", ItemDef.Type.FOOD, Color(0.32, 0.40, 0.35), "🐟", "Cá trắm to, nhiều thịt", true, 16, 40)
-	_add(db, "ca_mong", "Cá Mòng", ItemDef.Type.FOOD, Color(0.55, 0.65, 0.70), "🐟", "Cá mòng nhỏ, thịt ngọt", true, 16, 15)
-	_add(db, "ca_vang", "Cá Vàng", ItemDef.Type.FOOD, Color(0.88, 0.55, 0.12), "🐟", "Cá vàng cảnh, ăn được", true, 16, 25)
-	_add(db, "ca_linh", "Cá Linh", ItemDef.Type.FOOD, Color(0.70, 0.72, 0.75), "🐟", "Cá linh non, chiên giòn", true, 16, 12)
+	_add(db, "ca_chep", "Carp", ItemDef.Type.FOOD, Color(0.95, 0.70, 0.10), "🐟", "Freshwater carp — rich, firm flesh", true, 16, 30)
+	_add(db, "ca_ro",   "Climbing Perch", ItemDef.Type.FOOD, Color(0.30, 0.30, 0.30), "🐟", "Climbing perch — sweet white meat", true, 16, 20)
+	_add(db, "ca_dieu_hong", "Red Tilapia", ItemDef.Type.FOOD, Color(0.88, 0.55, 0.45), "🐟", "Red tilapia — firm, mild flavour", true, 16, 35)
+	_add(db, "ca_loc", "Snakehead", ItemDef.Type.FOOD, Color(0.30, 0.25, 0.15), "🐟", "Snakehead — dense, savoury fillet", true, 16, 45)
+	_add(db, "ca_la_han", "Flowerhorn", ItemDef.Type.FOOD, Color(0.92, 0.25, 0.15), "🐟", "Flowerhorn — rich, flavourful meat", true, 16, 55)
+	_add(db, "tom", "Freshwater Shrimp", ItemDef.Type.FOOD, Color(0.85, 0.35, 0.20), "🦐", "Freshwater shrimp — sweet, delicate meat", true, 16, 8)
 
 	return db
 

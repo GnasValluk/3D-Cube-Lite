@@ -18,6 +18,8 @@ var _party_ui
 var _settings_ui
 var _settings_icon: Button
 var _save_btn: Button
+var _library_btn: Button
+var _creature_library
 var _party_hud: Control
 var _party_indicators: Array[Panel] = []
 var _mgr: CharacterManager
@@ -57,6 +59,7 @@ var _icon_cache: Dictionary = {}
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _ChestUI = preload("res://scripts/items/ui/chest_ui.gd")
 const _PartyUI = preload("res://scripts/ui/party/party_ui.gd")
+const _CreatureLibrary = preload("res://scripts/ui/library/creature_library.gd")
 
 func _ready() -> void:
 	_setup_ui()
@@ -119,6 +122,7 @@ func _setup_ui() -> void:
 
 	_setup_settings_icon()
 	_setup_save_button()
+	_setup_library_button()
 	_setup_party_hud()
 
 	_party_ui = _PartyUI.new()
@@ -269,12 +273,43 @@ func _setup_save_button() -> void:
 	_save_btn.pressed.connect(_on_save_pressed)
 	add_child(_save_btn)
 
+func _setup_library_button() -> void:
+	_library_btn = Button.new()
+	_library_btn.position = Vector2(104, 10)
+	_library_btn.size = Vector2(40, 40)
+	_library_btn.text = "📖"
+	_library_btn.tooltip_text = tr("CREATURE_BUTTON")
+	_library_btn.add_theme_font_size_override("font_size", 18)
+	_library_btn.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.7))
+	var lb_bg := StyleBoxFlat.new()
+	lb_bg.bg_color = Color(0.08, 0.08, 0.14, 0.65)
+	lb_bg.corner_radius_top_left = 8; lb_bg.corner_radius_top_right = 8
+	lb_bg.corner_radius_bottom_left = 8; lb_bg.corner_radius_bottom_right = 8
+	lb_bg.border_width_left = 1; lb_bg.border_width_right = 1
+	lb_bg.border_width_top = 1; lb_bg.border_width_bottom = 1
+	lb_bg.border_color = Color(1, 1, 1, 0.10)
+	_library_btn.add_theme_stylebox_override("normal", lb_bg)
+	var lb_hover := lb_bg.duplicate()
+	lb_hover.bg_color = Color(0.15, 0.18, 0.30, 0.75)
+	lb_hover.border_color = Color(0.40, 0.55, 0.90, 0.40)
+	_library_btn.add_theme_stylebox_override("hover", lb_hover)
+	_library_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_library_btn.pressed.connect(_on_library_pressed)
+	add_child(_library_btn)
+
+	_creature_library = _CreatureLibrary.new()
+	add_child(_creature_library)
+
 func _on_save_pressed() -> void:
 	if SaveManager:
 		SaveManager.save_game()
 	var player := _find_player_character()
 	if player:
 		player._scroll_inventory_message(tr("GAME_SAVED"))
+
+func _on_library_pressed() -> void:
+	if _creature_library:
+		_creature_library.show_library()
 
 func _toggle_settings() -> void:
 	if _settings_ui and _settings_ui.visible:
