@@ -3,7 +3,7 @@ extends Node
 class_name ExploreSystem
 
 const CELL_SIZE: float = 2.0
-const EXPLORE_RADIUS: float = 6.0
+const EXPLORE_RADIUS: float = 14.0
 
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const _Dim = preload("res://scripts/world/dimension_defs.gd")

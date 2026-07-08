@@ -15,6 +15,7 @@ var _player: Node3D = null
 
 const MAGNET_RANGE: float = 8.0
 const FLY_SPEED: float = 7.0
+const PICKUP_DISTANCE: float = 1.35
 
 func init(def_: ItemDef, count: int = 1):
 	item_def = def_
@@ -133,10 +134,14 @@ func _process(delta: float):
 	else:
 		# Magnet: bay về phía người chơi khi đủ gần
 		if can_pickup and _player and is_instance_valid(_player):
-			var dist := global_position.distance_to(_player.global_position)
+			var to_player := _player.global_position - global_position
+			var dist := to_player.length()
+			if dist <= PICKUP_DISTANCE:
+				collect(_player)
+				return
 			if dist < MAGNET_RANGE:
-				var dir := (_player.global_position - global_position).normalized()
-				position += dir * FLY_SPEED * delta
+				var dir := to_player / maxf(dist, 0.001)
+				global_position += dir * FLY_SPEED * delta
 				return
 		var bob := sin(_time_alive * 2.0) * 0.05
 		position.y += bob * delta * 2.0
