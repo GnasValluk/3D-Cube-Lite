@@ -32,7 +32,7 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	var n_lake := FastNoiseLite.new()
 	n_lake.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_lake.seed = base_seed + 5555
-	n_lake.frequency = 0.018
+	n_lake.frequency = 0.010
 
 	## n_lake_type: xác định hồ bùn hay hồ cát — tần số thấp hơn để patch lớn hơn
 	var n_lake_type := FastNoiseLite.new()
@@ -61,8 +61,60 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_ocean.fractal_lacunarity = 2.0
 	n_ocean.fractal_gain = 0.5
 
+	## n_sea_rough: địa hình đáy biển gồ ghề — tần số cao hơn để có đồi/lõm nhỏ
+	var n_sea_rough := FastNoiseLite.new()
+	n_sea_rough.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_sea_rough.seed = base_seed + 12345
+	n_sea_rough.frequency = 0.06
+	n_sea_rough.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_sea_rough.fractal_octaves = 3
+	n_sea_rough.fractal_lacunarity = 2.0
+	n_sea_rough.fractal_gain = 0.5
+
+	## n_sea_large: cấu trúc lớn đáy biển (bồn trũng, sống núi) — tần số cực thấp
+	var n_sea_large := FastNoiseLite.new()
+	n_sea_large.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_sea_large.seed = base_seed + 23456
+	n_sea_large.frequency = 0.004
+	n_sea_large.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_sea_large.fractal_octaves = 3
+	n_sea_large.fractal_lacunarity = 2.0
+	n_sea_large.fractal_gain = 0.4
+
+	## n_sea_biome: phân bố block đáy biển (cát/đá/sỏi/bùn)
+	var n_sea_biome := FastNoiseLite.new()
+	n_sea_biome.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_sea_biome.seed = base_seed + 34567
+	n_sea_biome.frequency = 0.012
+	n_sea_biome.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_sea_biome.fractal_octaves = 2
+	n_sea_biome.fractal_lacunarity = 2.0
+	n_sea_biome.fractal_gain = 0.5
+
+	## n_ocean_warp: domain warping cho ocean mask → bờ biển lồi lõm bất quy tắc
+	var n_ocean_warp := FastNoiseLite.new()
+	n_ocean_warp.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_ocean_warp.seed = base_seed + 45678
+	n_ocean_warp.frequency = 0.0008
+	n_ocean_warp.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_ocean_warp.fractal_octaves = 2
+	n_ocean_warp.fractal_lacunarity = 2.0
+	n_ocean_warp.fractal_gain = 0.5
+
+	## n_sea_mountain: núi ngầm dưới đáy biển
+	var n_sea_mountain := FastNoiseLite.new()
+	n_sea_mountain.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_sea_mountain.seed = base_seed + 56789
+	n_sea_mountain.frequency = 0.005
+	n_sea_mountain.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_sea_mountain.fractal_octaves = 4
+	n_sea_mountain.fractal_lacunarity = 2.0
+	n_sea_mountain.fractal_gain = 0.5
+
 	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
-		"lake_type": n_lake_type, "continent": n_continent, "ocean": n_ocean }
+		"lake_type": n_lake_type, "continent": n_continent, "ocean": n_ocean,
+		"sea_rough": n_sea_rough, "sea_large": n_sea_large, "sea_biome": n_sea_biome,
+		"ocean_warp": n_ocean_warp, "sea_mountain": n_sea_mountain }
 	_noise_cache[dim_id] = result
 	return result
 

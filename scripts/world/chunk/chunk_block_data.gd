@@ -9,13 +9,12 @@ var size_x: int = 0
 var size_z: int = 0
 
 ## Y range: world Y từ Y_MIN đến Y_MAX (inclusive)
-## SLAB_HEIGHT = 0.5, WATER_Y = 0.5 (nằm ở top của slab layer 1)
-## Terrain cao nhất (DARK_GRASS) = 1.0 = top của slab layer 2
-## GIẢM layers để fix crash: Y_MIN = -6 → Y_MAX = 2 (9 slab layers)
-## → World Y từ -3.0 đến +1.0 (unit Godot)
-const Y_MIN: int = -10   # slab layer index — mở rộng để hỗ trợ đáy biển y=-4
+## SLAB_HEIGHT = 0.5, WATER_Y = 0.5
+## Terrain cao nhất (DARK_GRASS) = 1.0
+## Mở rộng depth: Y_MIN = -18 → đáy biển sâu đến -8.0 world units
+const Y_MIN: int = -18
 const Y_MAX: int = 2
-const CHUNK_H: int = Y_MAX - Y_MIN + 1   # = 13 slab layers
+const CHUNK_H: int = Y_MAX - Y_MIN + 1   # = 21 slab layers
 const SLAB_HEIGHT: float = 0.5
 
 var _data: PackedByteArray

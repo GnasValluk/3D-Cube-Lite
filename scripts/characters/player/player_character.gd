@@ -86,7 +86,7 @@ func _setup_pickup_area() -> void:
 func _on_pickup_area_entered(area: Area3D) -> void:
 	if area is DroppedItem:
 		var item := area as DroppedItem
-		if item.item_def == null:
+		if item.item_def == null or not item.can_pickup:
 			return
 		var remaining: int = pickup_item(item.item_def, item.item_count)
 		if remaining <= 0:
@@ -217,7 +217,9 @@ func drop_item(idx: int) -> void:
 		return
 
 	inventory.remove_item(idx, count)
-	DroppedItem.spawn(world, item_def, global_position + global_transform.basis.z * (-1.5), count)
+	var drop_pos: Vector3 = global_position + -global_transform.basis.z * 2.5
+	drop_pos.y += 0.3
+	DroppedItem.spawn(world, item_def, drop_pos, count)
 	_scroll_inventory_message(tr("DROP_MSG").format({"s": item_def.name, "n": count}))
 
 func _update_weapon_mesh() -> void:
@@ -301,7 +303,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _aim_dir.dot(fwd) < 0.99:
 					rotation.y = atan2(_aim_dir.x, _aim_dir.z)
 				_lmb_cd = 0.0
-				_attack_timer = attack_duration
+				_attack_timer = attack_duration * (2.0 if _underwater else 1.0)
 				_state = State.ATTACK
 				_melee_hit_once = false
 

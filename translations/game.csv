@@ -50,7 +50,9 @@ TOOLTIP_CLICK_ADD,"→ Click to add 1 to inventory","→ Click để thêm 1 và
 INVENTORY_TITLE,Inventory,Inventory
 STATS_TITLE,Stats,Stats
 EQUIPMENT_TITLE,Equipment,Equipment
-DROP_HINT,"Q = Drop  |  Right-click = Use","Q = Drop  |  Right-click = Use"
+DROP_HINT,"Right-click = Use","Chuột phải = Sử dụng"
+USE_ITEM,Use,Sử dụng
+DROP_ITEM,Drop,Vứt
 HEAL_VN,Heal: +{d} HP,"Hồi: +{d} HP"
 DIM_TWILIGHT,Twilight,Chạng Vạng
 DIM_REAL_WORLD,Real World,Thế Giới Thực Tại

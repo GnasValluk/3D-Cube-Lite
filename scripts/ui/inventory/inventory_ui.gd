@@ -18,7 +18,8 @@ const LIB_GAP: float = 3.0
 const LIB_COLS: int = 6
 
 const EQUIP_H: float = 154.0
-const CONTENT_H: float = PAD + 40 + 140 + 10 + EQUIP_H + PAD
+const DETAIL_H: float = 110.0
+const CONTENT_H: float = PAD + 40 + 4 * (SLOT_SIZE + GAP) + 10 + DETAIL_H + PAD
 # Tổng chiều rộng = thư viện + khoảng cách + inventory gốc
 const LIB_MARGIN: float = 12.0
 const CONTENT_W: float = LIB_W + LIB_MARGIN + PAD + GRID_W + 12 + STAT_W + PAD
@@ -42,6 +43,14 @@ var _count_label: Label
 var _equip_faces: Array[ColorRect] = []
 var _equip_labels: Array[Label] = []
 var _equip_names: Array[String] = ["Head", "Body", "Legs", "Feet"]
+
+# ── Detail panel ────────────────────────────────────────────────────────────────
+var _detail_bg: ColorRect
+var _detail_item_name: Label
+var _detail_desc: Label
+var _detail_stats: Label
+var _detail_use_btn: Button
+var _detail_drop_btn: Button
 
 # ── Item Library ───────────────────────────────────────────────────────────────
 var _item_db: Dictionary = {}           # id -> ItemDef (tất cả items)
@@ -112,6 +121,7 @@ func _ready() -> void:
 	_setup_status_panel()
 	_setup_equipment_panel()
 	_setup_tooltip()
+	_setup_detail_panel()
 	visible = false
 
 # ── Item Library: lọc danh sách ────────────────────────────────────────────────
@@ -494,7 +504,7 @@ func _setup_status_panel() -> void:
 	_def_label.add_theme_color_override("font_color", Color(0.55, 0.80, 0.55)); add_child(_def_label)
 
 	var dh := Label.new()
-	dh.text = "Q = Drop  |  Right-click = Use"
+	dh.text = tr("DROP_HINT")
 	dh.position = Vector2(sx + 12, sy + 120)
 	dh.add_theme_font_size_override("font_size", 10)
 	dh.add_theme_color_override("font_color", Color(1, 1, 1, 0.30))
@@ -564,6 +574,142 @@ func _setup_tooltip() -> void:
 	_tooltip.visible = false
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_tooltip)
+
+# ── Detail panel ────────────────────────────────────────────────────────────────
+func _setup_detail_panel() -> void:
+	var ox: float = LIB_W + LIB_MARGIN
+	var grid_y: float = PAD + 40
+	var dy: float = grid_y + 4 * (SLOT_SIZE + GAP) + 10
+	var dw: float = GRID_W
+	var dx: float = ox + PAD
+
+	_detail_bg = ColorRect.new()
+	_detail_bg.position = Vector2(dx, dy)
+	_detail_bg.size = Vector2(dw, DETAIL_H)
+	_detail_bg.color = Color(0.08, 0.08, 0.14, 0.50)
+	_detail_bg.visible = false
+	_detail_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_detail_bg)
+
+	_detail_item_name = Label.new()
+	_detail_item_name.position = Vector2(dx + 8, dy + 6)
+	_detail_item_name.size = Vector2(dw - 16, 22)
+	_detail_item_name.add_theme_font_size_override("font_size", 17)
+	_detail_item_name.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	_detail_item_name.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	_detail_item_name.add_theme_constant_override("shadow_offset_x", 1)
+	_detail_item_name.add_theme_constant_override("shadow_offset_y", 1)
+	_detail_item_name.visible = false
+	add_child(_detail_item_name)
+
+	_detail_desc = Label.new()
+	_detail_desc.position = Vector2(dx + 8, dy + 30)
+	_detail_desc.size = Vector2(dw - 16, 36)
+	_detail_desc.add_theme_font_size_override("font_size", 12)
+	_detail_desc.add_theme_color_override("font_color", Color(0.75, 0.78, 0.85, 0.85))
+	_detail_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_detail_desc.visible = false
+	add_child(_detail_desc)
+
+	_detail_stats = Label.new()
+	_detail_stats.position = Vector2(dx + 8, dy + 62)
+	_detail_stats.size = Vector2(dw - 16, 16)
+	_detail_stats.add_theme_font_size_override("font_size", 11)
+	_detail_stats.add_theme_color_override("font_color", Color(0.55, 0.60, 0.70, 0.80))
+	_detail_stats.visible = false
+	add_child(_detail_stats)
+
+	var btn_style := StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.15, 0.18, 0.30, 0.85)
+	btn_style.corner_radius_top_left = 4; btn_style.corner_radius_top_right = 4
+	btn_style.corner_radius_bottom_left = 4; btn_style.corner_radius_bottom_right = 4
+	btn_style.border_width_left = 1; btn_style.border_width_right = 1
+	btn_style.border_width_top = 1; btn_style.border_width_bottom = 1
+	btn_style.border_color = Color(0.40, 0.55, 0.90, 0.35)
+
+	var btn_hover := btn_style.duplicate() as StyleBoxFlat
+	btn_hover.bg_color = Color(0.22, 0.28, 0.45, 0.95)
+	btn_hover.border_color = Color(0.45, 0.65, 1.0, 0.55)
+
+	var btn_y: float = dy + DETAIL_H - 32
+
+	_detail_use_btn = Button.new()
+	_detail_use_btn.text = tr("USE_ITEM")
+	_detail_use_btn.position = Vector2(dx + dw - 170, btn_y)
+	_detail_use_btn.size = Vector2(75, 24)
+	_detail_use_btn.add_theme_font_size_override("font_size", 12)
+	_detail_use_btn.add_theme_color_override("font_color", Color(0.80, 0.95, 0.80, 0.90))
+	_detail_use_btn.add_theme_stylebox_override("normal", btn_style)
+	_detail_use_btn.add_theme_stylebox_override("hover", btn_hover)
+	_detail_use_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_detail_use_btn.pressed.connect(_on_detail_use)
+	_detail_use_btn.visible = false
+	add_child(_detail_use_btn)
+
+	_detail_drop_btn = Button.new()
+	_detail_drop_btn.text = tr("DROP_ITEM")
+	_detail_drop_btn.position = Vector2(dx + dw - 88, btn_y)
+	_detail_drop_btn.size = Vector2(80, 24)
+	_detail_drop_btn.add_theme_font_size_override("font_size", 12)
+	_detail_drop_btn.add_theme_color_override("font_color", Color(0.95, 0.65, 0.55, 0.90))
+	_detail_drop_btn.add_theme_stylebox_override("normal", btn_style)
+	_detail_drop_btn.add_theme_stylebox_override("hover", btn_hover)
+	_detail_drop_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_detail_drop_btn.pressed.connect(_on_detail_drop)
+	_detail_drop_btn.visible = false
+	add_child(_detail_drop_btn)
+
+func _update_detail_panel() -> void:
+	var has_selection: bool = false
+	if _inventory != null and _selected_slot >= 0 and _selected_slot < _inventory.slots.size():
+		var slot: ItemSlot = _inventory.slots[_selected_slot]
+		if not slot.is_empty():
+			has_selection = true
+			var item: ItemDef = slot.item
+			_detail_item_name.text = item.name
+			_detail_desc.text = item.desc if item.desc.length() > 0 else "(" + item.get_type_name() + ")"
+			var stats_text: String = ""
+			if item.atk_bonus > 0:  stats_text += "ATK: +" + str(item.atk_bonus) + "  "
+			if item.def_bonus > 0:  stats_text += "DEF: +" + str(item.def_bonus) + "  "
+			if item.heal_amount > 0: stats_text += "Heal: +" + str(item.heal_amount) + " HP"
+			_detail_stats.text = stats_text
+			var can_use: bool = item.type in [ItemDef.Type.FOOD, ItemDef.Type.WEAPON, ItemDef.Type.TOOL, ItemDef.Type.ARMOR]
+			_detail_use_btn.visible = can_use
+			_detail_item_name.visible = true
+			_detail_desc.visible = true
+			_detail_stats.visible = true
+			_detail_drop_btn.visible = true
+			_detail_bg.visible = true
+
+	if not has_selection:
+		_detail_bg.visible = false
+		_detail_item_name.visible = false
+		_detail_desc.visible = false
+		_detail_stats.visible = false
+		_detail_use_btn.visible = false
+		_detail_drop_btn.visible = false
+
+func _on_detail_use() -> void:
+	if _player_ref == null or _inventory == null: return
+	var idx: int = _selected_slot
+	if idx < 0 or idx >= _inventory.slots.size(): return
+	var slot: ItemSlot = _inventory.slots[idx]
+	if slot.is_empty(): return
+	_player_ref.use_item_from_inventory(idx)
+	# After use, the slot may be empty (e.g. food consumed)
+	if slot.is_empty():
+		_selected_slot = -1
+		_clear_selection()
+
+func _on_detail_drop() -> void:
+	if _player_ref == null or _inventory == null: return
+	var idx: int = _selected_slot
+	if idx < 0 or idx >= _inventory.slots.size(): return
+	var slot: ItemSlot = _inventory.slots[idx]
+	if slot.is_empty(): return
+	_player_ref.drop_item(idx)
+	_selected_slot = -1
+	_clear_selection()
 
 # ── Inventory slot events ──────────────────────────────────────────────────────
 func _on_slot_gui_input(event: InputEvent, idx: int) -> void:
@@ -647,6 +793,8 @@ func _process(_delta: float) -> void:
 		_atk_label.text = "ATK: %d"        % _player_ref.get_total_atk()
 		_def_label.text = "DEF: %d"        % _player_ref.get_total_def()
 		_update_equipment_display(_player_ref)
+
+	_update_detail_panel()
 
 	var filled: int = _inventory.count_filled_slots()
 	_count_label.text = "Used: %d / %d" % [filled, _inventory.slots.size()]

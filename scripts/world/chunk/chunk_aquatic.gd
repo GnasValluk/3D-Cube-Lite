@@ -4,7 +4,7 @@ const _Data = preload("chunk_data.gd")
 
 static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 		vx: int, vz: int, pos: Vector3, _h_vox: float, has_silt: bool,
-		lotus_lights: Array[Vector3] = []) -> void:
+		biome: int, lotus_lights: Array[Vector3] = []) -> void:
 	var wx: int = cx * size + vx
 	var wz: int = cz * size + vz
 
@@ -23,10 +23,16 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 
 	var water_gap: float = _Data.WATER_Y - pos.y
 
-	_add_tropical_weed(st, wx, wz, pos, r1, r2, r3, r4, h1, h2, water_gap, has_silt, lotus_lights)
+	var is_deep: bool = water_gap >= _Data.VOXEL * 0.5
+	var is_shore: bool = not is_deep and water_gap > -_Data.VOXEL * 0.5
 
-	if has_silt:
+	if is_deep:
+		_add_tropical_weed(st, wx, wz, pos, r1, r2, r3, r4, h1, h2, water_gap, has_silt, lotus_lights)
+		if has_silt:
 			_add_lotus_plant(st, wx, wz, pos, r1, r2, r3, r4, h1, lotus_lights)
+
+	if is_shore and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
+		_add_taro_plant(st, wx, wz, pos, r1, r2, r3, r4, h1)
 
 # ── Rong nước ngọt nhiệt đới (rong đuôi chó voxel) ──────────────────────────
 static func _add_tropical_weed(st: SurfaceTool, _wx: int, _wz: int, pos: Vector3,
@@ -59,6 +65,7 @@ static func _add_tropical_weed(st: SurfaceTool, _wx: int, _wz: int, pos: Vector3
 	var cur_x: float = pos.x + (r2 - 0.5) * 0.2
 	var cur_z: float = pos.z + (r3 - 0.5) * 0.2
 	var cur_y: float = pos.y
+	var bx := cur_x; var bz := cur_z; var by := cur_y
 
 	for seg in range(seg_count):
 		s = s * 16807 + 1; var dx := (float(s & 0x7FFFFFFF) / 2147483648.0 - 0.5) * 0.07
@@ -81,11 +88,10 @@ static func _add_tropical_weed(st: SurfaceTool, _wx: int, _wz: int, pos: Vector3
 		if seg > 0 or seg_count == 1:
 			s = _draw_branches(st, s, nx, nz, cur_y, sw, lean_x, lean_z, dx, dz, col_br1, col_br2)
 
-		# Hoa bên hông 25% mỗi đốt trừ đốt đáy
-		if seg > 0:
-			s = _draw_flower(st, s, cur_x, cur_z, cur_y, lean_x, lean_z, sw, lotus_lights)
-
 		cur_x = nx; cur_z = nz; cur_y = ny
+
+	# Chùm quả vàng phát sáng — ở gốc cây
+	s = _draw_fruit_cluster(st, s, bx, bz, by, lean_x, lean_z, sw, lotus_lights)
 
 # Vòng 6 râu tỏa tròn quanh đốt, mỗi râu chẻ đôi ở đầu
 static func _draw_whorls(st: SurfaceTool, s: int, nx: float, nz: float, cur_y: float,
@@ -163,35 +169,40 @@ static func _draw_branches(st: SurfaceTool, s: int, nx: float, nz: float, cur_y:
 				_add_quad(st, ftip + f2dir*f2len*0.5, f2perp*f2w, f2dir*f2len*0.5, -f2perp.cross(f2dir).normalized(), col_br2)
 	return s
 
-# Hoa nhỏ mọc bên hông đốt — 25% xác suất, nhiều màu nhiệt đới
-static func _draw_flower(st: SurfaceTool, s: int, cur_x: float, cur_z: float, cur_y: float,
+# ── Chùm quả vàng phát sáng (thay thế hoa cũ) ─────────────────────────────
+static func _draw_fruit_cluster(st: SurfaceTool, s: int, cur_x: float, cur_z: float, cur_y: float,
 		lean_x: float, lean_z: float, sw: float, lotus_lights: Array[Vector3]) -> int:
 	s = s * 16807 + 1
-	if float(s & 0x7FFFFFFF) / 2147483648.0 >= 0.25:
+	if float(s & 0x7FFFFFFF) / 2147483648.0 >= 0.35:
 		return s
 	s = s * 16807 + 1; var fc1 := float(s & 0x7FFFFFFF) / 2147483648.0
 	s = s * 16807 + 1; var fc2 := float(s & 0x7FFFFFFF) / 2147483648.0
 	s = s * 16807 + 1; var fc3 := float(s & 0x7FFFFFFF) / 2147483648.0
 	var fa: float = lean_x + lean_z + fc1 * TAU
-	var fpos := Vector3(cur_x, cur_y + _Data.VOXEL * 0.6, cur_z) + Vector3(cos(fa), 0, sin(fa)) * (sw + 0.07)
-	var col_f: Color
-	if   fc2 < 0.17: col_f = Color(1.0,  0.20 + fc3*0.35, 0.08, 1.0)
-	elif fc2 < 0.33: col_f = Color(1.0,  0.82 + fc3*0.12, 0.10, 1.0)
-	elif fc2 < 0.50: col_f = Color(0.15, 0.88 + fc3*0.10, 0.28, 1.0)
-	elif fc2 < 0.65: col_f = Color(0.08, 0.55 + fc3*0.25, 1.00, 1.0)
-	elif fc2 < 0.80: col_f = Color(0.72 + fc3*0.22, 0.08, 1.00, 1.0)
-	else:             col_f = Color(1.0,  0.28 + fc3*0.28, 0.68 + fc2*0.18, 1.0)
-	var fp: float = 0.035 + fc3 * 0.022
-	for fi in range(4):
-		var faa: float = fa + float(fi) * PI * 0.5
-		var fd := Vector3(cos(faa), 0, sin(faa))
-		var fpperp := Vector3(-sin(faa), 0, cos(faa))
-		_add_quad(st, fpos + fd*fp*0.5, fpperp*fp*0.45, Vector3(0,fp*0.65,0),  fd, col_f)
-		_add_quad(st, fpos + fd*fp*0.5, fpperp*fp*0.45, Vector3(0,fp*0.65,0), -fd, col_f)
-	var col_st := Color(1.0, 0.95, 0.15, 1.0)
-	_add_quad(st, fpos + Vector3(0,fp*0.4,0), Vector3(fp*0.18,0,0), Vector3(0,fp*0.18,0), Vector3(0,0,1), col_st)
-	_add_quad(st, fpos + Vector3(0,fp*0.4,0), Vector3(0,0,fp*0.18), Vector3(0,fp*0.18,0), Vector3(1,0,0), col_st)
-	lotus_lights.append(Vector3(fpos.x + 500.0, fpos.y, fpos.z))
+	var base_pos := Vector3(cur_x, cur_y + _Data.VOXEL * 0.6, cur_z) + Vector3(cos(fa), 0, sin(fa)) * (sw + 0.05)
+
+	# Chùm 7~12 trái to hơn, màu vàng óng
+	var num_berries: int = 7 + (s & 3) + ((s >> 2) & 1) + ((s >> 3) & 1)
+	var col_fruit := Color(1.0, 0.82, 0.08, 1.0)
+	var col_fruit_dark := Color(0.80, 0.65, 0.05, 1.0)
+
+	for bi in range(num_berries):
+		s = s * 16807 + 1; var b_r := float(s & 0x7FFFFFFF) / 2147483648.0
+		s = s * 16807 + 1; var b_a := float(s & 0x7FFFFFFF) / 2147483648.0 * TAU
+		s = s * 16807 + 1; var b_t := float(s & 0x7FFFFFFF) / 2147483648.0
+
+		var berry_radius: float = 0.022 + b_r * 0.025
+		var ox: float = cos(b_a) * (0.03 + b_r * 0.06)
+		var oz: float = sin(b_a) * (0.03 + b_r * 0.06)
+		var oy: float = -b_t * 0.07
+		var berry_pos := base_pos + Vector3(ox, oy, oz)
+		var col_berry := col_fruit if b_r > 0.35 else col_fruit_dark
+
+		_add_quad(st, berry_pos, Vector3(berry_radius,0,0), Vector3(0,berry_radius,0), Vector3(0,0,1), col_berry)
+		_add_quad(st, berry_pos, Vector3(0,0,berry_radius), Vector3(0,berry_radius,0), Vector3(1,0,0), col_berry)
+
+	# Đăng ký ánh sáng phát quang
+	lotus_lights.append(Vector3(base_pos.x + 500.0, base_pos.y, base_pos.z))
 	return s
 
 # ── Sen thạch anh ─────────────────────────────────────────────────────────────
@@ -236,3 +247,109 @@ static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3, 
 	st.add_vertex(center - u - v)
 	st.add_vertex(center + u + v)
 	st.add_vertex(center - u + v)
+
+## ── Môn ngọt — bờ hồ, lá lục giác to, cuống 3D ─────────────────────────────
+static func _add_taro_plant(st: SurfaceTool, _wx: int, _wz: int, pos: Vector3,
+		r1: float, r2: float, r3: float, r4: float, h1: int) -> void:
+	if r1 >= 0.12: return
+	var s: int = h1
+	var water_surf: float = _Data.WATER_Y
+	var root_y: float = water_surf - _Data.VOXEL * 0.5
+	var base := Vector3(pos.x + (r2 - 0.5) * 0.4, root_y, pos.z + (r3 - 0.5) * 0.4)
+	var num_leaves: int = 1 + (s & 2)
+	var col_stem := Color(0.26 + r4 * 0.10, 0.46 + r4 * 0.14, 0.10 + r4 * 0.04)
+	var col_leaf := Color(0.03 + r4 * 0.06, 0.22 + r4 * 0.16, 0.04 + r4 * 0.03)
+	var col_light := Color(0.04 + r4 * 0.04, 0.32 + r4 * 0.14, 0.06 + r4 * 0.03)
+	var col_vein := Color(0.06 + r4 * 0.04, 0.40 + r4 * 0.08, 0.08 + r4 * 0.03)
+	for i in range(num_leaves):
+		s = s * 16807 + 1; var la := float(s & 0x7FFFFFFF) / 2147483648.0 * TAU
+		s = s * 16807 + 1; var lb := float(s & 0x7FFFFFFF) / 2147483648.0
+		s = s * 16807 + 1; var lc := float(s & 0x7FFFFFFF) / 2147483648.0
+		# Cuống 3D — 4 mặt dạng hộp, cao
+		var lean: float = 0.08 + lb * 0.22
+		var pdx: float = cos(la) * lean
+		var pdz: float = sin(la) * lean
+		var stem_h: float = (_Data.VOXEL * 1.0) + lb * (_Data.VOXEL * 0.8)
+		var stem_top := base + Vector3(pdx, stem_h, pdz)
+		var segs: int = 4
+		for seg in range(segs):
+			var t: float = float(seg + 1) / float(segs)
+			var pt: float = float(seg) / float(segs)
+			var mid_y: float = base.y + stem_h * (t + pt) * 0.5
+			var mid_x: float = base.x + pdx * (t + pt) * 0.5
+			var mid_z: float = base.z + pdz * (t + pt) * 0.5
+			var sw: float = (0.035 + lc * 0.020) * (1.0 - t * 0.25)
+			var seg_mid := Vector3(mid_x, mid_y, mid_z)
+			var seg_h: float = stem_h / float(segs) * 0.5
+			_add_quad(st, seg_mid, Vector3(sw, 0, 0), Vector3(0, seg_h, 0), Vector3(0, 0, 1), col_stem)
+			_add_quad(st, seg_mid, Vector3(sw, 0, 0), Vector3(0, seg_h, 0), Vector3(0, 0, -1), col_stem)
+			_add_quad(st, seg_mid, Vector3(0, 0, sw), Vector3(0, seg_h, 0), Vector3(1, 0, 0), col_stem * 0.92)
+			_add_quad(st, seg_mid, Vector3(0, 0, sw), Vector3(0, seg_h, 0), Vector3(-1, 0, 0), col_stem * 0.92)
+
+		# Lá lục giác — 6 tam giác dạng quạt, không chồng chéo
+		var r: float = 0.35 + lc * 0.25
+		var lc2 := _draw_hex_leaf(st, stem_top, r, la, col_leaf, col_light, col_vein, s)
+		s = lc2
+
+## Lá lục giác — 6 tam giác quạt, viền + gân + thuỳ
+static func _draw_hex_leaf(st: SurfaceTool, center: Vector3, r: float,
+		angle: float, col_base: Color, col_light: Color, col_vein: Color, s: int) -> int:
+	var cx := center.x; var cy := center.y + 0.02; var cz := center.z
+	var d_cup: float = r * 0.10
+
+	# 6 đỉnh lục giác
+	var verts: Array[Vector3] = []
+	for vi in 6:
+		var va := angle + float(vi) * PI / 3.0
+		var vx := cx + cos(va) * r * 0.85
+		var vz := cz + sin(va) * r * 0.85
+		var vy: float = cy - d_cup * (1.0 - abs(cos(va - angle)) * 0.5)
+		verts.append(Vector3(vx, vy, vz))
+
+	# 6 tam giác từ tâm ra từng cặp đỉnh — không chồng lấn
+	for ti in 6:
+		var ni := (ti + 1) % 6
+		var col_t := col_light if (ti + (s & 1)) % 2 == 0 else col_base
+		var n := Vector3(0, 1, 0)
+		st.set_normal(n); st.set_color(col_t)
+		st.add_vertex(Vector3(cx, cy - d_cup * 0.4, cz))
+		st.add_vertex(verts[ti])
+		st.add_vertex(verts[ni])
+
+	# Viền lá — 6 quads nhỏ nối giữa các đỉnh lục giác
+	for ei in 6:
+		var e0 := verts[ei]
+		var e1 := verts[(ei + 1) % 6]
+		var em := (e0 + e1) * 0.5
+		var e_dir := (e1 - e0).normalized()
+		var e_perp := Vector3(-e_dir.z, 0, e_dir.x).normalized()
+		var col_edge := col_base * (0.80 + float(ei % 2) * 0.08)
+		_add_quad(st, em, e_perp * 0.025, e_dir * e0.distance_to(e1) * 0.5, Vector3(0, 1, 0), col_edge)
+
+	# Thuỳ đáy — 2 quads ở phía gốc cuống (mặt sau)
+	var ba := angle + PI
+	var bw: float = r * 0.28
+	var bh: float = r * 0.16
+	var col_lobe := col_base * 0.80
+	var lb := Vector3(cx + cos(ba - 0.3) * r * 0.45, cy - d_cup * 0.5, cz + sin(ba - 0.3) * r * 0.45)
+	var rb := Vector3(cx + cos(ba + 0.3) * r * 0.45, cy - d_cup * 0.5, cz + sin(ba + 0.3) * r * 0.45)
+	_add_quad(st, lb, Vector3(bw, 0, 0).rotated(Vector3(0,1,0), angle), Vector3(0, 0, bh).rotated(Vector3(0,1,0), angle), Vector3(0, 1, 0), col_lobe)
+	_add_quad(st, rb, Vector3(bw, 0, 0).rotated(Vector3(0,1,0), angle), Vector3(0, 0, bh).rotated(Vector3(0,1,0), angle), Vector3(0, 1, 0), col_lobe)
+
+	# Gân chính — dày, rõ
+	var ve := Vector3(cx, cy + 0.008, cz) + Vector3(0, 0, -r * 0.45).rotated(Vector3(0,1,0), angle)
+	var vm := Vector3(cx, cy + 0.008, cz) + Vector3(0, 0, r * 0.20).rotated(Vector3(0,1,0), angle)
+	_add_quad(st, (vm + ve) * 0.5, Vector3(0.018, 0, 0).rotated(Vector3(0,1,0), angle),
+		Vector3(0, 0, vm.distance_to(ve) * 0.5).rotated(Vector3(0,1,0), angle),
+		Vector3(0, 1, 0), col_vein)
+
+	# Gân phụ — 4 nhánh
+	s = s * 16807 + 1; var sr := float(s & 0x7FFFFFFF) / 2147483648.0
+	for si in 4:
+		var ga := angle + float(si) * PI / 4.0 + 0.3 + sr * 0.15
+		var gv := Vector3(cx + cos(ga) * r * 0.18, cy + 0.005, cz + sin(ga) * r * 0.18)
+		var ge := Vector3(cx + cos(ga) * r * 0.55, cy + 0.003, cz + sin(ga) * r * 0.55)
+		_add_quad(st, (gv + ge) * 0.5, Vector3(0.006, 0, 0).rotated(Vector3(0,1,0), ga),
+			Vector3(gv.distance_to(ge) * 0.5, 0, 0).rotated(Vector3(0,1,0), ga),
+			Vector3(0, 1, 0), col_vein * 0.85)
+	return s

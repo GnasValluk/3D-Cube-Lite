@@ -9,6 +9,7 @@ class_name FishSpawner
 
 const _FishChar = preload("res://scripts/characters/fish/fish_character.gd")
 const _Dim      = preload("res://scripts/world/dimension_defs.gd")
+const _Data     = preload("res://scripts/world/chunk/chunk_data.gd")
 
 # Số cá tối đa toàn scene
 @export var max_fish: int = 40
@@ -32,7 +33,7 @@ func _ready() -> void:
 	_noise = FastNoiseLite.new()
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_noise.seed = WorldSeed.seed_value + 1000 + 5555   # khớp n_lake của REAL_WORLD
-	_noise.frequency = 0.018
+	_noise.frequency = 0.010
 
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -82,12 +83,15 @@ func _try_spawn_batch() -> void:
 		if not _world_mgr.is_in_water(wx, wz, wy):
 			continue
 
-		# Không spawn cá trong biển — chỉ spawn ở hồ nội địa
+		# Không spawn cá trong biển — domain warping khớp với world_chunk
 		var nd: Dictionary = WorldChunk._noise_for_dim(1)
-		if nd.has("ocean"):
+		if nd.has("ocean") and nd.has("ocean_warp"):
 			var n_oc: FastNoiseLite = nd["ocean"]
-			var ov: float = (n_oc.get_noise_2d(wx, wz) + 1.0) * 0.5
-			if ov > 0.48:  # gần hoặc trong biển → skip
+			var ow: FastNoiseLite = nd["ocean_warp"]
+			var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
+			var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
+			var ov: float = (n_oc.get_noise_2d(wx + warp_x, wz + warp_z) + 1.0) * 0.5
+			if ov > _Data.OCEAN_THRESHOLD:
 				continue
 
 		# Kiểm tra khoảng cách với cá khác
@@ -101,7 +105,7 @@ func _try_spawn_batch() -> void:
 
 		# Tính loại hồ — khớp với world_chunk n_lake logic (seed+5555, freq 0.018)
 		var lake_val: float = (_noise.get_noise_2d(wx, wz) + 1.0) * 0.5
-		var has_silt: bool = lake_val > 0.50
+		var has_silt: bool = lake_val > 0.58
 
 		_spawn_fish(wx, wy, wz, has_silt)
 

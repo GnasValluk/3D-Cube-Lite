@@ -553,6 +553,8 @@ func _physics_process(delta: float) -> void:
 	# Underwater / swimming
 	if _underwater:
 		_swim_physics(delta)
+		if _attack_timer > 0.0 and not _melee_hit_once:
+			_do_melee_hit()
 		return
 
 	var on_floor: bool = is_on_floor()
@@ -716,6 +718,19 @@ func _do_melee_hit() -> void:
 				if dot >= 0.4:
 					SFXManager.play_damage_hit()
 					ch.take_damage(calc_skill_damage(melee_damage), self)
+	# Also hit fish in FishSpawner
+	var spawner := _find_fish_spawner()
+	if spawner:
+		for f in spawner.get_children():
+			if f is FishCharacter and f.is_alive:
+				var offset: Vector3 = f.global_position - global_position
+				offset.y = 0.0
+				var dist: float = offset.length()
+				if dist <= melee_range:
+					var dot: float = fwd.dot(offset / dist)
+					if dot >= 0.4:
+						SFXManager.play_damage_hit()
+						f.take_damage(calc_skill_damage(melee_damage), self)
 
 func _find_character_manager() -> Node:
 	var p := get_parent()
@@ -724,6 +739,12 @@ func _find_character_manager() -> Node:
 			return p
 		p = p.get_parent()
 	return null
+
+func _find_fish_spawner() -> Node:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return null
+	return scene.get_node_or_null("FishSpawner")
 
 # ── Read input direction ──────────────────────────────────────────────────────
 func _read_input() -> Vector3:
@@ -791,11 +812,13 @@ func _swim_physics(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, dir.x * spd, accel * delta)
 		velocity.z = move_toward(velocity.z, dir.z * spd, accel * delta)
 		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z), delta * 10.0)
-		_state = State.WALK
+		if _attack_timer <= 0.0:
+			_state = State.WALK
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, frict * delta)
 		velocity.z = move_toward(velocity.z, 0.0, frict * delta)
-		_state = State.IDLE
+		if _attack_timer <= 0.0:
+			_state = State.IDLE
 
 	move_and_slide()
 	_animate(delta)

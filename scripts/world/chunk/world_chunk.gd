@@ -31,6 +31,7 @@ var block_data: _BlockData = null
 ## References to non-terrain meshes (preserved across rebuilds)
 var _water_mesh_instance: MeshInstance3D = null
 var _aquatic_mesh_instance: MeshInstance3D = null
+var _sediment_mesh_instance: MeshInstance3D = null
 var _lotus_lights: Array[OmniLight3D] = []
 
 static var _mesh_cache: Dictionary = {}
@@ -135,48 +136,29 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 		biome_grid[ivx] = []; biome_grid[ivx].resize(cols)
 		height_grid[ivx] = []; height_grid[ivx].resize(cols)
 
+	var nd: Dictionary = {}
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		var nd: Dictionary = _Noise._noise_for_dim(dim_id)
+		nd = _Noise._noise_for_dim(dim_id)
 		var n_lake: FastNoiseLite      = nd["lake"]
 		var n_lake_type: FastNoiseLite = nd["lake_type"]
 		var n_biome: FastNoiseLite     = nd["biome"]
 		var n_ocean_pre: FastNoiseLite = nd["ocean"]
 
-		# ── Ocean mask (BFS padded) ──────────────────────────────────────────
+		# ── Ocean mask (BFS padded) — bờ biển bất quy tắc nhờ domain warping ──
 		const OCEAN_PAD: int = 26
 		var oct_total: int = cols + 2 * OCEAN_PAD
 		var oct: Array[Array] = []
 		oct.resize(oct_total)
+		var ow: FastNoiseLite = nd["ocean_warp"]
 		for pvx in range(oct_total):
 			oct[pvx] = []; oct[pvx].resize(oct_total)
 			for pvz in range(oct_total):
 				var wx: float = world_ox - half + (float(pvx - OCEAN_PAD) + 0.5) * _Data.VOXEL
 				var wz: float = world_oz - half + (float(pvz - OCEAN_PAD) + 0.5) * _Data.VOXEL
-				oct[pvx][pvz] = (n_ocean_pre.get_noise_2d(wx, wz) + 1.0) * 0.5 > _Data.OCEAN_THRESHOLD
-
-		var ocean_near: PackedByteArray
-		ocean_near.resize(cols * cols)
-		ocean_near.fill(0)
-		var odst_big: Array[Array] = []
-		odst_big.resize(oct_total)
-		for pvx in range(oct_total):
-			odst_big[pvx] = []; odst_big[pvx].resize(oct_total)
-			for pvz in range(oct_total):
-				odst_big[pvx][pvz] = 0 if oct[pvx][pvz] else _Data.CONST_INF
-		for d in range(1, OCEAN_PAD + 1):
-			for pvx in range(oct_total):
-				for pvz in range(oct_total):
-					if odst_big[pvx][pvz] != _Data.CONST_INF: continue
-					if (pvx > 0 and odst_big[pvx-1][pvz] == d-1) \
-					or (pvx < oct_total-1 and odst_big[pvx+1][pvz] == d-1) \
-					or (pvz > 0 and odst_big[pvx][pvz-1] == d-1) \
-					or (pvz < oct_total-1 and odst_big[pvx][pvz+1] == d-1):
-						odst_big[pvx][pvz] = d
-		for ivx in range(cols):
-			for ivz in range(cols):
-				var od2: int = odst_big[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
-				if od2 != _Data.CONST_INF and od2 <= 25:
-					ocean_near[ivx * cols + ivz] = 1
+				# Domain warping: bẻ cong tọa độ bằng noise → bờ biển lồi lõm
+				var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
+				var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
+				oct[pvx][pvz] = (n_ocean_pre.get_noise_2d(wx + warp_x, wz + warp_z) + 1.0) * 0.5 > _Data.OCEAN_THRESHOLD
 
 		var oct_small: Array[Array] = []
 		oct_small.resize(total)
@@ -185,7 +167,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 			for pvz in range(total):
 				oct_small[pvx][pvz] = oct[pvx + OCEAN_PAD - _Data.PAD][pvz + OCEAN_PAD - _Data.PAD]
 
-		const OCEAN_BUFFER: int = 30
+		const OCEAN_BUFFER: int = 45
 		var odst: Array[Array] = []
 		odst.resize(total)
 		for pvx in range(total):
@@ -217,7 +199,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					shore_dst[pvx][pvz] = 1 if adj_land else _Data.CONST_INF
 				else:
 					shore_dst[pvx][pvz] = _Data.CONST_INF
-		const MAX_OCEAN_DEPTH_DIST: int = 20
+		const MAX_OCEAN_DEPTH_DIST: int = 30
 		for d in range(2, MAX_OCEAN_DEPTH_DIST + 1):
 			for pvx in range(total):
 				for pvz in range(total):
@@ -239,10 +221,64 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 
 				if od == 0:
 					biome_grid[ivx][ivz] = _Data.TileType.OCEAN_DEEP
+					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
 					var sd: int = shore_dst[pvx][pvz]
 					if sd == _Data.CONST_INF: sd = MAX_OCEAN_DEPTH_DIST
-					var depth_t: float = clamp(float(sd - 1) / float(MAX_OCEAN_DEPTH_DIST - 1), 0.0, 1.0)
-					height_grid[ivx][ivz] = lerp(-0.5, -4.0, depth_t)
+					var raw_depth_t: float = clamp(float(sd - 1) / float(MAX_OCEAN_DEPTH_DIST - 1), 0.0, 1.0)
+
+					# 3 chế độ địa hình: thềm → sườn → đồng bằng sâu
+					var shelf_var: float = nd["sea_large"].get_noise_2d(wx * 0.5, wz * 0.5) * 0.08
+					var shelf_end: float = 0.12 + shelf_var
+					var slope_end: float = 0.32 + shelf_var * 0.5
+
+					var base_h: float
+					if raw_depth_t < shelf_end:
+						var st: float = raw_depth_t / shelf_end
+						base_h = lerp(-0.3, -1.5, st)
+					elif raw_depth_t < slope_end:
+						var st: float = (raw_depth_t - shelf_end) / max(slope_end - shelf_end, 0.01)
+						st = st * st  # dốc tăng dần
+						base_h = lerp(-1.5, -5.0, st)
+					else:
+						var st: float = (raw_depth_t - slope_end) / max(1.0 - slope_end, 0.01)
+						base_h = lerp(-5.0, -8.5, st)
+
+					# Cấu trúc lớn: sống núi, bồn trũng (amplitude tăng theo depth)
+					var large_n: float = nd["sea_large"].get_noise_2d(wx, wz)
+					base_h += large_n * (0.15 + raw_depth_t * 1.2)
+
+					# Núi ngầm — chỉ ở vùng sâu, có thể trồi gần mặt nước
+					if raw_depth_t > 0.25:
+						var mt_n: float = nd["sea_mountain"].get_noise_2d(wx * 0.8, wz * 0.8)
+						var mt_h: float = max(0.0, mt_n - 0.35) / 0.65
+						mt_h = mt_h * mt_h * (0.3 + raw_depth_t * 2.5)
+						var mt_mask: float = (nd["sea_large"].get_noise_2d(wx * 2.0, wz * 2.0) + 1.0) * 0.5
+						mt_h *= max(0.0, mt_mask)
+						base_h += mt_h
+
+					# Hẻm núi (canyon) — rãnh cắt vào thềm/sườn lục địa
+					var c1: float = nd["sea_rough"].get_noise_2d(wx * 3.0, wz * 0.35)
+					if c1 > 0.40:
+						var c_h: float = (c1 - 0.40) / 0.60
+						var c2: float = nd["sea_rough"].get_noise_2d(wx * 0.35, wz * 3.0)
+						if c2 > 0.40:
+							c_h = max(c_h, (c2 - 0.40) / 0.60)
+						base_h -= c_h * c_h * (0.4 + raw_depth_t * 0.8)
+
+					# Nhấp nhô tầm trung: mạnh ở vùng thềm/sườn, nhẹ ở đồng bằng
+					var rough_n: float = nd["sea_rough"].get_noise_2d(wx, wz)
+					var rough_scale: float = 1.0 - raw_depth_t * 0.6  # gần bờ gồ ghề hơn
+					base_h += rough_n * 0.25 * rough_scale
+
+					# Khe rãnh hẹp (trench) — vực sâu hiếm gặp
+					var trench_n: float = nd["sea_rough"].get_noise_2d(wx * 4.0, wz * 0.5)
+					var trench_t: float = clamp((abs(trench_n) - 0.55) / 0.25, 0.0, 1.0)
+					var trench_mask: float = trench_t * trench_t * (3.0 - 2.0 * trench_t)
+					base_h -= trench_mask * (0.3 + raw_depth_t * 1.0)
+
+					# Chặn không trồi lên mặt nước
+					height_grid[ivx][ivz] = min(base_h, -0.3)
 				elif od <= _Data.BEACH_WIDTH:
 					var beach_t: float = float(od - 1) / float(maxi(_Data.BEACH_WIDTH - 1, 1))
 					biome_grid[ivx][ivz] = _Data.TileType.SAND_WHITE
@@ -265,18 +301,19 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 						if dn > 0.70:
 							biome_grid[ivx][ivz] = _Data.TileType.DIRT
 					else:
-						var in_ocean_buffer: bool = ocean_near[ivx * cols + ivz] == 1
 						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
 						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
 						var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
 						var d: int = dst[pvx][pvz]
 
-						if lake_val > 0.50 and not in_ocean_buffer:
+						# Kiểm tra warped ocean mask trực tiếp — không cho hồ ở biển
+						var is_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
+						if not is_ocean and lake_val > 0.58 and (od == _Data.CONST_INF or od > 40):
 							var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
 							if lake_type_val > 0.50:
-								biome_grid[ivx][ivz] = _Data.TileType.SILT if d <= _Data.PAD else _Data.TileType.SAND
+								biome_grid[ivx][ivz] = _Data.TileType.SILT if d <= _Data.PAD else _Data.TileType.MUDDY_SAND
 							else:
-								biome_grid[ivx][ivz] = _Data.TileType.SAND
+								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND if d <= _Data.PAD else _Data.TileType.SAND
 							height_grid[ivx][ivz] = _Data.WATER_Y if d <= 1 else _Data.WATER_Y - min(d, _Data.PAD) * _BlockData.SLAB_HEIGHT
 						else:
 							biome_grid[ivx][ivz] = _Data.TileType.SAND
@@ -317,7 +354,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	# ── 5. Tạo ChunkBlockData từ biome + height ────────────────────────────────
 	var bd := _BlockData.new()
 	bd.init(cols, cols)
-	_fill_blocks(bd, biome_grid, height_grid, road_grid, cols, dim_id)
+	_fill_blocks(bd, biome_grid, height_grid, road_grid, cols, dim_id, cx, cz, size, nd)
 
 	# ── 6. Build terrain mesh từ block data (greedy mesher) ───────────────────
 	var st := SurfaceTool.new()
@@ -335,7 +372,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var pos := Vector3(px, h, pz)
 				var is_road: bool = road_grid.size() > 0 and road_grid[vx * cols + vz] != 0
 
-				if is_road and b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT:
+				if is_road and b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND:
 					_Detail.add_trail_detail(st, cx, cz, size, vx, vz, pos, 0.0)
 
 				# Sỏi xám trên cát vàng hồ — cát trắng biển không có sỏi
@@ -361,7 +398,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 			if b != _Data.TileType.GRASS \
 			and b != _Data.TileType.SAND \
 			and b != _Data.TileType.SAND_WHITE \
-			and b != _Data.TileType.SILT:
+			and b != _Data.TileType.SILT \
+			and b != _Data.TileType.MUDDY_SAND:
 				vz += 1; continue
 			var start_vz := vz
 			while vz < cols:
@@ -369,7 +407,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				if bb != _Data.TileType.GRASS \
 				and bb != _Data.TileType.SAND \
 				and bb != _Data.TileType.SAND_WHITE \
-				and bb != _Data.TileType.SILT:
+				and bb != _Data.TileType.SILT \
+				and bb != _Data.TileType.MUDDY_SAND:
 					break
 				vz += 1
 			var count: int = vz - start_vz
@@ -409,13 +448,13 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var b: int = biome_grid[vx][vz]
 				var h: float = height_grid[vx][vz]
 				# Chỉ SAND/SILT dưới mặt nước — biển (OCEAN_DEEP) không có rong
-				if b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT: continue
-				if h >= _Data.WATER_Y - h_vox: continue
+				if b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND: continue
+				if h >= _Data.WATER_Y + h_vox: continue
 				var px2: float = -half + (float(vx) + 0.5) * _Data.VOXEL
 				var pz2: float = -half + (float(vz) + 0.5) * _Data.VOXEL
 				var pos2 := Vector3(px2, h, pz2)
 				_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
-					b == _Data.TileType.SILT, lotus_lights)
+					b == _Data.TileType.SILT, b, lotus_lights)
 		mesh_aquatic = st_aq.commit()
 
 	# ── 9. Lamp positions ──────────────────────────────────────────────────────
@@ -426,18 +465,132 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	return {
 		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
 		"lotus_lights": lotus_lights, "biome_grid": biome_grid, "cols": cols,
-		"block_data_bytes": bd.to_bytes(), "lamp_positions": lamp_positions
+		"block_data_bytes": bd.to_bytes(), "lamp_positions": lamp_positions,
+		"sediment_mesh": _build_sediment_mesh(bd, cols)
 	}
+
+## ── _add_quad_uv: quad với UV (dùng cho sediment texture) ──────────────────
+static func _add_quad_uv(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,
+		n: Vector3) -> void:
+	st.set_normal(n)
+	st.set_uv(Vector2(0, 0)); st.add_vertex(center - u - v)
+	st.set_uv(Vector2(1, 0)); st.add_vertex(center + u - v)
+	st.set_uv(Vector2(1, 1)); st.add_vertex(center + u + v)
+	st.set_uv(Vector2(0, 0)); st.add_vertex(center - u - v)
+	st.set_uv(Vector2(1, 1)); st.add_vertex(center + u + v)
+	st.set_uv(Vector2(0, 1)); st.add_vertex(center - u + v)
+
+## ── _get_sediment_material: tạo 8x8 texture procedural kiểu Minecraft ──────
+static var _sediment_mat: Material = null
+static func _get_sediment_material() -> Material:
+	if _sediment_mat != null:
+		return _sediment_mat
+	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
+	var base := Color(0.50, 0.20, 0.10)
+	for y in range(8):
+		for x in range(8):
+			var h: int = x * 374761393 + y * 668265263 + 12345
+			h = (h ^ (h >> 13)) * 1274126177
+			h = h ^ (h >> 16)
+			var r := float(h & 0x7FFFFFFF) / 2147483648.0
+			var c := Color(
+				base.r + (r - 0.5) * 0.25,
+				base.g + (r - 0.5) * 0.15,
+				base.b + (r - 0.5) * 0.10
+			)
+			# Thêm hạt khoáng đỏ đồng và nâu đất xen kẽ
+			h = h * 16807 + 1
+			var speck := float(h & 0x7FFFFFFF) / 2147483648.0
+			if speck > 0.92:
+				c = Color(0.55, 0.18, 0.08)  # hạt nâu đậm
+			elif speck < 0.06:
+				c = Color(0.65, 0.30, 0.12)  # hạt đỏ đồng sáng
+			img.set_pixel(x, y, c)
+	var tex := ImageTexture.create_from_image(img)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = tex
+	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	mat.roughness = 0.9
+	mat.metallic_specular = 0.0
+	_sediment_mat = mat
+	return mat
+
+## ── _build_sediment_mesh: tách SEDIMENT ra mesh riêng có UV ─────────────────
+static func _build_sediment_mesh(bd: _BlockData, cols: int) -> ArrayMesh:
+	const Y_MIN := _BlockData.Y_MIN
+	const CHUNK_H := _BlockData.CHUNK_H
+	const SLAB := _BlockData.SLAB_HEIGHT
+	const B := _Data.BlockID
+	var hw: float = _Data.VOXEL * 0.5
+	var half: float = float(cols) * _Data.VOXEL * 0.5
+
+	# Tìm top layer SEDIMENT cho mỗi column
+	var top_ly := PackedInt32Array()
+	top_ly.resize(cols * cols)
+	top_ly.fill(-1)
+	for x in range(cols):
+		for z in range(cols):
+			for ly in range(CHUNK_H - 1, -1, -1):
+				if bd.get_block(x, ly, z) == B.SEDIMENT:
+					top_ly[x * cols + z] = ly
+					break
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	for x in range(cols):
+		for z in range(cols):
+			var ly: int = top_ly[x * cols + z]
+			if ly < 0: continue
+			var cx_f: float = -half + (float(x) + 0.5) * _Data.VOXEL
+			var cz_f: float = -half + (float(z) + 0.5) * _Data.VOXEL
+			var cy_top: float = float(ly + Y_MIN) * SLAB + SLAB
+			var cy_bot: float = float(ly + Y_MIN) * SLAB
+
+			# Top face (offset 0.005 để overlay lên main mesh tránh z-fighting)
+			_add_quad_uv(st, Vector3(cx_f, cy_top + 0.005, cz_f),
+				Vector3(hw, 0, 0), Vector3(0, 0, hw), Vector3(0, 1, 0))
+
+			# Bottom face (chỉ render nếu block bên dưới là AIR/WATER)
+			if ly > 0:
+				var below: int = bd.get_block(x, ly - 1, z)
+				if below == B.AIR or below == B.WATER:
+					_add_quad_uv(st, Vector3(cx_f, cy_bot, cz_f),
+						Vector3(-hw, 0, 0), Vector3(0, 0, hw), Vector3(0, -1, 0))
+
+			# Side faces — render khi kế bên không có SEDIMENT hoặc thấp hơn
+			var checks: Array = [
+				[z > 0, x, z - 1, Vector3(0, 0, -1), Vector3(0, 0, -hw)],
+				[z < cols - 1, x, z + 1, Vector3(0, 0, 1), Vector3(0, 0, hw)],
+				[x > 0, x - 1, z, Vector3(-1, 0, 0), Vector3(-hw, 0, 0)],
+				[x < cols - 1, x + 1, z, Vector3(1, 0, 0), Vector3(hw, 0, 0)],
+			]
+			for c in checks:
+				if not c[0]: continue
+				var nx: int = c[1]; var nz: int = c[2]
+				var nly: int = top_ly[nx * cols + nz]
+				if nly >= ly: continue
+				var nrm: Vector3 = c[3]; var off: Vector3 = c[4]
+				var n_top: float = float(nly + Y_MIN) * SLAB + SLAB if nly >= 0 else float(Y_MIN) * SLAB
+				var side_h: float = cy_top - max(cy_bot, n_top)
+				if side_h <= 0: continue
+				var cy_mid: float = cy_top - side_h * 0.5
+				var side_u: Vector3 = Vector3(hw, 0, 0) if abs(off.x) < 0.01 else Vector3(0, 0, hw)
+				_add_quad_uv(st, Vector3(cx_f + off.x * 0.5, cy_mid, cz_f + off.z * 0.5),
+					side_u, Vector3(0, side_h * 0.5, 0), nrm)
+
+	return st.commit()
 
 ## ── _fill_blocks: map biome/height → slab block IDs ─────────────────────────
 ## BEDROCK LAYER: Layer 0 (Y_MIN) luôn là BEDROCK (không thể phá vỡ)
 ## STONE fill từ layer 1 đến top_slab-2
 ## Hồ có đáy STONE chắc chắn, không rớt void
 static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
-		road_grid: PackedByteArray, cols: int, dim_id: int) -> void:
+		road_grid: PackedByteArray, cols: int, dim_id: int, cx: int = 0, cz: int = 0, size: int = 32,
+		nd: Dictionary = {}) -> void:
 	const SLAB := _BlockData.SLAB_HEIGHT  # 0.5
-	const Y_MIN := _BlockData.Y_MIN       # -6 (9 layers: 0..8)
-	const CHUNK_H := _BlockData.CHUNK_H   # 9
+	const Y_MIN := _BlockData.Y_MIN       # -18 (21 layers: 0..20)
+	const CHUNK_H := _BlockData.CHUNK_H   # 21
 	const B := _Data.BlockID
 
 	for x in range(cols):
@@ -453,12 +606,32 @@ static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 				_Data.TileType.SAND_WHITE: top_block = B.OCEAN_SAND
 				_Data.TileType.DIRT:       top_block = B.DIRT
 				_Data.TileType.SILT:       top_block = B.SILT
-				_Data.TileType.OCEAN_DEEP: top_block = B.SAND   # đáy biển là cát
+				_Data.TileType.MUDDY_SAND: top_block = B.MUDDY_SAND
+				_Data.TileType.OCEAN_DEEP:
+					if nd.is_empty() or not nd.has("sea_biome"):
+						top_block = B.OCEAN_FLOOR
+					else:
+						var wx: float = float(cx * size + x)
+						var wz: float = float(cz * size + z)
+						var sea_bm: float = (nd["sea_biome"].get_noise_2d(wx, wz) + 1.0) * 0.5
+						if sea_bm < 0.15:
+							top_block = B.STONE       # rạn đá
+						elif sea_bm < 0.28:
+							top_block = B.OCEAN_GRAVEL  # sỏi biển
+						elif sea_bm < 0.52:
+							top_block = B.OCEAN_FLOOR   # cát thô xám xanh
+						elif sea_bm < 0.72:
+							top_block = B.SAND        # cát sáng
+						elif sea_bm < 0.88:
+							top_block = B.OCEAN_MUD   # bùn biển sâu
+						else:
+							top_block = B.OCEAN_GRAVEL # sỏi biển
 
 			var is_trail: bool = road_grid.size() > 0 and road_grid[x * cols + z] != 0 \
 					and biome != _Data.TileType.SAND \
 					and biome != _Data.TileType.SAND_WHITE \
 					and biome != _Data.TileType.SILT \
+					and biome != _Data.TileType.MUDDY_SAND \
 					and biome != _Data.TileType.OCEAN_DEEP
 			if is_trail:
 				top_block = B.TRAIL
@@ -499,6 +672,44 @@ static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 						bd.set_block(x, ly, z, B.WATER)
 					else:
 						bd.set_block(x, ly, z, B.AIR)
+
+	# ── Trầm tích hồ: cụm 3~7 khối SEDIMENT màu đỏ đồng, tụ lại thành mảng ──
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		var dirs: Array[Vector2i] = [
+			Vector2i(0,0), Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1),
+			Vector2i(1,1), Vector2i(-1,1), Vector2i(1,-1), Vector2i(-1,-1)
+		]
+		for x in range(cols):
+			for z in range(cols):
+				var biome: int = biome_grid[x][z]
+				if biome != _Data.TileType.SAND and biome != _Data.TileType.MUDDY_SAND: continue
+				var h: float = height_grid[x][z]
+				if h >= _Data.WATER_Y - _BlockData.SLAB_HEIGHT: continue
+				var wx2: int = cx * size + x
+				var wz2: int = cz * size + z
+				var hh: int = wx2 * 374761393 + wz2 * 668265263
+				hh = (hh ^ (hh >> 13)) * 1274126177
+				hh = hh ^ (hh >> 16)
+				var r := float(hh & 0x7FFFFFFF) / 2147483648.0
+				if r >= 0.003: continue
+				var s: int = hh
+				s = s * 16807 + 1
+				var cluster_size: int = 3 + (s & 3)  # 3..6
+				if (s & 4) != 0: cluster_size += 1  # 3..7
+				var placed: int = 0
+				for di in dirs.size():
+					if placed >= cluster_size: break
+					var nx: int = x + dirs[di].x
+					var nz: int = z + dirs[di].y
+					if nx < 0 or nx >= cols or nz < 0 or nz >= cols: continue
+					var nb: int = biome_grid[nx][nz]
+					if nb != _Data.TileType.SAND and nb != _Data.TileType.MUDDY_SAND: continue
+					var nh: float = height_grid[nx][nz]
+					if nh >= _Data.WATER_Y - _BlockData.SLAB_HEIGHT: continue
+					var top_slab: int = floori((nh - _BlockData.SLAB_HEIGHT) / _BlockData.SLAB_HEIGHT) - _BlockData.Y_MIN
+					if top_slab < 0: continue
+					bd.set_block(nx, top_slab, nz, B.SEDIMENT)
+					placed += 1
 
 ## ── _build_terrain_mesh: COLUMN-TOP OPTIMIZED ────────────────────────────────
 ## Terrain này hầu như phẳng → mỗi column X/Z chỉ có 1–2 layer lộ ra.
@@ -722,14 +933,28 @@ func apply_chunk(data: Dictionary) -> void:
 		container.add_child(mi_aq)
 		_aquatic_mesh_instance = mi_aq
 
+	var sediment_mesh: ArrayMesh = data.get("sediment_mesh")
+	if sediment_mesh:
+		var mi_s := MeshInstance3D.new()
+		mi_s.mesh = sediment_mesh
+		mi_s.material_override = _get_sediment_material()
+		mi_s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		container.add_child(mi_s)
+		_sediment_mesh_instance = mi_s
+
 	var lotus_positions: Array[Vector3] = data.get("lotus_lights", [] as Array[Vector3])
 	for lpos in lotus_positions:
 		var is_weed_light: bool = lpos.x > 400.0
 		var real_pos := Vector3(lpos.x - (500.0 if is_weed_light else 0.0), lpos.y, lpos.z)
 		var light := OmniLight3D.new()
-		light.light_color      = Color(0.45, 0.85, 1.0)
-		light.light_energy     = 0.0
-		light.omni_range       = 2.0 if is_weed_light else 3.0
+		if is_weed_light:
+			light.light_color      = Color(1.0, 0.82, 0.08)  # vàng quả
+			light.light_energy     = 0.6
+			light.omni_range       = 1.5
+		else:
+			light.light_color      = Color(0.45, 0.85, 1.0)  # xanh sen
+			light.light_energy     = 0.0
+			light.omni_range       = 3.0
 		light.omni_attenuation = 2.5
 		light.shadow_enabled   = false
 		light.light_specular   = 0.0
@@ -796,7 +1021,7 @@ func rebuild_mesh() -> void:
 	for ch in get_children():
 		if ch is MeshInstance3D:
 			var mi := ch as MeshInstance3D
-			if mi != _water_mesh_instance and mi != _aquatic_mesh_instance:
+			if mi != _water_mesh_instance and mi != _aquatic_mesh_instance and mi != _sediment_mesh_instance:
 				mi.queue_free()
 
 	var st := SurfaceTool.new()
@@ -857,11 +1082,11 @@ shader_type spatial;
 render_mode blend_mix, cull_disabled, unshaded;
 uniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float sway_speed  : hint_range(0.1, 5.0) = 1.6;
-uniform float sway_amount : hint_range(0.0, 0.5) = 0.07;
+uniform float sway_amount : hint_range(0.0, 0.5) = 0.035;
 uniform float sway_freq   : hint_range(0.1, 8.0) = 2.8;
 void vertex() {
 	float is_flat = step(0.85, abs(NORMAL.y));
-	float height_factor = max(0.0, VERTEX.y + 0.5) * 0.7 * (1.0 - is_flat);
+	float height_factor = max(0.0, VERTEX.y + 0.5) * 0.7;
 	float phase_x = VERTEX.x * 3.7 + VERTEX.z * 1.3;
 	float phase_z = VERTEX.z * 3.1 + VERTEX.x * 1.7;
 	float w1  = sin(TIME * sway_speed + phase_x) * sway_amount * height_factor;
@@ -880,6 +1105,7 @@ void fragment() {
 """
 	var m := ShaderMaterial.new()
 	m.shader = shader
+	m.render_priority = 1
 	return m
 
 ## ── is_water_at (legacy API cho OpenWorldManager) ────────────────────────────

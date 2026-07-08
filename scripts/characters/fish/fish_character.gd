@@ -165,6 +165,17 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if not is_alive:
+		if _state == State.DEAD:
+			_death_timer -= delta
+			velocity.x *= 0.85
+			velocity.z *= 0.85
+			velocity.y -= 1.5 * delta
+			if _fish_anim:
+				_fish_anim.animate(delta)
+			rotation.x = lerp(rotation.x, PI, delta * 1.2)
+			move_and_slide()
+			if _death_timer <= 0.0:
+				queue_free()
 		return
 
 	_bob_phase += delta * randf_range(0.6, 1.4)
@@ -501,3 +512,35 @@ func take_damage(dmg: int, attacker: Node3D = null) -> void:
 				_target_dir = away.normalized()
 				_swim_dir = _target_dir
 				_turn_rate = 12.0
+
+# ── Loot ──────────────────────────────────────────────────────────────────────
+
+# Mỗi biến thể: [ { item_id, rate_0_1 }, ... ]
+const LOOT_TABLE: Dictionary = {
+	FishVariant.CARP:       [ { id = "ca_chep",       rate = 0.50 } ],
+	FishVariant.PERCH:      [ { id = "ca_ro",         rate = 0.50 } ],
+	FishVariant.TILAPIA:    [ { id = "ca_dieu_hong",  rate = 0.50 } ],
+	FishVariant.SNAKEHEAD:  [ { id = "ca_loc",        rate = 0.60 } ],
+	FishVariant.FLOWERHORN: [ { id = "ca_la_han",     rate = 0.70 } ],
+	FishVariant.SHRIMP:     [ { id = "tom",           rate = 0.40 } ],
+}
+
+const _DroppedItem = preload("res://scripts/items/world/dropped_item.gd")
+const _ItemDef = preload("res://scripts/items/core/item_def.gd")
+const _ItemDB = preload("res://scripts/items/core/inventory.gd")
+
+func _die(_attacker: Node3D = null) -> void:
+	super._die(_attacker)
+	_roll_loot()
+
+func _roll_loot() -> void:
+	var table: Array = LOOT_TABLE.get(fish_variant, [])
+	var world := get_tree().current_scene
+	if world == null:
+		return
+	var db := _ItemDB.create_item_db()
+	for entry in table:
+		if randf() < entry.rate:
+			var defn: ItemDef = db.get(entry.id)
+			if defn:
+				_DroppedItem.spawn(world, defn, global_position)
