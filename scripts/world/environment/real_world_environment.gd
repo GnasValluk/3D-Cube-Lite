@@ -47,22 +47,91 @@ func _ready() -> void:
 	env.ambient_light_color  = _keys[0]["amb"]
 	env.ambient_light_energy = _keys[0]["ae"]
 
-	env.glow_enabled = false
-
-	env.adjustment_enabled = false
-
-	env.tonemap_mode     = Environment.TONE_MAPPER_FILMIC
-	env.tonemap_exposure = 1.0
-	env.tonemap_white    = 1.0
+	_apply_graphics_preset(env)
 
 	environment = env
+
+	if SettingsManager:
+		SettingsManager.on_preset_changed(_reapply_preset)
 
 	await get_tree().process_frame
 	_setup_lights()
 
+func _apply_graphics_preset(env: Environment) -> void:
+	var preset: int = SettingsManager.graphics_preset if SettingsManager else 0
+
+	match preset:
+		SettingsManager.GraphicsPreset.STANDARD:
+			env.glow_enabled = false
+			env.adjustment_enabled = false
+			env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+			env.tonemap_exposure = 1.0
+			env.tonemap_white = 1.0
+
+		SettingsManager.GraphicsPreset.ENHANCED:
+			env.glow_enabled = true
+			env.glow_normalized = true
+			env.glow_intensity = 0.4
+			env.glow_strength = 0.8
+			env.glow_bloom = 0.15
+			env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+			env.glow_hdr_threshold = 1.0
+			env.glow_hdr_scale = 1.0
+			env.set_glow_level(0, false)
+			env.set_glow_level(1, true)
+			env.set_glow_level(2, true)
+			env.set_glow_level(3, false)
+			env.set_glow_level(4, false)
+			env.set_glow_level(5, false)
+			env.set_glow_level(6, false)
+
+			env.adjustment_enabled = true
+			env.adjustment_brightness = 0.98
+			env.adjustment_contrast = 1.02
+			env.adjustment_saturation = 1.1
+
+			env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+			env.tonemap_exposure = 1.0
+			env.tonemap_white = 1.0
+
+		SettingsManager.GraphicsPreset.REALISTIC:
+			env.glow_enabled = true
+			env.glow_normalized = true
+			env.glow_intensity = 0.6
+			env.glow_strength = 1.2
+			env.glow_bloom = 0.2
+			env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SOFTLIGHT
+			env.glow_hdr_threshold = 0.8
+			env.glow_hdr_scale = 1.5
+			env.set_glow_level(0, true)
+			env.set_glow_level(1, true)
+			env.set_glow_level(2, true)
+			env.set_glow_level(3, true)
+			env.set_glow_level(4, false)
+			env.set_glow_level(5, false)
+			env.set_glow_level(6, false)
+
+			env.adjustment_enabled = true
+			env.adjustment_brightness = 1.0
+			env.adjustment_contrast = 1.05
+			env.adjustment_saturation = 1.2
+
+			env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+			env.tonemap_exposure = 1.0
+			env.tonemap_white = 1.0
+
+			env.ssao_enabled = true
+			env.ssao_radius = 0.8
+			env.ssao_intensity = 0.5
+			env.ssao_power = 1.2
+			env.ssao_detail = 0.3
+
+	SettingsManager.apply_viewport_settings(get_viewport())
+
 func _setup_lights() -> void:
 	var dir := get_parent().find_child("DirectionalLight3D", true, false) as DirectionalLight3D
 	if dir:
+		_apply_shadow_settings(dir)
 		_dir_light = dir
 
 	var all := get_parent().find_children("PlayerLight", "OmniLight3D", true, false)
@@ -70,6 +139,35 @@ func _setup_lights() -> void:
 		var l := lt as OmniLight3D
 		if l:
 			l.light_energy = 0.0
+
+func _apply_shadow_settings(dir: DirectionalLight3D) -> void:
+	var preset: int = SettingsManager.graphics_preset if SettingsManager else 0
+
+	match preset:
+		SettingsManager.GraphicsPreset.STANDARD:
+			dir.shadow_enabled = false
+		SettingsManager.GraphicsPreset.ENHANCED:
+			dir.shadow_enabled = true
+			dir.shadow_bias = 0.02
+			dir.shadow_normal_bias = 0.5
+			dir.directional_shadow_max_distance = 50.0
+			dir.directional_shadow_split_1 = 0.1
+			dir.directional_shadow_split_2 = 0.3
+			dir.directional_shadow_split_3 = 0.6
+			dir.directional_shadow_blend_splits = false
+		SettingsManager.GraphicsPreset.REALISTIC:
+			dir.shadow_enabled = true
+			dir.shadow_bias = 0.01
+			dir.shadow_normal_bias = 0.3
+			dir.directional_shadow_max_distance = 100.0
+			dir.directional_shadow_split_1 = 0.12
+			dir.directional_shadow_split_2 = 0.3
+			dir.directional_shadow_split_3 = 0.55
+			dir.directional_shadow_blend_splits = true
+
+func _reapply_preset() -> void:
+	if environment:
+		_apply_graphics_preset(environment)
 
 func _process(delta: float) -> void:
 	var h: float = _get_hour()

@@ -3,8 +3,8 @@ class_name OpenWorldManager
 
 const CHUNK_SIZE: int = 32
 const VIEW_RADIUS: int = 2
-const PRELOAD_RADIUS: int = 3    # giảm từ 4 → 3: 7×7=49 chunks thay vì 9×9=81
-const MAX_LOADING_PER_FRAME: int = 2  # giảm từ 8 → 2: tránh spike CPU mỗi frame
+const PRELOAD_RADIUS: int = 2
+const MAX_LOADING_PER_FRAME: int = 1
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 
@@ -67,7 +67,7 @@ func _process(_delta: float) -> void:
 
 	# Promote completed async chunks — tối đa 1 chunk/frame để tránh spike
 	var promoted: int = 0
-	for ck in _loading.keys().duplicate():
+	for ck in _loading.keys():
 		if promoted >= 1:
 			break
 		var chunk: WorldChunk = _loading[ck] as WorldChunk
@@ -95,11 +95,11 @@ func _process(_delta: float) -> void:
 			for dz in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
 				keep.append(Vector2i(cx + dx, cz + dz))
 
-		for key in _chunks.keys().duplicate():
+		for key in _chunks.keys():
 			if not key in keep:
 				_chunks[key].queue_free()
 				_chunks.erase(key)
-		for key in _loading.keys().duplicate():
+		for key in _loading.keys():
 			if not key in keep:
 				var ck_pending: String = "%d,%d,%d" % [key.x, key.y, dimension_id]
 				WorldChunk._pending_chunks.erase(ck_pending)

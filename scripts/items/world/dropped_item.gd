@@ -2,11 +2,15 @@ class_name DroppedItem
 extends Area3D
 
 const _WeaponMesh := preload("res://scripts/characters/player/weapon_mesh.gd")
+const PlantProp := preload("res://scripts/world/props/plant_prop.gd")
 
 var item_def: ItemDef = null
 var item_count: int = 1
 var _time_alive: float = 0.0
 var can_pickup: bool = false
+var _flying: bool = false
+var _velocity: Vector3 = Vector3.ZERO
+var _ground_y: float = 0.0
 
 func init(def_: ItemDef, count: int = 1):
 	item_def = def_
@@ -31,6 +35,10 @@ func _setup_mesh():
 		_WeaponMesh.build(pivot, item_id)
 	elif item_id in ["ca_chep", "ca_ro", "ca_dieu_hong", "ca_loc", "ca_la_han", "tom"]:
 		_build_fish_model(root, item_id)
+	elif item_id == "mon_ngot":
+		PlantProp.build_drop_mesh(root, "weed")
+	elif item_id == "rong_nhiet_doi":
+		PlantProp.build_drop_mesh(root, "taro")
 	else:
 		ItemMesh.build(root, item_id)
 
@@ -84,6 +92,11 @@ func _build_fish_model(parent: Node3D, item_id: String) -> void:
 		parent.add_child(rig)
 	temp.queue_free()
 
+func launch(initial_velocity: Vector3, ground_y: float) -> void:
+	_flying = true
+	_velocity = initial_velocity
+	_ground_y = ground_y
+
 func _ready() -> void:
 	var timer := Timer.new()
 	timer.one_shot = true
@@ -94,10 +107,21 @@ func _ready() -> void:
 
 func _process(delta: float):
 	_time_alive += delta
-	var bob := sin(_time_alive * 2.0) * 0.05
-	position.y += bob * delta * 2.0
-	var rot := delta * 30.0
-	rotation.y += deg_to_rad(rot)
+	if _flying:
+		_velocity.y -= 9.8 * delta
+		position += _velocity * delta
+		rotation.x += delta * 6.0
+		rotation.z += delta * 4.0
+		if position.y <= _ground_y:
+			position.y = _ground_y
+			_flying = false
+			rotation.x = 0.0
+			rotation.z = 0.0
+	else:
+		var bob := sin(_time_alive * 2.0) * 0.05
+		position.y += bob * delta * 2.0
+		var rot := delta * 30.0
+		rotation.y += deg_to_rad(rot)
 
 func collect(player: Node) -> bool:
 	if not can_pickup:
@@ -110,9 +134,11 @@ func collect(player: Node) -> bool:
 		item_count = remaining
 	return false
 
-static func spawn(world: Node3D, def_: ItemDef, pos: Vector3, count: int = 1) -> DroppedItem:
+static func spawn(world: Node3D, def_: ItemDef, pos: Vector3, count: int = 1, velocity: Vector3 = Vector3.ZERO, ground_y: float = -INF) -> DroppedItem:
 	var item := DroppedItem.new()
 	item.init(def_, count)
 	item.position = pos + Vector3(0, 0.2, 0)
 	world.add_child(item)
+	if velocity != Vector3.ZERO:
+		item.launch(velocity, ground_y if ground_y > -INF else pos.y)
 	return item

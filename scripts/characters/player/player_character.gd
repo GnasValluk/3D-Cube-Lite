@@ -219,7 +219,9 @@ func drop_item(idx: int) -> void:
 	inventory.remove_item(idx, count)
 	var drop_pos: Vector3 = global_position + -global_transform.basis.z * 2.5
 	drop_pos.y += 0.3
-	DroppedItem.spawn(world, item_def, drop_pos, count)
+	var fwd := -global_transform.basis.z
+	var vel := (fwd * 2.0 + Vector3(0, 3.0, 0)) * 0.7
+	DroppedItem.spawn(world, item_def, drop_pos, count, vel, drop_pos.y)
 	_scroll_inventory_message(tr("DROP_MSG").format({"s": item_def.name, "n": count}))
 
 func _update_weapon_mesh() -> void:

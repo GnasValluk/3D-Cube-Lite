@@ -33,6 +33,7 @@ var _water_mesh_instance: MeshInstance3D = null
 var _aquatic_mesh_instance: MeshInstance3D = null
 var _sediment_mesh_instance: MeshInstance3D = null
 var _lotus_lights: Array[OmniLight3D] = []
+var _prop_queue: Array = []
 
 static var _mesh_cache: Dictionary = {}
 static var _pending_chunks: Dictionary = {}
@@ -440,6 +441,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	# ── 8. Aquatic mesh — chỉ hồ (SAND/SILT), biển không có rong/sen ───────────
 	var mesh_aquatic = null
 	var lotus_lights: Array[Vector3] = []
+	var plant_props: Array[Dictionary] = []
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		var st_aq := SurfaceTool.new()
 		st_aq.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -454,7 +456,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var pz2: float = -half + (float(vz) + 0.5) * _Data.VOXEL
 				var pos2 := Vector3(px2, h, pz2)
 				_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
-					b == _Data.TileType.SILT, b, lotus_lights)
+					b == _Data.TileType.SILT, b, lotus_lights, plant_props)
 		mesh_aquatic = st_aq.commit()
 
 	# ── 9. Lamp positions ──────────────────────────────────────────────────────
@@ -466,7 +468,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
 		"lotus_lights": lotus_lights, "biome_grid": biome_grid, "cols": cols,
 		"block_data_bytes": bd.to_bytes(), "lamp_positions": lamp_positions,
-		"sediment_mesh": _build_sediment_mesh(bd, cols)
+		"sediment_mesh": _build_sediment_mesh(bd, cols),
+		"plant_props": plant_props
 	}
 
 ## ── _add_quad_uv: quad với UV (dùng cho sediment texture) ──────────────────
@@ -927,7 +930,7 @@ func apply_chunk(data: Dictionary) -> void:
 		var mi_aq := MeshInstance3D.new()
 		mi_aq.mesh = aquatic_mesh
 		if not _mat_cache[_dimension_id].has("aquatic"):
-			_mat_cache[_dimension_id]["aquatic"] = _make_aquatic_mat()
+			_mat_cache[_dimension_id]["aquatic"] = make_aquatic_mat()
 		mi_aq.material_override = _mat_cache[_dimension_id]["aquatic"]
 		mi_aq.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		container.add_child(mi_aq)
@@ -986,7 +989,29 @@ func apply_chunk(data: Dictionary) -> void:
 		if not lamp_positions.is_empty():
 			_lamp_spawn_coroutine(lamp_positions)
 
+	# Spawn plant props (taro, seaweed) — throttle 2 props/frame
+	_prop_queue = data.get("plant_props", []).duplicate()
+	if not _prop_queue.is_empty():
+		set_process(true)
+
 	_built = true
+
+## Process prop queue — 2 props/frame để tránh spike
+func _process(_delta: float) -> void:
+	var count: int = mini(2, _prop_queue.size())
+	for _i in range(count):
+		if _prop_queue.is_empty():
+			break
+		var pd: Dictionary = _prop_queue.pop_front()
+		var ptype: String = pd.get("type", "weed")
+		var prop := PlantProp.new(50, DestroyableProp.WeaponReq.SWORD,
+			"mon_ngot" if ptype == "weed" else "rong_nhiet_doi")
+		prop.position = pd["pos"]
+		prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0),
+			pd.get("has_silt", false), pd.get("water_gap", 1.0))
+		add_child(prop)
+	if _prop_queue.is_empty():
+		set_process(false)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
@@ -1075,7 +1100,10 @@ func place_block_at(wx: float, wy: float, wz: float, block_id: int) -> bool:
 	return true
 
 ## ── Aquatic shader ────────────────────────────────────────────────────────────
-func _make_aquatic_mat() -> ShaderMaterial:
+static func make_aquatic_mat() -> ShaderMaterial:
+	return _build_aquatic_shader()
+
+static func _build_aquatic_shader() -> ShaderMaterial:
 	var shader := Shader.new()
 	shader.code = """
 shader_type spatial;
@@ -1108,19 +1136,15 @@ void fragment() {
 	m.render_priority = 1
 	return m
 
-## ── is_water_at (legacy API cho OpenWorldManager) ────────────────────────────
+## ── is_water_at: kiểm tra block data thực tế, không dựa vào biome ────────────
 func is_water_at(wx: float, wz: float, wy: float) -> bool:
-	if _biome_grid.is_empty(): return false
+	if block_data == null: return false
 	var half: float = _size * 0.5
 	var vx: int = int((wx - (global_position.x - half)) / _Data.VOXEL)
 	var vz: int = int((wz - (global_position.z - half)) / _Data.VOXEL)
 	if vx < 0 or vx >= _cols or vz < 0 or vz >= _cols: return false
-	var b: int = _biome_grid[vx][vz]
-	if b == _Data.TileType.SAND or b == _Data.TileType.SAND_WHITE or b == _Data.TileType.SILT:
-		return wy < _Data.VOXEL * 0.46
-	if b == _Data.TileType.OCEAN_DEEP:
-		return wy < _Data.WATER_Y
-	return false
+	var layer: int = _BlockData.world_y_to_layer(wy)
+	return block_data.get_block(vx, layer, vz) == _Data.BlockID.WATER
 
 ## ── _compute_lamp_positions_static: chạy trên worker thread ─────────────────
 ## Static version — không truy cập instance state, an toàn từ thread
@@ -1331,7 +1355,6 @@ func _lamp_spawn_coroutine(positions: Array) -> void:
 ## ── _spawn_road_lamps (legacy — kept for reference) ─────────────────────────
 func _spawn_road_lamps() -> void:
 	_lamp_spawn_coroutine(_compute_lamp_positions())
-
 
 ## ── _add_quad (shared helper) ────────────────────────────────────────────────
 static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,

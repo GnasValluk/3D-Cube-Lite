@@ -83,6 +83,7 @@ const DROWN_DAMAGE_INTERVAL: float = 1.5
 var _drown_timer: float = 0.0
 var _underwater: bool = false
 var _swim_jump_cd: float = 0.0
+var _water_check_cd: float = 0.0
 
 # ── State machine ─────────────────────────────────────────────────────────────
 enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD, SWIM }
@@ -539,16 +540,20 @@ func _physics_process(delta: float) -> void:
 		_animate(delta)
 		return
 
-	# Water detection
-	var was_underwater := _underwater
-	if _water_mgr == null or not _water_mgr.is_inside_tree():
-		_water_mgr = _find_water_manager()
-	if _water_mgr != null:
-		_underwater = _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y)
-	else:
-		_underwater = false
-	if _underwater != was_underwater:
-		submerged.emit(_underwater)
+	# Water detection — player check mỗi frame, NPC throttle
+	_water_check_cd -= delta
+	if _is_player or _water_check_cd <= 0.0:
+		if not _is_player:
+			_water_check_cd = 0.5
+		var was_underwater := _underwater
+		if _water_mgr == null or not _water_mgr.is_inside_tree():
+			_water_mgr = _find_water_manager()
+		if _water_mgr != null:
+			_underwater = _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y)
+		else:
+			_underwater = false
+		if _underwater != was_underwater:
+			submerged.emit(_underwater)
 
 	# Underwater / swimming
 	if _underwater:
@@ -731,6 +736,35 @@ func _do_melee_hit() -> void:
 					if dot >= 0.4:
 						SFXManager.play_damage_hit()
 						f.take_damage(calc_skill_damage(melee_damage), self)
+
+	# Also hit destroyable props (đèn, cây, v.v.)
+	var weapon_id: String = ""
+	if _is_player:
+		var pc := self as PlayerCharacter
+		if pc and pc.equipped_weapon != null:
+			weapon_id = pc.equipped_weapon.id
+	var tree := get_tree()
+	if tree == null:
+		return
+	var prop_nodes := tree.get_nodes_in_group("destroyable_props")
+	for pn in prop_nodes:
+		if not is_instance_valid(pn):
+			continue
+		var prop := pn as DestroyableProp
+		if prop == null:
+			continue
+		var offset: Vector3 = prop.global_position - global_position
+		offset.y = 0.0
+		var dist: float = offset.length()
+		if dist <= melee_range:
+			var dot: float = fwd.dot(offset / dist)
+			if dot >= 0.4:
+				var dmg: int = 1
+				if _is_player:
+					var pc := self as PlayerCharacter
+					if pc and pc.equipped_weapon != null:
+						dmg = pc.equipped_weapon.atk_bonus
+				prop.try_destroy(weapon_id, dmg)
 
 func _find_character_manager() -> Node:
 	var p := get_parent()

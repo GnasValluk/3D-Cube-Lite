@@ -85,6 +85,11 @@ var _orbit_angle: float = 0.0
 var _hunt_cooldown: float = 0.0
 var _hunt_scan_timer: float = 0.0
 
+# Cache
+var _bob_rate: float = 1.0
+var _boids_result: Vector3 = Vector3.FORWARD
+var _alert_check_cooldown: float = 0.0
+
 const HOME_RADIUS: float = 20.0
 const FLEE_SPEED_MULT: float = 2.2
 
@@ -158,6 +163,7 @@ func _ready() -> void:
 	super._ready()
 	_home = global_position
 	_bob_phase = randf_range(0.0, TAU)
+	_bob_rate = randf_range(0.6, 1.4)
 	add_to_group("fish")
 	var a := randf_range(0.0, TAU)
 	_swim_dir = Vector3(cos(a), 0, sin(a))
@@ -178,10 +184,11 @@ func _physics_process(delta: float) -> void:
 				queue_free()
 		return
 
-	_bob_phase += delta * randf_range(0.6, 1.4)
+	_bob_phase += delta * _bob_rate
 	_scan_timer -= delta
 	_wall_cooldown -= delta
 	_wall_memory_timer = max(0.0, _wall_memory_timer - delta)
+	_alert_check_cooldown -= delta
 	if _flee_timer > 0.0:
 		_flee_timer -= delta
 	if _alert_timer > 0.0:
@@ -193,16 +200,16 @@ func _physics_process(delta: float) -> void:
 		if not _is_predator() and _wall_cooldown <= 0.0:
 			_avoid_walls()
 	else:
-		# Scan neighbors periodically
+		# Scan neighbors periodically + recompute boids only on new scan
 		if _scan_timer <= 0.0:
 			_scan_neighbors()
+			_boids_result = _compute_boids()
+		var boids_dir := _boids_result
 
-		# Compute boids flocking force
-		var boids_dir := _compute_boids()
-
-		# Alert propagation — hoảng loạn lây lan
-		if _alert_timer <= 0.0:
+		# Alert propagation — tối đa 2 lần/giây
+		if _alert_check_cooldown <= 0.0:
 			_check_alert()
+			_alert_check_cooldown = 0.5
 
 		# Determine target direction
 		if _flee_timer > 0.0:
@@ -408,7 +415,6 @@ func _avoid_walls() -> void:
 		return
 	var origin := global_position + Vector3(0, 0.05, 0)
 	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir_3d * 1.2))
-	hit = hit if hit else space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, origin + dir_3d * 0.6))
 
 	if hit:
 		var normal: Vector3 = (hit.normal as Vector3) * Vector3(1, 0, 1)
@@ -426,8 +432,9 @@ func _avoid_walls() -> void:
 			_turn_rate = 10.0
 
 	# Biên mềm về home — chỉ khi đi quá xa
-	if global_position.distance_to(_home) > HOME_RADIUS:
-		var back := _home - global_position
+	var to_home_vec := _home - global_position
+	if to_home_vec.length_squared() > HOME_RADIUS * HOME_RADIUS:
+		var back := to_home_vec
 		back.y = 0.0
 		if back.length_squared() > 0.01 and _flee_timer <= 0.0 and _alert_timer <= 0.0:
 			_target_dir = _target_dir.lerp(back.normalized(), 0.3).normalized()
@@ -543,4 +550,5 @@ func _roll_loot() -> void:
 		if randf() < entry.rate:
 			var defn: ItemDef = db.get(entry.id)
 			if defn:
-				_DroppedItem.spawn(world, defn, global_position)
+				var vel := Vector3(randf_range(-1.0, 1.0), randf_range(2.0, 3.5), randf_range(-1.0, 1.0))
+				_DroppedItem.spawn(world, defn, global_position, 1, vel, global_position.y)

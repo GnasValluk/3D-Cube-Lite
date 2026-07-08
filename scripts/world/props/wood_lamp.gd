@@ -5,7 +5,7 @@
 ## Tối ưu: share ShaderMaterial (1 draw call cho toàn bộ kính),
 ## range nhỏ hơn trên mobile, tự unregister khi bị xóa.
 
-extends Node3D
+extends DestroyableProp
 class_name WoodLamp
 
 # ── Shared materials (tạo 1 lần, tất cả đèn dùng chung) ──────────────────────
@@ -45,7 +45,11 @@ var road_dir: Vector2 = Vector2(1.0, 0.0)
 var _light: OmniLight3D = null
 var _crystal_mi: MeshInstance3D = null
 
+func _init() -> void:
+	super._init(200, DestroyableProp.WeaponReq.AXE, "")
+
 func _ready() -> void:
+	super._ready()
 	# Đọc road_dir từ meta nếu được set bởi spawner (tránh type issue cross-script)
 	if has_meta("road_dir_x"):
 		road_dir = Vector2(get_meta("road_dir_x"), get_meta("road_dir_y"))
@@ -53,6 +57,7 @@ func _ready() -> void:
 	var arm_dir := Vector3(perp.x, 0.0, perp.y)
 	_build_mesh(arm_dir)
 	_setup_light(arm_dir)
+	_setup_collision()
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _build_mesh(arm_dir: Vector3) -> void:
@@ -184,13 +189,32 @@ func _setup_light(arm_dir: Vector3) -> void:
 	add_child(_light)
 	RoadLampManager.register_light(_light)
 
-## Tự unregister khi node bị xóa khỏi scene (chunk unload)
+func _setup_collision() -> void:
+	var body := StaticBody3D.new()
+	var col := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(BASE_W + 0.1, BASE_H + POLE_H + 0.2, BASE_W + 0.1)
+	col.shape = shape
+	col.position.y = (BASE_H + POLE_H) * 0.5
+	body.add_child(col)
+	add_child(body)
+
+## Tự unregister khi node bị xóa khỏi scene (chunk unload / bị phá)
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		if _light != null:
 			RoadLampManager.unregister_light(_light)
 		if _crystal_mi != null:
 			RoadLampManager.unregister_crystal(_crystal_mi)
+
+func _on_destroy() -> void:
+	super._on_destroy()
+	if _light != null:
+		RoadLampManager.unregister_light(_light)
+		_light = null
+	if _crystal_mi != null:
+		RoadLampManager.unregister_crystal(_crystal_mi)
+		_crystal_mi = null
 
 # ── Shared material helpers ───────────────────────────────────────────────────
 ## Trả về StandardMaterial3D dùng chung (tạo 1 lần cho toàn bộ session)

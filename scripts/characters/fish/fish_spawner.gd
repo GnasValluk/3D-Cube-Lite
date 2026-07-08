@@ -12,13 +12,13 @@ const _Dim      = preload("res://scripts/world/dimension_defs.gd")
 const _Data     = preload("res://scripts/world/chunk/chunk_data.gd")
 
 # Số cá tối đa toàn scene
-@export var max_fish: int = 40
+@export var max_fish: int = 25
 # Bán kính xung quanh player để thử spawn
 @export var spawn_check_radius: float = 48.0
 # Khoảng cách tối thiểu giữa các cá
 @export var min_fish_spacing: float = 3.5
 # Interval kiểm tra spawn (giây)
-@export var check_interval: float = 4.0
+@export var check_interval: float = 6.0
 
 var _world_mgr: OpenWorldManager = null
 var _fish_list: Array[FishCharacter] = []
@@ -44,13 +44,13 @@ func _process(delta: float) -> void:
 		_world_mgr = _find_world_manager()
 		return
 
-	# Dọn cá đã chết hoặc bị xoá
-	_fish_list = _fish_list.filter(func(f): return is_instance_valid(f) and f.is_alive)
-
+	# Dọn cá đã chết hoặc bị xoá (tối đa 1 lần/giây)
 	_timer += delta
 	if _timer < check_interval:
 		return
 	_timer = 0.0
+
+	_fish_list = _fish_list.filter(func(f): return is_instance_valid(f) and f.is_alive)
 
 	if _fish_list.size() >= max_fish:
 		return
@@ -67,7 +67,13 @@ func _try_spawn_batch() -> void:
 	var pz: float = player.global_position.z
 
 	# Thử vài vị trí ngẫu nhiên mỗi tick
-	var attempts: int = 12
+	var attempts: int = 8
+	# Cache ocean noise lookup
+	var nd: Dictionary = WorldChunk._noise_for_dim(1)
+	var has_ocean: bool = nd.has("ocean") and nd.has("ocean_warp")
+	var n_oc: FastNoiseLite = nd.get("ocean") as FastNoiseLite
+	var ow: FastNoiseLite = nd.get("ocean_warp") as FastNoiseLite
+
 	for _i in range(attempts):
 		if _fish_list.size() >= max_fish:
 			break
@@ -84,10 +90,7 @@ func _try_spawn_batch() -> void:
 			continue
 
 		# Không spawn cá trong biển — domain warping khớp với world_chunk
-		var nd: Dictionary = WorldChunk._noise_for_dim(1)
-		if nd.has("ocean") and nd.has("ocean_warp"):
-			var n_oc: FastNoiseLite = nd["ocean"]
-			var ow: FastNoiseLite = nd["ocean_warp"]
+		if has_ocean:
 			var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
 			var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
 			var ov: float = (n_oc.get_noise_2d(wx + warp_x, wz + warp_z) + 1.0) * 0.5

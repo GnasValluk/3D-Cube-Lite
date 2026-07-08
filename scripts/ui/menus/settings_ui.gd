@@ -7,10 +7,11 @@ var _current_tab: int = Tab.GENERAL
 var _rebinding_action: String = ""
 var _rebinding_btn: Button = null
 var _bg: Panel
-var _content: Control
+var _content_vbox: VBoxContainer
 var _tab_btns: Array[Button] = []
 var _close_btn: Button
 var _title_lbl: Label
+var _scroll: ScrollContainer
 
 func _ready() -> void:
 	visible = false
@@ -59,14 +60,10 @@ func _build() -> void:
 	_bg.size = Vector2(W, H)
 	var bg_style := StyleBoxFlat.new()
 	bg_style.bg_color = Color(0.08, 0.08, 0.14, 0.95)
-	bg_style.corner_radius_top_left = 12
-	bg_style.corner_radius_top_right = 12
-	bg_style.corner_radius_bottom_left = 12
-	bg_style.corner_radius_bottom_right = 12
-	bg_style.border_width_left = 2
-	bg_style.border_width_right = 2
-	bg_style.border_width_top = 2
-	bg_style.border_width_bottom = 2
+	bg_style.corner_radius_top_left = 12; bg_style.corner_radius_top_right = 12
+	bg_style.corner_radius_bottom_left = 12; bg_style.corner_radius_bottom_right = 12
+	bg_style.border_width_left = 2; bg_style.border_width_right = 2
+	bg_style.border_width_top = 2; bg_style.border_width_bottom = 2
 	bg_style.border_color = Color(0.3, 0.3, 0.5, 0.6)
 	_bg.add_theme_stylebox_override("panel", bg_style)
 	add_child(_bg)
@@ -89,15 +86,14 @@ func _build() -> void:
 	line.color = Color(0.3, 0.3, 0.5, 0.3)
 	_bg.add_child(line)
 
-	# Tab buttons
-	var tab_w: float = 96.0
+	var tab_w: float = (W - 28 - 15.0) / 6.0
 	var tab_names: Array[String] = ["SETTINGS_GENERAL", "SETTINGS_GRAPHICS", "SETTINGS_AUDIO", "SETTINGS_CONTROLS", "SETTINGS_MOBILE", "DEVICE_TAB"]
 	for i in range(6):
 		var btn := Button.new()
 		btn.text = tr(tab_names[i])
 		btn.position = Vector2(14 + i * (tab_w + 3), 58)
 		btn.size = Vector2(tab_w, 28)
-		btn.add_theme_font_size_override("font_size", 12)
+		btn.add_theme_font_size_override("font_size", 11)
 		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
 		var tb_bg := StyleBoxFlat.new()
 		tb_bg.corner_radius_top_left = 6; tb_bg.corner_radius_top_right = 6
@@ -115,14 +111,15 @@ func _build() -> void:
 		_bg.add_child(btn)
 		_tab_btns.append(btn)
 
-	var scroll := ScrollContainer.new()
-	scroll.position = Vector2(14, 92)
-	scroll.size = Vector2(W - 28, H - 160)
-	_bg.add_child(scroll)
+	_scroll = ScrollContainer.new()
+	_scroll.position = Vector2(14, 92)
+	_scroll.size = Vector2(W - 28, H - 160)
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_bg.add_child(_scroll)
 
-	_content = Control.new()
-	_content.size = Vector2(W - 48, 1)
-	scroll.add_child(_content)
+	_content_vbox = VBoxContainer.new()
+	_content_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(_content_vbox)
 
 	_close_btn = Button.new()
 	_close_btn.position = Vector2(W * 0.5 - 80, H - 38)
@@ -152,7 +149,7 @@ func _on_tab(tab: int) -> void:
 	_show_tab(tab)
 
 func _show_tab(tab: int) -> void:
-	for ch in _content.get_children():
+	for ch in _content_vbox.get_children():
 		ch.queue_free()
 
 	for i in range(_tab_btns.size()):
@@ -169,23 +166,23 @@ func _show_tab(tab: int) -> void:
 		Tab.MOBILE: _build_mobile_tab()
 		Tab.DEVICE: _build_device_tab()
 
-func _make_section_label(text: String, y: float) -> Label:
+func _section_label(text: String) -> Label:
 	var lbl := Label.new()
 	lbl.text = text
 	lbl.add_theme_font_size_override("font_size", 14)
 	lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 0.85))
-	lbl.position = Vector2(0, y)
-	lbl.size = Vector2(_content.size.x, 22)
-	_content.add_child(lbl)
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(lbl)
 	return lbl
 
 func _build_general_tab() -> void:
-	var y: float = 0
-	_make_section_label(tr("LANGUAGE"), y); y += 28
+	_section_label(tr("LANGUAGE"))
+	var hbox := HBoxContainer.new()
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(hbox)
 
 	var vi_btn := Button.new()
-	vi_btn.position = Vector2(0, y)
-	vi_btn.size = Vector2(140, 36)
+	vi_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vi_btn.text = tr("VIETNAMESE")
 	vi_btn.add_theme_font_size_override("font_size", 13)
 	vi_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
@@ -198,11 +195,10 @@ func _build_general_tab() -> void:
 	vi_btn.add_theme_stylebox_override("normal", vi_bg)
 	vi_btn.add_theme_stylebox_override("hover", vi_bg)
 	vi_btn.pressed.connect(_on_set_language.bind("vi"))
-	_content.add_child(vi_btn)
+	hbox.add_child(vi_btn)
 
 	var en_btn := Button.new()
-	en_btn.position = Vector2(150, y)
-	en_btn.size = Vector2(140, 36)
+	en_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	en_btn.text = tr("ENGLISH")
 	en_btn.add_theme_font_size_override("font_size", 13)
 	en_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
@@ -215,66 +211,95 @@ func _build_general_tab() -> void:
 	en_btn.add_theme_stylebox_override("normal", en_bg)
 	en_btn.add_theme_stylebox_override("hover", en_bg)
 	en_btn.pressed.connect(_on_set_language.bind("en"))
-	_content.add_child(en_btn)
+	hbox.add_child(en_btn)
 
-	y += 46
 	_refresh_lang_btns()
-	_content.size.y = y + 20
 
 func _build_graphics_tab() -> void:
-	var y: float = 0
-	_make_section_label(tr("DISPLAY"), y); y += 28
+	_section_label(tr("GRAPHICS_PRESET"))
+	var cur_preset: int = SettingsManager.graphics_preset if SettingsManager else 0
+	var preset_data: Array[Dictionary] = [
+		{ "label": tr("PRESET_STANDARD"), "mode": 0, "col": Color(0.40, 0.55, 0.70, 0.75) },
+		{ "label": tr("PRESET_ENHANCED"), "mode": 1, "col": Color(0.40, 0.70, 0.50, 0.75) },
+		{ "label": tr("PRESET_REALISTIC"), "mode": 2, "col": Color(0.80, 0.55, 0.25, 0.75) },
+	]
+	var hbox := HBoxContainer.new()
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(hbox)
+	for i in range(3):
+		var d: Dictionary = preset_data[i]
+		var btn := Button.new()
+		btn.text = d["label"]
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.90))
+		var sty := StyleBoxFlat.new()
+		if cur_preset == d["mode"]:
+			sty.bg_color = d["col"]
+			sty.border_color = Color(1, 1, 1, 0.45)
+		else:
+			sty.bg_color = Color(d["col"].r * 0.35, d["col"].g * 0.35, d["col"].b * 0.35, 0.55)
+			sty.border_color = Color(1, 1, 1, 0.12)
+		sty.corner_radius_top_left = 6; sty.corner_radius_top_right = 6
+		sty.corner_radius_bottom_left = 6; sty.corner_radius_bottom_right = 6
+		sty.border_width_left = 2; sty.border_width_right = 2
+		sty.border_width_top = 2; sty.border_width_bottom = 2
+		btn.add_theme_stylebox_override("normal", sty)
+		var sty_h := sty.duplicate()
+		sty_h.bg_color = d["col"]
+		sty_h.border_color = Color(1, 1, 1, 0.55)
+		btn.add_theme_stylebox_override("hover", sty_h)
+		var mode_val: int = d["mode"]
+		btn.pressed.connect(func():
+			if SettingsManager:
+				SettingsManager.set_graphics_preset(mode_val)
+			_show_tab(Tab.GRAPHICS)
+		)
+		hbox.add_child(btn)
 
-	_add_toggle(tr("FULLSCREEN"), y, _is_fullscreen(), func(v): _set_fullscreen(v))
-	y += 36
+	var preset_names: Array[String] = [tr("PRESET_DESC_STANDARD"), tr("PRESET_DESC_ENHANCED"), tr("PRESET_DESC_REALISTIC")]
+	var desc := Label.new()
+	desc.text = preset_names[cur_preset] if cur_preset < preset_names.size() else ""
+	desc.add_theme_font_size_override("font_size", 11)
+	desc.add_theme_color_override("font_color", Color(0.55, 0.60, 0.70, 0.70))
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(desc)
 
-	_add_toggle(tr("VSYNC"), y, _is_vsync(), func(v): _set_vsync(v))
-	y += 36
-	_content.size.y = y + 20
+	_section_label(tr("DISPLAY"))
+	_add_toggle(tr("FULLSCREEN"), _is_fullscreen(), func(v): _set_fullscreen(v))
+	_add_toggle(tr("VSYNC"), _is_vsync(), func(v): _set_vsync(v))
 
 func _build_audio_tab() -> void:
-	var y: float = 0
-	_make_section_label(tr("MASTER_VOLUME"), y); y += 28
-	_add_slider(y, _get_master_volume(), func(v): _set_master_volume(v))
-	y += 44
-	_make_section_label(tr("MUSIC_VOLUME"), y); y += 28
-	_add_slider(y, _get_music_volume(), func(v): _set_music_volume(v))
-	y += 44
-	_make_section_label(tr("SFX_VOLUME"), y); y += 28
-	_add_slider(y, _get_sfx_volume(), func(v): _set_sfx_volume(v))
-	_content.size.y = y + 44
+	_section_label(tr("MASTER_VOLUME"))
+	_add_slider(_get_master_volume(), func(v): _set_master_volume(v))
+	_section_label(tr("MUSIC_VOLUME"))
+	_add_slider(_get_music_volume(), func(v): _set_music_volume(v))
+	_section_label(tr("SFX_VOLUME"))
+	_add_slider(_get_sfx_volume(), func(v): _set_sfx_volume(v))
 
 func _build_controls_tab() -> void:
-	var y: float = 0
-	_make_section_label(tr("MOUSE_SENSITIVITY"), y); y += 28
-
+	_section_label(tr("MOUSE_SENSITIVITY"))
 	var hbox := HBoxContainer.new()
-	hbox.position = Vector2(0, y)
-	hbox.size = Vector2(_content.size.x, 36)
-	_content.add_child(hbox)
-
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(hbox)
 	var slider := HSlider.new()
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	slider.min_value = 0.1
-	slider.max_value = 5.0
-	slider.step = 0.05
+	slider.min_value = 0.1; slider.max_value = 5.0; slider.step = 0.05
 	slider.value = _get_mouse_sensitivity()
 	slider.value_changed.connect(_set_mouse_sensitivity)
 	hbox.add_child(slider)
-
 	var val_lbl := Label.new()
 	val_lbl.add_theme_font_size_override("font_size", 12)
 	val_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.8, 0.7))
-	val_lbl.size = Vector2(40, 36)
 	val_lbl.text = str(snapped(slider.value, 0.1))
 	slider.value_changed.connect(func(v): val_lbl.text = str(snapped(v, 0.1)))
 	hbox.add_child(val_lbl)
 
-	y += 44
-	_add_toggle(tr("INVERT_Y"), y, _is_invert_y(), func(v): _set_invert_y(v)); y += 36
+	_add_toggle(tr("INVERT_Y"), _is_invert_y(), func(v): _set_invert_y(v))
 
-	y += 8
-	_make_section_label(tr("KEY_BINDINGS"), y); y += 28
+	_content_vbox.add_spacer(false)
+	_section_label(tr("KEY_BINDINGS"))
 
 	var keys: Array[Dictionary] = [
 		{ "action": "Interact", "key": "controls/interact", "default": KEY_F },
@@ -285,18 +310,17 @@ func _build_controls_tab() -> void:
 		{ "action": "Debug", "key": "controls/debug", "default": KEY_F2 },
 	]
 	for entry in keys:
+		var row := HBoxContainer.new()
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_content_vbox.add_child(row)
 		var lbl := Label.new()
 		lbl.text = entry.action
-		lbl.position = Vector2(0, y)
-		lbl.size = Vector2(140, 28)
+		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lbl.add_theme_font_size_override("font_size", 13)
 		lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9, 0.8))
-		_content.add_child(lbl)
-
+		row.add_child(lbl)
 		var key_btn := Button.new()
 		key_btn.text = _keycode_name(_get_keybinding(entry.key, entry.default))
-		key_btn.position = Vector2(150, y)
-		key_btn.size = Vector2(130, 28)
 		key_btn.add_theme_font_size_override("font_size", 13)
 		key_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
 		var kb_bg := StyleBoxFlat.new()
@@ -308,25 +332,19 @@ func _build_controls_tab() -> void:
 		kb_bg.bg_color = Color(0.12, 0.12, 0.22, 0.7)
 		key_btn.add_theme_stylebox_override("normal", kb_bg)
 		key_btn.pressed.connect(_start_rebind.bind(entry.key, entry.default, key_btn))
-		_content.add_child(key_btn)
+		key_btn.custom_minimum_size = Vector2(120, 0)
+		row.add_child(key_btn)
 
-		y += 32
-
-	_content.size.y = y + 20
-
-func _add_toggle(label: String, y: float, initial: bool, cb: Callable) -> void:
+func _add_toggle(label: String, initial: bool, cb: Callable) -> void:
 	var hbox := HBoxContainer.new()
-	hbox.position = Vector2(0, y)
-	hbox.size = Vector2(_content.size.x, 32)
-	_content.add_child(hbox)
-
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(hbox)
 	var lbl := Label.new()
 	lbl.text = label
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lbl.add_theme_font_size_override("font_size", 13)
 	lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9, 0.8))
-	lbl.size = Vector2(200, 32)
 	hbox.add_child(lbl)
-
 	var btn := Button.new()
 	btn.toggle_mode = true
 	btn.button_pressed = initial
@@ -344,33 +362,27 @@ func _add_toggle(label: String, y: float, initial: bool, cb: Callable) -> void:
 		btn.text = tr("ON") if toggled else tr("OFF")
 		cb.call(toggled)
 	)
-	btn.size = Vector2(70, 30)
+	btn.custom_minimum_size = Vector2(70, 0)
 	hbox.add_child(btn)
 
-func _add_slider(y: float, initial: float, cb: Callable) -> void:
+func _add_slider(initial: float, cb: Callable) -> void:
 	var hbox := HBoxContainer.new()
-	hbox.position = Vector2(0, y)
-	hbox.size = Vector2(_content.size.x, 36)
-	_content.add_child(hbox)
-
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(hbox)
 	var slider := HSlider.new()
 	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	slider.min_value = 0.0
-	slider.max_value = 100.0
-	slider.step = 1.0
+	slider.min_value = 0.0; slider.max_value = 100.0; slider.step = 1.0
 	slider.value = initial
 	slider.value_changed.connect(cb)
 	hbox.add_child(slider)
-
 	var val_lbl := Label.new()
 	val_lbl.add_theme_font_size_override("font_size", 12)
 	val_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.8, 0.7))
-	val_lbl.size = Vector2(36, 36)
 	val_lbl.text = "%d%%" % initial
 	slider.value_changed.connect(func(v): val_lbl.text = "%d%%" % v)
 	hbox.add_child(val_lbl)
 
-# ── Settings storage (project settings) ──────────────────────────────────────
+# ── Settings storage ─────────────────────────────────────────────────────────
 
 func _is_fullscreen() -> bool:
 	return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
@@ -436,15 +448,19 @@ func _set_invert_y(v: bool) -> void:
 
 func _refresh_lang_btns() -> void:
 	var cur: String = TranslationServer.get_locale()
-	var children = _content.get_children()
-	for child in children:
-		if child is Button:
-			var btn := child as Button
-			var bg := btn.get_theme_stylebox("normal") as StyleBoxFlat
-			if bg and (btn.text == tr("VIETNAMESE") or btn.text == tr("ENGLISH")):
-				var is_active: bool = (cur == "vi" and btn.text == tr("VIETNAMESE")) or (cur == "en" and btn.text == tr("ENGLISH"))
-				bg.border_color = Color(0.3, 0.75, 0.3, 0.9) if is_active else Color(0.2, 0.2, 0.4, 0.6)
-				bg.bg_color = Color(0.1, 0.25, 0.1, 0.6) if is_active else Color(0.08, 0.08, 0.15, 0.6)
+	for child in _content_vbox.get_children():
+		if child is HBoxContainer:
+			for btn in child.get_children():
+				if btn is Button:
+					var b := btn as Button
+					var bg := b.get_theme_stylebox("normal") as StyleBoxFlat
+					if bg:
+						var is_vi: bool = b.text == tr("VIETNAMESE")
+						var is_en: bool = b.text == tr("ENGLISH")
+						if is_vi or is_en:
+							var is_active: bool = (cur == "vi" and is_vi) or (cur == "en" and is_en)
+							bg.border_color = Color(0.3, 0.75, 0.3, 0.9) if is_active else Color(0.2, 0.2, 0.4, 0.6)
+							bg.bg_color = Color(0.1, 0.25, 0.1, 0.6) if is_active else Color(0.08, 0.08, 0.15, 0.6)
 
 func _on_set_language(locale: String) -> void:
 	TranslationServer.set_locale(locale)
@@ -472,54 +488,12 @@ func hide_settings() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _build_mobile_tab() -> void:
-	var y: float = 0
-	_make_section_label(tr("TOUCH_CONTROLS"), y); y += 28
-	_add_toggle(tr("TOUCH_ENABLED"), y, _is_touch_enabled(), func(v): _set_touch_enabled(v)); y += 36
-
-	_make_section_label(tr("JOYSTICK"), y); y += 28
-	var js_hbox := HBoxContainer.new()
-	js_hbox.position = Vector2(0, y)
-	js_hbox.size = Vector2(_content.size.x, 36)
-	_content.add_child(js_hbox)
-	var js_slider := HSlider.new()
-	js_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	js_slider.min_value = 0.3
-	js_slider.max_value = 2.0
-	js_slider.step = 0.05
-	js_slider.value = _get_joystick_sensitivity()
-	js_slider.value_changed.connect(_set_joystick_sensitivity)
-	js_hbox.add_child(js_slider)
-	var js_lbl := Label.new()
-	js_lbl.add_theme_font_size_override("font_size", 12)
-	js_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.8, 0.7))
-	js_lbl.size = Vector2(40, 36)
-	js_lbl.text = str(snapped(js_slider.value, 0.1))
-	js_slider.value_changed.connect(func(v): js_lbl.text = str(snapped(v, 0.1)))
-	js_hbox.add_child(js_lbl)
-	y += 44
-
-	_make_section_label(tr("BUTTON_SIZE"), y); y += 28
-	var bs_hbox := HBoxContainer.new()
-	bs_hbox.position = Vector2(0, y)
-	bs_hbox.size = Vector2(_content.size.x, 36)
-	_content.add_child(bs_hbox)
-	var bs_slider := HSlider.new()
-	bs_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bs_slider.min_value = 0.5
-	bs_slider.max_value = 2.0
-	bs_slider.step = 0.1
-	bs_slider.value = _get_button_scale()
-	bs_slider.value_changed.connect(_set_button_scale)
-	bs_hbox.add_child(bs_slider)
-	var bs_lbl := Label.new()
-	bs_lbl.add_theme_font_size_override("font_size", 12)
-	bs_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.8, 0.7))
-	bs_lbl.size = Vector2(40, 36)
-	bs_lbl.text = str(snapped(bs_slider.value, 0.1))
-	bs_slider.value_changed.connect(func(v): bs_lbl.text = str(snapped(v, 0.1)))
-	bs_hbox.add_child(bs_lbl)
-	y += 44
-	_content.size.y = y + 20
+	_section_label(tr("TOUCH_CONTROLS"))
+	_add_toggle(tr("TOUCH_ENABLED"), _is_touch_enabled(), func(v): _set_touch_enabled(v))
+	_section_label(tr("JOYSTICK"))
+	_add_slider(_get_joystick_sensitivity(), func(v): _set_joystick_sensitivity(v))
+	_section_label(tr("BUTTON_SIZE"))
+	_add_slider(_get_button_scale(), func(v): _set_button_scale(v))
 
 # ── Mobile settings ──────────────────────────────────────────────────────────
 
@@ -547,36 +521,22 @@ func _get_keybinding(key: String, default_key: int) -> int:
 	return ProjectSettings.get_setting(key, default_key)
 
 func _keycode_name(code: int) -> String:
-	if code >= KEY_A and code <= KEY_Z:
-		return char(code)
-	if code >= KEY_F1 and code <= KEY_F12:
-		return "F%d" % (code - KEY_F1 + 1)
-	if code >= KEY_0 and code <= KEY_9:
-		return char(code)
-	if code == KEY_ESCAPE:
-		return "ESC"
-	if code == KEY_SPACE:
-		return "Space"
-	if code == KEY_SHIFT:
-		return "Shift"
-	if code == KEY_CTRL:
-		return "Ctrl"
-	if code == KEY_ALT:
-		return "Alt"
-	if code == KEY_TAB:
-		return "Tab"
-	if code == KEY_ENTER:
-		return "Enter"
-	if code == KEY_BACKSPACE:
-		return "Bksp"
-	if code == KEY_LEFT:
-		return "L_Arrow"
-	if code == KEY_RIGHT:
-		return "R_Arrow"
-	if code == KEY_UP:
-		return "U_Arrow"
-	if code == KEY_DOWN:
-		return "D_Arrow"
+	if code >= KEY_A and code <= KEY_Z: return char(code)
+	if code >= KEY_F1 and code <= KEY_F12: return "F%d" % (code - KEY_F1 + 1)
+	if code >= KEY_0 and code <= KEY_9: return char(code)
+	match code:
+		KEY_ESCAPE: return "ESC"
+		KEY_SPACE: return "Space"
+		KEY_SHIFT: return "Shift"
+		KEY_CTRL: return "Ctrl"
+		KEY_ALT: return "Alt"
+		KEY_TAB: return "Tab"
+		KEY_ENTER: return "Enter"
+		KEY_BACKSPACE: return "Bksp"
+		KEY_LEFT: return "L_Arrow"
+		KEY_RIGHT: return "R_Arrow"
+		KEY_UP: return "U_Arrow"
+		KEY_DOWN: return "D_Arrow"
 	return "Key%d" % code
 
 func _start_rebind(setting: String, default_key: int, btn: Button) -> void:
@@ -628,49 +588,37 @@ func _cancel_rebind() -> void:
 
 # ── Device Tab ────────────────────────────────────────────────────────────────
 func _build_device_tab() -> void:
-	var y: float = 0
-
-	# ── Tiêu đề mô tả ────────────────────────────────────────────────────────
-	_make_section_label(tr("DEVICE_TYPE"), y); y += 28
-
+	_section_label(tr("DEVICE_TYPE"))
 	var desc := Label.new()
 	desc.text = tr("DEVICE_DESC")
 	desc.add_theme_font_size_override("font_size", 12)
 	desc.add_theme_color_override("font_color", Color(0.60, 0.65, 0.75, 0.70))
-	desc.position = Vector2(0, y)
-	desc.size = Vector2(_content.size.x, 36)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	_content.add_child(desc)
-	y += 42
+	desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(desc)
 
-	# ── 3 nút chọn: Auto / PC / Mobile ───────────────────────────────────────
 	var cur_device: int = DeviceManager.get_device() if DeviceManager else 0
 	var btn_data: Array[Dictionary] = [
 		{ "label": tr("DEVICE_AUTO"), "mode": 0, "col": Color(0.35, 0.55, 0.80, 0.75) },
 		{ "label": "💻  " + tr("DEVICE_PC"),   "mode": 1, "col": Color(0.30, 0.70, 0.50, 0.75) },
 		{ "label": "📱  " + tr("DEVICE_MOBILE"), "mode": 2, "col": Color(0.80, 0.45, 0.20, 0.75) },
 	]
-
-	var btn_w: float = (_content.size.x - 16.0) / 3.0
-	var device_btns: Array[Button] = []
-
+	var hbox := HBoxContainer.new()
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(hbox)
 	for i in range(3):
 		var d: Dictionary = btn_data[i]
 		var btn := Button.new()
 		btn.text = d["label"]
-		btn.position = Vector2(i * (btn_w + 8.0), y)
-		btn.size = Vector2(btn_w, 52)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.add_theme_font_size_override("font_size", 13)
 		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.90))
 		var sty := StyleBoxFlat.new()
-		sty.bg_color = d["col"] if cur_device == d["mode"] \
-			else Color(d["col"].r * 0.4, d["col"].g * 0.4, d["col"].b * 0.4, 0.55)
-		sty.corner_radius_top_left    = 8
-		sty.corner_radius_top_right   = 8
-		sty.corner_radius_bottom_left = 8
-		sty.corner_radius_bottom_right = 8
-		sty.border_width_left   = 2; sty.border_width_right  = 2
-		sty.border_width_top    = 2; sty.border_width_bottom = 2
+		sty.bg_color = d["col"] if cur_device == d["mode"] else Color(d["col"].r * 0.4, d["col"].g * 0.4, d["col"].b * 0.4, 0.55)
+		sty.corner_radius_top_left = 8; sty.corner_radius_top_right = 8
+		sty.corner_radius_bottom_left = 8; sty.corner_radius_bottom_right = 8
+		sty.border_width_left = 2; sty.border_width_right = 2
+		sty.border_width_top = 2; sty.border_width_bottom = 2
 		sty.border_color = Color(1, 1, 1, 0.30) if cur_device == d["mode"] else Color(1, 1, 1, 0.10)
 		btn.add_theme_stylebox_override("normal", sty)
 		var sty_h := sty.duplicate() as StyleBoxFlat
@@ -679,69 +627,44 @@ func _build_device_tab() -> void:
 		btn.add_theme_stylebox_override("hover", sty_h)
 		var mode_val: int = d["mode"]
 		btn.pressed.connect(func():
-			if DeviceManager:
-				DeviceManager.set_device(mode_val)
-			# Refresh toàn bộ tab để highlight nút mới
+			if DeviceManager: DeviceManager.set_device(mode_val)
 			_show_tab(Tab.DEVICE)
 		)
-		_content.add_child(btn)
-		device_btns.append(btn)
-	y += 68
+		btn.custom_minimum_size = Vector2(0, 52)
+		hbox.add_child(btn)
 
-	# ── Trạng thái hiện tại ───────────────────────────────────────────────────
 	var status_lbl := Label.new()
 	var is_mob: bool = DeviceManager.is_mobile() if DeviceManager else false
 	var detected: String = tr("DEVICE_MOBILE") if DeviceManager._detect_mobile() else tr("DEVICE_PC")
-	status_lbl.text = tr("DEVICE_CURRENT") % [
-		tr("DEVICE_MOBILE") if is_mob else tr("DEVICE_PC"),
-		detected
-	]
+	status_lbl.text = tr("DEVICE_CURRENT") % [tr("DEVICE_MOBILE") if is_mob else tr("DEVICE_PC"), detected]
 	status_lbl.add_theme_font_size_override("font_size", 12)
 	status_lbl.add_theme_color_override("font_color", Color(0.70, 0.85, 0.70, 0.85))
-	status_lbl.position = Vector2(0, y)
-	status_lbl.size = Vector2(_content.size.x, 22)
-	_content.add_child(status_lbl)
-	y += 30
+	status_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(status_lbl)
 
-	# ── Divider ───────────────────────────────────────────────────────────────
 	var div := ColorRect.new()
 	div.color = Color(0.30, 0.40, 0.60, 0.20)
-	div.position = Vector2(0, y); div.size = Vector2(_content.size.x, 1)
-	_content.add_child(div)
-	y += 14
+	div.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	div.custom_minimum_size = Vector2(0, 1)
+	_content_vbox.add_child(div)
 
-	# ── Tóm tắt tối ưu theo thiết bị ─────────────────────────────────────────
 	if is_mob:
-		_make_section_label("📱 " + tr("MOBILE_FEATURES"), y); y += 26
-		var features: Array[String] = [
-			"✓  " + tr("FEAT_JOYSTICK"),
-			"✓  " + tr("FEAT_CAM_DRAG"),
-			"✓  " + tr("FEAT_TOUCH_BTNS"),
-			"✓  " + tr("FEAT_CHUNK_LOW"),
-		]
+		_section_label("📱 " + tr("MOBILE_FEATURES"))
+		var features: Array[String] = ["✓  " + tr("FEAT_JOYSTICK"), "✓  " + tr("FEAT_CAM_DRAG"), "✓  " + tr("FEAT_TOUCH_BTNS"), "✓  " + tr("FEAT_CHUNK_LOW")]
 		for ft in features:
 			var fl := Label.new()
 			fl.text = ft
 			fl.add_theme_font_size_override("font_size", 12)
 			fl.add_theme_color_override("font_color", Color(0.65, 0.90, 0.65, 0.80))
-			fl.position = Vector2(8, y); fl.size = Vector2(_content.size.x - 8, 20)
-			_content.add_child(fl)
-			y += 22
+			fl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_content_vbox.add_child(fl)
 	else:
-		_make_section_label("💻 " + tr("PC_FEATURES"), y); y += 26
-		var features: Array[String] = [
-			"✓  " + tr("FEAT_WASD"),
-			"✓  " + tr("FEAT_MOUSE_CAM"),
-			"✓  " + tr("FEAT_KEYBOARD"),
-			"✓  " + tr("FEAT_CHUNK_HIGH"),
-		]
+		_section_label("💻 " + tr("PC_FEATURES"))
+		var features: Array[String] = ["✓  " + tr("FEAT_WASD"), "✓  " + tr("FEAT_MOUSE_CAM"), "✓  " + tr("FEAT_KEYBOARD"), "✓  " + tr("FEAT_CHUNK_HIGH")]
 		for ft in features:
 			var fl := Label.new()
 			fl.text = ft
 			fl.add_theme_font_size_override("font_size", 12)
 			fl.add_theme_color_override("font_color", Color(0.65, 0.80, 0.90, 0.80))
-			fl.position = Vector2(8, y); fl.size = Vector2(_content.size.x - 8, 20)
-			_content.add_child(fl)
-			y += 22
-
-	_content.size.y = y + 20
+			fl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			_content_vbox.add_child(fl)

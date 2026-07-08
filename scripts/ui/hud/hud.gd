@@ -55,6 +55,7 @@ var _coords_label: Label
 var _biome_label: Label  # hiển thị tên biome + continent value góc trái
 # Cache texture để tránh load() blocking mỗi frame trong _refresh_party_hud
 var _icon_cache: Dictionary = {}
+var _hud_throttle: float = 0.0
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _ChestUI = preload("res://scripts/items/ui/chest_ui.gd")
@@ -140,6 +141,15 @@ func _setup_ui() -> void:
 	add_child(_explore_map)
 
 	_mini_map = MiniMap.new()
+	_mini_map.gui_input.connect(func(event: InputEvent):
+		if _explore_sys and event is InputEventMouseButton:
+			var mb := event as InputEventMouseButton
+			if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+				if _explore_map and _explore_map.visible:
+					_explore_map.close()
+				else:
+					_explore_map.open(_explore_sys)
+	)
 	add_child(_mini_map)
 
 	_build_hint = Label.new()
@@ -198,6 +208,12 @@ func _setup_mobile_controls() -> void:
 		var player := _find_player_character()
 		if player:
 			player.interact_with_nearby()
+	)
+	mob.map_pressed.connect(func():
+		if _explore_map and _explore_map.visible:
+			_explore_map.close()
+		elif _explore_sys:
+			_explore_map.open(_explore_sys)
 	)
 
 func _setup_loading_overlay() -> void:
@@ -424,49 +440,55 @@ func _process(delta: float) -> void:
 	_b_key_held = Input.is_key_pressed(KEY_B)
 
 	var vp: Vector2 = get_viewport().get_visible_rect().size
+	_hud_throttle -= delta
+
+	if _hud_throttle <= 0:
+		_hud_throttle = 0.08
+		if _mgr:
+			_refresh_party_hud()
+		if TimeSystem:
+			var h: int = TimeSystem.get_hour_int()
+			var m: int = TimeSystem.get_minute()
+			_world_clock.text = "%02d:%02d" % [h, m]
+			_time_label.text = "%s %d  |  %s  |  %s" % [TimeSystem.get_month_name(), TimeSystem.get_day(), TimeSystem.get_season_name(), TimeSystem.get_weather_name()]
+		else:
+			var env := get_parent().get_node_or_null("WorldEnvironment") as WorldEnvironment
+			if env and env.has_method("get_cycle_progress"):
+				var prog: float = fmod(env.get_cycle_progress(), 1.0)
+				var total_minutes: int = int(prog * 1440.0)
+				var hours: int = total_minutes / 60
+				var minutes: int = total_minutes % 60
+				_world_clock.text = "%02d:%02d" % [hours, minutes]
+		if _coords_label:
+			var player := _find_player_character()
+			var tracked_ch: CharacterBase = _mgr.get_current_character() if _mgr else null
+			var pos_src: Node3D = player if player else tracked_ch
+			if pos_src and is_instance_valid(pos_src) and pos_src.is_inside_tree():
+				var p := pos_src.global_position
+				_coords_label.text = "X %.1f  Y %.1f  Z %.1f" % [p.x, p.y, p.z]
+				if _biome_label:
+					_biome_label.text = _get_biome_name_at(p.x, p.z)
+			else:
+				_coords_label.text = ""
+				if _biome_label:
+					_biome_label.text = ""
+
 	if _mgr:
-		_refresh_party_hud()
 		_party_hud.position = Vector2(vp.x - 72, (vp.y - _party_hud.size.y) * 0.5)
 
 	if _mini_map:
-		_mini_map.visible = _explore_sys != null and get_parent().has_node("WorldManager")
+		_mini_map.visible = _explore_sys != null and get_parent().has_node("WorldManager") and not (_explore_map and _explore_map.visible)
 		if _mini_map.visible:
 			_mini_map.position = Vector2(vp.x - 162, vp.y - 162)
 
-	if TimeSystem:
-		var h: int = TimeSystem.get_hour_int()
-		var m: int = TimeSystem.get_minute()
-		_world_clock.text = "%02d:%02d" % [h, m]
-		_time_label.text = "%s %d  |  %s  |  %s" % [TimeSystem.get_month_name(), TimeSystem.get_day(), TimeSystem.get_season_name(), TimeSystem.get_weather_name()]
-	else:
-		var env := get_parent().get_node_or_null("WorldEnvironment") as WorldEnvironment
-		if env and env.has_method("get_cycle_progress"):
-			var prog: float = fmod(env.get_cycle_progress(), 1.0)
-			var total_minutes: int = int(prog * 1440.0)
-			var hours: int = total_minutes / 60
-			var minutes: int = total_minutes % 60
-			_world_clock.text = "%02d:%02d" % [hours, minutes]
 	_world_clock.position = Vector2(vp.x - _world_clock.size.x - 12, 12)
 	_time_label.position = Vector2(vp.x - _time_label.size.x - 12, 30)
 
-	# Tọa độ XYZ — lấy từ nhân vật đang được điều khiển
 	if _coords_label:
-		var player := _find_player_character()
-		var tracked_ch: CharacterBase = _mgr.get_current_character() if _mgr else null
-		var pos_src: Node3D = player if player else tracked_ch
-		if pos_src and is_instance_valid(pos_src) and pos_src.is_inside_tree():
-			var p := pos_src.global_position
-			_coords_label.text = "X %.1f  Y %.1f  Z %.1f" % [p.x, p.y, p.z]
-			# Cập nhật biome label — throttle 0.25s để không gọi noise mỗi frame
-			if _biome_label:
-				_biome_label.text = _get_biome_name_at(p.x, p.z)
-				_biome_label.position = Vector2(12, 62)
-		else:
-			_coords_label.text = ""
-			if _biome_label:
-				_biome_label.text = ""
 		_coords_label.size = Vector2(220, 18)
 		_coords_label.position = Vector2(vp.x - _coords_label.size.x - 12, 46)
+		if _biome_label:
+			_biome_label.position = Vector2(12, 62)
 
 	if _debug_open:
 		_debug_panel.position = Vector2(vp.x * 0.5 - 175, vp.y * 0.5 - 130)

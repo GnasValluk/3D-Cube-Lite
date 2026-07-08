@@ -103,6 +103,13 @@ CHARACTER_FMT,"Character %d","Nhân vật %d"
 PICKUP_MSG_SIMPLE,Picked up: {s},"Nhặt: {s}"
 GENERATE_LABEL,Generating World...,Đang tạo thế giới...
 SETTINGS_GRAPHICS,Graphics,Đồ hoạ
+GRAPHICS_PRESET,Graphics Quality,Chất lượng đồ hoạ
+PRESET_STANDARD,"Standard","Tiêu chuẩn"
+PRESET_ENHANCED,Enhanced,Tăng cường
+PRESET_REALISTIC,Realistic,Chân thật
+PRESET_DESC_STANDARD,"Balanced performance and visuals. Default settings.","Cân bằng hiệu năng và hình ảnh. Mặc định."
+PRESET_DESC_ENHANCED,"Better visuals with higher view distance, glow, and shadows.","Hình ảnh tốt hơn với tầm nhìn xa, phát sáng và đổ bóng."
+PRESET_DESC_REALISTIC,"Maximum quality with SSAO, MSAA 4x, long shadows and rich glow.","Chất lượng tối đa với SSAO, MSAA 4x, bóng đổ dài và phát sáng mạnh."
 SETTINGS_AUDIO,Audio,Âm thanh
 SETTINGS_CONTROLS,Controls,Điều khiển
 SETTINGS_GENERAL,General,Cơ bản

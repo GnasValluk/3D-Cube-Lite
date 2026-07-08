@@ -8,6 +8,7 @@ signal jump_pressed
 signal interact_pressed
 signal sprint_changed(held: bool)
 signal inventory_pressed
+signal map_pressed
 signal attack_pressed
 signal camera_drag(delta: Vector2)
 
@@ -96,6 +97,11 @@ func _build() -> void:
 	var btn_inv := _make_btn("🎒", 20.0 * s, 80.0 * s, bsz * 0.85, br, Color(0.70, 0.60, 0.40, 0.70))
 	btn_inv.pressed.connect(func(): emit_signal("inventory_pressed"))
 	add_child(btn_inv)
+
+	# ── Nút Map (kế Inventory) ──────────────────────────────────────────────
+	var btn_map := _make_btn("🗺", 20.0 * s + bsz * 0.85 + 10.0 * s, 80.0 * s, bsz * 0.85, br, Color(0.30, 0.65, 0.45, 0.70))
+	btn_map.pressed.connect(func(): emit_signal("map_pressed"))
+	add_child(btn_map)
 
 func _make_btn(label: String, x: float, y: float, sz: float, radius: float, col: Color) -> Button:
 	var btn := Button.new()
