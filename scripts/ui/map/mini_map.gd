@@ -110,7 +110,15 @@ func _draw() -> void:
 		var ry := (w_min_z - _origin_z) * _tex_scale
 		var rw := (w_max_x - w_min_x) * _tex_scale
 		var rh := (w_max_z - w_min_z) * _tex_scale
-		draw_texture_rect_region(_tex, Rect2(Vector2.ZERO, size), Rect2(rx, ry, rw, rh))
+		# Clamp region to texture bounds tránh white flash khi player ở ngoài vùng khám phá
+		var ts := _tex.get_size()
+		var src_pos := Vector2(maxf(rx, 0.0), maxf(ry, 0.0))
+		var src_end := Vector2(minf(rx + rw, ts.x), minf(ry + rh, ts.y))
+		var src_size := src_end - src_pos
+		if src_size.x > 0 and src_size.y > 0:
+			var dst_pos := Vector2((src_pos.x - rx) * MAP_SIZE / rw, (src_pos.y - ry) * MAP_SIZE / rh)
+			var dst_size := Vector2(src_size.x * MAP_SIZE / rw, src_size.y * MAP_SIZE / rh)
+			draw_texture_rect_region(_tex, Rect2(dst_pos, dst_size), Rect2(src_pos, src_size))
 	draw_circle(off, PLAYER_RADIUS, Color(1.0, 1.0, 1.0, 0.95))
 	draw_line(off, off + Vector2(0, -PLAYER_RADIUS - 4), Color(1.0, 1.0, 1.0, 0.70), 1.5)
 	draw_string(_cache_font, Vector2(MAP_SIZE * 0.5 - 3, 14), "N", HORIZONTAL_ALIGNMENT_CENTER, -1, 8, Color(0.7, 0.7, 0.7, 0.50))

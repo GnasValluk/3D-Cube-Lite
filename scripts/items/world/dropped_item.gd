@@ -11,15 +11,20 @@ var can_pickup: bool = false
 var _flying: bool = false
 var _velocity: Vector3 = Vector3.ZERO
 var _ground_y: float = 0.0
+var _player: Node3D = null
+
+const MAGNET_RANGE: float = 8.0
+const FLY_SPEED: float = 7.0
 
 func init(def_: ItemDef, count: int = 1):
 	item_def = def_
 	item_count = count
 	_setup_mesh()
+	call_deferred("_find_player")
 	var timer := Timer.new()
 	timer.one_shot = true
 	timer.autostart = true
-	timer.wait_time = 3.0
+	timer.wait_time = 1.0
 	timer.timeout.connect(func(): can_pickup = true)
 	add_child(timer)
 
@@ -97,6 +102,13 @@ func launch(initial_velocity: Vector3, ground_y: float) -> void:
 	_velocity = initial_velocity
 	_ground_y = ground_y
 
+func _find_player() -> void:
+	var world := get_tree().current_scene
+	if world == null: return
+	var mgr := world.get_node_or_null("CharacterManager") as CharacterManager
+	if mgr:
+		_player = mgr.get_current_character()
+
 func _ready() -> void:
 	var timer := Timer.new()
 	timer.one_shot = true
@@ -106,6 +118,7 @@ func _ready() -> void:
 	timer.start()
 
 func _process(delta: float):
+	if not is_instance_valid(self): return
 	_time_alive += delta
 	if _flying:
 		_velocity.y -= 9.8 * delta
@@ -118,6 +131,13 @@ func _process(delta: float):
 			rotation.x = 0.0
 			rotation.z = 0.0
 	else:
+		# Magnet: bay về phía người chơi khi đủ gần
+		if can_pickup and _player and is_instance_valid(_player):
+			var dist := global_position.distance_to(_player.global_position)
+			if dist < MAGNET_RANGE:
+				var dir := (_player.global_position - global_position).normalized()
+				position += dir * FLY_SPEED * delta
+				return
 		var bob := sin(_time_alive * 2.0) * 0.05
 		position.y += bob * delta * 2.0
 		var rot := delta * 30.0
