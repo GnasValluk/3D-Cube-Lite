@@ -133,6 +133,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	beach_mask.resize(cols * cols)
 	beach_mask.fill(0)
 
+	var reef_mask: PackedFloat32Array
+	reef_mask.resize(cols * cols)
+	reef_mask.fill(0.0)
+
+	var cave_mask: PackedByteArray
+	cave_mask.resize(cols * cols)
+	cave_mask.fill(0)
+
 	for ivx in range(cols):
 		biome_grid[ivx] = []; biome_grid[ivx].resize(cols)
 		height_grid[ivx] = []; height_grid[ivx].resize(cols)
@@ -249,14 +257,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					var large_n: float = nd["sea_large"].get_noise_2d(wx, wz)
 					base_h += large_n * (0.15 + raw_depth_t * 1.2)
 
-					# Núi ngầm — chỉ ở vùng sâu, có thể trồi gần mặt nước
-					if raw_depth_t > 0.25:
-						var mt_n: float = nd["sea_mountain"].get_noise_2d(wx * 0.8, wz * 0.8)
-						var mt_h: float = max(0.0, mt_n - 0.35) / 0.65
-						mt_h = mt_h * mt_h * (0.3 + raw_depth_t * 2.5)
-						var mt_mask: float = (nd["sea_large"].get_noise_2d(wx * 2.0, wz * 2.0) + 1.0) * 0.5
-						mt_h *= max(0.0, mt_mask)
-						base_h += mt_h
+					# Núi ngầm (Seamount) — núi lửa ngầm cao vút, xuất hiện khắp nơi
+					var mt_n: float = nd["sea_mountain"].get_noise_2d(wx * 0.5, wz * 0.5)
+					var mt_h: float = max(0.0, mt_n) * 8.0
+					base_h += mt_h
 
 					# Hẻm núi (canyon) — rãnh cắt vào thềm/sườn lục địa
 					var c1: float = nd["sea_rough"].get_noise_2d(wx * 3.0, wz * 0.35)
@@ -278,8 +282,22 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					var trench_mask: float = trench_t * trench_t * (3.0 - 2.0 * trench_t)
 					base_h -= trench_mask * (0.3 + raw_depth_t * 1.0)
 
-					# Chặn không trồi lên mặt nước
-					height_grid[ivx][ivz] = min(base_h, -0.3)
+					# Bãi đá ngầm (Reef) — đá nhô cao rải rác khắp đáy biển
+					var rf_n: float = (nd["reef"].get_noise_2d(wx, wz) + 1.0) * 0.5
+					if rf_n > 0.40:
+						var rf_h: float = (rf_n - 0.40) / 0.60
+						rf_h = rf_h * 4.0
+						base_h += rf_h
+						reef_mask[ivx * cols + ivz] = rf_h * 0.3
+
+					# Hang động đáy biển (Tube Cave) — vòm cong nổi trên đáy biển, đẩy height lên
+					var cave_n: float = (nd["cave_3d"].get_noise_2d(wx * 0.5, wz * 0.5) + 1.0) * 0.5
+					if cave_n > 0.58:
+						cave_mask[ivx * cols + ivz] = 1
+						base_h += 3.0  # vòm cao 3 blocks
+
+					# Chặn không trồi lên quá mặt nước
+					height_grid[ivx][ivz] = min(base_h, _Data.WATER_Y - 0.1)
 				elif od <= _Data.BEACH_WIDTH:
 					var beach_t: float = float(od - 1) / float(maxi(_Data.BEACH_WIDTH - 1, 1))
 					biome_grid[ivx][ivz] = _Data.TileType.SAND_WHITE
@@ -355,7 +373,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	# ── 5. Tạo ChunkBlockData từ biome + height ────────────────────────────────
 	var bd := _BlockData.new()
 	bd.init(cols, cols)
-	_fill_blocks(bd, biome_grid, height_grid, road_grid, cols, dim_id, cx, cz, size, nd)
+	_fill_blocks(bd, biome_grid, height_grid, road_grid, cols, dim_id, cx, cz, size, nd, reef_mask, cave_mask)
 
 	# ── 6. Build terrain mesh từ block data (greedy mesher) ───────────────────
 	var st := SurfaceTool.new()
@@ -590,7 +608,8 @@ static func _build_sediment_mesh(bd: _BlockData, cols: int) -> ArrayMesh:
 ## Hồ có đáy STONE chắc chắn, không rớt void
 static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 		road_grid: PackedByteArray, cols: int, dim_id: int, cx: int = 0, cz: int = 0, size: int = 32,
-		nd: Dictionary = {}) -> void:
+		nd: Dictionary = {}, reef_mask: PackedFloat32Array = PackedFloat32Array(),
+		cave_mask: PackedByteArray = PackedByteArray()) -> void:
 	const SLAB := _BlockData.SLAB_HEIGHT  # 0.5
 	const Y_MIN := _BlockData.Y_MIN       # -18 (21 layers: 0..20)
 	const CHUNK_H := _BlockData.CHUNK_H   # 21
@@ -629,6 +648,9 @@ static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 							top_block = B.OCEAN_MUD   # bùn biển sâu
 						else:
 							top_block = B.OCEAN_GRAVEL # sỏi biển
+					# Bãi đá ngầm ghi đè lên top_block
+					if reef_mask.size() > 0 and reef_mask[x * cols + z] > 0.0:
+						top_block = B.STONE
 
 			var is_trail: bool = road_grid.size() > 0 and road_grid[x * cols + z] != 0 \
 					and biome != _Data.TileType.SAND \
@@ -648,29 +670,44 @@ static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 			# water_top_slab: water fill đến đây
 			var water_top_slab: int = floori((_Data.WATER_Y - SLAB) / SLAB) - Y_MIN
 
+			# Hang động đáy biển (Tube Cave): vòm bằng STONE, bên trong khoét rỗng
+			var is_tube_cave: bool = biome == _Data.TileType.OCEAN_DEEP \
+					and cave_mask.size() > 0 and cave_mask[x * cols + z] != 0
+			var cave_floor_slab: int = 0  # slab index sàn hang
+			var cave_ceiling_slab: int = 0  # slab index trần vòm (đỉnh)
+			if is_tube_cave:
+				# Lùi 3.5 slabs từ đỉnh để trần dày 0.5 slab, sàn dày tối thiểu 2 slabs
+				cave_ceiling_slab = top_slab - 1
+				cave_floor_slab = top_slab - 7
+				cave_floor_slab = maxi(cave_floor_slab, 2)
+
 			# Điền toàn bộ CHUNK_H slab layers từ dưới lên trên
 			for ly in range(CHUNK_H):
+				var in_cave: bool = false
+				if is_tube_cave and ly >= cave_floor_slab and ly <= cave_ceiling_slab:
+					# Khoét AIR bên trong, trừ 2 cột biên (vách hang)
+					var col_inner: bool = x > 0 and x < cols - 1 and z > 0 and z < cols - 1
+					if col_inner:
+						in_cave = true
+
 				if ly == 0:
-					# Layer 0: nếu là đáy hồ (top_slab = 0) → đặt TOP block luôn
-					# Nếu không phải đáy hồ → BEDROCK
 					if top_slab == 0:
 						bd.set_block(x, ly, z, top_block)
 					else:
 						bd.set_block(x, ly, z, B.BEDROCK)
+				elif in_cave:
+					# Hang ngập nước nếu dưới mặt nước
+					bd.set_block(x, ly, z, B.WATER if ly <= water_top_slab else B.AIR)
 				elif ly <= top_slab - 2:
-					# Lớp sâu → đá
 					bd.set_block(x, ly, z, B.STONE)
 				elif ly == top_slab - 1 and top_slab > 1:
-					# Slab ngay dưới mặt → sub-surface (chỉ khi top_slab >= 2)
 					if top_block == B.DARK_GRASS or top_block == B.DIRT:
 						bd.set_block(x, ly, z, B.DARK_DIRT)
 					else:
 						bd.set_block(x, ly, z, B.SAND_DEEP)
 				elif ly == top_slab and top_slab > 0:
-					# Mặt trên cùng (chỉ khi top_slab > 0, vì 0 đã xử lý ở trên)
 					bd.set_block(x, ly, z, top_block)
 				else:
-					# ly > top_slab → trên mặt đất
 					if ly <= water_top_slab:
 						bd.set_block(x, ly, z, B.WATER)
 					else:
@@ -1005,7 +1042,7 @@ func _process(_delta: float) -> void:
 		var pd: Dictionary = _prop_queue.pop_front()
 		var ptype: String = pd.get("type", "weed")
 		var prop := PlantProp.new(50, DestroyableProp.WeaponReq.SWORD,
-			"mon_ngot" if ptype == "weed" else "rong_nhiet_doi")
+			"rong_nhiet_doi" if ptype == "weed" else "mon_ngot")
 		prop.position = pd["pos"]
 		prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0),
 			pd.get("has_silt", false), pd.get("water_gap", 1.0))
