@@ -11,6 +11,7 @@ signal inventory_pressed
 signal map_pressed
 signal attack_pressed
 signal camera_drag(delta: Vector2)
+signal pinch_zoom(factor: float)
 
 var joystick: Control = null   # VirtualJoystick instance
 
@@ -19,8 +20,8 @@ var sprint_held:   bool = false
 var interact_held: bool = false
 var attack_held:   bool = false
 
-var _cam_touch_idx: int     = -1
-var _cam_last_pos: Vector2  = Vector2.ZERO
+var _cam_touches: Dictionary = {}  # index -> Vector2 position
+var _pinch_last_dist: float = 0.0
 var _sprint_held_internal: bool = false
 
 ## Scale toàn bộ UI theo button_scale setting
@@ -131,7 +132,6 @@ func _make_btn(label: String, x: float, y: float, sz: float, radius: float, col:
 	return btn
 
 func _make_cam_area(vp: Vector2, s: float) -> Control:
-	# Vùng kéo camera — chiếm nửa phải màn hình
 	var area := Control.new()
 	area.position = Vector2(vp.x * 0.35, 0)
 	area.size = Vector2(vp.x * 0.65, vp.y * 0.70)
@@ -142,15 +142,30 @@ func _make_cam_area(vp: Vector2, s: float) -> Control:
 func _on_cam_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
 		var e := event as InputEventScreenTouch
-		if e.pressed and _cam_touch_idx < 0:
-			_cam_touch_idx = e.index
-			_cam_last_pos  = e.position
-		elif not e.pressed and e.index == _cam_touch_idx:
-			_cam_touch_idx = -1
+		if e.pressed:
+			_cam_touches[e.index] = e.position
+			if _cam_touches.size() == 2:
+				var pts := _cam_touches.values()
+				_pinch_last_dist = pts[0].distance_to(pts[1])
+		else:
+			_cam_touches.erase(e.index)
+			if _cam_touches.size() < 2:
+				_pinch_last_dist = 0.0
+
 	elif event is InputEventScreenDrag:
 		var e := event as InputEventScreenDrag
-		if e.index == _cam_touch_idx:
+		var prev_pos: Vector2 = _cam_touches.get(e.index, e.position)
+		_cam_touches[e.index] = e.position
+
+		if _cam_touches.size() == 2 and _pinch_last_dist > 0.0:
+			var pts := _cam_touches.values()
+			var dist: float = pts[0].distance_to(pts[1])
+			var factor: float = dist / _pinch_last_dist
+			if abs(factor - 1.0) > 0.01:
+				emit_signal("pinch_zoom", factor)
+			_pinch_last_dist = dist
+		elif _cam_touches.size() == 1:
 			var sensitivity: float = ProjectSettings.get_setting("mobile/joystick_sensitivity", 1.0)
-			var d := (e.position - _cam_last_pos) * sensitivity
-			_cam_last_pos = e.position
-			emit_signal("camera_drag", d)
+			var delta_pos: Vector2 = e.position - prev_pos
+			if delta_pos.length_squared() > 0.01:
+				emit_signal("camera_drag", delta_pos * sensitivity)

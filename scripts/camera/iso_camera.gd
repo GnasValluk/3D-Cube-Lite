@@ -12,6 +12,12 @@ extends Node3D
 @export var cam_height:   float   = 22.0  # Chiều cao camera so với player
 @export var cam_back:     float   = 18.0  # Khoảng lùi ra sau theo trục Z
 @export var ortho_size:   float   = 18.0  # Kích thước vùng nhìn Orthographic (tăng = thấy nhiều hơn)
+@export var zoom_min:     float   = 4.0   # Zoom in tối đa
+@export var zoom_max:     float   = 40.0  # Zoom out tối đa
+@export var zoom_step:    float   = 2.0   # Mỗi lần lăn chuột
+@export var zoom_speed:   float   = 10.0  # Tốc độ lerp zoom
+
+signal zoom_changed(zoom_level: float)
 
 @onready var _camera: Camera3D = $Camera3D
 
@@ -21,19 +27,19 @@ var _shake_duration: float = 0.0
 var _shake_intensity: float = 0.0
 var _shake_offset: Vector3 = Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
+var _target_ortho: float = 18.0
 
 
 func _ready() -> void:
 	_target = get_node_or_null(target_path)
 	_rng.randomize()
+	_target_ortho = ortho_size
 
 	# Đặt offset camera cố định theo góc isometric (pitch -35.26°, yaw 45°)
-	# Góc isometric chuẩn: nhìn từ hướng (+X+Z) xuống dưới
 	_camera.position = Vector3(cam_back, cam_height, cam_back)
-	# Camera nhìn về gốc tọa độ local của rig (= vị trí player)
 	_camera.look_at(Vector3.ZERO, Vector3.UP)
 
-	# Orthographic để không có điểm tụ – giữ các cạnh song song
+	# Orthographic
 	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 	_camera.size       = ortho_size
 	_camera.near       = 0.5
@@ -55,6 +61,50 @@ func add_shake(intensity: float, duration: float) -> void:
 	_shake_duration = max(_shake_duration, duration)
 	_shake_timer = max(_shake_timer, duration)
 
+func zoom_in() -> void:
+	_target_ortho = max(_target_ortho - zoom_step, zoom_min)
+	emit_signal("zoom_changed", _target_ortho)
+
+func zoom_out() -> void:
+	_target_ortho = min(_target_ortho + zoom_step, zoom_max)
+	emit_signal("zoom_changed", _target_ortho)
+
+func set_zoom(value: float) -> void:
+	_target_ortho = clamp(value, zoom_min, zoom_max)
+	emit_signal("zoom_changed", _target_ortho)
+
+func get_zoom() -> float:
+	return _target_ortho
+
+func get_zoom_normalized() -> float:
+	return (clamp(_target_ortho, zoom_min, zoom_max) - zoom_min) / max(zoom_max - zoom_min, 0.001)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not _camera.current:
+		return
+	if event is InputEventMouseButton:
+		var e := event as InputEventMouseButton
+		if e.pressed:
+			if e.button_index == MOUSE_BUTTON_WHEEL_UP:
+				zoom_in()
+				get_viewport().set_input_as_handled()
+			elif e.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				zoom_out()
+				get_viewport().set_input_as_handled()
+	elif event is InputEventKey:
+		var ke := event as InputEventKey
+		if ke.pressed:
+			if ke.keycode == KEY_PAGEUP or ke.keycode == KEY_EQUAL or ke.keycode == KEY_KP_ADD:
+				zoom_in()
+				get_viewport().set_input_as_handled()
+			elif ke.keycode == KEY_PAGEDOWN or ke.keycode == KEY_MINUS or ke.keycode == KEY_KP_SUBTRACT:
+				zoom_out()
+				get_viewport().set_input_as_handled()
+
+func pinch_zoom(factor: float) -> void:
+	_target_ortho = clamp(_target_ortho * factor, zoom_min, zoom_max)
+	emit_signal("zoom_changed", _target_ortho)
+
 func _process(delta: float) -> void:
 	if not is_instance_valid(_target):
 		return
@@ -63,6 +113,12 @@ func _process(delta: float) -> void:
 	var dest := Vector3(_target.global_position.x, 0.0, _target.global_position.z)
 	global_position = global_position.lerp(dest, follow_speed * delta)
 	_camera.position = Vector3(cam_back, cam_height, cam_back) + _shake_offset * 6.0
+
+	# Smooth zoom
+	if abs(_camera.size - _target_ortho) > 0.01:
+		_camera.size = lerp(_camera.size, _target_ortho, delta * zoom_speed)
+	else:
+		_camera.size = _target_ortho
 
 func _update_shake(delta: float) -> void:
 	if _shake_timer <= 0.0:

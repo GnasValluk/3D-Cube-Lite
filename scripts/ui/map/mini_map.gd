@@ -67,9 +67,11 @@ func _draw() -> void:
 		var py := c.y * blk + int(off_z)
 		if px + blk < 0 or px > MAP_SIZE or py + blk < 0 or py > MAP_SIZE: continue
 		var col: Color = _explored_cache[key] as Color
-		col.r = min(col.r * 2.5, 1.0)
-		col.g = min(col.g * 2.5, 1.0)
-		col.b = min(col.b * 2.5, 1.0)
+		var mc: float = max(col.r, max(col.g, col.b))
+		var boost: float = 1.0 + (1.0 - mc) * 1.8 if mc > 0.01 else 2.5
+		col.r = min(col.r * boost, 1.0)
+		col.g = min(col.g * boost, 1.0)
+		col.b = min(col.b * boost, 1.0)
 		draw_rect(Rect2(px, py, blk, blk), col)
 	draw_circle(off, PLAYER_RADIUS, Color(1.0, 1.0, 1.0, 0.95))
 	draw_line(off, off + Vector2(0, -PLAYER_RADIUS - 4), Color(1.0, 1.0, 1.0, 0.70), 1.5)

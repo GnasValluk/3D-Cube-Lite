@@ -166,9 +166,12 @@ func _rebuild_texture() -> void:
 		var py: int = ((cell.y * cs) - _map_origin_z) * _tex_scale as int
 		if px < 0 or py < 0 or px + cell_block > tex_w or py + cell_block > tex_h: continue
 		var col: Color = _explored_cache[key] as Color
-		col.r = min(col.r * 2.5, 1.0)
-		col.g = min(col.g * 2.5, 1.0)
-		col.b = min(col.b * 2.5, 1.0)
+		# Boost: màu tối được tăng nhiều, màu sáng được tăng ít → không bị clip
+		var mc: float = max(col.r, max(col.g, col.b))
+		var boost: float = 1.0 + (1.0 - mc) * 1.8 if mc > 0.01 else 2.5
+		col.r = min(col.r * boost, 1.0)
+		col.g = min(col.g * boost, 1.0)
+		col.b = min(col.b * boost, 1.0)
 		_map_image.fill_rect(Rect2i(px, py, cell_block, cell_block), col)
 	if _map_texture and _map_image.get_size() == Vector2i(_map_texture.get_size()):
 		_map_texture.update(_map_image)

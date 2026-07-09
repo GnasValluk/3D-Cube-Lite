@@ -6,6 +6,7 @@ const CELL_SIZE: float = 2.0
 const EXPLORE_RADIUS: float = 14.0
 
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
+const _BlockData = preload("res://scripts/world/chunk/chunk_block_data.gd")
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _Noise = preload("res://scripts/world/chunk/chunk_noise.gd")
 
@@ -16,11 +17,13 @@ var _player: Node3D = null
 
 var _explore_timer: float = 0.0
 var _dimension_id: int = _Dim.DimensionID.TWILIGHT
+var _world_mgr: OpenWorldManager = null
+
 
 func _ready() -> void:
-	var owm := get_node("../WorldManager") as OpenWorldManager
-	if owm:
-		_dimension_id = owm.dimension_id
+	_world_mgr = get_node("../WorldManager") as OpenWorldManager
+	if _world_mgr:
+		_dimension_id = _world_mgr.dimension_id
 
 func set_player(p: Node3D) -> void:
 	_player = p
@@ -115,6 +118,46 @@ func _sample_color(wx: float, wz: float) -> Color:
 	return _sample_color_tw(wx, wz)
 
 func _sample_color_rw(wx: float, wz: float) -> Color:
+	var colors: Array[Color] = _Data.BLOCK_COLORS_RW
+
+	# Ưu tiên: đọc block thực tế từ chunk nếu có
+	if _world_mgr:
+		var chunk: Node = _world_mgr.get_chunk_at(wx, wz)
+		if chunk is WorldChunk:
+			var wc: WorldChunk = chunk as WorldChunk
+			if wc.block_data != null:
+				var bd: _BlockData = wc.block_data
+				var org: float = wc._cx * 32.0 - 16.0
+				var orgz: float = wc._cz * 32.0 - 16.0
+				var lx: int = clampi(floori(wx - org), 0, 31)
+				var lz: int = clampi(floori(wz - orgz), 0, 31)
+				var top_bid: int = _Data.BlockID.AIR
+				var top_ly: int = -1
+				var floor_ly: int = -1
+				for ly in range(_BlockData.CHUNK_H - 1, -1, -1):
+					var bid: int = bd.get_block(lx, ly, lz)
+					if bid == _Data.BlockID.WATER and top_bid == _Data.BlockID.AIR:
+						top_bid = _Data.BlockID.WATER
+						top_ly = ly
+					elif bid != _Data.BlockID.AIR and bid != _Data.BlockID.WATER:
+						if top_bid == _Data.BlockID.AIR:
+							top_bid = bid
+						floor_ly = ly
+						break
+				if top_bid == _Data.BlockID.WATER:
+					var depth_t: float = 1.0
+					if floor_ly >= 0:
+						var floor_y: float = _BlockData.layer_to_world_y(floor_ly) + _BlockData.SLAB_HEIGHT
+						var water_y: float = _BlockData.layer_to_world_y(top_ly)
+						depth_t = clamp((water_y - floor_y) / 5.0, 0.0, 1.0)
+					return Color(0.04, lerp(0.38, 0.12, depth_t), lerp(0.68, 0.30, depth_t))
+				if top_bid != _Data.BlockID.AIR and top_bid < colors.size():
+					return colors[top_bid]
+
+	# Fallback noise nếu chunk chưa load
+	return _sample_color_rw_fallback(wx, wz)
+
+func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 	var nd: Dictionary = _Noise._noise_for_dim(_dimension_id)
 	var n_biome: FastNoiseLite = nd["biome"]
 	var n_warp: FastNoiseLite = nd["warp"]
@@ -125,15 +168,16 @@ func _sample_color_rw(wx: float, wz: float) -> Color:
 	var threshold: float = 0.40
 	var is_dark: bool = n >= threshold
 
+	# Đường
 	if _is_road(wx, wz):
 		return Color(0.68, 0.52, 0.26)
 
+	# Biển
 	var n_ocean: FastNoiseLite = nd["ocean"]
 	var ow: FastNoiseLite = nd["ocean_warp"]
 	var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
 	var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
 	var is_ocean: bool = (n_ocean.get_noise_2d(wx + warp_x, wz + warp_z) + 1.0) * 0.5 > _Data.OCEAN_THRESHOLD
-
 	if is_ocean:
 		var dist_to_shore: float = _ocean_shore_dist(wx, wz, nd)
 		if dist_to_shore < 5.0:

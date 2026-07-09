@@ -215,6 +215,11 @@ func _setup_mobile_controls() -> void:
 		elif _explore_sys:
 			_explore_map.open(_explore_sys)
 	)
+	mob.pinch_zoom.connect(func(factor: float):
+		var rig := get_parent().get_node_or_null("CameraRig")
+		if rig:
+			rig.pinch_zoom(1.0 / factor)
+	)
 
 func _setup_loading_overlay() -> void:
 	_load_overlay = ColorRect.new()
