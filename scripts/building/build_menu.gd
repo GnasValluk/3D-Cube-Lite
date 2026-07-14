@@ -1,18 +1,26 @@
 extends Control
 class_name BuildMenu
 
-var _sys: PlacementSystem
-var _btns: Array[Button] = []
+const PANEL_W: float = 220.0
+const ITEM_H: float = 56.0
 
-signal building_selected(idx: int)
+var _player_inv: Inventory = null
+
+var _btns: Array[Button] = []
+var _building_names: Array[String] = []
+var _building_ids: Array[String] = []
+
+signal building_selected(item_id: String)
 signal closed()
 
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_building_ids = ["twilight_gate", "chest"]
+	_building_names = ["Cổng Twilight", "Rương đồ"]
 
-func open(sys: PlacementSystem) -> void:
-	_sys = sys
+func open(initial_inv: Inventory) -> void:
+	_player_inv = initial_inv
 	_clear()
 	_build_ui()
 	visible = true
@@ -29,107 +37,108 @@ func _clear() -> void:
 
 func _build_ui() -> void:
 	var vp_size: Vector2 = get_viewport().get_visible_rect().size
+
 	var bg := ColorRect.new()
-	bg.color = Color(0.0, 0.0, 0.0, 0.50)
+	bg.color = Color(0.0, 0.0, 0.0, 0.35)
 	bg.position = Vector2.ZERO
 	bg.size = vp_size
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bg)
 
 	var panel := Panel.new()
-	var pw: float = 360.0
-	var buildings: Array[Dictionary] = _sys.get_buildings()
-	var inv: Dictionary = _sys.get_inventory()
-	var item_count: int = 0
-	for b in buildings:
-		if b.type == "tile":
-			var cnt: int = inv.get(b.key, 0)
-			if cnt > 0:
-				item_count += 1
-		elif b.type == "unique" and not b.placed:
-			item_count += 1
-	var rows: int = max(item_count, 1)
-	var ph: float = 50.0 + rows * 58.0 + 20.0
-
-	panel.position = Vector2((vp_size.x - pw) * 0.5, (vp_size.y - ph) * 0.5)
-	panel.size = Vector2(pw, ph)
+	panel.position = Vector2(vp_size.x - PANEL_W, 0)
+	panel.size = Vector2(PANEL_W, vp_size.y)
 	var pbg := StyleBoxFlat.new()
-	pbg.bg_color = Color(0.07, 0.07, 0.12, 0.95)
-	pbg.corner_radius_top_left = 12; pbg.corner_radius_top_right = 12
-	pbg.corner_radius_bottom_left = 12; pbg.corner_radius_bottom_right = 12
-	pbg.border_width_left = 2; pbg.border_width_right = 2
-	pbg.border_width_top = 2; pbg.border_width_bottom = 2
-	pbg.border_color = Color(0.3, 0.3, 0.45, 0.6)
+	pbg.bg_color = Color(0.06, 0.06, 0.12, 0.92)
+	pbg.corner_radius_top_left = 12
+	pbg.corner_radius_bottom_left = 12
+	pbg.border_width_left = 1
+	pbg.border_color = Color(0.25, 0.25, 0.40, 0.5)
 	panel.add_theme_stylebox_override("panel", pbg)
 	add_child(panel)
 
+	var close_btn := Button.new()
+	close_btn.text = "✕"
+	close_btn.position = Vector2(PANEL_W - 36, 8)
+	close_btn.size = Vector2(28, 28)
+	close_btn.add_theme_font_size_override("font_size", 16)
+	close_btn.add_theme_color_override("font_color", Color(0.7, 0.7, 0.8, 0.8))
+	var cb_bg := StyleBoxFlat.new()
+	cb_bg.bg_color = Color(0.15, 0.15, 0.22, 0.6)
+	cb_bg.corner_radius_top_left = 6; cb_bg.corner_radius_top_right = 6
+	cb_bg.corner_radius_bottom_left = 6; cb_bg.corner_radius_bottom_right = 6
+	close_btn.add_theme_stylebox_override("normal", cb_bg)
+	close_btn.add_theme_stylebox_override("hover", cb_bg)
+	close_btn.pressed.connect(func(): close())
+	panel.add_child(close_btn)
+
 	var title := Label.new()
-	title.text = tr("BUILD_TITLE")
+	title.text = "Xây dựng"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 20)
-	title.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	title.position = Vector2(0, 12)
-	title.size = Vector2(pw, 28)
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0, 0.95))
+	title.position = Vector2(0, 10)
+	title.size = Vector2(PANEL_W, 30)
 	panel.add_child(title)
 
-	var y: float = 52.0
-	for i in range(buildings.size()):
-		var data: Dictionary = buildings[i]
-		var is_tile: bool = data.type == "tile"
-		var tile_count: int = inv.get(data.key, 0) if is_tile else 0
-		var disabled: bool = false
+	var inv_info := Label.new()
+	inv_info.text = "Vật phẩm trong túi:"
+	inv_info.position = Vector2(14, 46)
+	inv_info.add_theme_font_size_override("font_size", 11)
+	inv_info.add_theme_color_override("font_color", Color(0.55, 0.55, 0.75, 0.7))
+	panel.add_child(inv_info)
 
-		if data.type == "unique" and data.placed:
-			disabled = true
-		if is_tile and tile_count <= 0:
-			disabled = true
+	var y: float = 68.0
+	for i in range(_building_ids.size()):
+		var bid: String = _building_ids[i]
+		var bname: String = _building_names[i]
+		var count: int = _get_item_count(bid)
+		var has_item: bool = count > 0
 
-		if not disabled or data.type == "unique":
-			var btn := Button.new()
-			btn.position = Vector2(20, y)
-			btn.size = Vector2(pw - 70, 50)
-			var label_text: String = tr(data.get("name_key", data.get("name", "")))
-			if is_tile:
-				label_text += " [" + str(tile_count) + "]"
-			btn.text = label_text
-			btn.add_theme_font_size_override("font_size", 14)
-			btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
-			btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-			var btn_bg := StyleBoxFlat.new()
-			if disabled:
-				btn_bg.bg_color = Color(0.12, 0.12, 0.18, 0.6)
-				btn_bg.border_color = Color(0.3, 0.3, 0.35, 0.3)
-				btn.disabled = true
-			else:
-				btn_bg.bg_color = Color(0.10, 0.10, 0.18, 0.85)
-				btn_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
-				btn.pressed.connect(_on_building_click.bind(i))
-			btn_bg.corner_radius_top_left = 8; btn_bg.corner_radius_top_right = 8
-			btn_bg.corner_radius_bottom_left = 8; btn_bg.corner_radius_bottom_right = 8
-			btn_bg.border_width_left = 1; btn_bg.border_width_right = 1
-			btn_bg.border_width_top = 1; btn_bg.border_width_bottom = 1
-			btn.add_theme_stylebox_override("normal", btn_bg)
-			btn.add_theme_stylebox_override("disabled", btn_bg)
-			panel.add_child(btn)
+		var btn := Button.new()
+		btn.position = Vector2(10, y)
+		btn.size = Vector2(PANEL_W - 20, ITEM_H)
+		btn.text = bname
+		btn.add_theme_font_size_override("font_size", 14)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		var btn_bg := StyleBoxFlat.new()
+		if not has_item:
+			btn_bg.bg_color = Color(0.10, 0.10, 0.16, 0.5)
+			btn_bg.border_color = Color(0.2, 0.2, 0.3, 0.25)
+			btn.add_theme_color_override("font_color", Color(0.4, 0.4, 0.5, 0.5))
+			btn.disabled = true
+		else:
+			btn_bg.bg_color = Color(0.10, 0.10, 0.20, 0.85)
+			btn_bg.border_color = Color(0.25, 0.30, 0.45, 0.5)
+			btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0, 0.9))
+			var idx := i
+			btn.pressed.connect(func(): _on_item_click(idx))
+		btn_bg.corner_radius_top_left = 8; btn_bg.corner_radius_top_right = 8
+		btn_bg.corner_radius_bottom_left = 8; btn_bg.corner_radius_bottom_right = 8
+		btn_bg.border_width_left = 1; btn_bg.border_width_right = 1
+		btn_bg.border_width_top = 1; btn_bg.border_width_bottom = 1
+		btn.add_theme_stylebox_override("normal", btn_bg)
+		btn.add_theme_stylebox_override("disabled", btn_bg)
+		panel.add_child(btn)
 
-			var desc := Label.new()
-			desc.text = tr(data.get("desc_key", data.get("desc", "")))
-			desc.position = Vector2(12, 30)
-			desc.add_theme_font_size_override("font_size", 11)
-			desc.add_theme_color_override("font_color", Color(0.55, 0.55, 0.75, 0.7))
-			btn.add_child(desc)
-			_btns.append(btn)
-			y += 58.0
+		var count_label := Label.new()
+		count_label.text = "x" + str(count)
+		count_label.add_theme_font_size_override("font_size", 12)
+		count_label.add_theme_color_override("font_color", Color(0.6, 0.7, 0.85, 0.8) if has_item else Color(0.35, 0.35, 0.45, 0.4))
+		count_label.position = Vector2(PANEL_W - 70, 28)
+		count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		count_label.size = Vector2(55, 22)
+		btn.add_child(count_label)
 
-	if _btns.size() == 0:
-		var empty := Label.new()
-		empty.text = tr("EMPTY_BUILD")
-		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		empty.add_theme_font_size_override("font_size", 14)
-		empty.add_theme_color_override("font_color", Color(0.5, 0.5, 0.7, 0.6))
-		empty.position = Vector2(0, 52)
-		empty.size = Vector2(pw, 40)
-		panel.add_child(empty)
+		_btns.append(btn)
+		y += ITEM_H + 6
 
-func _on_building_click(idx: int) -> void:
-	building_selected.emit(idx)
+func _get_item_count(item_id: String) -> int:
+	if _player_inv == null:
+		return 0
+	return _player_inv.get_item_count(item_id)
+
+func _on_item_click(idx: int) -> void:
+	if idx < 0 or idx >= _building_ids.size():
+		return
+	building_selected.emit(_building_ids[idx])

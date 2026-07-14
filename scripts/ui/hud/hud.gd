@@ -13,13 +13,14 @@ var _inventory_ui: InventoryUI
 var _chest_ui
 var _inventory_open: bool = false
 var _chest_open: bool = false
+var _current_chest: Chest = null
 var _switch_hint: Label
 var _party_ui
 var _settings_ui
 var _settings_icon: Button
 var _save_btn: Button
 var _library_btn: Button
-var _creature_library
+var _library
 var _party_hud: Control
 var _party_indicators: Array[Panel] = []
 var _mgr: CharacterManager
@@ -60,7 +61,7 @@ var _hud_throttle: float = 0.0
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _ChestUI = preload("res://scripts/items/ui/chest_ui.gd")
 const _PartyUI = preload("res://scripts/ui/party/party_ui.gd")
-const _CreatureLibrary = preload("res://scripts/ui/library/creature_library.gd")
+const _Library = preload("res://scripts/ui/library/creature_library.gd")
 
 func _ready() -> void:
 	_setup_ui()
@@ -136,6 +137,7 @@ func _setup_ui() -> void:
 	add_child(_build_menu)
 	_build_menu.building_selected.connect(_on_build_selected)
 	_build_menu.closed.connect(_on_build_menu_closed)
+	_build_menu.visible = false
 
 	_explore_map = ExploreMap.new()
 	add_child(_explore_map)
@@ -318,8 +320,8 @@ func _setup_library_button() -> void:
 	_library_btn.pressed.connect(_on_library_pressed)
 	add_child(_library_btn)
 
-	_creature_library = _CreatureLibrary.new()
-	add_child(_creature_library)
+	_library = _Library.new()
+	add_child(_library)
 
 func _on_save_pressed() -> void:
 	if SaveManager:
@@ -329,8 +331,8 @@ func _on_save_pressed() -> void:
 		player._scroll_inventory_message(tr("GAME_SAVED"))
 
 func _on_library_pressed() -> void:
-	if _creature_library:
-		_creature_library.show_library()
+	if _library:
+		_library.show_library()
 
 func _toggle_settings() -> void:
 	if _settings_ui and _settings_ui.visible:
@@ -744,14 +746,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				if _build_menu and _build_menu.visible:
 					_build_menu.close()
 				else:
-					if _placement_sys == null:
-						_placement_sys = PlacementSystem.new()
-						_placement_sys.name = "PlacementSystem"
-						var p := get_parent()
-						if p:
-							p.add_child(_placement_sys)
+					var player := _find_player_character()
+					if player:
+						if _placement_sys == null:
+							_placement_sys = PlacementSystem.new()
+							_placement_sys.name = "PlacementSystem"
+							var p := get_parent()
+							if p:
+								p.add_child(_placement_sys)
+						_placement_sys.set_player_inventory(player.inventory)
 					if not (_settings_ui and _settings_ui.visible) and not (_party_ui and _party_ui.visible):
-						_build_menu.open(_placement_sys)
+						_build_menu.open(player.inventory if player else null)
 				return
 			if k.keycode == k_party:
 				if _party_ui and _party_ui.visible:
@@ -786,6 +791,7 @@ func open_chest(chest) -> void:
 	if _inventory_open:
 		_toggle_inventory()
 	_chest_open = true
+	_current_chest = chest
 	var player := _find_player_character()
 	if player:
 		_chest_ui.open(chest, player)
@@ -795,6 +801,9 @@ func close_chest() -> void:
 		return
 	_chest_open = false
 	_chest_ui.close()
+	if _current_chest and is_instance_valid(_current_chest):
+		_current_chest.close_ui()
+	_current_chest = null
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -824,6 +833,9 @@ func _find_and_track() -> void:
 		var p := get_parent()
 		if p:
 			p.add_child(_placement_sys, true)
+	var player := _find_player_character()
+	if player:
+		_placement_sys.set_player_inventory(player.inventory)
 	_explore_sys = _find_explore_system()
 	if _explore_sys:
 		_explore_sys.set_player(_mgr.get_current_character())
@@ -930,10 +942,13 @@ func _find_portal_gate() -> PortalGate:
 				return child as PortalGate
 	return null
 
-func _on_build_selected(idx: int) -> void:
+func _on_build_selected(item_id: String) -> void:
 	if _placement_sys:
 		_build_menu.close()
-		_placement_sys.start_placement(idx)
+		var player := _find_player_character()
+		if player:
+			_placement_sys.set_player_inventory(player.inventory)
+		_placement_sys.start_placement(item_id)
 
 func _on_build_menu_closed() -> void:
 	_build_hint.text = tr("BUILD_HINT_B")

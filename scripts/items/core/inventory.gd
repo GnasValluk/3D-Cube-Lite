@@ -112,6 +112,21 @@ func get_item_count(item_id: String) -> int:
 			total += slot.count
 	return total
 
+func remove_item_by_id(item_id: String, count: int = 1) -> bool:
+	var remaining: int = count
+	for i in range(slots.size()):
+		if remaining <= 0:
+			break
+		var slot: ItemSlot = slots[i]
+		if slot.is_empty() or slot.item.id != item_id:
+			continue
+		var take: int = mini(remaining, slot.count)
+		remaining -= take
+		slot.count -= take
+		if slot.count <= 0:
+			slot.clear()
+	return remaining < count
+
 func count_filled_slots() -> int:
 	var n: int = 0
 	for slot in slots:

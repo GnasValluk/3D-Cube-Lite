@@ -4,6 +4,8 @@ extends StaticBody3D
 var inventory: Inventory = null
 var _label: Label3D
 var _player_nearby: bool = false
+var _lid_pivot: Node3D
+var _is_open: bool = false
 
 func _ready() -> void:
 	inventory = Inventory.new(27)
@@ -30,13 +32,17 @@ func _setup_mesh() -> void:
 	body_mesh.position = Vector3(0, 0.175, 0)
 	add_child(body_mesh)
 
+	_lid_pivot = Node3D.new()
+	_lid_pivot.position = Vector3(0, 0.38, 0.31)
+	add_child(_lid_pivot)
+
 	var lid_mesh := MeshInstance3D.new()
 	var lid_box := BoxMesh.new()
 	lid_box.size = Vector3(0.72, 0.06, 0.62)
 	lid_mesh.mesh = lid_box
 	lid_mesh.material_override = lid_mat
-	lid_mesh.position = Vector3(0, 0.38, 0)
-	add_child(lid_mesh)
+	lid_mesh.position = Vector3(0, 0, -0.31)
+	_lid_pivot.add_child(lid_mesh)
 
 	var band_mat := StandardMaterial3D.new()
 	band_mat.albedo_color = Color(0.35, 0.22, 0.12)
@@ -103,16 +109,40 @@ func is_player_nearby() -> bool:
 	return _player_nearby
 
 func open_ui() -> void:
+	if _is_open:
+		return
+	_is_open = true
 	var hud := _find_hud()
 	if hud:
 		hud.open_chest(self)
 	SFXManager.play_chest_open()
+	_open_animation()
 
 func close_ui() -> void:
+	if not _is_open:
+		return
+	_is_open = false
 	var hud := _find_hud()
 	if hud:
 		hud.close_chest()
 	SFXManager.play_chest_close()
+	_close_animation()
+
+func _open_animation() -> void:
+	if not is_instance_valid(_lid_pivot):
+		return
+	var tween := create_tween()
+	tween.tween_property(_lid_pivot, "rotation:x", deg_to_rad(120.0), 0.35)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BACK)
+
+func _close_animation() -> void:
+	if not is_instance_valid(_lid_pivot):
+		return
+	var tween := create_tween()
+	tween.tween_property(_lid_pivot, "rotation:x", 0.0, 0.25)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BOUNCE)
 
 func _find_hud() -> HUD:
 	var root := get_tree().current_scene if get_tree() else null

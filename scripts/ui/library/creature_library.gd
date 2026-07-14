@@ -1,22 +1,9 @@
 extends Control
-class_name CreatureLibrary
+class_name Library
 
-var _selected: String = ""
-var _creature_list: Array[Dictionary] = []
-var _btn_group: Array[Button] = []
-var _preview_name: Label
-var _preview_element: Label
-var _preview_stats: Label
-var _preview_skills: Label
-var _preview_spawn: Label
-
-var _viewport_container: SubViewportContainer
-var _viewport: SubViewport
-var _cam: Camera3D
-var _model_root: Node3D
-
-var _cam_rot: float = 0.0
-
+const _ItemMesh = preload("res://scripts/items/world/item_mesh.gd")
+const _WeaponMesh = preload("res://scripts/characters/player/weapon_mesh.gd")
+const _PlantProp = preload("res://scripts/world/props/plant_prop.gd")
 const _PlayerMesh = preload("res://scripts/characters/player/player_mesh.gd")
 const _RaptorMesh = preload("res://scripts/characters/raptor/raptor_mesh.gd")
 const _DragonMesh = preload("res://scripts/characters/dragon/dragon_mesh.gd")
@@ -32,20 +19,13 @@ const FISH_COLORS := [
 	[Color(0.92, 0.25, 0.15), Color(0.90, 0.55, 0.45), Color(0.75, 0.15, 0.10)],
 	[Color(0.85, 0.35, 0.20), Color(0.92, 0.55, 0.35), Color(0.75, 0.25, 0.15)],
 ]
-
 const FISH_PATTERN := [
-	Color(0.15, 0.10, 0.05),
-	Color(0, 0, 0, 0),
-	Color(0, 0, 0, 0),
-	Color(0, 0, 0, 0),
-	Color(0.15, 0.10, 0.08),
-	Color(0, 0, 0, 0),
+	Color(0.15, 0.10, 0.05), Color(0, 0, 0, 0), Color(0, 0, 0, 0),
+	Color(0, 0, 0, 0), Color(0.15, 0.10, 0.08), Color(0, 0, 0, 0),
 ]
-
 const FISH_BODY_Z := [1.0, 1.0, 1.0, 1.8, 1.0, 1.0]
 
 const CREATURES := [
-	# Party characters
 	{ "id": "player",     "name": "Player",      "cat": "party", "element": 6,
 	  "hp": 500, "atk": 80, "def": 20, "spd": 3.6, "mp": 200,
 	  "skills": "LMB: Vụt kiếm (0s)\nQ: Vụt sáng 80st (0.6s)\nR: Chém Xoáy 150st (1.0s)\nSPACE: Nhảy",
@@ -66,33 +46,61 @@ const CREATURES := [
 	  "hp": 450, "atk": 165, "def": 12, "spd": 5.0, "mp": 200,
 	  "skills": "LMB: Bắn 6 phát (1.0s)\nQ: Lướt / Thả bom (3.0s)\nR: 2 hoả tiễn 100st + AOE (7.0s)\nSPACE: Biến chiến cơ 10s",
 	  "spawn": "Overworld" },
-	# Fish
 	{ "id": "carp",       "name": "Carp",        "cat": "fish", "fi": 0,
-	  "hp": 60, "atk": 0, "def": 0, "spd": 1.4,
-	  "spawn": "Silt / Sand lakes" },
+	  "hp": 60, "atk": 0, "def": 0, "spd": 1.4, "spawn": "Silt / Sand lakes" },
 	{ "id": "perch",      "name": "Climbing Perch", "cat": "fish", "fi": 1,
-	  "hp": 40, "atk": 0, "def": 0, "spd": 2.0,
-	  "spawn": "Silt / Sand lakes" },
+	  "hp": 40, "atk": 0, "def": 0, "spd": 2.0, "spawn": "Silt / Sand lakes" },
 	{ "id": "tilapia",    "name": "Red Tilapia", "cat": "fish", "fi": 2,
-	  "hp": 50, "atk": 0, "def": 0, "spd": 1.8,
-	  "spawn": "Silt / Sand lakes" },
+	  "hp": 50, "atk": 0, "def": 0, "spd": 1.8, "spawn": "Silt / Sand lakes" },
 	{ "id": "snakehead",  "name": "Snakehead",   "cat": "fish", "fi": 3,
-	  "hp": 70, "atk": 0, "def": 0, "spd": 1.5,
-	  "spawn": "Silt / Sand lakes" },
+	  "hp": 70, "atk": 0, "def": 0, "spd": 1.5, "spawn": "Silt / Sand lakes" },
 	{ "id": "flowerhorn", "name": "Flowerhorn",  "cat": "fish", "fi": 4,
-	  "hp": 70, "atk": 25, "def": 5, "spd": 1.2,
-	  "spawn": "Silt / Sand lakes" },
+	  "hp": 70, "atk": 25, "def": 5, "spd": 1.2, "spawn": "Silt / Sand lakes" },
 	{ "id": "shrimp",     "name": "Freshwater Shrimp", "cat": "fish", "fi": 5,
-	  "hp": 15, "atk": 0, "def": 0, "spd": 0.8,
-	  "spawn": "Silt / Sand lakes (bottom)" },
+	  "hp": 15, "atk": 0, "def": 0, "spd": 0.8, "spawn": "Silt / Sand lakes (bottom)" },
 ]
-
 const ELEMENT_SYMBOLS := { 1: "⚡", 2: "❄", 3: "☣", 5: "🌑", 6: "☀" }
 const ELEMENT_NAMES := { 1: "Electric", 2: "Ice", 3: "Decay", 5: "Dark", 6: "Light" }
+
+enum Tab { CREATURES, ITEMS }
+
+var _current_tab: int = Tab.CREATURES
+var _selected: String = ""
+
+# Creature
+var _creature_left: Panel
+var _creature_right: Panel
+var _btn_group: Array[Button] = []
+var _preview_name: Label
+var _preview_element: Label
+var _preview_stats: Label
+var _preview_skills: Label
+var _preview_spawn: Label
+
+# Item
+var _item_left: Panel
+var _item_right: Panel
+var _item_btn_group: Array[Button] = []
+var _item_name_label: Label
+var _item_type_label: Label
+var _item_desc_label: Label
+var _item_stats_label: Label
+var _item_db: Dictionary = {}
+
+# Tab
+var _tab_buttons: Array[Button] = []
+
+# 3D viewport (shared)
+var _viewport_container: SubViewportContainer
+var _viewport: SubViewport
+var _cam: Camera3D
+var _model_root: Node3D
+var _cam_rot: float = 0.0
 
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_item_db = Inventory.create_item_db()
 	_build()
 
 func _build() -> void:
@@ -152,23 +160,142 @@ func _build() -> void:
 	div.color = Color(0.3, 0.3, 0.45, 0.4)
 	bg.add_child(div)
 
-	_build_creature_list(bg)
-	_build_preview(bg)
+	_build_tabs(bg, W)
 
-func _build_creature_list(bg: Panel) -> void:
-	var left := Panel.new()
-	left.position = Vector2(16, 54)
-	left.size = Vector2(200, 540)
-	var left_bg := StyleBoxFlat.new()
-	left_bg.bg_color = Color(0.06, 0.06, 0.10, 0.92)
-	left_bg.corner_radius_top_left = 10; left_bg.corner_radius_top_right = 10
-	left_bg.corner_radius_bottom_left = 10; left_bg.corner_radius_bottom_right = 10
-	left_bg.border_width_left = 1; left_bg.border_width_right = 1
-	left_bg.border_width_top = 1; left_bg.border_width_bottom = 1
-	left_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
-	left.add_theme_stylebox_override("panel", left_bg)
-	bg.add_child(left)
+	_creature_left = _make_side_panel(bg, 16, 90, 200, 510)
+	_creature_right = _make_side_panel(bg, 230, 90, 714, 510)
+	_build_creature_list(_creature_left)
+	_build_creature_preview(_creature_right)
 
+	_item_left = _make_side_panel(bg, 16, 90, 200, 510)
+	_item_right = _make_side_panel(bg, 230, 90, 714, 510)
+	_build_item_list(_item_left)
+	_build_item_preview(_item_right)
+
+	_build_shared_viewport(bg)
+	_update_tab_visibility()
+	_reparent_viewport()
+
+func _make_side_panel(bg: Panel, x: float, y: float, w: float, h: float) -> Panel:
+	var p := Panel.new()
+	p.position = Vector2(x, y)
+	p.size = Vector2(w, h)
+	var s := StyleBoxFlat.new()
+	s.bg_color = Color(0.06, 0.06, 0.10, 0.92)
+	s.corner_radius_top_left = 10; s.corner_radius_top_right = 10
+	s.corner_radius_bottom_left = 10; s.corner_radius_bottom_right = 10
+	s.border_width_left = 1; s.border_width_right = 1
+	s.border_width_top = 1; s.border_width_bottom = 1
+	s.border_color = Color(0.25, 0.25, 0.35, 0.5)
+	p.add_theme_stylebox_override("panel", s)
+	bg.add_child(p)
+	return p
+
+func _build_tabs(bg: Panel, W: float) -> void:
+	var tab_data := [
+		{ "id": Tab.CREATURES, "label": "Sinh vật" },
+		{ "id": Tab.ITEMS,     "label": "Vật phẩm" },
+	]
+	var tab_y: float = 50.0
+	var tw: float = 110.0
+	var th: float = 34.0
+	var start_x: float = 30.0
+	for i in range(tab_data.size()):
+		var d: Dictionary = tab_data[i]
+		var btn := Button.new()
+		btn.position = Vector2(start_x + i * (tw + 4), tab_y)
+		btn.size = Vector2(tw, th)
+		btn.text = d["label"]
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.pressed.connect(_on_tab_selected.bind(d["id"]))
+		bg.add_child(btn)
+		_tab_buttons.append(btn)
+	_update_tab_styles()
+
+func _build_shared_viewport(bg: Panel) -> void:
+	_viewport_container = SubViewportContainer.new()
+	_viewport_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_viewport_container.size = Vector2(360, 360)
+	bg.add_child(_viewport_container)
+
+	_viewport = SubViewport.new()
+	_viewport.size = Vector2i(340, 340)
+	_viewport.transparent_bg = true
+	_viewport.world_3d = World3D.new()
+	_viewport_container.add_child(_viewport)
+
+	_cam = Camera3D.new()
+	_viewport.add_child(_cam)
+
+	_model_root = Node3D.new()
+	_viewport.add_child(_model_root)
+
+	var world_env := WorldEnvironment.new()
+	world_env.environment = Environment.new()
+	world_env.environment.ambient_light_color = Color(0.4, 0.4, 0.5)
+	world_env.environment.ambient_light_energy = 1.5
+	_viewport.add_child(world_env)
+
+	for p in [Vector3(3, 5, 4), Vector3(-2, 3, -2)]:
+		var lt := DirectionalLight3D.new()
+		lt.look_at_from_position(p, Vector3.ZERO)
+		lt.light_energy = 1.2 if p.z > 0 else 0.5
+		_viewport.add_child(lt)
+
+func _on_tab_selected(tab: int) -> void:
+	if _current_tab == tab:
+		return
+	_current_tab = tab
+	_selected = ""
+	_update_tab_visibility()
+	_reparent_viewport()
+	if _current_tab == Tab.CREATURES and CREATURES.size() > 0:
+		_on_select(CREATURES[0]["id"])
+	elif _current_tab == Tab.ITEMS:
+		var ids := _item_db.keys()
+		if ids.size() > 0:
+			_on_item_select(ids[0])
+
+func _reparent_viewport() -> void:
+	var parent: Panel = _creature_right if _current_tab == Tab.CREATURES else _item_right
+	if _viewport_container.get_parent() != parent:
+		if _viewport_container.get_parent():
+			_viewport_container.get_parent().remove_child(_viewport_container)
+		parent.add_child(_viewport_container)
+	if _current_tab == Tab.CREATURES:
+		_viewport_container.position = Vector2(340, 10)
+		_viewport_container.size = Vector2(360, 360)
+	else:
+		_viewport_container.position = Vector2(16, 10)
+		_viewport_container.size = Vector2(340, 340)
+
+func _update_tab_visibility() -> void:
+	_creature_left.visible = _current_tab == Tab.CREATURES
+	_creature_right.visible = _current_tab == Tab.CREATURES
+	_item_left.visible = _current_tab == Tab.ITEMS
+	_item_right.visible = _current_tab == Tab.ITEMS
+	_update_tab_styles()
+
+func _update_tab_styles() -> void:
+	for i in range(_tab_buttons.size()):
+		var btn: Button = _tab_buttons[i]
+		var active: bool = (i == _current_tab)
+		var bg := StyleBoxFlat.new()
+		if active:
+			bg.bg_color = Color(0.18, 0.22, 0.38, 0.95)
+			bg.border_color = Color(0.4, 0.55, 0.9, 0.5)
+		else:
+			bg.bg_color = Color(0.08, 0.08, 0.14, 0.85)
+			bg.border_color = Color(0.3, 0.3, 0.45, 0.5)
+		bg.corner_radius_top_left = 6; bg.corner_radius_top_right = 6
+		bg.corner_radius_bottom_left = 6; bg.corner_radius_bottom_right = 6
+		bg.border_width_left = 1; bg.border_width_right = 1
+		bg.border_width_top = 1; bg.border_width_bottom = 1
+		btn.add_theme_stylebox_override("normal", bg)
+		btn.add_theme_stylebox_override("hover", bg)
+		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.9) if active else Color(0.7, 0.7, 0.85, 0.8))
+
+func _build_creature_list(left: Panel) -> void:
 	var cats := build_categories()
 	var y: float = 10.0
 	for cat in cats:
@@ -180,7 +307,6 @@ func _build_creature_list(bg: Panel) -> void:
 		cat_label.size = Vector2(180, 18)
 		left.add_child(cat_label)
 		y += 22.0
-
 		for entry in cat["entries"]:
 			var btn := Button.new()
 			btn.position = Vector2(8, y)
@@ -213,54 +339,7 @@ func build_categories() -> Array:
 			fish["entries"].append({ "id": c["id"], "name": c["name"] })
 	return [party, fish]
 
-func _build_preview(bg: Panel) -> void:
-	var right := Panel.new()
-	right.position = Vector2(230, 54)
-	right.size = Vector2(714, 540)
-	var right_bg := StyleBoxFlat.new()
-	right_bg.bg_color = Color(0.06, 0.06, 0.10, 0.92)
-	right_bg.corner_radius_top_left = 10; right_bg.corner_radius_top_right = 10
-	right_bg.corner_radius_bottom_left = 10; right_bg.corner_radius_bottom_right = 10
-	right_bg.border_width_left = 1; right_bg.border_width_right = 1
-	right_bg.border_width_top = 1; right_bg.border_width_bottom = 1
-	right_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
-	right.add_theme_stylebox_override("panel", right_bg)
-	bg.add_child(right)
-
-	_viewport_container = SubViewportContainer.new()
-	_viewport_container.position = Vector2(340, 10)
-	_viewport_container.size = Vector2(360, 360)
-	_viewport_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right.add_child(_viewport_container)
-
-	_viewport = SubViewport.new()
-	_viewport.size = Vector2i(360, 360)
-	_viewport.transparent_bg = true
-	_viewport.world_3d = World3D.new()
-	_viewport_container.add_child(_viewport)
-
-	_cam = Camera3D.new()
-	_cam.position = Vector3(0, 0.5, 2.0)
-	_cam.transform.basis = Basis.looking_at(Vector3(0, -0.5, -2.0))
-	_viewport.add_child(_cam)
-
-	_model_root = Node3D.new()
-	_viewport.add_child(_model_root)
-
-	var world_env := WorldEnvironment.new()
-	world_env.environment = Environment.new()
-	world_env.environment.ambient_light_color = Color(0.4, 0.4, 0.5)
-	world_env.environment.ambient_light_energy = 1.5
-	_viewport.add_child(world_env)
-
-	var lbl := Label.new()
-	lbl.text = tr("CREATURE_3D_VIEW")
-	lbl.add_theme_font_size_override("font_size", 10)
-	lbl.add_theme_color_override("font_color", Color(0.45, 0.45, 0.6, 0.6))
-	lbl.position = Vector2(350, 370)
-	lbl.size = Vector2(200, 16)
-	right.add_child(lbl)
-
+func _build_creature_preview(right: Panel) -> void:
 	_preview_name = Label.new()
 	_preview_name.position = Vector2(16, 10)
 	_preview_name.size = Vector2(320, 28)
@@ -325,11 +404,144 @@ func _build_preview(bg: Panel) -> void:
 	_preview_spawn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(_preview_spawn)
 
+	var lbl_3d := Label.new()
+	lbl_3d.text = tr("CREATURE_3D_VIEW")
+	lbl_3d.add_theme_font_size_override("font_size", 10)
+	lbl_3d.add_theme_color_override("font_color", Color(0.45, 0.45, 0.6, 0.6))
+	lbl_3d.position = Vector2(350, 370)
+	lbl_3d.size = Vector2(200, 16)
+	right.add_child(lbl_3d)
+
+func _build_item_list(left: Panel) -> void:
+	var type_order: Array = [
+		ItemDef.Type.BLOCK, ItemDef.Type.TOOL, ItemDef.Type.WEAPON,
+		ItemDef.Type.FOOD, ItemDef.Type.MATERIAL
+	]
+	var type_labels := {
+		ItemDef.Type.BLOCK: "— BLOCK —",
+		ItemDef.Type.TOOL: "— TOOL —",
+		ItemDef.Type.WEAPON: "— WEAPON —",
+		ItemDef.Type.FOOD: "— FOOD —",
+		ItemDef.Type.MATERIAL: "— MATERIAL —",
+	}
+	var by_type: Dictionary = {}
+	for id in _item_db:
+		var item: ItemDef = _item_db[id]
+		if not by_type.has(item.type):
+			by_type[item.type] = []
+		by_type[item.type].append(item)
+	for t in type_order:
+		var arr: Array = by_type.get(t, []).duplicate()
+		arr.sort_custom(func(a, b): return a.name < b.name)
+		by_type[t] = arr
+
+	var y: float = 8.0
+	for t in type_order:
+		var items: Array = by_type.get(t, [])
+		if items.is_empty():
+			continue
+		var cat_label := Label.new()
+		cat_label.text = type_labels.get(t, "")
+		cat_label.add_theme_font_size_override("font_size", 12)
+		cat_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.7, 0.8))
+		cat_label.position = Vector2(10, y)
+		cat_label.size = Vector2(180, 18)
+		left.add_child(cat_label)
+		y += 20.0
+
+		for item in items:
+			var btn := Button.new()
+			btn.position = Vector2(8, y)
+			btn.size = Vector2(184, 34)
+			btn.text = "  " + item.name
+			btn.add_theme_font_size_override("font_size", 13)
+			btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+			btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			var btn_bg := StyleBoxFlat.new()
+			btn_bg.bg_color = Color(0.1, 0.1, 0.18, 0.85)
+			btn_bg.corner_radius_top_left = 6; btn_bg.corner_radius_top_right = 6
+			btn_bg.corner_radius_bottom_left = 6; btn_bg.corner_radius_bottom_right = 6
+			btn_bg.border_width_left = 1; btn_bg.border_width_right = 1
+			btn_bg.border_width_top = 1; btn_bg.border_width_bottom = 1
+			btn_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
+			btn.add_theme_stylebox_override("normal", btn_bg)
+			btn.add_theme_stylebox_override("hover", btn_bg)
+			btn.pressed.connect(_on_item_select.bind(item.id))
+			left.add_child(btn)
+			_item_btn_group.append(btn)
+			y += 38.0
+
+func _build_item_preview(right: Panel) -> void:
+	_item_name_label = Label.new()
+	_item_name_label.position = Vector2(370, 10)
+	_item_name_label.size = Vector2(320, 28)
+	_item_name_label.add_theme_font_size_override("font_size", 22)
+	_item_name_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	_item_name_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+	_item_name_label.add_theme_constant_override("shadow_offset_x", 1)
+	_item_name_label.add_theme_constant_override("shadow_offset_y", 1)
+	right.add_child(_item_name_label)
+
+	_item_type_label = Label.new()
+	_item_type_label.position = Vector2(370, 38)
+	_item_type_label.size = Vector2(320, 20)
+	_item_type_label.add_theme_font_size_override("font_size", 13)
+	right.add_child(_item_type_label)
+
+	var desc_title := Label.new()
+	desc_title.text = "MÔ TẢ"
+	desc_title.position = Vector2(370, 64)
+	desc_title.size = Vector2(320, 18)
+	desc_title.add_theme_font_size_override("font_size", 13)
+	desc_title.add_theme_color_override("font_color", Color(0.6, 0.6, 0.8, 0.7))
+	right.add_child(desc_title)
+
+	_item_desc_label = Label.new()
+	_item_desc_label.position = Vector2(370, 82)
+	_item_desc_label.size = Vector2(320, 60)
+	_item_desc_label.add_theme_font_size_override("font_size", 13)
+	_item_desc_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.95, 0.9))
+	_item_desc_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	right.add_child(_item_desc_label)
+
+	var stats_title := Label.new()
+	stats_title.text = "CHỈ SỐ"
+	stats_title.position = Vector2(370, 148)
+	stats_title.size = Vector2(320, 18)
+	stats_title.add_theme_font_size_override("font_size", 13)
+	stats_title.add_theme_color_override("font_color", Color(0.6, 0.6, 0.8, 0.7))
+	right.add_child(stats_title)
+
+	_item_stats_label = Label.new()
+	_item_stats_label.position = Vector2(370, 166)
+	_item_stats_label.size = Vector2(320, 120)
+	_item_stats_label.add_theme_font_size_override("font_size", 13)
+	_item_stats_label.add_theme_color_override("font_color", Color(0.85, 0.85, 0.95, 0.9))
+	_item_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	right.add_child(_item_stats_label)
+
+	# 3D viewport position hint (item mode: viewport on left of right panel)
+	var lbl_3d := Label.new()
+	lbl_3d.text = tr("CREATURE_3D_VIEW")
+	lbl_3d.add_theme_font_size_override("font_size", 10)
+	lbl_3d.add_theme_color_override("font_color", Color(0.45, 0.45, 0.6, 0.6))
+	lbl_3d.position = Vector2(16, 370)
+	lbl_3d.size = Vector2(200, 16)
+	right.add_child(lbl_3d)
+
 func _on_select(id: String) -> void:
 	_selected = id
 	_update_selection()
 	_update_preview()
+	_position_viewport_for_creature()
 	_rebuild_model()
+
+func _on_item_select(id: String) -> void:
+	_selected = id
+	_update_item_selection()
+	_update_item_preview()
+	_position_viewport_for_item()
+	_rebuild_item_model()
 
 func _update_selection() -> void:
 	for i in range(_btn_group.size()):
@@ -348,6 +560,39 @@ func _update_selection() -> void:
 		bg.border_width_top = 1; bg.border_width_bottom = 1
 		_btn_group[i].add_theme_stylebox_override("normal", bg)
 		_btn_group[i].add_theme_stylebox_override("hover", bg)
+
+func _update_item_selection() -> void:
+	for i in range(_item_btn_group.size()):
+		var item := _find_item_by_btn_idx(i)
+		var selected: bool = item != null and item.id == _selected
+		var bg := StyleBoxFlat.new()
+		if selected:
+			bg.bg_color = Color(0.18, 0.22, 0.35, 0.9)
+			bg.border_color = Color(0.4, 0.55, 0.9, 0.5)
+		else:
+			bg.bg_color = Color(0.1, 0.1, 0.18, 0.85)
+			bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
+		bg.corner_radius_top_left = 6; bg.corner_radius_top_right = 6
+		bg.corner_radius_bottom_left = 6; bg.corner_radius_bottom_right = 6
+		bg.border_width_left = 1; bg.border_width_right = 1
+		bg.border_width_top = 1; bg.border_width_bottom = 1
+		_item_btn_group[i].add_theme_stylebox_override("normal", bg)
+		_item_btn_group[i].add_theme_stylebox_override("hover", bg)
+
+func _find_item_by_btn_idx(idx: int) -> ItemDef:
+	var flat: Array[ItemDef] = []
+	var type_order := [ItemDef.Type.BLOCK, ItemDef.Type.TOOL, ItemDef.Type.WEAPON, ItemDef.Type.FOOD, ItemDef.Type.MATERIAL]
+	for t in type_order:
+		var items: Array[ItemDef] = []
+		for id in _item_db:
+			var item: ItemDef = _item_db[id]
+			if item.type == t:
+				items.append(item)
+		items.sort_custom(func(a, b): return a.name < b.name)
+		flat.append_array(items)
+	if idx < flat.size():
+		return flat[idx]
+	return null
 
 func _update_preview() -> void:
 	var data := _find_creature(_selected)
@@ -375,6 +620,45 @@ func _update_preview() -> void:
 		_preview_skills.text = ""
 		_preview_spawn.text = "📍 " + data["spawn"]
 
+func _update_item_preview() -> void:
+	var item: ItemDef = _item_db.get(_selected)
+	if item == null:
+		_item_name_label.text = ""
+		_item_type_label.text = ""
+		_item_desc_label.text = ""
+		_item_stats_label.text = ""
+		return
+	_item_name_label.text = item.name
+	_item_type_label.text = "[ " + item.get_type_name() + " ]"
+	_item_type_label.add_theme_color_override("font_color", _type_color(item.type))
+	_item_desc_label.text = item.desc
+
+	var stats: String = ""
+	if item.atk_bonus > 0:  stats += "ATK: +%d\n" % item.atk_bonus
+	if item.def_bonus > 0:  stats += "DEF: +%d\n" % item.def_bonus
+	if item.heal_amount > 0: stats += "Hồi: +%d HP\n" % item.heal_amount
+	if item.stackable:       stats += "Xếp chồng: %d\n" % item.max_stack
+	if not item.stackable:   stats += "Không thể xếp chồng\n"
+	if stats.is_empty():     stats = "Không có chỉ số đặc biệt"
+	_item_stats_label.text = stats
+
+func _type_color(type: int) -> Color:
+	match type:
+		ItemDef.Type.BLOCK:    return Color(0.54, 0.32, 0.12)
+		ItemDef.Type.TOOL:     return Color(0.65, 0.55, 0.40)
+		ItemDef.Type.WEAPON:   return Color(0.75, 0.30, 0.30)
+		ItemDef.Type.FOOD:     return Color(0.30, 0.80, 0.30)
+		ItemDef.Type.MATERIAL: return Color(0.80, 0.75, 0.30)
+		_:                     return Color(0.7, 0.7, 0.7)
+
+func _position_viewport_for_creature() -> void:
+	_viewport_container.position = Vector2(340, 10)
+	_viewport_container.size = Vector2(360, 360)
+
+func _position_viewport_for_item() -> void:
+	_viewport_container.position = Vector2(16, 10)
+	_viewport_container.size = Vector2(340, 340)
+
 func _find_entry_by_idx(idx: int) -> Dictionary:
 	var flat: Array = []
 	for cat in build_categories():
@@ -393,26 +677,33 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	_cam_rot += delta * 0.5
-	_cam.position = Vector3(sin(_cam_rot) * 2.0, 0.5, cos(_cam_rot) * 2.0)
+	if _current_tab == Tab.CREATURES:
+		_cam.position = Vector3(sin(_cam_rot) * 2.0, 0.5, cos(_cam_rot) * 2.0)
+	elif _selected in _WEAPON_IDS:
+		_cam.position = Vector3(sin(_cam_rot) * 0.7, 0.3, cos(_cam_rot) * 0.7)
+	elif _selected == "mon_ngot" or _selected == "rong_nhiet_doi":
+		_cam.position = Vector3(sin(_cam_rot) * 1.5, 0.6, cos(_cam_rot) * 1.5)
+	else:
+		_cam.position = Vector3(sin(_cam_rot) * 0.2, 0.08, cos(_cam_rot) * 0.2)
 	_cam.look_at(Vector3.ZERO)
 
 func show_library() -> void:
 	visible = true
-	if _selected.is_empty() and CREATURES.size() > 0:
+	if _current_tab == Tab.CREATURES and _selected.is_empty() and CREATURES.size() > 0:
 		_on_select(CREATURES[0]["id"])
+	elif _current_tab == Tab.ITEMS:
+		var ids := _item_db.keys()
+		if ids.size() > 0:
+			_on_item_select(ids[0])
 
 func _rebuild_model() -> void:
-	for c in _model_root.get_children():
-		_model_root.remove_child(c)
-		c.free()
-
+	_clear_model_root()
+	_model_root.scale = Vector3.ONE
 	if _selected.is_empty():
 		return
-
 	var data := _find_creature(_selected)
 	if data.is_empty():
 		return
-
 	if data["cat"] == "party":
 		var body := CharacterBody3D.new()
 		_model_root.add_child(body)
@@ -421,6 +712,27 @@ func _rebuild_model() -> void:
 		var body := Node3D.new()
 		_model_root.add_child(body)
 		_build_fish_mesh(body, data["fi"])
+
+const _WEAPON_IDS := ["cup", "xeng", "riu", "kiem", "can_cau"]
+
+func _rebuild_item_model() -> void:
+	_clear_model_root()
+	_model_root.scale = Vector3.ONE
+	if _selected.is_empty() or not _item_db.has(_selected):
+		return
+	if _selected in _WEAPON_IDS:
+		_WeaponMesh.build(_model_root, _selected)
+	elif _selected == "mon_ngot":
+		_PlantProp.build_drop_mesh(_model_root, "taro")
+	elif _selected == "rong_nhiet_doi":
+		_PlantProp.build_drop_mesh(_model_root, "weed")
+	else:
+		_ItemMesh.build(_model_root, _selected)
+
+func _clear_model_root() -> void:
+	for c in _model_root.get_children():
+		_model_root.remove_child(c)
+		c.free()
 
 func _find_creature(id: String) -> Dictionary:
 	for c in CREATURES:

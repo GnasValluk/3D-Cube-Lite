@@ -42,9 +42,9 @@ func _setup_mesh():
 	elif item_id in ["ca_chep", "ca_ro", "ca_dieu_hong", "ca_loc", "ca_la_han", "tom"]:
 		_build_fish_model(root, item_id)
 	elif item_id == "mon_ngot":
-		PlantProp.build_drop_mesh(root, "weed")
-	elif item_id == "rong_nhiet_doi":
 		PlantProp.build_drop_mesh(root, "taro")
+	elif item_id == "rong_nhiet_doi":
+		PlantProp.build_drop_mesh(root, "weed")
 	else:
 		ItemMesh.build(root, item_id)
 
