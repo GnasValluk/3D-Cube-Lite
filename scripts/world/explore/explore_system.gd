@@ -168,6 +168,9 @@ func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 	var threshold: float = 0.40
 	var is_dark: bool = n >= threshold
 
+	# Sông
+	if _is_river(wx, wz):
+		return Color(0.08, 0.38, 0.72, 0.70)
 	# Đường
 	if _is_road(wx, wz):
 		return Color(0.68, 0.52, 0.26)
@@ -246,3 +249,6 @@ func _ocean_shore_dist(wx: float, wz: float, nd: Dictionary) -> float:
 
 func _is_road(wx: float, wz: float) -> bool:
 	return WorldChunk._is_on_road(wx, wz)
+
+func _is_river(wx: float, wz: float) -> bool:
+	return WorldChunk._is_on_river(wx, wz)

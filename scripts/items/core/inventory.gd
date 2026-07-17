@@ -4,16 +4,10 @@ extends RefCounted
 const DEFAULT_SIZE: int = 36
 const HOTBAR_SIZE: int = 9
 
-static var items_db: Dictionary = {}
-
-static func ensure_db() -> void:
-	if items_db.is_empty():
-		items_db = create_item_db()
-
 var slots: Array[ItemSlot] = []
 
 func _init(size: int = DEFAULT_SIZE):
-	ensure_db()
+	ItemDatabase.ensure_db()
 	slots.resize(size)
 	for i in range(size):
 		slots[i] = ItemSlot.new()
@@ -158,41 +152,6 @@ func has_item(item_id: String) -> bool:
 			return true
 	return false
 
-static func create_item_db() -> Dictionary:
-	var db: Dictionary = {}
-	_add(db, "chest",         "Rương đồ",     ItemDef.Type.BLOCK,  Color(0.50, 0.32, 0.10), "C",  "Rương chứa đồ",          false, 1)
-	_add(db, "twilight_gate", "Cổng Twilight", ItemDef.Type.TOOL,   Color(0.10, 0.50, 0.45), "T",  "Đặt cổng Twilight ra thế giới", false, 1)
-
-	# ── Công cụ ────────────────────────────────────────────────────────────────
-	_add(db, "cup",   "Cúp",   ItemDef.Type.TOOL,   Color(0.60, 0.55, 0.50), "⛏", "Đào đất, khai thác tài nguyên",   false, 1, 0, 8,  0)
-	_add(db, "xeng",  "Xẻng",  ItemDef.Type.TOOL,   Color(0.70, 0.65, 0.55), "🔨", "Xúc đất, di chuyển vật liệu",     false, 1, 0, 6,  0)
-	_add(db, "riu",   "Rìu",   ItemDef.Type.TOOL,   Color(0.50, 0.45, 0.40), "🪓", "Chặt cây, phá gỗ",                false, 1, 0, 14, 0)
-
-	# ── Vũ khí ─────────────────────────────────────────────────────────────────
-	_add(db, "kiem",  "Kiếm",  ItemDef.Type.WEAPON, Color(0.75, 0.80, 0.90), "⚔",  "Tấn công nhanh, sát thương cao",  false, 1, 0, 22, 0)
-
-	# ── Câu cá ────────────────────────────────────────────────────────────────
-	_add(db, "can_cau", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0)
-
-	# ── Cá (thức ăn) ──────────────────────────────────────────────────────────
-	_add(db, "ca_chep", "Carp", ItemDef.Type.FOOD, Color(0.95, 0.70, 0.10), "🐟", "Freshwater carp — rich, firm flesh", true, 16, 30)
-	_add(db, "ca_ro",   "Climbing Perch", ItemDef.Type.FOOD, Color(0.30, 0.30, 0.30), "🐟", "Climbing perch — sweet white meat", true, 16, 20)
-	_add(db, "ca_dieu_hong", "Red Tilapia", ItemDef.Type.FOOD, Color(0.88, 0.55, 0.45), "🐟", "Red tilapia — firm, mild flavour", true, 16, 35)
-	_add(db, "ca_loc", "Snakehead", ItemDef.Type.FOOD, Color(0.30, 0.25, 0.15), "🐟", "Snakehead — dense, savoury fillet", true, 16, 45)
-	_add(db, "ca_la_han", "Flowerhorn", ItemDef.Type.FOOD, Color(0.92, 0.25, 0.15), "🐟", "Flowerhorn — rich, flavourful meat", true, 16, 55)
-	_add(db, "tom", "Freshwater Shrimp", ItemDef.Type.FOOD, Color(0.85, 0.35, 0.20), "🦐", "Freshwater shrimp — sweet, delicate meat", true, 16, 8)
-
-	# ── Vật phẩm từ prop ─────────────────────────────────────────────────────
-	_add(db, "mon_ngot", "Môn ngọt (Taro)", ItemDef.Type.FOOD, Color(0.25, 0.50, 0.15), "🌿", "Củ môn ngọt — có thể nấu ăn", true, 16, 12)
-	_add(db, "rong_nhiet_doi", "Rong nhiệt đới", ItemDef.Type.MATERIAL, Color(0.08, 0.55, 0.10), "🌊", "Rong nhiệt đới — nguyên liệu chế tạo", true, 32)
-
-	return db
-
-static func _add(db: Dictionary, id: String, name: String, type: int, color: Color, char: String,
-				 desc: String = "", stackable: bool = true, max_stack: int = 64,
-				 heal: int = 0, atk: int = 0, def_val: int = 0, armor_slot: int = -1) -> void:
-	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot)
-
 func to_dict() -> Array:
 	var arr: Array = []
 	for slot in slots:
@@ -203,8 +162,8 @@ func to_dict() -> Array:
 	return arr
 
 func from_dict(data: Array) -> void:
-	ensure_db()
-	var db := items_db
+	ItemDatabase.ensure_db()
+	var db := ItemDatabase.items_db
 	for i in range(mini(data.size(), slots.size())):
 		if data[i] != null:
 			var item_id: String = data[i]["id"]
@@ -218,5 +177,3 @@ func from_dict(data: Array) -> void:
 		else:
 			slots[i].item = null
 			slots[i].count = 0
-
-

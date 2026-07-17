@@ -1,7 +1,7 @@
 class_name ItemDef
 
 enum Type { BLOCK, TOOL, WEAPON, FOOD, MATERIAL, ARMOR }
-enum ArmorSlot { HEAD, BODY, LEGS, FEET }
+enum ArmorSlot { HEAD, BODY, LEGS, FEET, HANDS, BACK, SUB }
 
 var id: String
 var name: String

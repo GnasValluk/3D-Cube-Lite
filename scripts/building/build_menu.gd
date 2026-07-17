@@ -98,7 +98,6 @@ func _build_ui() -> void:
 		var btn := Button.new()
 		btn.position = Vector2(10, y)
 		btn.size = Vector2(PANEL_W - 20, ITEM_H)
-		btn.text = bname
 		btn.add_theme_font_size_override("font_size", 14)
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var btn_bg := StyleBoxFlat.new()
@@ -113,6 +112,24 @@ func _build_ui() -> void:
 			btn.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0, 0.9))
 			var idx := i
 			btn.pressed.connect(func(): _on_item_click(idx))
+		var icon := TextureRect.new()
+		icon.position = Vector2(8, 8)
+		icon.size = Vector2(40, 40)
+		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		var icon_tex := IconRenderer.get_texture(bid)
+		if icon_tex:
+			icon.texture = icon_tex
+		btn.add_child(icon)
+
+		var name_label := Label.new()
+		name_label.text = bname
+		name_label.position = Vector2(56, 10)
+		name_label.size = Vector2(PANEL_W - 120, 22)
+		name_label.add_theme_font_size_override("font_size", 14)
+		name_label.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0, 0.9) if has_item else Color(0.4, 0.4, 0.5, 0.5))
+		btn.add_child(name_label)
+
 		btn_bg.corner_radius_top_left = 8; btn_bg.corner_radius_top_right = 8
 		btn_bg.corner_radius_bottom_left = 8; btn_bg.corner_radius_bottom_right = 8
 		btn_bg.border_width_left = 1; btn_bg.border_width_right = 1

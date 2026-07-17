@@ -107,6 +107,9 @@ func _collect_player_data(cm: CharacterManager) -> Dictionary:
 		pd["equipped_body"] = pc.equipped_body.id if pc.equipped_body else ""
 		pd["equipped_legs"] = pc.equipped_legs.id if pc.equipped_legs else ""
 		pd["equipped_feet"] = pc.equipped_feet.id if pc.equipped_feet else ""
+		pd["equipped_hands"] = pc.equipped_hands.id if pc.equipped_hands else ""
+		pd["equipped_back"] = pc.equipped_back.id if pc.equipped_back else ""
+		pd["equipped_sub"] = pc.equipped_sub.id if pc.equipped_sub else ""
 	return pd
 
 func _collect_party_data(cm: CharacterManager) -> Array:
@@ -214,7 +217,8 @@ func _apply_player_data(cm: CharacterManager, pd: Dictionary) -> void:
 			pc.rotation = Vector3(rot[0], rot[1], rot[2])
 		if pc.inventory and pd.has("inventory"):
 			pc.inventory.from_dict(pd["inventory"])
-		var db = Inventory.create_item_db()
+		ItemDatabase.ensure_db()
+		var db = ItemDatabase.items_db
 		var wid = pd.get("equipped_weapon", "")
 		pc.equipped_weapon = db.get(wid, null)
 		var hid = pd.get("equipped_head", "")
@@ -225,6 +229,9 @@ func _apply_player_data(cm: CharacterManager, pd: Dictionary) -> void:
 		pc.equipped_legs = db.get(lid, null)
 		var fid = pd.get("equipped_feet", "")
 		pc.equipped_feet = db.get(fid, null)
+		pc.equipped_hands = db.get(pd.get("equipped_hands", ""), null)
+		pc.equipped_back = db.get(pd.get("equipped_back", ""), null)
+		pc.equipped_sub = db.get(pd.get("equipped_sub", ""), null)
 		if pc.equipped_weapon:
 			pc.call_deferred("_update_weapon_mesh")
 	var scene = get_tree().current_scene

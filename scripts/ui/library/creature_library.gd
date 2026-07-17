@@ -1,8 +1,8 @@
 extends Control
 class_name Library
 
-const _ItemMesh = preload("res://scripts/items/world/item_mesh.gd")
-const _WeaponMesh = preload("res://scripts/characters/player/weapon_mesh.gd")
+const _ItemMesh = preload("res://scripts/items/models/router.gd")
+const _ToolsMesh = preload("res://scripts/items/models/tools.gd")
 const _PlantProp = preload("res://scripts/world/props/plant_prop.gd")
 const _PlayerMesh = preload("res://scripts/characters/player/player_mesh.gd")
 const _RaptorMesh = preload("res://scripts/characters/raptor/raptor_mesh.gd")
@@ -100,7 +100,8 @@ var _cam_rot: float = 0.0
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_item_db = Inventory.create_item_db()
+	ItemDatabase.ensure_db()
+	_item_db = ItemDatabase.items_db
 	_build()
 
 func _build() -> void:
@@ -683,6 +684,8 @@ func _process(delta: float) -> void:
 		_cam.position = Vector3(sin(_cam_rot) * 0.7, 0.3, cos(_cam_rot) * 0.7)
 	elif _selected == "mon_ngot" or _selected == "rong_nhiet_doi":
 		_cam.position = Vector3(sin(_cam_rot) * 1.5, 0.6, cos(_cam_rot) * 1.5)
+	elif _is_icon_item(_selected):
+		_cam.position = Vector3(sin(_cam_rot) * 0.45, 0.2, cos(_cam_rot) * 0.45)
 	else:
 		_cam.position = Vector3(sin(_cam_rot) * 0.2, 0.08, cos(_cam_rot) * 0.2)
 	_cam.look_at(Vector3.ZERO)
@@ -721,7 +724,7 @@ func _rebuild_item_model() -> void:
 	if _selected.is_empty() or not _item_db.has(_selected):
 		return
 	if _selected in _WEAPON_IDS:
-		_WeaponMesh.build(_model_root, _selected)
+		_ToolsMesh.build_held(_model_root, _selected)
 	elif _selected == "mon_ngot":
 		_PlantProp.build_drop_mesh(_model_root, "taro")
 	elif _selected == "rong_nhiet_doi":
@@ -773,6 +776,14 @@ func _build_fish_mesh(body: Node3D, fi: int) -> void:
 	elif fi == 5:
 		fm.body_shape = _FishMesh.BodyShape.SHRIMP
 	fm.build(body)
+
+static func _is_icon_item(id: String) -> bool:
+	return id in [
+		"apple_green", "banana_peeled", "blueberry", "cabbage", "carrot", "cauliflower",
+		"cherry", "chili_red", "corn", "cucumber", "eggplant", "grapes_black",
+		"leek", "lemon", "onion", "orange", "paprika_red", "pear", "pineapple",
+		"plum", "potato", "pumpkin", "raspberry", "strawberry", "tomato", "watermelon",
+	]
 
 func show_creature_direct(creature_id: String, parent_control: Control) -> void:
 	pass

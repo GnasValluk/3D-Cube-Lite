@@ -73,6 +73,7 @@ var character_name: String = ""
 var element: int = Element.NONE
 var shield: int = 0
 var _melee_hit_once: bool = false
+var _melee_hit_progress: float = 0.25
 
 # ── Oxygen / Swimming ──────────────────────────────────────
 @export var max_oxygen: float = 100.0
@@ -558,7 +559,7 @@ func _physics_process(delta: float) -> void:
 	# Underwater / swimming
 	if _underwater:
 		_swim_physics(delta)
-		if _attack_timer > 0.0 and not _melee_hit_once:
+		if _attack_timer > 0.0 and not _melee_hit_once and (1.0 - _attack_timer / attack_duration) >= _melee_hit_progress:
 			_do_melee_hit()
 		return
 
@@ -659,7 +660,7 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, friction * delta)
 
 	# Melee hit detection (ATTACK state)
-	if attacking and not _melee_hit_once:
+	if attacking and not _melee_hit_once and (1.0 - _attack_timer / attack_duration) >= _melee_hit_progress:
 		_do_melee_hit()
 
 	# Dash trigger

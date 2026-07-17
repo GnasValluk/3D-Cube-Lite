@@ -17,7 +17,7 @@ const LIB_SLOT: float = 36.0
 const LIB_GAP: float = 3.0
 const LIB_COLS: int = 6
 
-const EQUIP_H: float = 154.0
+const EQUIP_H: float = 210.0
 const DETAIL_H: float = 110.0
 const CONTENT_H: float = PAD + 40 + 4 * (SLOT_SIZE + GAP) + 10 + DETAIL_H + PAD
 # Tổng chiều rộng = thư viện + khoảng cách + inventory gốc
@@ -29,6 +29,7 @@ var _inventory: Inventory = null
 var _player_ref: PlayerCharacter = null
 var _slots: Array[Panel] = []
 var _slot_faces: Array[ColorRect] = []
+var _slot_icons: Array[TextureRect] = []
 var _slot_count_labels: Array[Label] = []
 var _selected_slot: int = -1
 
@@ -42,7 +43,12 @@ var _def_label: Label
 var _count_label: Label
 var _equip_faces: Array[ColorRect] = []
 var _equip_labels: Array[Label] = []
-var _equip_names: Array[String] = ["Head", "Body", "Legs", "Feet"]
+var _equip_item_labels: Array[Label] = []
+var _equip_centers: Array[Vector2] = []
+var _equip_line_pairs: Array[Array] = []
+var _equip_line_time: float = 0.0
+var _line_layer: Control
+var _equip_names: Array[String] = ["Đầu", "Thân", "Chân", "Tay", "Lưng", "Phụ"]
 
 # ── Detail panel ────────────────────────────────────────────────────────────────
 var _detail_bg: ColorRect
@@ -58,6 +64,7 @@ var _lib_filter: int = -1               # -1 = All, else ItemDef.Type
 var _lib_items: Array[ItemDef] = []     # danh sách hiển thị theo filter
 var _lib_panels: Array[Panel] = []      # panel slots thư viện
 var _lib_faces: Array[ColorRect] = []
+var _lib_icon_textures: Array[TextureRect] = []
 var _lib_name_labels: Array[Label] = []
 var _lib_scroll_offset: int = 0         # hàng đầu tiên hiển thị
 var _lib_visible_rows: int = 0
@@ -110,7 +117,8 @@ func _ready() -> void:
 	_lib_slot_hover_style.bg_color = Color(0.18, 0.25, 0.40, 0.85)
 	_lib_slot_hover_style.border_color = Color(0.45, 0.65, 1.0, 0.55)
 
-	_item_db = Inventory.create_item_db()
+	ItemDatabase.ensure_db()
+	_item_db = ItemDatabase.items_db
 	_lib_filter = -1
 	_lib_apply_filter()
 
@@ -154,11 +162,21 @@ func _lib_refresh_display() -> void:
 		if item_idx < _lib_items.size():
 			var item: ItemDef = _lib_items[item_idx]
 			face.color = item.icon_color
+			var icon_tex := _lib_icon_textures[i]
+			var tex := IconRenderer.get_texture(item.id)
+			if tex:
+				icon_tex.texture = tex
+				icon_tex.visible = true
+			else:
+				icon_tex.texture = null
+				icon_tex.visible = false
 			lbl.text = item.name
 			panel.visible = true
 			panel.set_meta("item_idx", item_idx)
 		else:
 			face.color = Color(0.12, 0.12, 0.18, 0.3)
+			_lib_icon_textures[i].texture = null
+			_lib_icon_textures[i].visible = false
 			lbl.text = ""
 			panel.visible = true
 			panel.set_meta("item_idx", -1)
@@ -237,8 +255,18 @@ func _setup_library_panel() -> void:
 		face.position = Vector2(2, 2)
 		face.size = Vector2(LIB_SLOT - 4, LIB_SLOT - 18)
 		face.color = Color(0.12, 0.12, 0.18, 0.3)
+		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(face)
 		_lib_faces.append(face)
+
+		var lib_icon := TextureRect.new()
+		lib_icon.position = Vector2(2, 2)
+		lib_icon.size = Vector2(LIB_SLOT - 4, LIB_SLOT - 18)
+		lib_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		lib_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lib_icon.visible = false
+		panel.add_child(lib_icon)
+		_lib_icon_textures.append(lib_icon)
 
 		var lbl := Label.new()
 		lbl.position = Vector2(1, LIB_SLOT - 15)
@@ -247,6 +275,7 @@ func _setup_library_panel() -> void:
 		lbl.add_theme_font_size_override("font_size", 8)
 		lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.80))
 		lbl.clip_contents = true
+		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		panel.add_child(lbl)
 		_lib_name_labels.append(lbl)
 
@@ -451,8 +480,18 @@ func _setup_grid() -> void:
 			face.position = Vector2(2, 2)
 			face.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
 			face.color = Color(0.15, 0.15, 0.22, 0.4)
+			face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			panel.add_child(face)
 			_slot_faces.append(face)
+
+			var slot_icon := TextureRect.new()
+			slot_icon.position = Vector2(2, 2)
+			slot_icon.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
+			slot_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			slot_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			slot_icon.visible = false
+			panel.add_child(slot_icon)
+			_slot_icons.append(slot_icon)
 
 			var cnt := Label.new()
 			cnt.position = Vector2(2, SLOT_SIZE - 18)
@@ -460,6 +499,7 @@ func _setup_grid() -> void:
 			cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 			cnt.add_theme_font_size_override("font_size", 11)
 			cnt.add_theme_color_override("font_color", Color(1, 1, 1, 0.70))
+			cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			panel.add_child(cnt)
 			_slot_count_labels.append(cnt)
 
@@ -513,11 +553,12 @@ func _setup_status_panel() -> void:
 func _setup_equipment_panel() -> void:
 	var ox: float = LIB_W + LIB_MARGIN
 	var sx: float = ox + PAD + GRID_W + 12
-	var sy: float = PAD + 40 + 140 + 10
+	var sy: float = PAD + 40 + 140 + 6
 
 	var eq := Panel.new()
 	eq.position = Vector2(sx, sy)
 	eq.size = Vector2(STAT_W, EQUIP_H)
+	eq.clip_contents = true
 	var eq_style := _glass_style.duplicate() as StyleBoxFlat
 	eq_style.bg_color = Color(0.08, 0.08, 0.14, 0.45)
 	eq_style.corner_radius_top_left = 8; eq_style.corner_radius_top_right = 8
@@ -526,34 +567,126 @@ func _setup_equipment_panel() -> void:
 	add_child(eq)
 
 	var eq_title := Label.new()
-	eq_title.text = "Equipment"
-	eq_title.position = Vector2(sx + 12, sy + 8)
+	eq_title.text = "Trang bị"
+	eq_title.position = Vector2(12, 8)
 	eq_title.add_theme_font_size_override("font_size", 15)
 	eq_title.add_theme_color_override("font_color", Color(1, 1, 1, 0.80))
-	add_child(eq_title)
+	eq.add_child(eq_title)
 
-	var esize: float = 48.0; var egap: float = 6.0; var ecols: int = 2
-	var gx: float = sx + 14.0; var gy: float = sy + 34.0
-	var equip_colors: Array[Color] = [Color(0.40,0.70,0.95),Color(0.55,0.80,0.55),Color(0.75,0.60,0.85),Color(0.90,0.70,0.40)]
-	var lx: float = gx + 2 * (esize + egap) + 8
+	var esize: float = 46.0
+	var egap: float = 4.0
+	var slot_w: float = esize + egap
+	var row_h: float = esize + 14
+	var gx: float = (STAT_W - slot_w * 2) * 0.5
+	var gy: float = 26.0
 
-	for i in range(4):
-		var row: int = i / ecols; var col: int = i % ecols
-		var px: float = gx + col * (esize + egap); var py: float = gy + row * (esize + 18)
-		var panel := Panel.new(); panel.position = Vector2(px, py); panel.size = Vector2(esize, esize)
-		panel.add_theme_stylebox_override("panel", _slot_style); add_child(panel)
-		var face := ColorRect.new(); face.position = Vector2(2,2); face.size = Vector2(esize-4,esize-4)
-		face.color = Color(0.15,0.15,0.22,0.4); panel.add_child(face); _equip_faces.append(face)
-		var name_lbl := Label.new(); name_lbl.text = _equip_names[i]
-		name_lbl.position = Vector2(px, py + esize + 1); name_lbl.size = Vector2(esize, 14)
+	var hex_colors: Array[Color] = [
+		Color(0.40,0.70,0.95),
+		Color(0.55,0.80,0.55),
+		Color(0.75,0.60,0.85),
+		Color(0.90,0.70,0.40),
+		Color(0.70,0.50,0.90),
+		Color(0.50,0.85,0.75),
+	]
+
+	var slot_positions: Array[Vector2] = [
+		Vector2(gx, gy),
+		Vector2(gx + slot_w, gy),
+		Vector2(gx, gy + row_h),
+		Vector2(gx + slot_w, gy + row_h),
+		Vector2(gx, gy + row_h * 2),
+		Vector2(gx + slot_w, gy + row_h * 2),
+	]
+
+	var face_style := StyleBoxFlat.new()
+	face_style.bg_color = Color(0.12, 0.12, 0.18, 0.7)
+	face_style.corner_radius_top_left = 6
+	face_style.corner_radius_top_right = 6
+	face_style.corner_radius_bottom_left = 6
+	face_style.corner_radius_bottom_right = 6
+	face_style.border_width_left = 2
+	face_style.border_width_right = 2
+	face_style.border_width_top = 2
+	face_style.border_width_bottom = 2
+	face_style.border_color = Color(1, 1, 1, 0.25)
+
+	_equip_item_labels.clear()
+	for i in range(6):
+		var px: float = slot_positions[i].x
+		var py: float = slot_positions[i].y
+
+		var panel := Panel.new()
+		panel.position = Vector2(px, py)
+		panel.size = Vector2(esize, esize)
+		panel.add_theme_stylebox_override("panel", face_style)
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		eq.add_child(panel)
+
+		var face := ColorRect.new()
+		face.position = Vector2(2, 2)
+		face.size = Vector2(esize - 4, esize - 4)
+		face.color = Color(0.20, 0.20, 0.30, 0.6)
+		face.pivot_offset = Vector2((esize - 4) * 0.5, (esize - 4) * 0.5)
+		face.rotation = deg_to_rad(45)
+		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(face)
+		_equip_faces.append(face)
+
+		var item_lbl := Label.new()
+		item_lbl.position = Vector2.ZERO
+		item_lbl.size = Vector2(esize, esize)
+		item_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		item_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		item_lbl.add_theme_font_size_override("font_size", 9)
+		item_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.90))
+		item_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(item_lbl)
+		_equip_item_labels.append(item_lbl)
+
+		var name_lbl := Label.new()
+		name_lbl.text = _equip_names[i]
+		name_lbl.position = Vector2(px, py + esize + 2)
+		name_lbl.size = Vector2(esize, 12)
 		name_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		name_lbl.add_theme_font_size_override("font_size", 9)
-		name_lbl.add_theme_color_override("font_color", Color(1,1,1,0.35)); add_child(name_lbl)
-		var item_label := Label.new(); item_label.position = Vector2(lx, py + 4)
-		item_label.size = Vector2(STAT_W - (lx - sx), 18)
-		item_label.add_theme_font_size_override("font_size", 11)
-		item_label.add_theme_color_override("font_color", equip_colors[i]); add_child(item_label)
-		_equip_labels.append(item_label)
+		name_lbl.add_theme_font_size_override("font_size", 10)
+		name_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.55))
+		eq.add_child(name_lbl)
+
+	# ── Connecting lines ───────────────────────────────────────────
+	var line_layer := Control.new()
+	_line_layer = line_layer
+	line_layer.name = "EquipLineLayer"
+	line_layer.position = Vector2.ZERO
+	line_layer.size = Vector2(STAT_W, EQUIP_H)
+	line_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	eq.add_child(line_layer)
+
+	for sp in slot_positions:
+		_equip_centers.append(sp + Vector2(esize * 0.5, esize * 0.5))
+	_equip_line_pairs = [
+		[0, 1], [2, 3], [4, 5],
+		[0, 2], [2, 4], [1, 3], [3, 5],
+	]
+
+	line_layer.draw.connect(func():
+		if _equip_centers.is_empty(): return
+		var lc := Color(0.50, 0.70, 1.0, 0.60)
+		var dl: float = 6.0; var gl: float = 5.0; var tl: float = dl + gl
+		var ph: float = fmod(_equip_line_time, tl)
+		for pair in _equip_line_pairs:
+			var a: Vector2 = _equip_centers[pair[0]]
+			var b: Vector2 = _equip_centers[pair[1]]
+			var dv: Vector2 = b - a
+			var sl: float = dv.length()
+			var dn: Vector2 = dv / sl
+			var d: float = -ph
+			while d < sl:
+				var ds: float = max(d, 0.0)
+				var de: float = min(d + dl, sl)
+				if de > ds:
+					line_layer.draw_line(a + dn * ds, a + dn * de, lc, 2.5, true)
+				d += tl
+	)
 
 func _setup_tooltip() -> void:
 	_tooltip_bg = ColorRect.new()
@@ -776,15 +909,23 @@ func set_inventory(inv: Inventory) -> void:
 func set_player(p: PlayerCharacter) -> void:
 	_player_ref = p
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _inventory == null: return
 	for i in range(_inventory.slots.size()):
 		var slot: ItemSlot = _inventory.slots[i]
 		if slot.is_empty():
 			var col = Color(0.15,0.15,0.22,0.4) if i != _selected_slot else Color(0.25,0.28,0.40,0.5)
 			_slot_faces[i].color = col; _slot_count_labels[i].text = ""
+			_slot_icons[i].texture = null; _slot_icons[i].visible = false
 		else:
 			_slot_faces[i].color = slot.item.icon_color
+			var tex := IconRenderer.get_texture(slot.item.id)
+			if tex:
+				_slot_icons[i].texture = tex
+				_slot_icons[i].visible = true
+			else:
+				_slot_icons[i].texture = null
+				_slot_icons[i].visible = false
 			_slot_count_labels[i].text = str(slot.count) if slot.count > 1 else ""
 
 	if _player_ref:
@@ -799,16 +940,22 @@ func _process(_delta: float) -> void:
 	var filled: int = _inventory.count_filled_slots()
 	_count_label.text = "Used: %d / %d" % [filled, _inventory.slots.size()]
 
+	_equip_line_time += delta * 2.0
+	if _line_layer:
+		_line_layer.queue_redraw()
+
 	if _tooltip.visible:
 		var mp: Vector2 = get_global_mouse_position()
 		_tooltip.position = mp + Vector2(16, 16)
 		_tooltip_bg.position = mp + Vector2(14, 14)
 
 func _update_equipment_display(player: PlayerCharacter) -> void:
-	var equipped: Array = [player.equipped_head, player.equipped_body, player.equipped_legs, player.equipped_feet]
-	for i in range(4):
+	var equipped: Array = [player.equipped_head, player.equipped_body, player.equipped_legs, player.equipped_hands, player.equipped_back, player.equipped_sub]
+	for i in range(6):
 		var item: ItemDef = equipped[i] as ItemDef
 		if item != null:
-			_equip_faces[i].color = item.icon_color; _equip_labels[i].text = item.name
+			_equip_faces[i].color = item.icon_color
+			_equip_item_labels[i].text = item.name.substr(0, 6)
 		else:
-			_equip_faces[i].color = Color(0.15, 0.15, 0.22, 0.4); _equip_labels[i].text = ""
+			_equip_faces[i].color = Color(0.20, 0.20, 0.30, 0.6)
+			_equip_item_labels[i].text = ""

@@ -49,6 +49,11 @@ const ROAD_OFFSET: float = 22.0
 const ROAD_HALF_W: float = 1.5
 const ROAD_GRID_R: int = 40
 
+const RIVER_GRID: float = 160.0
+const RIVER_OFFSET: float = 50.0
+const RIVER_HALF_W: float = 3.0
+const RIVER_GRID_R: int = 40
+
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 
 ## ── Màu sắc theo block ID ────────────────────────────────────────────────────

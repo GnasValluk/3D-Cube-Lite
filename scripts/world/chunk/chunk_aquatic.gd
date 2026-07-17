@@ -5,7 +5,7 @@ const _Data = preload("chunk_data.gd")
 static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 		vx: int, vz: int, pos: Vector3, _h_v: float, has_silt: bool,
 		biome: int, lotus_lights: Array[Vector3] = [],
-		plant_props: Array[Dictionary] = []) -> void:
+		plant_props: Array[Dictionary] = [], is_river: bool = false) -> void:
 	var wx: int = cx * size + vx
 	var wz: int = cz * size + vz
 
@@ -29,16 +29,16 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 	var is_deep: bool = water_gap >= _Data.VOXEL * 0.5
 	var is_shore: bool = not is_deep and water_gap > -_Data.VOXEL * 0.5
 
-	# Weed and taro are now rendered by PlantProp nodes (not combined mesh)
-	if is_deep and has_silt:
+	# No lotus in rivers
+	if not is_river and is_deep and has_silt:
 		_add_lotus_plant(st, wx, wz, pos, r1, r2, r3, r4, h1, lotus_lights)
 
-	# Track plant positions for destroyable props (same r1 check as _add_tropical_weed / _add_taro_plant)
+	# Track plant positions for destroyable props
 	if is_deep:
-		var weed_chance: float = 0.10 if has_silt else 0.04
+		var weed_chance: float = 0.04 if is_river else (0.10 if has_silt else 0.04)
 		if r1 < weed_chance:
 			plant_props.append({ "type": "weed", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
-	if is_shore and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
+	if not is_river and is_shore and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
 		if r1 < 0.08:
 			plant_props.append({ "type": "taro", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
 

@@ -7,6 +7,7 @@ var _selected: int = 0
 var _slots: Array[Panel] = []
 var _slot_faces: Array[ColorRect] = []
 var _slot_labels: Array[Label] = []
+var _slot_icons: Array[TextureRect] = []
 var _slot_count_labels: Array[Label] = []
 var _tooltip: Label = null
 var _tooltip_bg: ColorRect = null
@@ -75,6 +76,15 @@ func _ready() -> void:
 		lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
 		panel.add_child(lbl)
 		_slot_labels.append(lbl)
+
+		var icon_tex := TextureRect.new()
+		icon_tex.position = Vector2(2, 2)
+		icon_tex.size = Vector2(ss - 4, ss - 4)
+		icon_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon_tex.visible = false
+		panel.add_child(icon_tex)
+		_slot_icons.append(icon_tex)
 
 		var cnt := Label.new()
 		cnt.position = Vector2(2, ss - 16)
@@ -239,7 +249,17 @@ func _process(_delta: float) -> void:
 			_slot_faces[i].color = Color(0.15, 0.15, 0.22, 0.4)
 			_slot_labels[i].text = ""
 			_slot_count_labels[i].text = ""
+			_slot_icons[i].texture = null
+			_slot_icons[i].visible = false
 		else:
 			_slot_faces[i].color = slot.item.icon_color
-			_slot_labels[i].text = slot.item.icon_char
+			var tex := IconRenderer.get_texture(slot.item.id)
+			if tex:
+				_slot_icons[i].texture = tex
+				_slot_icons[i].visible = true
+				_slot_labels[i].text = ""
+			else:
+				_slot_icons[i].texture = null
+				_slot_icons[i].visible = false
+				_slot_labels[i].text = slot.item.icon_char
 			_slot_count_labels[i].text = str(slot.count) if slot.count > 1 else ""

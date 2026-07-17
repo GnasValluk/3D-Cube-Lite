@@ -532,9 +532,7 @@ const LOOT_TABLE: Dictionary = {
 	FishVariant.SHRIMP:     [ { id = "tom",           rate = 0.40 } ],
 }
 
-const _DroppedItem = preload("res://scripts/items/world/dropped_item.gd")
-const _ItemDef = preload("res://scripts/items/core/item_def.gd")
-const _ItemDB = preload("res://scripts/items/core/inventory.gd")
+const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 
 func _die(_attacker: Node3D = null) -> void:
 	super._die(_attacker)
@@ -545,7 +543,8 @@ func _roll_loot() -> void:
 	var world := get_tree().current_scene
 	if world == null:
 		return
-	var db := _ItemDB.create_item_db()
+	ItemDatabase.ensure_db()
+	var db := ItemDatabase.items_db
 	for entry in table:
 		if randf() < entry.rate:
 			var defn: ItemDef = db.get(entry.id)

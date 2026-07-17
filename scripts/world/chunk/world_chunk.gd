@@ -4,6 +4,7 @@ class_name WorldChunk
 const _Data  = preload("chunk_data.gd")
 const _Noise = preload("chunk_noise.gd")
 const _Road  = preload("chunk_road.gd")
+const _River = preload("chunk_river.gd")
 const _Detail = preload("chunk_detail.gd")
 const _Aquatic = preload("chunk_aquatic.gd")
 const _BlockData = preload("chunk_block_data.gd")
@@ -48,6 +49,9 @@ static func clear_noise_cache() -> void:
 
 static func _is_on_road(wx: float, wz: float) -> bool:
 	return _Road.is_on_road(wx, wz)
+
+static func _is_on_river(wx: float, wz: float) -> bool:
+	return _River.is_on_river(wx, wz)
 
 static func _cache_key(cx: int, cz: int, dim: int) -> String:
 	return "%d,%d,%d" % [cx, cz, dim]
@@ -318,7 +322,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 
 						# Kiểm tra warped ocean mask trực tiếp — không cho hồ ở biển
 						var is_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
-						if not is_ocean and lake_val > 0.58 and (od == _Data.CONST_INF or od > 40):
+						if not is_ocean and lake_val > 0.80 and (od == _Data.CONST_INF or od > 40):
 							var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
 							if lake_type_val > 0.50:
 								biome_grid[ivx][ivz] = _Data.TileType.SILT if d <= _Data.PAD else _Data.TileType.MUDDY_SAND
@@ -347,6 +351,85 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					if d == _Data.CONST_INF: d = _Data.PAD
 					height_grid[ivx][ivz] = _Data.WATER_Y - min(d, _Data.PAD) * _Data.VOXEL
 
+	# ── 3b. River override ────────────────────────────────────────────────────
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		var n_river := FastNoiseLite.new()
+		n_river.seed = WorldSeed.seed_value + 9999
+		n_river.noise_type = FastNoiseLite.TYPE_PERLIN
+		n_river.frequency = 0.06
+		var n_river_bed := FastNoiseLite.new()
+		n_river_bed.seed = WorldSeed.seed_value + 10101
+		n_river_bed.noise_type = FastNoiseLite.TYPE_PERLIN
+		n_river_bed.frequency = 0.04
+		var river_flag: PackedByteArray = PackedByteArray()
+		river_flag.resize(cols * cols)
+		# Save original heights for transition blending
+		var orig_heights: Array[Array] = []
+		orig_heights.resize(cols)
+		for ivx in range(cols):
+			orig_heights[ivx] = []; orig_heights[ivx].resize(cols)
+			for ivz in range(cols):
+				orig_heights[ivx][ivz] = height_grid[ivx][ivz]
+		for ivx in range(cols):
+			for ivz in range(cols):
+				var bg: int = biome_grid[ivx][ivz]
+				if bg == _Data.TileType.OCEAN_DEEP:
+					continue
+				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+				var factor: float = _River.river_distance_factor(wx, wz)
+				if factor >= 0.0:
+					var orig_h: float = height_grid[ivx][ivz]
+					# Skip carving in lakes — river just passes through at lake level
+					if orig_h <= _Data.WATER_Y:
+						river_flag[ivx * cols + ivz] = 1
+						continue
+					var bottom_var: float = n_river.get_noise_2d(wx * 0.5, wz * 0.5) * 1.5 * _BlockData.SLAB_HEIGHT
+					var deep_h: float = _Data.WATER_Y - 6.0 * _BlockData.SLAB_HEIGHT + bottom_var
+					var t: float = clamp(factor, 0.0, 1.0)
+					t = t * t * (3.0 - 2.0 * t)
+					height_grid[ivx][ivz] = lerp(deep_h, max(orig_h, _Data.WATER_Y - 0.1), t)
+					if t < 0.4:
+						var bed_n: float = (n_river_bed.get_noise_2d(wx * 1.5, wz * 1.5) + 1.0) * 0.5
+						if bed_n < 0.25:
+							biome_grid[ivx][ivz] = _Data.TileType.SAND
+						elif bed_n < 0.55:
+							biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+						else:
+							biome_grid[ivx][ivz] = _Data.TileType.SILT
+					else:
+						biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+					river_flag[ivx * cols + ivz] = 1
+		# Gentle ramp where river meets lake — blend carved height toward water level
+		var dirs4: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+		for ramp_pass in range(2):
+			var updated: bool = false
+			for ivx in range(cols):
+				for ivz in range(cols):
+					if river_flag[ivx * cols + ivz] == 0:
+						continue
+					var orig_h: float = orig_heights[ivx][ivz]
+					if orig_h <= _Data.WATER_Y:
+						continue
+					var has_sub: bool = false
+					for d in dirs4:
+						var nx: int = ivx + d.x
+						var nz: int = ivz + d.y
+						if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
+							continue
+						if height_grid[nx][nz] <= _Data.WATER_Y:
+							has_sub = true
+							break
+					if has_sub:
+						var carved: float = height_grid[ivx][ivz]
+						var surf: float = _Data.WATER_Y - 0.1
+						if carved < surf - 0.05:
+							height_grid[ivx][ivz] = lerp(carved, surf, 0.3)
+							biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+							updated = true
+			if not updated:
+				break
+
 	# ── 4. Road grid ──────────────────────────────────────────────────────────
 	var road_grid: PackedByteArray
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
@@ -359,7 +442,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					continue
 				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
 				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-				road_grid[ivx * cols + ivz] = 1 if _Road.is_on_road(wx, wz) else 0
+				if _River.is_on_river(wx, wz):
+					road_grid[ivx * cols + ivz] = 0
+				else:
+					road_grid[ivx * cols + ivz] = 1 if _Road.is_on_road(wx, wz) else 0
 
 	# ── 5. Tạo ChunkBlockData từ biome + height ────────────────────────────────
 	var bd := _BlockData.new()
@@ -464,8 +550,11 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var px2: float = -half + (float(vx) + 0.5) * _Data.VOXEL
 				var pz2: float = -half + (float(vz) + 0.5) * _Data.VOXEL
 				var pos2 := Vector3(px2, h, pz2)
+				var wwx: float = world_ox - half + (float(vx) + 0.5) * _Data.VOXEL
+				var wwz: float = world_oz - half + (float(vz) + 0.5) * _Data.VOXEL
+				var is_river: bool = _River.is_on_river(wwx, wwz)
 				_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
-					b == _Data.TileType.SILT, b, lotus_lights, plant_props)
+					b == _Data.TileType.SILT, b, lotus_lights, plant_props, is_river)
 		mesh_aquatic = st_aq.commit()
 
 	# ── 9. Lamp positions ──────────────────────────────────────────────────────

@@ -55,7 +55,7 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	var n_ocean := FastNoiseLite.new()
 	n_ocean.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_ocean.seed = base_seed + 77777
-	n_ocean.frequency = 0.00036   # n_lake = 0.018, chia 50 → biển ~50x hồ
+	n_ocean.frequency = 0.00025
 	n_ocean.fractal_type = FastNoiseLite.FRACTAL_FBM
 	n_ocean.fractal_octaves = 4
 	n_ocean.fractal_lacunarity = 2.0

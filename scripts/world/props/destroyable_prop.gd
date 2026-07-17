@@ -104,8 +104,8 @@ func spawn_drop() -> void:
 	var world := _find_world_manager()
 	if world == null:
 		return
-	Inventory.ensure_db()
-	var def: ItemDef = Inventory.items_db.get(drop_item_id)
+	ItemDatabase.ensure_db()
+	var def: ItemDef = ItemDatabase.items_db.get(drop_item_id)
 	if def != null:
 		DroppedItem.spawn(world, def, global_position, 1, _spawn_drop_velocity(), global_position.y)
 

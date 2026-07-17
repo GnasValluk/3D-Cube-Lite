@@ -5,10 +5,10 @@ var _material: StandardMaterial3D
 
 func _init(arc_angle: float = 70.0, outer_r: float = 0.5, inner_r: float = 0.12, color: Color = Color.WHITE) -> void:
 	_material = StandardMaterial3D.new()
-	_material.albedo_color = Color(1, 1, 1, 0.6)
+	_material.albedo_color = Color(color.r, color.g, color.b, 0.6)
 	_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_material.emission_enabled = true
-	_material.emission = Color(1, 1, 1)
+	_material.emission = color
 	_material.emission_energy_multiplier = 3.0
 	_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED

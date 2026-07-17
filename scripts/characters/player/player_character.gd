@@ -1,7 +1,7 @@
 extends CharacterBase
 class_name PlayerCharacter
 
-const _BlockHighlight := preload("res://scripts/items/block_highlight.gd")
+const _BlockHighlight := preload("res://scripts/items/entities/block_highlight.gd")
 const _BlockData := preload("res://scripts/world/chunk/chunk_block_data.gd")
 
 var _mesh: PlayerMesh
@@ -14,6 +14,9 @@ var equipped_head: ItemDef = null
 var equipped_body: ItemDef = null
 var equipped_legs: ItemDef = null
 var equipped_feet: ItemDef = null
+var equipped_hands: ItemDef = null
+var equipped_back: ItemDef = null
+var equipped_sub: ItemDef = null
 
 var combo_step: int = 0
 var combo_timer: float = 0.0
@@ -178,6 +181,9 @@ func use_item_from_inventory(idx: int) -> void:
 				ItemDef.ArmorSlot.BODY: old = equipped_body; equipped_body = item
 				ItemDef.ArmorSlot.LEGS: old = equipped_legs; equipped_legs = item
 				ItemDef.ArmorSlot.FEET: old = equipped_feet; equipped_feet = item
+				ItemDef.ArmorSlot.HANDS: old = equipped_hands; equipped_hands = item
+				ItemDef.ArmorSlot.BACK: old = equipped_back; equipped_back = item
+				ItemDef.ArmorSlot.SUB: old = equipped_sub; equipped_sub = item
 			inventory.remove_item(idx, 1)
 			if old != null:
 				inventory.add_item(old, 1)
@@ -231,8 +237,7 @@ func _update_weapon_mesh() -> void:
 		return
 	var item_id: String = equipped_weapon.id if equipped_weapon != null else ""
 	print("[WM] building '", item_id, "' in_tree=", _mesh.weapon_pivot.is_inside_tree())
-	var wm_script = preload("res://scripts/characters/player/weapon_mesh.gd")
-	wm_script.build(_mesh.weapon_pivot, item_id)
+	ToolsMesh.build_held(_mesh.weapon_pivot, item_id)
 	print("[WM] done, child_count=", _mesh.weapon_pivot.get_child_count())
 
 ## Cầm weapon trực tiếp từ hotbar (không remove khỏi inventory)
@@ -249,7 +254,7 @@ func get_total_atk() -> int:
 
 func get_total_def() -> int:
 	var base: int = defense
-	for slot in [equipped_head, equipped_body, equipped_legs, equipped_feet]:
+	for slot in [equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_hands, equipped_back, equipped_sub]:
 		if slot != null:
 			base += slot.def_bonus
 	return base
@@ -291,13 +296,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				_fishing_action()
 				return
 			if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
-				if combo_timer > 0.0 and combo_step < 2:
-					combo_step += 1
-				elif _attack_timer <= 0.0:
+				var wep_id: String = equipped_weapon.id if equipped_weapon else ""
+				var is_heavy: bool = wep_id == "riu" or wep_id == "cup"
+				if is_heavy:
+					if _attack_timer > 0.0:
+						return
 					combo_step = 0
 				else:
-					return
-				combo_timer = COMBO_WINDOW
+					if combo_timer > 0.0 and combo_step < 2:
+						combo_step += 1
+					elif _attack_timer <= 0.0:
+						combo_step = 0
+					else:
+						return
+					combo_timer = COMBO_WINDOW
 				if not try_skill(mana_cost_lmb):
 					return
 				_aim_dir = _calc_aim_dir()
@@ -305,6 +317,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _aim_dir.dot(fwd) < 0.99:
 					rotation.y = atan2(_aim_dir.x, _aim_dir.z)
 				_lmb_cd = 0.0
+				attack_duration = 0.65 if wep_id == "cup" else (0.85 if wep_id == "riu" else 0.50)
+				_melee_hit_progress = 0.35 if wep_id == "cup" or wep_id == "riu" else 0.25
 				_attack_timer = attack_duration * (2.0 if _underwater else 1.0)
 				_state = State.ATTACK
 				_melee_hit_once = false
@@ -323,7 +337,7 @@ func _fishing_action() -> void:
 func _cast_fishing_line() -> void:
 	var target := _calc_aim_dir() * 8.0 + global_position
 	target.y = 0.46
-	var bob := preload("res://scripts/items/fishing/bobber_3d.gd").new()
+	var bob := preload("res://scripts/items/entities/fishing_bobber.gd").new()
 	var root := get_tree().current_scene
 	if root:
 		root.add_child(bob)
@@ -337,8 +351,8 @@ func _cast_fishing_line() -> void:
 func _on_bobber_done(item_id: String) -> void:
 	_bobber = null
 	if item_id != "":
-		Inventory.ensure_db()
-		var def: ItemDef = Inventory.items_db.get(item_id)
+		ItemDatabase.ensure_db()
+		var def: ItemDef = ItemDatabase.items_db.get(item_id)
 		if def and inventory.add_item(def, 1) == 0:
 			_scroll_inventory_message("+1 " + def.name)
 		else:

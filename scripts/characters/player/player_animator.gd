@@ -182,114 +182,174 @@ func _attack(delta: float, _t: float) -> void:
 		_slash_spawned = false
 	_last_remaining = remaining
 
-	# ── Wind-up (0.0 → 0.25) ──────────────────────────────────────────────────
-	if prog < 0.25:
-		var p: float = prog / 0.25
-		match step:
-			0:  # Hit 1: vung chéo phải→trái
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 72.0, delta * 18.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 28.0, delta * 18.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -14.0, delta * 18.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.55 * p, delta * 22.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.20 * p, delta * 18.0)
-				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.12 * p, delta * 16.0)
-				mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.18 * p, delta * 14.0)
-				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.12 * p, delta * 14.0)
-			1:  # Hit 2: vung chéo trái→phải
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 72.0, delta * 18.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -28.0, delta * 18.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 18.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.55 * p, delta * 22.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.20 * p, delta * 18.0)
-				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.12 * p, delta * 16.0)
-				mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.18 * p, delta * 14.0)
-				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.12 * p, delta * 14.0)
-			2:  # Hit 3: vung ngang
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 82.0, delta * 18.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 42.0, delta * 18.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -7.0, delta * 18.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.28 * p, delta * 22.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.32 * p, delta * 18.0)
-				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.20 * p, delta * 16.0)
-				mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.25 * p, delta * 14.0)
-				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.16 * p, delta * 14.0)
-		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.08 * p, delta * 16.0)
-		mesh.body.rotation.x = lerp(mesh.body.rotation.x, -0.05 * p, delta * 14.0)
+	var is_heavy: bool = player and player.equipped_weapon != null and (player.equipped_weapon.id == "riu" or player.equipped_weapon.id == "cup")
 
-	# ── Strike (0.25 → 0.70) ─────────────────────────────────────────────────
-	elif prog < 0.70:
-		if not _slash_spawned:
-			_slash_spawned = true
-			_spawn_slash(step)
-		var p: float = (prog - 0.25) / 0.45
-		match step:
-			0:  # Chéo phải→trái
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 112.0, delta * 30.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -22.0, delta * 30.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 16.0, delta * 30.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.75 * p - 0.55 * (1.0 - p), delta * 32.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.10 * sin(p * PI), delta * 26.0)
-				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.18 * sin(p * PI), delta * 20.0)
-				mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.22 * sin(p * PI), delta * 18.0)
-				mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
-				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.18 * sin(p * PI), delta * 16.0)
-				mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
-			1:  # Chéo trái→phải
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 112.0, delta * 30.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 22.0, delta * 30.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -16.0, delta * 30.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.75 * p - 0.55 * (1.0 - p), delta * 32.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 26.0)
-				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.18 * sin(p * PI), delta * 20.0)
-				mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.22 * sin(p * PI), delta * 18.0)
-				mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
-				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.18 * sin(p * PI), delta * 16.0)
-				mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
-			2:  # Vung ngang
-				wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 97.0, delta * 30.0)
-				wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -42.0, delta * 30.0)
-				wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 11.0, delta * 30.0)
-				mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.45 * p - 0.28 * (1.0 - p), delta * 32.0)
-				mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.14 * sin(p * PI), delta * 26.0)
-				mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.45 * sin(p * PI), delta * 22.0)
-				mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.38 * sin(p * PI), delta * 20.0)
-				mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.06 * sin(p * PI), delta * 16.0)
-				mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.22 * sin(p * PI), delta * 16.0)
-				mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.22 * sin(p * PI), delta * 14.0)
-		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.12 * p, delta * 22.0)
-		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.05 * sin(p * PI), delta * 20.0)
-		mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.08 * p, delta * 18.0)
+	if is_heavy:
+		# ── Heavy overhead swing ──────────────────────────────────────────────
+		# Wind-up (0.0 → 0.35): raise weapon above head
+		if prog < 0.35:
+			var p: float = prog / 0.35
+			wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, -35.0 + 90.0 * (1.0 - p), delta * 14.0)
+			wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 8.0 * p, delta * 14.0)
+			wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -5.0 * p, delta * 14.0)
+			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.70 * p, delta * 18.0)
+			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.06 * p, delta * 14.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.06 * p, delta * 14.0)
+			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.08 * p, delta * 12.0)
+			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.06 * p, delta * 12.0)
+			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.14 * p, delta * 12.0)
+			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.10 * p, delta * 12.0)
 
-	# ── Recovery (0.70 → 1.0) ────────────────────────────────────────────────
+		# Strike (0.35 → 0.75): overhead swing down
+		elif prog < 0.75:
+			if not _slash_spawned:
+				_slash_spawned = true
+				_spawn_slash(step)
+			var p: float = (prog - 0.35) / 0.40
+			wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 145.0, delta * 26.0)
+			wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -12.0, delta * 22.0)
+			wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 8.0, delta * 22.0)
+			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.50 * p - 0.70 * (1.0 - p), delta * 28.0)
+			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.12 * sin(p * PI), delta * 22.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.10 * sin(p * PI), delta * 18.0)
+			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.15 * sin(p * PI), delta * 18.0)
+			mesh.body.rotation.x = lerp(mesh.body.rotation.x, -0.08 * sin(p * PI), delta * 16.0)
+			mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.18 * sin(p * PI), delta * 16.0)
+			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.10 * sin(p * PI), delta * 14.0)
+			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.15 * sin(p * PI), delta * 14.0)
+			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.20 * sin(p * PI), delta * 12.0)
+
+		# Recovery (0.75 → 1.0)
+		else:
+			wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
+			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
+			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
+			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
+			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
+			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
+			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
+			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
+			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
+			mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
+			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
+
 	else:
-		wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
-		mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
-		mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
-		mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
-		mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
-		mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
-		mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
-		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
-		mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
-		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
-		mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
-		mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
-		if remaining <= 0.0 and player and player.combo_timer <= 0.0:
-			player.combo_step = 0
+		# ── Fast sword combo ──────────────────────────────────────────────────
+		# Wind-up (0.0 → 0.25)
+		if prog < 0.25:
+			var p: float = prog / 0.25
+			match step:
+				0:
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 72.0, delta * 18.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 28.0, delta * 18.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -14.0, delta * 18.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.55 * p, delta * 22.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.20 * p, delta * 18.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.12 * p, delta * 16.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.18 * p, delta * 14.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.12 * p, delta * 14.0)
+				1:
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 72.0, delta * 18.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -28.0, delta * 18.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 18.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.55 * p, delta * 22.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.20 * p, delta * 18.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.12 * p, delta * 16.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.18 * p, delta * 14.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.12 * p, delta * 14.0)
+				2:
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 82.0, delta * 18.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 42.0, delta * 18.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -7.0, delta * 18.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.28 * p, delta * 22.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.32 * p, delta * 18.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.20 * p, delta * 16.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.25 * p, delta * 14.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.16 * p, delta * 14.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.08 * p, delta * 16.0)
+			mesh.body.rotation.x = lerp(mesh.body.rotation.x, -0.05 * p, delta * 14.0)
+
+		# Strike (0.25 → 0.70)
+		elif prog < 0.70:
+			if not _slash_spawned:
+				_slash_spawned = true
+				_spawn_slash(step)
+			var p: float = (prog - 0.25) / 0.45
+			match step:
+				0:
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 112.0, delta * 30.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -22.0, delta * 30.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 16.0, delta * 30.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.75 * p - 0.55 * (1.0 - p), delta * 32.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.10 * sin(p * PI), delta * 26.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.18 * sin(p * PI), delta * 20.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.22 * sin(p * PI), delta * 18.0)
+					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.18 * sin(p * PI), delta * 16.0)
+					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
+				1:
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 112.0, delta * 30.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 22.0, delta * 30.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -16.0, delta * 30.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.75 * p - 0.55 * (1.0 - p), delta * 32.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 26.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.18 * sin(p * PI), delta * 20.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.22 * sin(p * PI), delta * 18.0)
+					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.18 * sin(p * PI), delta * 16.0)
+					mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
+				2:
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 97.0, delta * 30.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -42.0, delta * 30.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 11.0, delta * 30.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.45 * p - 0.28 * (1.0 - p), delta * 32.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.14 * sin(p * PI), delta * 26.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.45 * sin(p * PI), delta * 22.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.38 * sin(p * PI), delta * 20.0)
+					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.06 * sin(p * PI), delta * 16.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.22 * sin(p * PI), delta * 16.0)
+					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.22 * sin(p * PI), delta * 14.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.12 * p, delta * 22.0)
+			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.05 * sin(p * PI), delta * 20.0)
+			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.08 * p, delta * 18.0)
+
+		# Recovery (0.70 → 1.0)
+		else:
+			wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
+			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
+			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
+			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
+			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
+			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
+			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
+			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
+			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
+			mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
+			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
+			if remaining <= 0.0 and player and player.combo_timer <= 0.0:
+				player.combo_step = 0
 
 func _spawn_slash(step: int) -> void:
 	if not is_instance_valid(mesh) or not is_instance_valid(mesh.weapon_pivot):
 		return
-	if not player or not player.equipped_weapon or player.equipped_weapon.id != "kiem":
+	if not player or not player.equipped_weapon:
 		return
 	var wp := mesh.weapon_pivot
-	var vfx := SlashVFX.new()
-	wp.add_child(vfx)
-	vfx.position = Vector3(0, 0.40, 0)
-	match step:
-		0:
-			vfx.rotation_degrees = Vector3(0, 0, 30)
-		1:
-			vfx.rotation_degrees = Vector3(0, 0, -30)
-		2:
-			vfx.rotation_degrees = Vector3(85, 0, 0)
+	var is_heavy: bool = player.equipped_weapon.id == "riu" or player.equipped_weapon.id == "cup"
+
+	if is_heavy:
+		var is_axe: bool = player.equipped_weapon.id == "riu"
+		var vfx := SlashVFX.new(75.0 if is_axe else 60.0, 0.40 if is_axe else 0.30, 0.10, Color.WHITE)
+		wp.add_child(vfx)
+		vfx.position = Vector3(0, 0.40, 0)
+		vfx.rotation_degrees = Vector3(0, 90, 0)
+	elif player.equipped_weapon.id == "kiem":
+		var vfx := SlashVFX.new(70.0, 0.5, 0.12, Color.WHITE)
+		wp.add_child(vfx)
+		vfx.position = Vector3(0, 0.40, 0)
+		match step:
+			0: vfx.rotation_degrees = Vector3(0, 0, 30)
+			1: vfx.rotation_degrees = Vector3(0, 0, -30)
+			2: vfx.rotation_degrees = Vector3(85, 0, 0)

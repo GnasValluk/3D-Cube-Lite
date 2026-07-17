@@ -25,6 +25,7 @@ TimeSystem="*res://scripts/core/time_system.gd"
 SFXManager="*res://scripts/audio/sfx_manager.gd"
 CollisionQueue="*res://scripts/core/collision_queue.gd"
 SettingsData="*res://scripts/core/settings_manager.gd"
+IconRenderer="*res://scripts/items/icon_renderer.gd"
 
 [display]
 

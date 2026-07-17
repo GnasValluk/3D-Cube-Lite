@@ -31,7 +31,7 @@ const ITEM_ANIMS := {
 }
 
 const _CD = preload("res://scripts/world/chunk/chunk_data.gd")
-const _WM = preload("res://scripts/characters/player/weapon_mesh.gd")
+const _WM = preload("res://scripts/items/models/tools.gd")
 const _PlayerMesh = preload("res://scripts/characters/player/player_mesh.gd")
 const _RaptorMesh = preload("res://scripts/characters/raptor/raptor_mesh.gd")
 const _DragonMesh = preload("res://scripts/characters/dragon/dragon_mesh.gd")
@@ -400,7 +400,7 @@ func _show_item() -> void:
 	var iid: String = ITEM_IDS[_index]
 	match iid:
 		"cup", "xeng", "riu", "kiem", "can_cau":
-			_WM.build(_container, iid)
+			_WM.build_held(_container, iid)
 		"chest":
 			_build_chest()
 		"twilight_gate":
