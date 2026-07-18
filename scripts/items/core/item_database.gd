@@ -240,3 +240,9 @@ static func get_icon_2d_path(item_id: String) -> String:
 		"twilight_powder": return "res://assets/icon_items/resource_mats/twilight_powder.png"
 
 	return ""
+
+static func load_icon_2d(item_id: String) -> Texture2D:
+	var path := get_icon_2d_path(item_id)
+	if path.is_empty():
+		return null
+	return load(path) as Texture2D

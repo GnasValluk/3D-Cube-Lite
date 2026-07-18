@@ -2,8 +2,8 @@ extends Node3D
 class_name OpenWorldManager
 
 const CHUNK_SIZE: int = 32
-const VIEW_RADIUS: int = 2
-const PRELOAD_RADIUS: int = 2
+const VIEW_RADIUS: int = 3
+const PRELOAD_RADIUS: int = 3
 const MAX_LOADING_PER_FRAME: int = 1
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")

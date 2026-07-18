@@ -117,7 +117,7 @@ func _build_ui() -> void:
 		icon.size = Vector2(40, 40)
 		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		var icon_tex := IconRenderer.get_texture(bid)
+		var icon_tex := ItemDatabase.load_icon_2d(bid)
 		if icon_tex:
 			icon.texture = icon_tex
 		btn.add_child(icon)

@@ -32,13 +32,13 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	var n_lake := FastNoiseLite.new()
 	n_lake.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_lake.seed = base_seed + 5555
-	n_lake.frequency = 0.010
+	n_lake.frequency = 0.025
 
 	## n_lake_type: xác định hồ bùn hay hồ cát — tần số thấp hơn để patch lớn hơn
 	var n_lake_type := FastNoiseLite.new()
 	n_lake_type.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_lake_type.seed = base_seed + 8888
-	n_lake_type.frequency = 0.008
+	n_lake_type.frequency = 0.020
 
 	## n_continent: noise tần số rất thấp xác định lục địa vs biển
 	## Chỉ dùng cho REAL_WORLD — Twilight không có biển

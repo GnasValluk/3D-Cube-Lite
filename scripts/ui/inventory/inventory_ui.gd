@@ -163,7 +163,7 @@ func _lib_refresh_display() -> void:
 			var item: ItemDef = _lib_items[item_idx]
 			face.color = item.icon_color
 			var icon_tex := _lib_icon_textures[i]
-			var tex := IconRenderer.get_texture(item.id)
+			var tex := ItemDatabase.load_icon_2d(item.id)
 			if tex:
 				icon_tex.texture = tex
 				icon_tex.visible = true
@@ -919,7 +919,7 @@ func _process(delta: float) -> void:
 			_slot_icons[i].texture = null; _slot_icons[i].visible = false
 		else:
 			_slot_faces[i].color = slot.item.icon_color
-			var tex := IconRenderer.get_texture(slot.item.id)
+			var tex := ItemDatabase.load_icon_2d(slot.item.id)
 			if tex:
 				_slot_icons[i].texture = tex
 				_slot_icons[i].visible = true

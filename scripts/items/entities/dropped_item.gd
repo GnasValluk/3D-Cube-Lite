@@ -50,7 +50,7 @@ func _setup_mesh():
 		ItemMesh.build(root, item_id)
 	else:
 		var scale_pivot := Node3D.new()
-		scale_pivot.scale = Vector3(4.0, 4.0, 4.0)
+		scale_pivot.scale = Vector3(2.5, 2.5, 2.5)
 		root.add_child(scale_pivot)
 		ItemMesh.build(scale_pivot, item_id)
 

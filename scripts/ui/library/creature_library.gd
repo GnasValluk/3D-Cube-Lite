@@ -1,30 +1,6 @@
 extends Control
 class_name Library
 
-const _ItemMesh = preload("res://scripts/items/models/router.gd")
-const _ToolsMesh = preload("res://scripts/items/models/tools.gd")
-const _PlantProp = preload("res://scripts/world/props/plant_prop.gd")
-const _PlayerMesh = preload("res://scripts/characters/player/player_mesh.gd")
-const _RaptorMesh = preload("res://scripts/characters/raptor/raptor_mesh.gd")
-const _DragonMesh = preload("res://scripts/characters/dragon/dragon_mesh.gd")
-const _WarriorMesh = preload("res://scripts/characters/warrior/warrior_mesh.gd")
-const _BeyordeathMesh = preload("res://scripts/characters/beyordeath/beyordeath_mesh.gd")
-const _FishMesh = preload("res://scripts/characters/fish/fish_mesh.gd")
-
-const FISH_COLORS := [
-	[Color(0.95, 0.70, 0.10), Color(0.98, 0.95, 0.80), Color(0.85, 0.55, 0.05)],
-	[Color(0.30, 0.30, 0.30), Color(0.65, 0.65, 0.65), Color(0.20, 0.20, 0.20)],
-	[Color(0.88, 0.55, 0.45), Color(0.95, 0.80, 0.70), Color(0.85, 0.40, 0.30)],
-	[Color(0.30, 0.25, 0.15), Color(0.65, 0.60, 0.50), Color(0.20, 0.18, 0.10)],
-	[Color(0.92, 0.25, 0.15), Color(0.90, 0.55, 0.45), Color(0.75, 0.15, 0.10)],
-	[Color(0.85, 0.35, 0.20), Color(0.92, 0.55, 0.35), Color(0.75, 0.25, 0.15)],
-]
-const FISH_PATTERN := [
-	Color(0.15, 0.10, 0.05), Color(0, 0, 0, 0), Color(0, 0, 0, 0),
-	Color(0, 0, 0, 0), Color(0.15, 0.10, 0.08), Color(0, 0, 0, 0),
-]
-const FISH_BODY_Z := [1.0, 1.0, 1.0, 1.8, 1.0, 1.0]
-
 const CREATURES := [
 	{ "id": "player",     "name": "Player",      "cat": "party", "element": 6,
 	  "hp": 500, "atk": 80, "def": 20, "spd": 3.6, "mp": 200,
@@ -90,12 +66,7 @@ var _item_db: Dictionary = {}
 # Tab
 var _tab_buttons: Array[Button] = []
 
-# 3D viewport (shared)
-var _viewport_container: SubViewportContainer
-var _viewport: SubViewport
-var _cam: Camera3D
-var _model_root: Node3D
-var _cam_rot: float = 0.0
+
 
 func _ready() -> void:
 	visible = false
@@ -173,9 +144,7 @@ func _build() -> void:
 	_build_item_list(_item_left)
 	_build_item_preview(_item_right)
 
-	_build_shared_viewport(bg)
 	_update_tab_visibility()
-	_reparent_viewport()
 
 func _make_side_panel(bg: Panel, x: float, y: float, w: float, h: float) -> Panel:
 	var p := Panel.new()
@@ -213,35 +182,7 @@ func _build_tabs(bg: Panel, W: float) -> void:
 		_tab_buttons.append(btn)
 	_update_tab_styles()
 
-func _build_shared_viewport(bg: Panel) -> void:
-	_viewport_container = SubViewportContainer.new()
-	_viewport_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_viewport_container.size = Vector2(360, 360)
-	bg.add_child(_viewport_container)
 
-	_viewport = SubViewport.new()
-	_viewport.size = Vector2i(340, 340)
-	_viewport.transparent_bg = true
-	_viewport.world_3d = World3D.new()
-	_viewport_container.add_child(_viewport)
-
-	_cam = Camera3D.new()
-	_viewport.add_child(_cam)
-
-	_model_root = Node3D.new()
-	_viewport.add_child(_model_root)
-
-	var world_env := WorldEnvironment.new()
-	world_env.environment = Environment.new()
-	world_env.environment.ambient_light_color = Color(0.4, 0.4, 0.5)
-	world_env.environment.ambient_light_energy = 1.5
-	_viewport.add_child(world_env)
-
-	for p in [Vector3(3, 5, 4), Vector3(-2, 3, -2)]:
-		var lt := DirectionalLight3D.new()
-		lt.look_at_from_position(p, Vector3.ZERO)
-		lt.light_energy = 1.2 if p.z > 0 else 0.5
-		_viewport.add_child(lt)
 
 func _on_tab_selected(tab: int) -> void:
 	if _current_tab == tab:
@@ -249,7 +190,6 @@ func _on_tab_selected(tab: int) -> void:
 	_current_tab = tab
 	_selected = ""
 	_update_tab_visibility()
-	_reparent_viewport()
 	if _current_tab == Tab.CREATURES and CREATURES.size() > 0:
 		_on_select(CREATURES[0]["id"])
 	elif _current_tab == Tab.ITEMS:
@@ -257,18 +197,7 @@ func _on_tab_selected(tab: int) -> void:
 		if ids.size() > 0:
 			_on_item_select(ids[0])
 
-func _reparent_viewport() -> void:
-	var parent: Panel = _creature_right if _current_tab == Tab.CREATURES else _item_right
-	if _viewport_container.get_parent() != parent:
-		if _viewport_container.get_parent():
-			_viewport_container.get_parent().remove_child(_viewport_container)
-		parent.add_child(_viewport_container)
-	if _current_tab == Tab.CREATURES:
-		_viewport_container.position = Vector2(340, 10)
-		_viewport_container.size = Vector2(360, 360)
-	else:
-		_viewport_container.position = Vector2(16, 10)
-		_viewport_container.size = Vector2(340, 340)
+
 
 func _update_tab_visibility() -> void:
 	_creature_left.visible = _current_tab == Tab.CREATURES
@@ -405,14 +334,6 @@ func _build_creature_preview(right: Panel) -> void:
 	_preview_spawn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(_preview_spawn)
 
-	var lbl_3d := Label.new()
-	lbl_3d.text = tr("CREATURE_3D_VIEW")
-	lbl_3d.add_theme_font_size_override("font_size", 10)
-	lbl_3d.add_theme_color_override("font_color", Color(0.45, 0.45, 0.6, 0.6))
-	lbl_3d.position = Vector2(350, 370)
-	lbl_3d.size = Vector2(200, 16)
-	right.add_child(lbl_3d)
-
 func _build_item_list(left: Panel) -> void:
 	var type_order: Array = [
 		ItemDef.Type.BLOCK, ItemDef.Type.TOOL, ItemDef.Type.WEAPON,
@@ -521,28 +442,15 @@ func _build_item_preview(right: Panel) -> void:
 	_item_stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(_item_stats_label)
 
-	# 3D viewport position hint (item mode: viewport on left of right panel)
-	var lbl_3d := Label.new()
-	lbl_3d.text = tr("CREATURE_3D_VIEW")
-	lbl_3d.add_theme_font_size_override("font_size", 10)
-	lbl_3d.add_theme_color_override("font_color", Color(0.45, 0.45, 0.6, 0.6))
-	lbl_3d.position = Vector2(16, 370)
-	lbl_3d.size = Vector2(200, 16)
-	right.add_child(lbl_3d)
-
 func _on_select(id: String) -> void:
 	_selected = id
 	_update_selection()
 	_update_preview()
-	_position_viewport_for_creature()
-	_rebuild_model()
 
 func _on_item_select(id: String) -> void:
 	_selected = id
 	_update_item_selection()
 	_update_item_preview()
-	_position_viewport_for_item()
-	_rebuild_item_model()
 
 func _update_selection() -> void:
 	for i in range(_btn_group.size()):
@@ -652,14 +560,6 @@ func _type_color(type: int) -> Color:
 		ItemDef.Type.MATERIAL: return Color(0.80, 0.75, 0.30)
 		_:                     return Color(0.7, 0.7, 0.7)
 
-func _position_viewport_for_creature() -> void:
-	_viewport_container.position = Vector2(340, 10)
-	_viewport_container.size = Vector2(360, 360)
-
-func _position_viewport_for_item() -> void:
-	_viewport_container.position = Vector2(16, 10)
-	_viewport_container.size = Vector2(340, 340)
-
 func _find_entry_by_idx(idx: int) -> Dictionary:
 	var flat: Array = []
 	for cat in build_categories():
@@ -674,22 +574,6 @@ func _find_entry_by_idx(idx: int) -> Dictionary:
 func _on_close() -> void:
 	visible = false
 
-func _process(delta: float) -> void:
-	if not visible:
-		return
-	_cam_rot += delta * 0.5
-	if _current_tab == Tab.CREATURES:
-		_cam.position = Vector3(sin(_cam_rot) * 2.0, 0.5, cos(_cam_rot) * 2.0)
-	elif _selected in _WEAPON_IDS:
-		_cam.position = Vector3(sin(_cam_rot) * 0.7, 0.3, cos(_cam_rot) * 0.7)
-	elif _selected == "mon_ngot" or _selected == "rong_nhiet_doi":
-		_cam.position = Vector3(sin(_cam_rot) * 1.5, 0.6, cos(_cam_rot) * 1.5)
-	elif _is_icon_item(_selected):
-		_cam.position = Vector3(sin(_cam_rot) * 0.45, 0.2, cos(_cam_rot) * 0.45)
-	else:
-		_cam.position = Vector3(sin(_cam_rot) * 0.2, 0.08, cos(_cam_rot) * 0.2)
-	_cam.look_at(Vector3.ZERO)
-
 func show_library() -> void:
 	visible = true
 	if _current_tab == Tab.CREATURES and _selected.is_empty() and CREATURES.size() > 0:
@@ -699,91 +583,11 @@ func show_library() -> void:
 		if ids.size() > 0:
 			_on_item_select(ids[0])
 
-func _rebuild_model() -> void:
-	_clear_model_root()
-	_model_root.scale = Vector3.ONE
-	if _selected.is_empty():
-		return
-	var data := _find_creature(_selected)
-	if data.is_empty():
-		return
-	if data["cat"] == "party":
-		var body := CharacterBody3D.new()
-		_model_root.add_child(body)
-		_build_party_mesh(body, data["id"])
-	else:
-		var body := Node3D.new()
-		_model_root.add_child(body)
-		_build_fish_mesh(body, data["fi"])
-
-const _WEAPON_IDS := ["cup", "xeng", "riu", "kiem", "can_cau"]
-
-func _rebuild_item_model() -> void:
-	_clear_model_root()
-	_model_root.scale = Vector3.ONE
-	if _selected.is_empty() or not _item_db.has(_selected):
-		return
-	if _selected in _WEAPON_IDS:
-		_ToolsMesh.build_held(_model_root, _selected)
-	elif _selected == "mon_ngot":
-		_PlantProp.build_drop_mesh(_model_root, "taro")
-	elif _selected == "rong_nhiet_doi":
-		_PlantProp.build_drop_mesh(_model_root, "weed")
-	else:
-		_ItemMesh.build(_model_root, _selected)
-
-func _clear_model_root() -> void:
-	for c in _model_root.get_children():
-		_model_root.remove_child(c)
-		c.free()
-
 func _find_creature(id: String) -> Dictionary:
 	for c in CREATURES:
 		if c["id"] == id:
 			return c
 	return {}
-
-func _build_party_mesh(body: Node3D, id: String) -> void:
-	match id:
-		"player":
-			var pm := _PlayerMesh.new()
-			pm.build(body)
-		"raptor":
-			var rm := _RaptorMesh.new()
-			rm.build(body)
-		"dragon":
-			var dm := _DragonMesh.new()
-			dm.build(body)
-		"warrior":
-			var wm := _WarriorMesh.new()
-			wm.build(body)
-		"beyordeath":
-			var bm := _BeyordeathMesh.new()
-			bm.build(body)
-
-func _build_fish_mesh(body: Node3D, fi: int) -> void:
-	var cols: Array = FISH_COLORS[fi]
-	var fm := _FishMesh.new()
-	fm.color_body  = cols[0]
-	fm.color_belly = cols[1]
-	fm.color_fin   = cols[2]
-	fm.color_tail  = (cols[0] as Color) * 0.8
-	fm.color_pattern = FISH_PATTERN[fi]
-	fm.body_z_scale  = FISH_BODY_Z[fi]
-	if fi == 4:
-		fm.body_triangular = true
-		fm.has_horns = true
-	elif fi == 5:
-		fm.body_shape = _FishMesh.BodyShape.SHRIMP
-	fm.build(body)
-
-static func _is_icon_item(id: String) -> bool:
-	return id in [
-		"apple_green", "banana_peeled", "blueberry", "cabbage", "carrot", "cauliflower",
-		"cherry", "chili_red", "corn", "cucumber", "eggplant", "grapes_black",
-		"leek", "lemon", "onion", "orange", "paprika_red", "pear", "pineapple",
-		"plum", "potato", "pumpkin", "raspberry", "strawberry", "tomato", "watermelon",
-	]
 
 func show_creature_direct(creature_id: String, parent_control: Control) -> void:
 	pass

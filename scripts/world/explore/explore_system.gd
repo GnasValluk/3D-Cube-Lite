@@ -196,7 +196,7 @@ func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 
 	var n_lake: FastNoiseLite = nd["lake"]
 	var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-	if lake_val > 0.55:
+	if lake_val > 0.90:
 		return Color(0.08, 0.36, 0.68, 0.70)
 
 	var dist_to_dark: float = _dist_to_dark_grass(wx, wz, n_biome, n_warp, threshold)

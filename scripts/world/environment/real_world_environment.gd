@@ -47,6 +47,12 @@ func _ready() -> void:
 	env.ambient_light_color  = _keys[0]["amb"]
 	env.ambient_light_energy = _keys[0]["ae"]
 
+	env.fog_enabled = true
+	env.fog_density = 0.0
+	env.fog_height = 2.0
+	env.fog_height_density = 0.0
+	env.fog_light_color = Color(0.40, 0.42, 0.48)
+
 	_apply_graphics_preset(env)
 
 	environment = env
@@ -58,7 +64,10 @@ func _ready() -> void:
 	_setup_lights()
 
 func _apply_graphics_preset(env: Environment) -> void:
-	var preset: int = SettingsManager.graphics_preset if SettingsManager else 0
+	if not SettingsManager:
+		return
+
+	var preset: int = SettingsManager.graphics_preset
 
 	match preset:
 		SettingsManager.GraphicsPreset.STANDARD:
@@ -177,15 +186,18 @@ func _process(delta: float) -> void:
 	if TimeSystem:
 		weather_intensity = TimeSystem.get_weather_intensity()
 
-	var rain_factor: float = 1.0 - weather_intensity * 0.35
+	var rain_factor: float = 1.0 - weather_intensity * 0.55
 
-	environment.background_color = k["bg"].lerp(Color(0.12, 0.14, 0.18), weather_intensity * 0.5)
-	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.5)
+	environment.background_color = k["bg"].lerp(Color(0.12, 0.14, 0.18), weather_intensity * 0.7)
+	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
 	environment.ambient_light_energy = k["ae"] * rain_factor
 
 	if _dir_light:
-		_dir_light.light_color = k["dc"].lerp(Color(0.50, 0.50, 0.55), weather_intensity * 0.4)
+		_dir_light.light_color = k["dc"].lerp(Color(0.50, 0.50, 0.55), weather_intensity * 0.5)
 		_dir_light.light_energy = k["de"] * rain_factor
+
+	environment.fog_density = weather_intensity * 0.012
+	environment.fog_height_density = weather_intensity * 0.08
 
 func get_cycle_progress() -> float:
 	if TimeSystem:

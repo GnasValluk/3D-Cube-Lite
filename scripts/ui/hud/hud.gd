@@ -1154,9 +1154,17 @@ func _on_debug_weather_toggle() -> void:
 	if TimeSystem.get_weather() == TimeSystem.Weather.CLEAR:
 		TimeSystem.force_weather(TimeSystem.Weather.RAIN)
 		_debug_weather_btn.text = "Rain"
+		var player := _find_player_character()
+		if player:
+			var rm := get_tree().current_scene.find_child("RainManager", true, false) as RainManager
+			if rm:
+				rm.add_zone(Vector2(player.global_position.x, player.global_position.z), 80.0, TimeSystem.CYCLE_DURATION)
 	else:
 		TimeSystem.force_weather(TimeSystem.Weather.CLEAR)
 		_debug_weather_btn.text = "Clear"
+		var rm := get_tree().current_scene.find_child("RainManager", true, false) as RainManager
+		if rm:
+			rm.clear_zones()
 
 func _on_teleport_biome(biome_type: String) -> void:
 	var player := _find_player_character()

@@ -22,6 +22,12 @@ func _ready() -> void:
 	env.ambient_light_color  = DAY_AMBIENT
 	env.ambient_light_energy = DAY_AMB_ENERGY
 
+	env.fog_enabled = true
+	env.fog_density = 0.0
+	env.fog_height = 2.0
+	env.fog_height_density = 0.0
+	env.fog_light_color = Color(0.40, 0.42, 0.48)
+
 	_apply_graphics_preset(env)
 
 	environment = env
@@ -120,7 +126,8 @@ func _apply_graphics_preset(env: Environment) -> void:
 			env.ssao_power = 1.5
 			env.ssao_detail = 0.5
 
-	SettingsManager.apply_viewport_settings(get_viewport())
+	if SettingsManager:
+		SettingsManager.apply_viewport_settings(get_viewport())
 
 func _setup_lights() -> void:
 	var omnis := get_parent().find_children("PlayerLight", "OmniLight3D", true, false)
@@ -186,15 +193,23 @@ func _process(delta: float) -> void:
 		raw = 0.5
 	var t: float = clamp(raw * 0.5 + 0.5, 0.3, 1.0)
 
-	environment.background_color = DAY_BG.lerp(NIGHT_BG, 1.0 - t)
-	environment.ambient_light_color = DAY_AMBIENT.lerp(NIGHT_AMBIENT, 1.0 - t)
-	environment.ambient_light_energy = lerp(DAY_AMB_ENERGY, NIGHT_AMB_ENERGY, 1.0 - t)
+	var wi: float = 0.0
+	if TimeSystem:
+		wi = TimeSystem.get_weather_intensity()
+	var rf: float = 1.0 - wi * 0.55
+
+	environment.background_color = DAY_BG.lerp(NIGHT_BG, 1.0 - t).lerp(Color(0.12, 0.14, 0.18), wi * 0.7)
+	environment.ambient_light_color = DAY_AMBIENT.lerp(NIGHT_AMBIENT, 1.0 - t).lerp(Color(0.08, 0.10, 0.14), wi * 0.7)
+	environment.ambient_light_energy = lerp(DAY_AMB_ENERGY, NIGHT_AMB_ENERGY, 1.0 - t) * rf
 
 	for light in _lights:
-		var base_energy: float = 0.6
+		var base_energy: float = 5.0
 		if light is OmniLight3D:
 			base_energy = 1.5
-		light.light_energy = base_energy * t
+		light.light_energy = base_energy * t * rf
+
+	environment.fog_density = wi * 0.012
+	environment.fog_height_density = wi * 0.08
 
 func get_cycle_progress() -> float:
 	if TimeSystem:

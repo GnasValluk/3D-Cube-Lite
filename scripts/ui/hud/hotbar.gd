@@ -182,10 +182,7 @@ func _auto_equip_selected() -> void:
 		return
 	var item: ItemDef = slot.item
 	print("[Hotbar] equipping item: ", item.id, " type=", item.type)
-	if item.type == ItemDef.Type.WEAPON or item.type == ItemDef.Type.TOOL:
-		player.equip_weapon_direct(item)
-	else:
-		player.equip_weapon_direct(null)
+	player.equip_weapon_direct(item)
 
 func _find_player() -> PlayerCharacter:
 	if _player_ref != null:
@@ -253,7 +250,7 @@ func _process(_delta: float) -> void:
 			_slot_icons[i].visible = false
 		else:
 			_slot_faces[i].color = slot.item.icon_color
-			var tex := IconRenderer.get_texture(slot.item.id)
+			var tex := ItemDatabase.load_icon_2d(slot.item.id)
 			if tex:
 				_slot_icons[i].texture = tex
 				_slot_icons[i].visible = true

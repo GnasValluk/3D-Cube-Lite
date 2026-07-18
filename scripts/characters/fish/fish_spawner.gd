@@ -33,7 +33,7 @@ func _ready() -> void:
 	_noise = FastNoiseLite.new()
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	_noise.seed = WorldSeed.seed_value + 1000 + 5555   # khớp n_lake của REAL_WORLD
-	_noise.frequency = 0.010
+	_noise.frequency = 0.025
 
 	await get_tree().process_frame
 	await get_tree().process_frame

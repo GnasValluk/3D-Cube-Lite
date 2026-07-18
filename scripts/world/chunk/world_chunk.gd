@@ -322,7 +322,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 
 						# Kiểm tra warped ocean mask trực tiếp — không cho hồ ở biển
 						var is_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
-						if not is_ocean and lake_val > 0.80 and (od == _Data.CONST_INF or od > 40):
+						if not is_ocean and lake_val > 0.96 and (od == _Data.CONST_INF or od > 40):
 							var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
 							if lake_type_val > 0.50:
 								biome_grid[ivx][ivz] = _Data.TileType.SILT if d <= _Data.PAD else _Data.TileType.MUDDY_SAND
@@ -380,15 +380,15 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var factor: float = _River.river_distance_factor(wx, wz)
 				if factor >= 0.0:
 					var orig_h: float = height_grid[ivx][ivz]
-					# Skip carving in lakes — river just passes through at lake level
-					if orig_h <= _Data.WATER_Y:
-						river_flag[ivx * cols + ivz] = 1
-						continue
 					var bottom_var: float = n_river.get_noise_2d(wx * 0.5, wz * 0.5) * 1.5 * _BlockData.SLAB_HEIGHT
 					var deep_h: float = _Data.WATER_Y - 6.0 * _BlockData.SLAB_HEIGHT + bottom_var
 					var t: float = clamp(factor, 0.0, 1.0)
 					t = t * t * (3.0 - 2.0 * t)
-					height_grid[ivx][ivz] = lerp(deep_h, max(orig_h, _Data.WATER_Y - 0.1), t)
+					if orig_h <= _Data.WATER_Y:
+						# Lake cell: blend river deep_h → lake bed orig_h (xóa thành hồ)
+						height_grid[ivx][ivz] = lerp(deep_h, orig_h, t)
+					else:
+						height_grid[ivx][ivz] = lerp(deep_h, max(orig_h, _Data.WATER_Y - 0.1), t)
 					if t < 0.4:
 						var bed_n: float = (n_river_bed.get_noise_2d(wx * 1.5, wz * 1.5) + 1.0) * 0.5
 						if bed_n < 0.25:
@@ -400,35 +400,26 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					else:
 						biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
 					river_flag[ivx * cols + ivz] = 1
-		# Gentle ramp where river meets lake — blend carved height toward water level
+		# Flatten river banks at lake boundary — xóa thành hồ nơi sông giao
 		var dirs4: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
-		for ramp_pass in range(2):
-			var updated: bool = false
-			for ivx in range(cols):
-				for ivz in range(cols):
-					if river_flag[ivx * cols + ivz] == 0:
+		for ivx in range(cols):
+			for ivz in range(cols):
+				if river_flag[ivx * cols + ivz] == 0:
+					continue
+				if height_grid[ivx][ivz] <= _Data.WATER_Y:
+					continue
+				var adjacent_to_lake: bool = false
+				for d in dirs4:
+					var nx: int = ivx + d.x
+					var nz: int = ivz + d.y
+					if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
 						continue
-					var orig_h: float = orig_heights[ivx][ivz]
-					if orig_h <= _Data.WATER_Y:
-						continue
-					var has_sub: bool = false
-					for d in dirs4:
-						var nx: int = ivx + d.x
-						var nz: int = ivz + d.y
-						if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
-							continue
-						if height_grid[nx][nz] <= _Data.WATER_Y:
-							has_sub = true
-							break
-					if has_sub:
-						var carved: float = height_grid[ivx][ivz]
-						var surf: float = _Data.WATER_Y - 0.1
-						if carved < surf - 0.05:
-							height_grid[ivx][ivz] = lerp(carved, surf, 0.3)
-							biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
-							updated = true
-			if not updated:
-				break
+					if orig_heights[nx][nz] <= _Data.WATER_Y and height_grid[nx][nz] <= _Data.WATER_Y:
+						adjacent_to_lake = true
+						break
+				if adjacent_to_lake:
+					height_grid[ivx][ivz] = _Data.WATER_Y - 0.1
+					biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
 
 	# ── 4. Road grid ──────────────────────────────────────────────────────────
 	var road_grid: PackedByteArray

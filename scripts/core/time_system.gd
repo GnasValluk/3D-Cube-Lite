@@ -28,6 +28,7 @@ var _time_scale: float = 1.0
 var _weather: int = Weather.CLEAR
 var _weather_timer: float = 0.0
 var _weather_intensity: float = 0.0
+var _weather_intensity_target: float = 0.0
 var _weather_check_interval: float = GAME_HOUR
 
 var _month_names: Array[String] = [
@@ -38,6 +39,8 @@ var _month_names: Array[String] = [
 func _ready() -> void:
 	_cycle_time = CYCLE_DURATION * 6.0 / 24.0
 	_weather = Weather.CLEAR
+	_weather_intensity = 0.0
+	_weather_intensity_target = 0.0
 	_weather_timer = _weather_check_interval * randf_range(0.5, 1.5)
 
 func get_hour() -> float:
@@ -107,18 +110,18 @@ func set_hour(target_hour: float) -> void:
 func force_weather(weather: int) -> void:
 	_weather = weather
 	if weather == Weather.RAIN:
-		var duration: float = GAME_HOUR * randf_range(0.5, 2.0)
-		_weather_timer = duration
-		_weather_intensity = randf_range(0.4, 1.0)
+		_weather_timer = CYCLE_DURATION
+		_weather_intensity_target = randf_range(0.4, 1.0)
 	else:
-		_weather_timer = _weather_check_interval * randf_range(0.5, 1.5)
+		_weather_timer = _weather_check_interval * randf_range(0.8, 1.5)
+		_weather_intensity_target = 0.0
 	weather_changed.emit(weather)
 
 func get_cycle_progress() -> float:
 	return _cycle_time / CYCLE_DURATION
 
 func get_weather_intensity() -> float:
-	return _weather_intensity if _weather == Weather.RAIN else 0.0
+	return _weather_intensity
 
 func _try_change_weather() -> void:
 	if _weather == Weather.CLEAR:
@@ -137,6 +140,11 @@ func _process(delta: float) -> void:
 	_weather_timer -= delta * _time_scale
 	if _weather_timer <= 0.0:
 		_try_change_weather()
+
+	var dt := delta * _time_scale
+	_weather_intensity = lerp(_weather_intensity, _weather_intensity_target, dt * 0.5)
+	if abs(_weather_intensity - _weather_intensity_target) < 0.001:
+		_weather_intensity = _weather_intensity_target
 
 	if get_total_days() != prev_day:
 		_emit_time()

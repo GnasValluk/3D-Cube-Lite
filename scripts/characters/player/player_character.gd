@@ -223,22 +223,29 @@ func drop_item(idx: int) -> void:
 		return
 
 	inventory.remove_item(idx, count)
-	var drop_pos: Vector3 = global_position + -global_transform.basis.z * 2.5
+	var drop_pos: Vector3 = global_position + global_transform.basis.z * 2.5
 	drop_pos.y += 0.3
-	var fwd := -global_transform.basis.z
+	var fwd := global_transform.basis.z
 	var vel := (fwd * 2.0 + Vector3(0, 3.0, 0)) * 0.7
 	DroppedItem.spawn(world, item_def, drop_pos, count, vel, drop_pos.y)
 	_scroll_inventory_message(tr("DROP_MSG").format({"s": item_def.name, "n": count}))
 
 func _update_weapon_mesh() -> void:
-	print("[WM] _update_weapon_mesh mesh=", _mesh != null)
 	if _mesh == null or _mesh.weapon_pivot == null:
-		print("[WM] SKIP: mesh=", _mesh != null, " pivot=", _mesh != null and _mesh.weapon_pivot != null)
 		return
+	var pivot: Node3D = _mesh.weapon_pivot
+	for ch in pivot.get_children():
+		ch.queue_free()
 	var item_id: String = equipped_weapon.id if equipped_weapon != null else ""
-	print("[WM] building '", item_id, "' in_tree=", _mesh.weapon_pivot.is_inside_tree())
-	ToolsMesh.build_held(_mesh.weapon_pivot, item_id)
-	print("[WM] done, child_count=", _mesh.weapon_pivot.get_child_count())
+	if item_id.is_empty():
+		return
+	if item_id in ["cup", "xeng", "riu", "kiem", "can_cau"]:
+		ToolsMesh.build_held(pivot, item_id)
+	else:
+		var held_scale := Node3D.new()
+		held_scale.scale = Vector3(6.0, 6.0, 6.0)
+		pivot.add_child(held_scale)
+		ItemMesh.build(held_scale, item_id)
 
 ## Cầm weapon trực tiếp từ hotbar (không remove khỏi inventory)
 func equip_weapon_direct(item: ItemDef) -> void:

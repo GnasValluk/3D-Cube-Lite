@@ -52,8 +52,8 @@ static func _make_curve_hash(a: Vector2, b: Vector2, h: int) -> PackedVector2Arr
 	var t1: float = 0.15 + float(hh & 0x7F) / 256.0 * 0.35
 	hh = hh * 16807 + 1
 	var t2: float = 0.15 + float(hh & 0x7F) / 256.0 * 0.35
-	var p1: Vector2 = a + dir * dist * t1 + perp * (r1 * 2.0 * dist * 0.65)
-	var p2: Vector2 = b - dir * dist * t2 + perp * (r2 * 2.0 * dist * 0.65)
+	var p1: Vector2 = a + dir * dist * t1 + perp * (r1 * 2.0 * dist * 0.85)
+	var p2: Vector2 = b - dir * dist * t2 + perp * (r2 * 2.0 * dist * 0.85)
 	var steps: int = maxi(16, int(dist / 3.0))
 	var wp: PackedVector2Array = PackedVector2Array()
 	wp.resize(steps + 1)
@@ -65,7 +65,7 @@ static func _make_curve_hash(a: Vector2, b: Vector2, h: int) -> PackedVector2Arr
 		var nx: float = noise.get_noise_2d(base.x * 0.08, base.y * 0.08)
 		var nz: float = noise.get_noise_2d(base.x * 0.08 + 100.0, base.y * 0.08 + 100.0)
 		var off: float = t * (1.0 - t) * 4.0
-		wp[i] = base + perp * (nx * 8.0 * off) + dir * (nz * 4.0 * off)
+		wp[i] = base + perp * (nx * 14.0 * off) + dir * (nz * 7.0 * off)
 	return wp
 	return wp
 
@@ -111,7 +111,7 @@ static func _ensure_rivers() -> void:
 			h = h * 16807 + 1; var r1: float = float(h & 0x7FFFFFFF) / 2147483648.0
 			h = h * 16807 + 1; var r2: float = float(h & 0x7FFFFFFF) / 2147483648.0
 			h = h * 16807 + 1; var r3: float = float(h & 0x7FFFFFFF) / 2147483648.0
-			var has: Array = [r0 < 0.35, r1 < 0.35, r2 < 0.12, r3 < 0.12]
+			var has: Array = [r0 < 0.16, r1 < 0.16, r2 < 0.05, r3 < 0.05]
 			var cnt: int = 0
 			for v in has:
 				if v: cnt += 1
