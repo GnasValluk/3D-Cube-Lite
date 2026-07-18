@@ -6,6 +6,7 @@ const _Noise = preload("chunk_noise.gd")
 const _Road  = preload("chunk_road.gd")
 const _River = preload("chunk_river.gd")
 const _Detail = preload("chunk_detail.gd")
+const _Grass = preload("chunk_grass.gd")
 const _Aquatic = preload("chunk_aquatic.gd")
 const _BlockData = preload("chunk_block_data.gd")
 const _WoodLamp = preload("res://scripts/world/props/wood_lamp.gd")
@@ -39,6 +40,20 @@ var _prop_queue: Array = []
 
 static var _mesh_cache: Dictionary = {}
 static var _pending_chunks: Dictionary = {}
+static var _river_noise: FastNoiseLite = null
+static var _river_bed_noise: FastNoiseLite = null
+
+static func _ensure_river_noise() -> void:
+	if _river_noise == null:
+		_river_noise = FastNoiseLite.new()
+		_river_noise.seed = WorldSeed.seed_value + 9999
+		_river_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+		_river_noise.frequency = 0.06
+	if _river_bed_noise == null:
+		_river_bed_noise = FastNoiseLite.new()
+		_river_bed_noise.seed = WorldSeed.seed_value + 10101
+		_river_bed_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+		_river_bed_noise.frequency = 0.04
 
 static func _noise_for_dim(dim_id: int) -> Dictionary:
 	return _Noise._noise_for_dim(dim_id)
@@ -46,6 +61,8 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 static func clear_noise_cache() -> void:
 	_Noise.clear_cache()
 	_mesh_cache.clear()
+	_river_noise = null
+	_river_bed_noise = null
 
 static func _is_on_road(wx: float, wz: float) -> bool:
 	return _Road.is_on_road(wx, wz)
@@ -154,21 +171,29 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 		var n_biome: FastNoiseLite     = nd["biome"]
 		var n_ocean_pre: FastNoiseLite = nd["ocean"]
 
-		# ── Ocean mask (BFS padded) — bờ biển bất quy tắc nhờ domain warping ──
+		# ── Ocean mask (BFS padded) — stride 2, ~75% fewer noise calls ─────────
 		const OCEAN_PAD: int = 26
 		var oct_total: int = cols + 2 * OCEAN_PAD
 		var oct: Array[Array] = []
 		oct.resize(oct_total)
-		var ow: FastNoiseLite = nd["ocean_warp"]
 		for pvx in range(oct_total):
 			oct[pvx] = []; oct[pvx].resize(oct_total)
-			for pvz in range(oct_total):
+		var ow: FastNoiseLite = nd["ocean_warp"]
+		for pvx in range(0, oct_total, 2):
+			for pvz in range(0, oct_total, 2):
 				var wx: float = world_ox - half + (float(pvx - OCEAN_PAD) + 0.5) * _Data.VOXEL
 				var wz: float = world_oz - half + (float(pvz - OCEAN_PAD) + 0.5) * _Data.VOXEL
-				# Domain warping: bẻ cong tọa độ bằng noise → bờ biển lồi lõm
 				var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
 				var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
 				oct[pvx][pvz] = (n_ocean_pre.get_noise_2d(wx + warp_x, wz + warp_z) + 1.0) * 0.5 > _Data.OCEAN_THRESHOLD
+		# Fill odd indices by copying nearest computed neighbor
+		for pvx in range(0, oct_total, 2):
+			for pvz in range(0, oct_total, 2):
+				var val: bool = oct[pvx][pvz]
+				if pvx + 1 < oct_total: oct[pvx + 1][pvz] = val
+				if pvz + 1 < oct_total: oct[pvx][pvz + 1] = val
+				if pvx + 1 < oct_total and pvz + 1 < oct_total:
+					oct[pvx + 1][pvz + 1] = val
 
 		var oct_small: Array[Array] = []
 		oct_small.resize(total)
@@ -352,18 +377,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					height_grid[ivx][ivz] = _Data.WATER_Y - min(d, _Data.PAD) * _Data.VOXEL
 
 	# ── 3b. River override ────────────────────────────────────────────────────
+	var river_flag: PackedByteArray = PackedByteArray()
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		var n_river := FastNoiseLite.new()
-		n_river.seed = WorldSeed.seed_value + 9999
-		n_river.noise_type = FastNoiseLite.TYPE_PERLIN
-		n_river.frequency = 0.06
-		var n_river_bed := FastNoiseLite.new()
-		n_river_bed.seed = WorldSeed.seed_value + 10101
-		n_river_bed.noise_type = FastNoiseLite.TYPE_PERLIN
-		n_river_bed.frequency = 0.04
-		var river_flag: PackedByteArray = PackedByteArray()
+		_ensure_river_noise()
 		river_flag.resize(cols * cols)
-		# Save original heights for transition blending
 		var orig_heights: Array[Array] = []
 		orig_heights.resize(cols)
 		for ivx in range(cols):
@@ -380,17 +397,16 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var factor: float = _River.river_distance_factor(wx, wz)
 				if factor >= 0.0:
 					var orig_h: float = height_grid[ivx][ivz]
-					var bottom_var: float = n_river.get_noise_2d(wx * 0.5, wz * 0.5) * 1.5 * _BlockData.SLAB_HEIGHT
+					var bottom_var: float = _river_noise.get_noise_2d(wx * 0.5, wz * 0.5) * 1.5 * _BlockData.SLAB_HEIGHT
 					var deep_h: float = _Data.WATER_Y - 6.0 * _BlockData.SLAB_HEIGHT + bottom_var
 					var t: float = clamp(factor, 0.0, 1.0)
 					t = t * t * (3.0 - 2.0 * t)
 					if orig_h <= _Data.WATER_Y:
-						# Lake cell: blend river deep_h → lake bed orig_h (xóa thành hồ)
 						height_grid[ivx][ivz] = lerp(deep_h, orig_h, t)
 					else:
 						height_grid[ivx][ivz] = lerp(deep_h, max(orig_h, _Data.WATER_Y - 0.1), t)
 					if t < 0.4:
-						var bed_n: float = (n_river_bed.get_noise_2d(wx * 1.5, wz * 1.5) + 1.0) * 0.5
+						var bed_n: float = (_river_bed_noise.get_noise_2d(wx * 1.5, wz * 1.5) + 1.0) * 0.5
 						if bed_n < 0.25:
 							biome_grid[ivx][ivz] = _Data.TileType.SAND
 						elif bed_n < 0.55:
@@ -400,7 +416,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					else:
 						biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
 					river_flag[ivx * cols + ivz] = 1
-		# Flatten river banks at lake boundary — xóa thành hồ nơi sông giao
+		# Flatten river banks at lake boundary
 		var dirs4: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
 		for ivx in range(cols):
 			for ivz in range(cols):
@@ -431,11 +447,11 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				if bg == _Data.TileType.OCEAN_DEEP:
 					road_grid[ivx * cols + ivz] = 0
 					continue
-				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-				if _River.is_on_river(wx, wz):
+				if river_flag[ivx * cols + ivz] == 1:
 					road_grid[ivx * cols + ivz] = 0
 				else:
+					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
 					road_grid[ivx * cols + ivz] = 1 if _Road.is_on_road(wx, wz) else 0
 
 	# ── 5. Tạo ChunkBlockData từ biome + height ────────────────────────────────
@@ -449,7 +465,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 	_build_terrain_mesh(st, bd, cols, dim_id)
 
 	# ── 6b. Detail mesh — đường mòn, sỏi cát, hoạ tiết đất ──────────────────
+	var st_grass: SurfaceTool = null
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		st_grass = SurfaceTool.new()
+		st_grass.begin(Mesh.PRIMITIVE_TRIANGLES)
 		for vx in range(cols):
 			for vz in range(cols):
 				var b: int  = biome_grid[vx][vz]
@@ -468,7 +487,11 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 
 				if b == _Data.TileType.DIRT:
 					_Detail.add_dirt_mounds(st, cx, cz, size, vx, vz, pos, 0.0)
+
+				if (b == _Data.TileType.GRASS or b == _Data.TileType.DARK_GRASS) and not is_road and h >= _Data.VOXEL * 0.9:
+					_Grass.add_grass_cluster(st_grass, cx, cz, size, vx, vz, pos, 0.0)
 	var mesh := st.commit()
+	var grass_mesh: ArrayMesh = st_grass.commit() if st_grass else null
 	if mesh == null:
 		return { "mesh": null, "water_mesh": null, "biome_grid": biome_grid,
 				"cols": cols, "block_data_bytes": bd.to_bytes() }
@@ -541,9 +564,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var px2: float = -half + (float(vx) + 0.5) * _Data.VOXEL
 				var pz2: float = -half + (float(vz) + 0.5) * _Data.VOXEL
 				var pos2 := Vector3(px2, h, pz2)
-				var wwx: float = world_ox - half + (float(vx) + 0.5) * _Data.VOXEL
-				var wwz: float = world_oz - half + (float(vz) + 0.5) * _Data.VOXEL
-				var is_river: bool = _River.is_on_river(wwx, wwz)
+				var is_river: bool = river_flag[vx * cols + vz] == 1
 				_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
 					b == _Data.TileType.SILT, b, lotus_lights, plant_props, is_river)
 		mesh_aquatic = st_aq.commit()
@@ -555,6 +576,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 
 	return {
 		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
+		"grass_mesh": grass_mesh,
 		"lotus_lights": lotus_lights, "biome_grid": biome_grid, "cols": cols,
 		"block_data_bytes": bd.to_bytes(), "lamp_positions": lamp_positions,
 		"sediment_mesh": _build_sediment_mesh(bd, cols),
@@ -1030,6 +1052,19 @@ func apply_chunk(data: Dictionary) -> void:
 		mi_s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		container.add_child(mi_s)
 		_sediment_mesh_instance = mi_s
+
+	var grass_mesh: ArrayMesh = data.get("grass_mesh")
+	if grass_mesh:
+		var mi_g := MeshInstance3D.new()
+		mi_g.mesh = grass_mesh
+		if not _mat_cache[_dimension_id].has("grass"):
+			var gmat := StandardMaterial3D.new()
+			gmat.vertex_color_use_as_albedo = true
+			gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_mat_cache[_dimension_id]["grass"] = gmat
+		mi_g.material_override = _mat_cache[_dimension_id]["grass"]
+		mi_g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		container.add_child(mi_g)
 
 	var lotus_positions: Array[Vector3] = data.get("lotus_lights", [] as Array[Vector3])
 	for lpos in lotus_positions:

@@ -128,9 +128,9 @@ func _setup_clouds() -> void:
 	_clouds.name = "RainClouds"
 	_clouds.local_coords = false
 	_clouds.one_shot = false
-	_clouds.emitting = false
+	_clouds.emitting = true
 	_clouds.amount = 8
-	_clouds.lifetime = 25.0
+	_clouds.lifetime = 60.0
 	_clouds.fixed_fps = 0
 	_clouds.interpolate = false
 
@@ -142,7 +142,7 @@ func _setup_clouds() -> void:
 	_cloud_pm.initial_velocity_max = 0.4
 	_cloud_pm.scale_min = 8.0
 	_cloud_pm.scale_max = 18.0
-	_cloud_pm.color = Color(0.92, 0.92, 0.95, 0.75)
+	_cloud_pm.color = Color(0.35, 0.35, 0.40, 0.75)
 	_cloud_pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
 	_cloud_pm.emission_box_extents = Vector3(42, 0.4, 42)
 	_cloud_pm.angle_min = 0.0
@@ -150,7 +150,7 @@ func _setup_clouds() -> void:
 	_clouds.process_material = _cloud_pm
 
 	_cloud_mat = StandardMaterial3D.new()
-	_cloud_mat.albedo_color = Color(0.90, 0.90, 0.93, 0.75)
+	_cloud_mat.albedo_color = Color(0.35, 0.35, 0.40, 0.75)
 	_cloud_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_cloud_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_cloud_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -273,10 +273,3 @@ func _process(delta: float) -> void:
 	if _cloud_pm:
 		var c2: Color = _cloud_pm.color
 		_cloud_pm.color = Color(c2.r, c2.g, c2.b, _cloud_alpha)
-
-	if _cloud_alpha < 0.01 and _clouds.emitting:
-		_clouds.emitting = false
-		_clouds.visible = false
-	elif _cloud_alpha >= 0.01 and not _clouds.emitting:
-		_clouds.emitting = true
-		_clouds.visible = true
