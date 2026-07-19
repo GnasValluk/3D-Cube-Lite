@@ -1,6 +1,6 @@
 extends RefCounted
 
-enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE, MUDDY_SAND }
+enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE, MUDDY_SAND, DESERT }
 
 ## ── Block IDs cho hệ thống voxel Minecraft-style ────────────────────────────
 ## 0 = AIR luôn luôn, giá trị khớp với TileType để map dễ dàng

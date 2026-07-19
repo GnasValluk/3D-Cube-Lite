@@ -168,6 +168,15 @@ func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 	var threshold: float = 0.40
 	var is_dark: bool = n >= threshold
 
+	# Sa mạc
+	var n_desert: FastNoiseLite = nd.get("desert") as FastNoiseLite
+	if n_desert:
+		var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
+		if dv > 0.55:
+			if _is_river(wx, wz):
+				return Color(0.08, 0.38, 0.72, 0.70)
+			return Color(0.92, 0.78, 0.32)
+
 	# Sông
 	if _is_river(wx, wz):
 		return Color(0.08, 0.38, 0.72, 0.70)

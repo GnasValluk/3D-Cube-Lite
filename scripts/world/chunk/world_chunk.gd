@@ -129,7 +129,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 			row[vz] = 0 if bio[vx][vz] == _Data.TileType.DARK_GRASS else _Data.CONST_INF
 	for vx in range(total):
 		for vz in range(total):
-			if bio[vx][vz] != _Data.TileType.GRASS: continue
+			if bio[vx][vz] != _Data.TileType.GRASS and bio[vx][vz] != _Data.TileType.DESERT: continue
 			if (vx > 0 and bio[vx-1][vz] == _Data.TileType.DARK_GRASS) \
 			or (vx < total-1 and bio[vx+1][vz] == _Data.TileType.DARK_GRASS) \
 			or (vz > 0 and bio[vx][vz-1] == _Data.TileType.DARK_GRASS) \
@@ -345,15 +345,21 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 						var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
 						var d: int = dst[pvx][pvz]
 
-						# Kiểm tra warped ocean mask trực tiếp — không cho hồ ở biển
 						var is_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
-						if not is_ocean and lake_val > 0.96 and (od == _Data.CONST_INF or od > 40):
+						var lake_t: float = 0.60 if base_bio == _Data.TileType.DESERT else 0.96
+						if not is_ocean and lake_val > lake_t and (od == _Data.CONST_INF or od > 40):
 							var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
 							if lake_type_val > 0.50:
 								biome_grid[ivx][ivz] = _Data.TileType.SILT if d <= _Data.PAD else _Data.TileType.MUDDY_SAND
 							else:
 								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND if d <= _Data.PAD else _Data.TileType.SAND
-							height_grid[ivx][ivz] = _Data.WATER_Y if d <= 1 else _Data.WATER_Y - min(d, _Data.PAD) * _BlockData.SLAB_HEIGHT
+							if base_bio == _Data.TileType.DESERT:
+								height_grid[ivx][ivz] = _Data.WATER_Y
+							else:
+								height_grid[ivx][ivz] = _Data.WATER_Y if d <= 1 else _Data.WATER_Y - min(d, _Data.PAD) * _BlockData.SLAB_HEIGHT
+						elif base_bio == _Data.TileType.DESERT:
+							biome_grid[ivx][ivz] = _Data.TileType.DESERT
+							height_grid[ivx][ivz] = _Data.VOXEL
 						else:
 							biome_grid[ivx][ivz] = _Data.TileType.SAND
 							if d <= 1:
@@ -522,6 +528,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 					break
 				vz += 1
 			var count: int = vz - start_vz
+			# Skip nếu không có nước (vd: hồ chết sa mạc)
+			var has_water := false
+			for cz2 in range(start_vz, vz):
+				if height_grid[vx][cz2] < _Data.WATER_Y:
+					has_water = true
+					break
+			if not has_water:
+				continue
 			var px: float = -half + (float(vx) + 0.5) * _Data.VOXEL
 			var z_mid: float = -half + float(start_vz * 2 + count) * h_vox
 			_add_quad(st_water, Vector3(px, _Data.WATER_Y - 0.04, z_mid),
@@ -560,7 +574,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				var h: float = height_grid[vx][vz]
 				# Chỉ SAND/SILT dưới mặt nước — biển (OCEAN_DEEP) không có rong
 				if b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND: continue
-				if h >= _Data.WATER_Y + h_vox: continue
+				if h >= _Data.WATER_Y: continue
 				var px2: float = -half + (float(vx) + 0.5) * _Data.VOXEL
 				var pz2: float = -half + (float(vz) + 0.5) * _Data.VOXEL
 				var pos2 := Vector3(px2, h, pz2)
@@ -719,6 +733,7 @@ static func _fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 				_Data.TileType.SAND:       top_block = B.SAND
 				_Data.TileType.SAND_WHITE: top_block = B.OCEAN_SAND
 				_Data.TileType.DIRT:       top_block = B.DIRT
+				_Data.TileType.DESERT:     top_block = B.SAND
 				_Data.TileType.SILT:       top_block = B.SILT
 				_Data.TileType.MUDDY_SAND: top_block = B.MUDDY_SAND
 				_Data.TileType.OCEAN_DEEP:

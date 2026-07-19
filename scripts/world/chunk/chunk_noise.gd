@@ -121,11 +121,21 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_reef.fractal_lacunarity = 2.0
 	n_reef.fractal_gain = 0.5
 
+	# ── n_desert: sa mạc cấp lục địa — tần số cực thấp (ngang ocean) ─────────
+	var n_desert := FastNoiseLite.new()
+	n_desert.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_desert.seed = base_seed + 99999
+	n_desert.frequency = 0.0003
+	n_desert.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_desert.fractal_octaves = 3
+	n_desert.fractal_lacunarity = 2.0
+	n_desert.fractal_gain = 0.5
+
 	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
 		"lake_type": n_lake_type, "continent": n_continent, "ocean": n_ocean,
 		"sea_rough": n_sea_rough, "sea_large": n_sea_large, "sea_biome": n_sea_biome,
 		"ocean_warp": n_ocean_warp, "sea_mountain": n_sea_mountain,
-		"reef": n_reef }
+		"reef": n_reef, "desert": n_desert }
 	_noise_cache[dim_id] = result
 	return result
 
@@ -137,6 +147,11 @@ static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 	var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0
 	var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0
 	var n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
+
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5
+		if d > 0.55:
+			return _Data.TileType.DESERT
 
 	var threshold: float = 0.50
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:

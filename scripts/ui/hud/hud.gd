@@ -1132,6 +1132,15 @@ func _setup_debug_menu() -> void:
 	tp_ocean_btn.pressed.connect(_on_teleport_biome.bind("ocean"))
 	_debug_panel.add_child(tp_ocean_btn)
 
+	y += 26
+	var tp_desert_btn := Button.new()
+	tp_desert_btn.position = Vector2(12, y - 2)
+	tp_desert_btn.size = Vector2(155, 26)
+	tp_desert_btn.add_theme_font_size_override("font_size", 13)
+	tp_desert_btn.text = "🏜️ Sa Mạc"
+	tp_desert_btn.pressed.connect(_on_teleport_biome.bind("desert"))
+	_debug_panel.add_child(tp_desert_btn)
+
 	add_child(_debug_panel)
 
 func _toggle_debug() -> void:
@@ -1213,11 +1222,20 @@ func _on_teleport_biome(biome_type: String) -> void:
 						# GRASS + ocean noise cao — đây mới thực sự là biển
 						if bio_n < 0.40 and ov > 0.55:
 							found = Vector2(wx, wz); found_ok = true; break
+				"desert":
+					var n_desert: FastNoiseLite = nd.get("desert")
+					var n_ocean: FastNoiseLite = nd.get("ocean")
+					if n_desert and n_ocean:
+						var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
+						var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
+						if dv > 0.55 and ov <= 0.50:
+							found = Vector2(wx, wz); found_ok = true; break
 		r += STEP
 
 	if found_ok:
+		var biome_name: String = "Đồng Bằng" if biome_type == "plains" else ("Biển Khơi" if biome_type == "ocean" else "Sa Mạc")
 		player.global_position = Vector3(found.x, 5.0, found.y)
-		player._scroll_inventory_message("Teleport → " + ("Đồng Bằng" if biome_type == "plains" else "Biển Khơi"))
+		player._scroll_inventory_message("Teleport → " + biome_name)
 	else:
 		player._scroll_inventory_message("Không tìm thấy " + biome_type + " trong bán kính 6km!")
 
@@ -1238,6 +1256,18 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 	var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0 if n_warp else 0.0
 	var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0 if n_warp else 0.0
 	var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
+
+	# Check sa mạc trước (ghi đè grassland)
+	var n_desert: FastNoiseLite = nd.get("desert")
+	if n_desert:
+		var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
+		if dv > 0.55:
+			var n_ocean: FastNoiseLite = nd.get("ocean")
+			if n_ocean:
+				var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
+				if ov > 0.50:
+					return "🌊 Biển"
+				return "🏜️ Sa Mạc"
 
 	# DARK_GRASS (threshold = 0.40) → đồi, không thể là biển/hồ
 	if bio_n >= 0.40:
