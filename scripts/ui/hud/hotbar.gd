@@ -1,6 +1,24 @@
 class_name Hotbar
 extends Control
 
+const S: float = 1.6
+const SS: float = 1.4
+
+const BG_DEEP := Color(0.06, 0.04, 0.12)
+const BG_PANEL := Color(0.10, 0.07, 0.18)
+const BG_CARD := Color(0.14, 0.10, 0.22)
+const PURPLE := Color(0.55, 0.35, 0.90)
+const TEAL := Color(0.15, 0.72, 0.68)
+const PINK := Color(0.82, 0.28, 0.52)
+const ORANGE := Color(0.92, 0.52, 0.12)
+const CYAN := Color(0.15, 0.62, 0.92)
+const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
+const TEXT_MAIN := Color(0.82, 0.78, 0.95)
+const TEXT_DIM := Color(0.55, 0.50, 0.72)
+const TEXT_MUTED := Color(0.35, 0.32, 0.50)
+
+signal slot_changed(idx: int)
+
 var _inventory: Inventory = null
 var _player_ref: PlayerCharacter = null   # direct reference, không cần find
 var _selected: int = 0
@@ -17,8 +35,8 @@ var _slot_hl_style: StyleBoxFlat
 var _slot_sel_style: StyleBoxFlat
 
 func _ready() -> void:
-	var ss: float = 44.0
-	var gap: float = 4.0
+	var ss: float = 62.0
+	var gap: float = 6.0
 	var tw: float = ss * 9 + gap * 8
 
 	anchor_left = 0.5
@@ -28,10 +46,10 @@ func _ready() -> void:
 	offset_left = -tw * 0.5
 	offset_top = -(ss + 22)
 	offset_right = tw * 0.5
-	offset_bottom = -14
+	offset_bottom = -20
 
 	_slot_style = StyleBoxFlat.new()
-	_slot_style.bg_color = Color(0.08, 0.08, 0.14, 0.70)
+	_slot_style.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.70)
 	_slot_style.corner_radius_top_left = 4
 	_slot_style.corner_radius_top_right = 4
 	_slot_style.corner_radius_bottom_left = 4
@@ -40,14 +58,14 @@ func _ready() -> void:
 	_slot_style.border_width_right = 1
 	_slot_style.border_width_top = 1
 	_slot_style.border_width_bottom = 1
-	_slot_style.border_color = Color(1, 1, 1, 0.10)
+	_slot_style.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.10)
 
 	_slot_hl_style = _slot_style.duplicate()
-	_slot_hl_style.bg_color = Color(0.08, 0.08, 0.14, 0.70)
+	_slot_hl_style.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.70)
 
 	_slot_sel_style = _slot_style.duplicate()
-	_slot_sel_style.bg_color = Color(0.15, 0.18, 0.30, 0.75)
-	_slot_sel_style.border_color = Color(0.40, 0.55, 0.90, 0.45)
+	_slot_sel_style.bg_color = Color(0.22, 0.18, 0.35, 0.75)
+	_slot_sel_style.border_color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.45)
 
 	for i in range(9):
 		var panel := Panel.new()
@@ -61,24 +79,24 @@ func _ready() -> void:
 		add_child(panel)
 
 		var face := ColorRect.new()
-		face.position = Vector2(2, 2)
+		face.position = Vector2(3, 3)
 		face.size = Vector2(ss - 4, ss - 4)
-		face.color = Color(0.15, 0.15, 0.22, 0.4)
+		face.color = Color(0.20, 0.15, 0.30, 0.4)
 		panel.add_child(face)
 		_slot_faces.append(face)
 
 		var lbl := Label.new()
-		lbl.position = Vector2(2, 2)
+		lbl.position = Vector2(3, 3)
 		lbl.size = Vector2(ss - 4, ss - 4)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		lbl.add_theme_font_size_override("font_size", 16)
-		lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+		lbl.add_theme_font_size_override("font_size", 26)
+		lbl.add_theme_color_override("font_color", TEXT_BRIGHT)
 		panel.add_child(lbl)
 		_slot_labels.append(lbl)
 
 		var icon_tex := TextureRect.new()
-		icon_tex.position = Vector2(2, 2)
+		icon_tex.position = Vector2(3, 3)
 		icon_tex.size = Vector2(ss - 4, ss - 4)
 		icon_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -87,36 +105,36 @@ func _ready() -> void:
 		_slot_icons.append(icon_tex)
 
 		var cnt := Label.new()
-		cnt.position = Vector2(2, ss - 16)
-		cnt.size = Vector2(ss - 4, 14)
+		cnt.position = Vector2(3, ss - 24)
+		cnt.size = Vector2(ss - 4, 20)
 		cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		cnt.add_theme_font_size_override("font_size", 10)
-		cnt.add_theme_color_override("font_color", Color(1, 1, 1, 0.70))
+		cnt.add_theme_font_size_override("font_size", 16)
+		cnt.add_theme_color_override("font_color", TEXT_DIM)
 		panel.add_child(cnt)
 		_slot_count_labels.append(cnt)
 
 		var key_lbl := Label.new()
-		key_lbl.position = Vector2(2, 0)
-		key_lbl.size = Vector2(14, 14)
-		key_lbl.add_theme_font_size_override("font_size", 10)
-		key_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.35))
+		key_lbl.position = Vector2(3, 0)
+		key_lbl.size = Vector2(20, 20)
+		key_lbl.add_theme_font_size_override("font_size", 16)
+		key_lbl.add_theme_color_override("font_color", TEXT_MUTED)
 		key_lbl.text = str(i + 1)
 		panel.add_child(key_lbl)
 
 		_slots.append(panel)
 
 	_tooltip_bg = ColorRect.new()
-	_tooltip_bg.color = Color(0.06, 0.06, 0.12, 0.92)
-	_tooltip_bg.position = Vector2(0, -36)
-	_tooltip_bg.size = Vector2(120, 28)
+	_tooltip_bg.color = Color(0.08, 0.05, 0.16, 0.92)
+	_tooltip_bg.position = Vector2(0, -50)
+	_tooltip_bg.size = Vector2(170, 40)
 	_tooltip_bg.visible = false
 	add_child(_tooltip_bg)
 
 	_tooltip = Label.new()
-	_tooltip.position = Vector2(4, -34)
-	_tooltip.size = Vector2(116, 24)
-	_tooltip.add_theme_font_size_override("font_size", 11)
-	_tooltip.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	_tooltip.position = Vector2(6, -48)
+	_tooltip.size = Vector2(162, 34)
+	_tooltip.add_theme_font_size_override("font_size", 18)
+	_tooltip.add_theme_color_override("font_color", TEXT_BRIGHT)
 	_tooltip.visible = false
 	add_child(_tooltip)
 
@@ -141,7 +159,7 @@ func _on_slot_mouse_entered(idx: int) -> void:
 		_tooltip_bg.visible = false
 		return
 	_tooltip.text = slot.item.name
-	_tooltip_bg.size.x = max(120, _tooltip.get_minimum_size().x + 8)
+	_tooltip_bg.size.x = max(170, _tooltip.get_minimum_size().x + 8)
 	_tooltip_bg.visible = true
 	_tooltip.visible = true
 
@@ -228,6 +246,7 @@ func _select(idx: int) -> void:
 	_update_highlight()
 	# Auto-equip: khi chọn slot có weapon/tool → tự cầm; slot trống/khác → bỏ
 	_auto_equip_selected()
+	slot_changed.emit(idx)
 
 func _update_highlight() -> void:
 	for i in range(_slots.size()):
@@ -243,7 +262,7 @@ func _process(_delta: float) -> void:
 	for i in range(9):
 		var slot: ItemSlot = _inventory.slots[i]
 		if slot.is_empty():
-			_slot_faces[i].color = Color(0.15, 0.15, 0.22, 0.4)
+			_slot_faces[i].color = Color(0.20, 0.15, 0.30, 0.4)
 			_slot_labels[i].text = ""
 			_slot_count_labels[i].text = ""
 			_slot_icons[i].texture = null

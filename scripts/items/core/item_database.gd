@@ -18,7 +18,10 @@ static func create_item_db() -> Dictionary:
 	_add(db, "riu",   "Rìu",   ItemDef.Type.TOOL,   Color(0.50, 0.45, 0.40), "🪓", "Chặt cây, phá gỗ",                false, 1, 0, 14, 0)
 
 	# ── Vũ khí ─────────────────────────────────────────────────────────────────
-	_add(db, "kiem",  "Kiếm",  ItemDef.Type.WEAPON, Color(0.75, 0.80, 0.90), "⚔",  "Tấn công nhanh, sát thương cao",  false, 1, 0, 10, 0)
+	_add(db, "kiem",    "Kiếm",       ItemDef.Type.WEAPON, Color(0.75, 0.80, 0.90), "⚔", "Tấn công nhanh, sát thương cao",  false, 1, 0, 10, 0)
+	_add(db, "dai_kiem","Đại Kiếm",   ItemDef.Type.WEAPON, Color(0.40, 0.45, 0.60), "🗡", "Chém mạnh một nhát, sát thương cực cao", false, 1, 0, 16, 0)
+	_add(db, "gang_tay_da_thu","Găng Tay Da Thú", ItemDef.Type.WEAPON, Color(0.55, 0.32, 0.14), "🥊", "Đấm nhanh liên hoàn, sát thương thấp", false, 1, 0, 7, 0)
+	_add(db, "no",          "Nỏ",          ItemDef.Type.WEAPON, Color(0.55, 0.35, 0.18), "🏹", "Nỏ — bắn tên từ xa, giữ chuột để nạp và tăng sát thương", false, 1, 0, 8, 0)
 
 	# ── Câu cá ────────────────────────────────────────────────────────────────
 	_add(db, "can_cau", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0)
@@ -134,6 +137,24 @@ static func create_item_db() -> Dictionary:
 	_add(db, "tiger_skin", "Tiger Skin", ItemDef.Type.MATERIAL, Color(0.75, 0.50, 0.20), "RM", "Crafting material", true, 64)
 	_add(db, "twilight_essence", "Twilight Essence", ItemDef.Type.MATERIAL, Color(0.55, 0.35, 0.75), "RM", "Crafting material", true, 64)
 	_add(db, "twilight_powder", "Twilight Powder", ItemDef.Type.MATERIAL, Color(0.35, 0.20, 0.45), "RM", "Crafting material", true, 64)
+	_add(db, "mui_ten", "Mũi Tên", ItemDef.Type.MATERIAL, Color(0.60, 0.50, 0.35), "🪶", "Đạn cho nỏ — tiêu hao khi bắn", true, 64)
+
+	# ── Khối (đào từ thế giới) ─────────────────────────────────────────────────
+	_add(db, "block_grass",       "Cỏ",        ItemDef.Type.BLOCK, Color(0.22, 0.58, 0.14), "🧱", "Khối cỏ",           true, 64)
+	_add(db, "block_dark_grass",  "Cỏ Tối",    ItemDef.Type.BLOCK, Color(0.14, 0.40, 0.08), "🧱", "Khối cỏ tối",       true, 64)
+	_add(db, "block_sand",        "Cát",       ItemDef.Type.BLOCK, Color(0.92, 0.78, 0.32), "🧱", "Khối cát",          true, 64)
+	_add(db, "block_dirt",        "Đất",       ItemDef.Type.BLOCK, Color(0.42, 0.22, 0.08), "🧱", "Khối đất",          true, 64)
+	_add(db, "block_silt",        "Phù Sa",    ItemDef.Type.BLOCK, Color(0.16, 0.15, 0.13), "🧱", "Khối phù sa",       true, 64)
+	_add(db, "block_stone",       "Đá",        ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Khối đá",           true, 64)
+	_add(db, "block_dark_dirt",   "Đất Tối",   ItemDef.Type.BLOCK, Color(0.28, 0.16, 0.06), "🧱", "Khối đất tối",      true, 64)
+	_add(db, "block_sand_deep",   "Cát Sâu",   ItemDef.Type.BLOCK, Color(0.80, 0.66, 0.28), "🧱", "Khối cát sâu",      true, 64)
+	_add(db, "block_trail",       "Đường Mòn", ItemDef.Type.BLOCK, Color(0.76, 0.58, 0.22), "🧱", "Khối đường mòn",    true, 64)
+	_add(db, "block_ocean_floor", "Đáy Biển",  ItemDef.Type.BLOCK, Color(0.22, 0.28, 0.32), "🧱", "Khối đáy biển",     true, 64)
+	_add(db, "block_ocean_sand",  "Cát Biển",  ItemDef.Type.BLOCK, Color(0.86, 0.78, 0.52), "🧱", "Khối cát biển",     true, 64)
+	_add(db, "block_muddy_sand",  "Cát Bùn",   ItemDef.Type.BLOCK, Color(0.54, 0.46, 0.22), "🧱", "Khối cát bùn",      true, 64)
+	_add(db, "block_sediment",    "Trầm Tích", ItemDef.Type.BLOCK, Color(0.50, 0.20, 0.10), "🧱", "Khối trầm tích",    true, 64)
+	_add(db, "block_ocean_gravel","Sỏi Biển",  ItemDef.Type.BLOCK, Color(0.35, 0.30, 0.25), "🧱", "Khối sỏi biển",     true, 64)
+	_add(db, "block_ocean_mud",   "Bùn Biển",  ItemDef.Type.BLOCK, Color(0.16, 0.20, 0.22), "🧱", "Khối bùn biển",     true, 64)
 
 	return db
 

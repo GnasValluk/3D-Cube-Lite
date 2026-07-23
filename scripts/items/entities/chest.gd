@@ -13,6 +13,10 @@ func _ready() -> void:
 	_setup_area()
 	_setup_label()
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and _label:
+		_label.text = tr("CHEST_INTERACT" if _player_nearby else "CHEST_LABEL")
+
 func _setup_mesh() -> void:
 	var body_mat := StandardMaterial3D.new()
 	body_mat.albedo_color = Color(0.45, 0.28, 0.15)

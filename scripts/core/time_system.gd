@@ -22,6 +22,16 @@ const GAME_MINUTE: float = GAME_HOUR / 60.0
 const DAYS_PER_MONTH: int = 30
 const MONTHS_PER_YEAR: int = 12
 
+## Temperature constants per season: { min, max } in °C
+const TEMP_RANGES: Dictionary = {
+	Season.SPRING: { "min": 12.0, "max": 24.0 },
+	Season.SUMMER: { "min": 22.0, "max": 36.0 },
+	Season.AUTUMN: { "min": 10.0, "max": 22.0 },
+	Season.WINTER: { "min": -2.0, "max": 12.0 },
+}
+const TEMP_RAIN_PENALTY: float = 6.0    # °C giảm khi mưa
+const TEMP_LAPSE_RATE: float = 0.0065    # °C giảm mỗi mét độ cao
+
 var _cycle_time: float = CYCLE_DURATION * 6.0 / 24.0
 var _time_scale: float = 1.0
 
@@ -77,11 +87,34 @@ func get_season() -> int:
 
 func get_season_name() -> String:
 	match get_season():
-		Season.SPRING: return "Spring"
-		Season.SUMMER: return "Summer"
-		Season.AUTUMN: return "Autumn"
-		Season.WINTER: return "Winter"
+		Season.SPRING: return tr("SEASON_SPRING")
+		Season.SUMMER: return tr("SEASON_SUMMER")
+		Season.AUTUMN: return tr("SEASON_AUTUMN")
+		Season.WINTER: return tr("SEASON_WINTER")
 	return ""
+
+## Nhiệt độ tại vị trí người chơi, dựa trên mùa + giờ + thời tiết + độ cao
+func get_temperature(player_y: float = 0.0) -> float:
+	var season: int = get_season()
+	var hour: float = get_hour()
+	var r: Dictionary = TEMP_RANGES.get(season, { "min": 15.0, "max": 25.0 })
+
+	# Biến thiên theo giờ: lạnh nhất 5h, nóng nhất 14h
+	var day_curve: float = sin((hour - 5.0) / 24.0 * TAU)
+	var t: float = (day_curve + 1.0) * 0.5
+	var temp: float = lerp(r["min"], r["max"], t)
+
+	# Mưa làm giảm nhiệt
+	temp -= _weather_intensity * TEMP_RAIN_PENALTY
+
+	# Giảm theo độ cao (lapse rate)
+	temp -= maxf(player_y, 0.0) * TEMP_LAPSE_RATE
+
+	return temp
+
+func get_temperature_string(player_y: float = 0.0) -> String:
+	var temp: float = get_temperature(player_y)
+	return tr("TEMP_FORMAT").replace("%d", "%d" % [round(temp)])
 
 func get_date_string() -> String:
 	return "%s %d, Year %d" % [get_month_name(), get_day(), get_year() + 1]
@@ -94,8 +127,8 @@ func get_weather() -> int:
 
 func get_weather_name() -> String:
 	match _weather:
-		Weather.RAIN: return "Rain"
-	return "Clear"
+		Weather.RAIN: return tr("WEATHER_RAIN")
+	return tr("WEATHER_CLEAR")
 
 func get_time_scale() -> float:
 	return _time_scale

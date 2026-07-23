@@ -1,6 +1,19 @@
 extends Control
 class_name PartyUI
 
+const BG_DEEP := Color(0.06, 0.04, 0.12)
+const BG_PANEL := Color(0.10, 0.07, 0.18)
+const BG_CARD := Color(0.14, 0.10, 0.22)
+const PURPLE := Color(0.55, 0.35, 0.90)
+const TEAL := Color(0.15, 0.72, 0.68)
+const PINK := Color(0.82, 0.28, 0.52)
+const ORANGE := Color(0.92, 0.52, 0.12)
+const CYAN := Color(0.15, 0.62, 0.92)
+const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
+const TEXT_MAIN := Color(0.82, 0.78, 0.95)
+const TEXT_DIM := Color(0.55, 0.50, 0.72)
+const TEXT_MUTED := Color(0.35, 0.32, 0.50)
+
 var _mgr: CharacterManager
 var _all_chars: Array[String] = ["Raptor", "Dragon", "Warrior", "Beyordeath"]
 var _party_order: Array[String] = []
@@ -20,6 +33,11 @@ var _skill_labels: Array[Label] = []
 var _btn_quick: Button
 var _btn_confirm: Button
 var _slot_indicators: Array[Label] = []
+
+var _title_label: Label
+var _lib_label: Label
+var _skill_header: Label
+var _close_hint: Label
 
 var _char_info: Dictionary = {
 	"Raptor":     { "element": CharacterBase.Element.DIEN },
@@ -55,15 +73,28 @@ var _skill_data: Dictionary = {
 	],
 }
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and _title_label:
+		_refresh_texts()
+
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build()
 
+func _refresh_texts() -> void:
+	_title_label.text = tr("PARTY_TITLE")
+	_lib_label.text = tr("ROSTER")
+	_skill_header.text = tr("SKILL")
+	_close_hint.text = tr("PARTY_CLOSE_HINT")
+	_btn_confirm.text = tr("PARTY_CONFIRM")
+	_refresh_quick_btn()
+	_refresh_preview()
+
 func _build() -> void:
 	var vp := get_viewport().get_visible_rect().size
-	var W: float = 960.0
-	var H: float = 600.0
+	var W: float = min(vp.x * 0.85, 1200.0)
+	var H: float = vp.y * 0.8
 	var ox: float = (vp.x - W) * 0.5
 	var oy: float = (vp.y - H) * 0.5
 
@@ -77,71 +108,71 @@ func _build() -> void:
 	bg.position = Vector2(ox, oy)
 	bg.size = Vector2(W, H)
 	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = Color(0.07, 0.07, 0.12, 0.95)
-	bg_style.corner_radius_top_left = 14; bg_style.corner_radius_top_right = 14
-	bg_style.corner_radius_bottom_left = 14; bg_style.corner_radius_bottom_right = 14
+	bg_style.bg_color = BG_PANEL
+	bg_style.corner_radius_top_left = 18; bg_style.corner_radius_top_right = 18
+	bg_style.corner_radius_bottom_left = 18; bg_style.corner_radius_bottom_right = 18
 	bg_style.border_width_left = 2; bg_style.border_width_right = 2
 	bg_style.border_width_top = 2; bg_style.border_width_bottom = 2
-	bg_style.border_color = Color(0.3, 0.3, 0.45, 0.6)
+	bg_style.border_color = Color(0.40, 0.30, 0.60, 0.6)
 	bg.add_theme_stylebox_override("panel", bg_style)
 	add_child(bg)
 
-	var title := Label.new()
-	title.text = "ĐỘI HÌNH"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 26)
-	title.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
-	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
-	title.add_theme_constant_override("shadow_offset_x", 2)
-	title.add_theme_constant_override("shadow_offset_y", 2)
-	title.position = Vector2(0, 10)
-	title.size = Vector2(W, 34)
-	bg.add_child(title)
+	_title_label = Label.new()
+	_title_label.text = tr("PARTY_TITLE")
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title_label.add_theme_font_size_override("font_size", 40)
+	_title_label.add_theme_color_override("font_color", TEXT_BRIGHT)
+	_title_label.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.8))
+	_title_label.add_theme_constant_override("shadow_offset_x", 2)
+	_title_label.add_theme_constant_override("shadow_offset_y", 2)
+	_title_label.position = Vector2(0, 14)
+	_title_label.size = Vector2(W, 46)
+	bg.add_child(_title_label)
 
 	var div := ColorRect.new()
-	div.position = Vector2(30, 46)
+	div.position = Vector2(30, 60)
 	div.size = Vector2(W - 60, 2)
-	div.color = Color(0.3, 0.3, 0.45, 0.4)
+	div.color = Color(0.40, 0.30, 0.60, 0.4)
 	bg.add_child(div)
 
 	var left := Panel.new()
-	left.position = Vector2(16, 54)
-	left.size = Vector2(200, 440)
+	left.position = Vector2(20, 66)
+	left.size = Vector2(250, int(H - 160))
 	var left_bg := StyleBoxFlat.new()
-	left_bg.bg_color = Color(0.06, 0.06, 0.10, 0.92)
-	left_bg.corner_radius_top_left = 10; left_bg.corner_radius_top_right = 10
-	left_bg.corner_radius_bottom_left = 10; left_bg.corner_radius_bottom_right = 10
-	left_bg.border_width_left = 1; left_bg.border_width_right = 1
-	left_bg.border_width_top = 1; left_bg.border_width_bottom = 1
-	left_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
+	left_bg.bg_color = BG_CARD
+	left_bg.corner_radius_top_left = 14; left_bg.corner_radius_top_right = 14
+	left_bg.corner_radius_bottom_left = 14; left_bg.corner_radius_bottom_right = 14
+	left_bg.border_width_left = 2; left_bg.border_width_right = 2
+	left_bg.border_width_top = 2; left_bg.border_width_bottom = 2
+	left_bg.border_color = Color(0.40, 0.30, 0.60, 0.5)
 	left.add_theme_stylebox_override("panel", left_bg)
 	bg.add_child(left)
 
-	var lib_lbl := Label.new()
-	lib_lbl.text = "THƯ VIỆN"
-	lib_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lib_lbl.add_theme_font_size_override("font_size", 14)
-	lib_lbl.add_theme_color_override("font_color", Color(0.55, 0.55, 0.75, 0.8))
-	lib_lbl.position = Vector2(0, 8)
-	lib_lbl.size = Vector2(200, 22)
-	left.add_child(lib_lbl)
+	_lib_label = Label.new()
+	_lib_label.text = tr("ROSTER")
+	_lib_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lib_label.add_theme_font_size_override("font_size", 22)
+	_lib_label.add_theme_color_override("font_color", TEXT_DIM)
+	_lib_label.position = Vector2(0, 10)
+	_lib_label.size = Vector2(250, 28)
+	left.add_child(_lib_label)
 
 	for i in range(_all_chars.size()):
-		var y: float = 36.0 + i * 68.0
+		var y: float = 42.0 + i * 80.0
 		var btn := Button.new()
 		btn.position = Vector2(10, y)
-		btn.size = Vector2(180, 60)
-		btn.add_theme_font_size_override("font_size", 14)
+		btn.size = Vector2(230, 72)
+		btn.add_theme_font_size_override("font_size", 22)
 		btn.text = "  " + _all_chars[i]
-		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+		btn.add_theme_color_override("font_color", TEXT_BRIGHT)
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var btn_bg := StyleBoxFlat.new()
-		btn_bg.bg_color = Color(0.1, 0.1, 0.18, 0.85)
-		btn_bg.corner_radius_top_left = 8; btn_bg.corner_radius_top_right = 8
-		btn_bg.corner_radius_bottom_left = 8; btn_bg.corner_radius_bottom_right = 8
-		btn_bg.border_width_left = 1; btn_bg.border_width_right = 1
-		btn_bg.border_width_top = 1; btn_bg.border_width_bottom = 1
-		btn_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
+		btn_bg.bg_color = BG_CARD
+		btn_bg.corner_radius_top_left = 10; btn_bg.corner_radius_top_right = 10
+		btn_bg.corner_radius_bottom_left = 10; btn_bg.corner_radius_bottom_right = 10
+		btn_bg.border_width_left = 2; btn_bg.border_width_right = 2
+		btn_bg.border_width_top = 2; btn_bg.border_width_bottom = 2
+		btn_bg.border_color = Color(0.40, 0.30, 0.60, 0.5)
 		btn.add_theme_stylebox_override("normal", btn_bg)
 		btn.add_theme_stylebox_override("hover", btn_bg)
 		btn.pressed.connect(_on_roster_click.bind(i))
@@ -157,41 +188,41 @@ func _build() -> void:
 		_ros_btns.append(btn)
 		_ros_icons.append(icon)
 
-	_right_build(bg)
+	_right_build(bg, W, H)
 
-	var bottom_y: float = 500.0
+	var bottom_y: float = H - 100
 
 	_btn_quick = Button.new()
-	_btn_quick.position = Vector2(16, bottom_y)
-	_btn_quick.size = Vector2(200, 38)
-	_btn_quick.text = "THIẾT LẬP NHANH: TẮT"
-	_btn_quick.add_theme_font_size_override("font_size", 12)
-	_btn_quick.add_theme_color_override("font_color", Color(0.65, 0.65, 0.85, 0.8))
+	_btn_quick.position = Vector2(20, bottom_y)
+	_btn_quick.size = Vector2(250, 46)
+	_btn_quick.text = tr("PARTY_QUICK_OFF")
+	_btn_quick.add_theme_font_size_override("font_size", 18)
+	_btn_quick.add_theme_color_override("font_color", TEXT_DIM)
 	var qb_bg := StyleBoxFlat.new()
-	qb_bg.bg_color = Color(0.08, 0.08, 0.14, 0.85)
+	qb_bg.bg_color = BG_CARD
 	qb_bg.corner_radius_top_left = 6; qb_bg.corner_radius_top_right = 6
 	qb_bg.corner_radius_bottom_left = 6; qb_bg.corner_radius_bottom_right = 6
-	qb_bg.border_width_left = 1; qb_bg.border_width_right = 1
-	qb_bg.border_width_top = 1; qb_bg.border_width_bottom = 1
-	qb_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
+	qb_bg.border_width_left = 2; qb_bg.border_width_right = 2
+	qb_bg.border_width_top = 2; qb_bg.border_width_bottom = 2
+	qb_bg.border_color = Color(0.40, 0.30, 0.60, 0.5)
 	_btn_quick.add_theme_stylebox_override("normal", qb_bg)
 	_btn_quick.add_theme_stylebox_override("hover", qb_bg)
 	_btn_quick.pressed.connect(_on_toggle_quick)
 	bg.add_child(_btn_quick)
 
 	_btn_confirm = Button.new()
-	_btn_confirm.position = Vector2(232, bottom_y)
-	_btn_confirm.size = Vector2(140, 38)
-	_btn_confirm.text = "XÁC NHẬN"
-	_btn_confirm.add_theme_font_size_override("font_size", 14)
-	_btn_confirm.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+	_btn_confirm.position = Vector2(290, bottom_y)
+	_btn_confirm.size = Vector2(170, 46)
+	_btn_confirm.text = tr("PARTY_CONFIRM")
+	_btn_confirm.add_theme_font_size_override("font_size", 22)
+	_btn_confirm.add_theme_color_override("font_color", TEXT_BRIGHT)
 	var cf_bg := StyleBoxFlat.new()
-	cf_bg.bg_color = Color(0.15, 0.40, 0.20, 0.85)
+	cf_bg.bg_color = Color(0.15, 0.72, 0.68, 0.85)
 	cf_bg.corner_radius_top_left = 6; cf_bg.corner_radius_top_right = 6
 	cf_bg.corner_radius_bottom_left = 6; cf_bg.corner_radius_bottom_right = 6
-	cf_bg.border_width_left = 1; cf_bg.border_width_right = 1
-	cf_bg.border_width_top = 1; cf_bg.border_width_bottom = 1
-	cf_bg.border_color = Color(0.3, 0.7, 0.35, 0.6)
+	cf_bg.border_width_left = 2; cf_bg.border_width_right = 2
+	cf_bg.border_width_top = 2; cf_bg.border_width_bottom = 2
+	cf_bg.border_color = Color(0.15, 0.72, 0.68, 0.6)
 	_btn_confirm.add_theme_stylebox_override("normal", cf_bg)
 	_btn_confirm.add_theme_stylebox_override("hover", cf_bg)
 	_btn_confirm.pressed.connect(_on_confirm)
@@ -200,102 +231,102 @@ func _build() -> void:
 
 	for i in range(3):
 		var lbl := Label.new()
-		lbl.position = Vector2(400 + i * 160, bottom_y + 8)
-		lbl.size = Vector2(150, 22)
+		lbl.position = Vector2(480 + i * 200, bottom_y + 10)
+		lbl.size = Vector2(190, 28)
 		lbl.text = "V%d: —" % [i + 1]
-		lbl.add_theme_font_size_override("font_size", 13)
-		lbl.add_theme_color_override("font_color", Color(0.55, 0.55, 0.75, 0.7))
+		lbl.add_theme_font_size_override("font_size", 20)
+		lbl.add_theme_color_override("font_color", TEXT_DIM)
 		bg.add_child(lbl)
 		_slot_indicators.append(lbl)
 
-	var hint := Label.new()
-	hint.text = "ESC / P — Đóng"
-	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hint.add_theme_font_size_override("font_size", 12)
-	hint.add_theme_color_override("font_color", Color(0.35, 0.35, 0.45, 0.55))
-	hint.position = Vector2(0, H - 22)
-	hint.size = Vector2(W, 20)
-	bg.add_child(hint)
+	_close_hint = Label.new()
+	_close_hint.text = tr("PARTY_CLOSE_HINT")
+	_close_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_close_hint.add_theme_font_size_override("font_size", 18)
+	_close_hint.add_theme_color_override("font_color", TEXT_DIM)
+	_close_hint.position = Vector2(0, H - 22)
+	_close_hint.size = Vector2(W, 20)
+	bg.add_child(_close_hint)
 
-func _right_build(bg: Panel) -> void:
+func _right_build(bg: Panel, W: float, H: float) -> void:
 	var right := Panel.new()
-	right.position = Vector2(232, 54)
-	right.size = Vector2(480, 440)
+	right.position = Vector2(290, 66)
+	right.size = Vector2(int(W - 310), int(H - 160))
 	var right_bg := StyleBoxFlat.new()
-	right_bg.bg_color = Color(0.06, 0.06, 0.10, 0.92)
-	right_bg.corner_radius_top_left = 10; right_bg.corner_radius_top_right = 10
-	right_bg.corner_radius_bottom_left = 10; right_bg.corner_radius_bottom_right = 10
-	right_bg.border_width_left = 1; right_bg.border_width_right = 1
-	right_bg.border_width_top = 1; right_bg.border_width_bottom = 1
-	right_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
+	right_bg.bg_color = BG_CARD
+	right_bg.corner_radius_top_left = 14; right_bg.corner_radius_top_right = 14
+	right_bg.corner_radius_bottom_left = 14; right_bg.corner_radius_bottom_right = 14
+	right_bg.border_width_left = 2; right_bg.border_width_right = 2
+	right_bg.border_width_top = 2; right_bg.border_width_bottom = 2
+	right_bg.border_color = Color(0.40, 0.30, 0.60, 0.5)
 	right.add_theme_stylebox_override("panel", right_bg)
 	bg.add_child(right)
 
 	_preview_avatar = TextureRect.new()
-	_preview_avatar.position = Vector2(20, 16)
-	_preview_avatar.size = Vector2(80, 80)
+	_preview_avatar.position = Vector2(24, 20)
+	_preview_avatar.size = Vector2(100, 100)
 	_preview_avatar.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	_preview_avatar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	right.add_child(_preview_avatar)
 
 	_preview_name = Label.new()
-	_preview_name.position = Vector2(114, 20)
-	_preview_name.size = Vector2(200, 30)
-	_preview_name.add_theme_font_size_override("font_size", 22)
-	_preview_name.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	_preview_name.position = Vector2(140, 24)
+	_preview_name.size = Vector2(260, 38)
+	_preview_name.add_theme_font_size_override("font_size", 34)
+	_preview_name.add_theme_color_override("font_color", TEXT_BRIGHT)
 	right.add_child(_preview_name)
 
 	_preview_element = Label.new()
-	_preview_element.position = Vector2(114, 50)
-	_preview_element.size = Vector2(200, 18)
-	_preview_element.add_theme_font_size_override("font_size", 13)
+	_preview_element.position = Vector2(140, 62)
+	_preview_element.size = Vector2(260, 22)
+	_preview_element.add_theme_font_size_override("font_size", 20)
 	right.add_child(_preview_element)
 
 	_preview_level = Label.new()
 	_preview_level.name = "PreviewLevel"
-	_preview_level.position = Vector2(114, 68)
-	_preview_level.size = Vector2(200, 18)
-	_preview_level.add_theme_font_size_override("font_size", 11)
+	_preview_level.position = Vector2(140, 84)
+	_preview_level.size = Vector2(260, 22)
+	_preview_level.add_theme_font_size_override("font_size", 16)
 	_preview_level.add_theme_color_override("font_color", Color(0.6, 0.9, 0.6, 0.8))
 	right.add_child(_preview_level)
 
 	var stat_keys: Array[String] = ["hp", "mp", "atk", "def", "spd", "crit", "crit_dmg", "mp_regen", "mp_refund"]
 	var stat_pos: Array[Vector2] = [
-		Vector2(114, 90), Vector2(260, 90),
-		Vector2(114, 110), Vector2(260, 110),
-		Vector2(114, 130), Vector2(260, 130),
-		Vector2(114, 150), Vector2(260, 150),
-		Vector2(114, 170),
+		Vector2(140, 110), Vector2(320, 110),
+		Vector2(140, 136), Vector2(320, 136),
+		Vector2(140, 162), Vector2(320, 162),
+		Vector2(140, 188), Vector2(320, 188),
+		Vector2(140, 214),
 	]
 	for i in range(stat_keys.size()):
 		var lbl := Label.new()
 		lbl.position = stat_pos[i]
-		lbl.size = Vector2(130, 18)
-		lbl.add_theme_font_size_override("font_size", 12)
-		lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.85, 0.8))
+		lbl.size = Vector2(160, 22)
+		lbl.add_theme_font_size_override("font_size", 18)
+		lbl.add_theme_color_override("font_color", TEXT_DIM)
 		right.add_child(lbl)
 		_stat_labels[stat_keys[i]] = lbl
 
 	var div1 := ColorRect.new()
-	div1.position = Vector2(20, 186)
-	div1.size = Vector2(440, 1)
-	div1.color = Color(0.3, 0.3, 0.4, 0.3)
+	div1.position = Vector2(24, 230)
+	div1.size = Vector2(int(W - 310 - 40), 1)
+	div1.color = Color(0.40, 0.30, 0.55, 0.3)
 	right.add_child(div1)
 
-	var sk_header := Label.new()
-	sk_header.text = "KỸ NĂNG"
-	sk_header.position = Vector2(20, 192)
-	sk_header.add_theme_font_size_override("font_size", 12)
-	sk_header.add_theme_color_override("font_color", Color(0.45, 0.45, 0.65, 0.7))
-	right.add_child(sk_header)
+	_skill_header = Label.new()
+	_skill_header.text = tr("SKILL")
+	_skill_header.position = Vector2(24, 238)
+	_skill_header.add_theme_font_size_override("font_size", 18)
+	_skill_header.add_theme_color_override("font_color", PURPLE)
+	right.add_child(_skill_header)
 
 	for i in range(4):
 		var lbl := Label.new()
-		lbl.position = Vector2(20, 214 + i * 56)
-		lbl.size = Vector2(440, 50)
+		lbl.position = Vector2(24, 266 + i * 70)
+		lbl.size = Vector2(int(W - 310 - 40), 60)
 		lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lbl.add_theme_font_size_override("font_size", 12)
-		lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.9, 0.85))
+		lbl.add_theme_font_size_override("font_size", 18)
+		lbl.add_theme_color_override("font_color", TEXT_MAIN)
 		lbl.add_theme_constant_override("shadow_offset_x", 1)
 		lbl.add_theme_constant_override("shadow_offset_y", 1)
 		lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
@@ -364,24 +395,24 @@ func _refresh_roster() -> void:
 			btn_bg.border_color = Color(ec.r, ec.g, ec.b, 0.55)
 			btn_bg.border_width_left = 2; btn_bg.border_width_right = 2
 			btn_bg.border_width_top = 2; btn_bg.border_width_bottom = 2
-			btn_bg.bg_color = Color(0.12, 0.12, 0.20, 0.7)
+			btn_bg.bg_color = BG_CARD
 		elif is_active:
 			btn_bg.border_color = Color(ec.r, ec.g, ec.b, 0.6)
 			btn_bg.border_width_left = 2; btn_bg.border_width_right = 2
 			btn_bg.border_width_top = 2; btn_bg.border_width_bottom = 2
-			btn_bg.bg_color = Color(0.12, 0.12, 0.20, 0.7)
+			btn_bg.bg_color = BG_CARD
 		else:
-			btn_bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
-			btn_bg.border_width_left = 1; btn_bg.border_width_right = 1
-			btn_bg.border_width_top = 1; btn_bg.border_width_bottom = 1
-			btn_bg.bg_color = Color(0.1, 0.1, 0.18, 0.85)
+			btn_bg.border_color = Color(0.40, 0.30, 0.60, 0.5)
+			btn_bg.border_width_left = 2; btn_bg.border_width_right = 2
+			btn_bg.border_width_top = 2; btn_bg.border_width_bottom = 2
+			btn_bg.bg_color = BG_CARD
 
 func _refresh_preview() -> void:
 	if _quick_deploy:
 		_preview_name.text = "CHẾ ĐỘ NHANH"
-		_preview_element.text = "Ấn XÁC NHẬN để áp dụng"
+		_preview_element.text = tr("PARTY_CONFIRM_HINT")
 		_preview_avatar.texture = null
-		_preview_avatar.modulate = Color(0.15, 0.15, 0.2, 1)
+		_preview_avatar.modulate = Color(0.20, 0.15, 0.30, 1)
 		_preview_level.text = ""
 		for key in _stat_labels:
 			_stat_labels[key].text = ""
@@ -394,7 +425,7 @@ func _refresh_preview() -> void:
 		_preview_element.text = ""
 		_preview_level.text = ""
 		_preview_avatar.texture = null
-		_preview_avatar.modulate = Color(0.15, 0.15, 0.2, 1)
+		_preview_avatar.modulate = Color(0.20, 0.15, 0.30, 1)
 		for key in _stat_labels:
 			_stat_labels[key].text = ""
 		for lbl in _skill_labels:
@@ -409,39 +440,39 @@ func _refresh_preview() -> void:
 	var tex_path: String = "res://assets/icon_character/" + _selected.to_lower() + ".png"
 	_preview_avatar.texture = load(tex_path) as Texture2D
 	_preview_avatar.modulate = Color(1, 1, 1, 1)
-	_preview_element.text = "Hệ: " + _get_element_name(_selected)
+	_preview_element.text = tr("PARTY_ELEMENT") + _get_element_name(_selected)
 	_preview_element.add_theme_color_override("font_color", Color(ec.r, ec.g, ec.b, 0.9))
 
 	var ch: CharacterBase = _find_char(_selected)
 	if ch != null:
 		_preview_level.text = "Cấp %d  |  EXP: %d/%d" % [ch.level, ch.exp, ch.exp_to_next]
-		_stat_labels["hp"].text = "HP: %d/%d" % [ch.hp, ch.max_hp]
-		_stat_labels["mp"].text = "MP: %d/%d" % [ch.mana, ch.max_mana]
-		_stat_labels["atk"].text = "ATK: %d" % ch.attack_power
-		_stat_labels["def"].text = "DEF: %d" % ch.defense
-		_stat_labels["spd"].text = "SPD: %.1f" % ch.move_speed
-		_stat_labels["crit"].text = "Tỉ lệ Crit: %d%%" % int(ch.crit_rate * 100.0)
-		_stat_labels["crit_dmg"].text = "Sát thương Crit: %d%%" % int(ch.crit_dmg * 100.0)
-		_stat_labels["mp_regen"].text = "Hồi MP: %.1f/s" % ch.mp_regen
-		_stat_labels["mp_refund"].text = "Hoàn MP: %d" % ch.mp_refund
+		_stat_labels["hp"].text = tr("PARTY_HP") % [ch.hp, ch.max_hp]; _stat_labels["hp"].add_theme_color_override("font_color", TEAL)
+		_stat_labels["mp"].text = tr("PARTY_MP") % [ch.mana, ch.max_mana]; _stat_labels["mp"].add_theme_color_override("font_color", PURPLE)
+		_stat_labels["atk"].text = tr("PARTY_ATK") % ch.attack_power; _stat_labels["atk"].add_theme_color_override("font_color", PINK)
+		_stat_labels["def"].text = tr("PARTY_DEF") % ch.defense; _stat_labels["def"].add_theme_color_override("font_color", ORANGE)
+		_stat_labels["spd"].text = tr("PARTY_SPD") % ch.move_speed; _stat_labels["spd"].add_theme_color_override("font_color", CYAN)
+		_stat_labels["crit"].text = tr("PARTY_CRIT_RATE") % int(ch.crit_rate * 100.0)
+		_stat_labels["crit_dmg"].text = tr("PARTY_CRIT_DMG") % int(ch.crit_dmg * 100.0)
+		_stat_labels["mp_regen"].text = tr("PARTY_MP_REGEN") % ch.mp_regen
+		_stat_labels["mp_refund"].text = tr("PARTY_MP_REFUND") % ch.mp_refund
 	else:
 		_preview_level.text = ""
-		_stat_labels["hp"].text = "HP: —"
-		_stat_labels["mp"].text = "MP: —"
-		_stat_labels["atk"].text = "ATK: —"
-		_stat_labels["def"].text = "DEF: —"
-		_stat_labels["spd"].text = "SPD: —"
-		_stat_labels["crit"].text = "Tỉ lệ Crit: —"
-		_stat_labels["crit_dmg"].text = "Sát thương Crit: —"
-		_stat_labels["mp_regen"].text = "Hồi MP: —"
-		_stat_labels["mp_refund"].text = "Hoàn MP: —"
+		_stat_labels["hp"].text = tr("PARTY_HP") % [0, 0]
+		_stat_labels["mp"].text = tr("PARTY_MP") % [0, 0]
+		_stat_labels["atk"].text = tr("PARTY_ATK") % 0
+		_stat_labels["def"].text = tr("PARTY_DEF") % 0
+		_stat_labels["spd"].text = tr("PARTY_SPD") % 0.0
+		_stat_labels["crit"].text = tr("PARTY_CRIT_RATE") % 0
+		_stat_labels["crit_dmg"].text = tr("PARTY_CRIT_DMG") % 0
+		_stat_labels["mp_regen"].text = tr("PARTY_MP_REGEN") % 0.0
+		_stat_labels["mp_refund"].text = tr("PARTY_MP_REFUND") % 0
 
 	var skills: Array = _skill_data.get(_selected, [])
 	for i in range(4):
 		if i < skills.size():
 			var s: Dictionary = skills[i]
 			if s.has("mana"):
-				var mana_str: String = "%d MP" % s.mana if s.mana > 0 else "0 MP"
+				var mana_str: String = tr("PARTY_MP_COST") % s.mana if s.mana > 0 else tr("PARTY_MP_COST") % 0
 				_skill_labels[i].text = "%s  |  CD: %.1fs  |  %s\n• %s" % [s.name, s.cd, mana_str, s.desc]
 			else:
 				_skill_labels[i].text = "%s\n• %s" % [s.name, s.desc]
@@ -450,10 +481,10 @@ func _refresh_preview() -> void:
 
 func _refresh_quick_btn() -> void:
 	if _quick_deploy:
-		_btn_quick.text = "THIẾT LẬP NHANH: BẬT"
-		_btn_quick.add_theme_color_override("font_color", Color(1, 0.85, 0.2, 0.95))
+		_btn_quick.text = tr("PARTY_QUICK_ON")
+		_btn_quick.add_theme_color_override("font_color", ORANGE)
 	else:
-		_btn_quick.text = "THIẾT LẬP NHANH: TẮT"
+		_btn_quick.text = tr("PARTY_QUICK_OFF")
 		_btn_quick.add_theme_color_override("font_color", Color(0.65, 0.65, 0.85, 0.8))
 	_btn_confirm.visible = _quick_deploy
 
@@ -469,7 +500,7 @@ func _refresh_slot_indicators() -> void:
 			_slot_indicators[i].add_theme_color_override("font_color", Color(ec.r, ec.g, ec.b, 0.9 if is_active else 0.7))
 		else:
 			_slot_indicators[i].text = "V%d: —" % [i + 1]
-			_slot_indicators[i].add_theme_color_override("font_color", Color(0.35, 0.35, 0.45, 0.5))
+			_slot_indicators[i].add_theme_color_override("font_color", TEXT_MUTED)
 
 func _on_roster_click(idx: int) -> void:
 	if idx >= _all_chars.size():
@@ -492,10 +523,10 @@ func _show_error(msg: String) -> void:
 	var lbl := Label.new()
 	lbl.text = msg
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.add_theme_font_size_override("font_size", 16)
-	lbl.add_theme_color_override("font_color", Color(1, 0.3, 0.3, 0.95))
-	lbl.position = Vector2(232, 456)
-	lbl.size = Vector2(480, 30)
+	lbl.add_theme_font_size_override("font_size", 24)
+	lbl.add_theme_color_override("font_color", Color(0.82, 0.28, 0.52, 0.95))
+	lbl.position = Vector2(290, 456)
+	lbl.size = Vector2(480, 38)
 	add_child(lbl)
 	get_tree().create_timer(1.8).timeout.connect(func():
 		if is_instance_valid(lbl):
@@ -504,7 +535,7 @@ func _show_error(msg: String) -> void:
 
 func _on_confirm() -> void:
 	if _party_order.is_empty():
-		_show_error("Cần ít nhất một nhân vật")
+		_show_error(tr("PARTY_NEED_CHAR"))
 	else:
 		_apply()
 		hide_party()
@@ -525,10 +556,10 @@ func _get_element_name(name_str: String) -> String:
 	var info: Dictionary = _char_info.get(name_str, {})
 	var elem: Variant = info.get("element", CharacterBase.Element.DIEN)
 	match elem:
-		CharacterBase.Element.DIEN: return "Điện"
-		CharacterBase.Element.HOA: return "Hỏa"
-		CharacterBase.Element.BANG: return "Băng"
-		CharacterBase.Element.HAC_AM: return "Hắc Ám"
-		CharacterBase.Element.DECAY: return "Phân hủy"
-		CharacterBase.Element.ANH_SANG: return "Ánh Sáng"
+		CharacterBase.Element.DIEN: return tr("ELEM_ELECTRIC")
+		CharacterBase.Element.HOA: return tr("ELEM_FIRE")
+		CharacterBase.Element.BANG: return tr("ELEM_ICE")
+		CharacterBase.Element.HAC_AM: return tr("ELEM_DARK")
+		CharacterBase.Element.DECAY: return tr("ELEM_DECAY")
+		CharacterBase.Element.ANH_SANG: return tr("ELEM_LIGHT")
 	return "?"

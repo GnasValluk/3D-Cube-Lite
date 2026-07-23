@@ -30,7 +30,8 @@ var _built: bool = false
 ## Block data — cho phép set_block / get_block sau này (build/mine)
 var block_data: _BlockData = null
 
-## References to non-terrain meshes (preserved across rebuilds)
+## References to per-type meshes (preserved across rebuilds)
+var _terrain_mesh_instance: MeshInstance3D = null
 var _water_mesh_instance: MeshInstance3D = null
 var _aquatic_mesh_instance: MeshInstance3D = null
 var _sediment_mesh_instance: MeshInstance3D = null
@@ -61,6 +62,7 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 static func clear_noise_cache() -> void:
 	_Noise.clear_cache()
 	_mesh_cache.clear()
+	_mat_cache.clear()
 	_river_noise = null
 	_river_bed_noise = null
 
@@ -542,7 +544,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 				Vector3(1,0,0) * h_vox, Vector3(0,0,1) * (count * h_vox),
 				Vector3(0,1,0), Color(1,1,1))
 
-	# 7b. Nước biển (OCEAN_DEEP) — tint xanh đậm
+	# 7b. Nước biển (OCEAN_DEEP)
 	for vx in range(cols):
 		var vz := 0
 		while vz < cols:
@@ -1017,6 +1019,8 @@ func _init_materials() -> void:
 
 ## ── apply_chunk: nhận data từ thread, tạo nodes ──────────────────────────────
 func apply_chunk(data: Dictionary) -> void:
+	if _built:
+		return
 	_mesh_cache[_cache_key(_cx, _cz, _dimension_id)] = data
 	_biome_grid = data["biome_grid"]
 
@@ -1035,10 +1039,23 @@ func apply_chunk(data: Dictionary) -> void:
 	# Tạo container ngoài tree → add hết children vào → add_child(container) 1 lần.
 	var container := Node3D.new()
 
+	# Xoá container cũ nếu có (phòng trường hợp apply_chunk gọi 2 lần)
+	if _mesh_container != null:
+		_mesh_container.queue_free()
+		_mesh_container = null
+	_terrain_mesh_instance = null
+	_water_mesh_instance = null
+	_aquatic_mesh_instance = null
+	_sediment_mesh_instance = null
+	for light in _lotus_lights:
+		LotusLightManager.unregister(light)
+	_lotus_lights.clear()
+
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
 	mi.material_override = _mat_cache[_dimension_id]["terrain"]
 	container.add_child(mi)
+	_terrain_mesh_instance = mi
 
 	var water_mesh = data.get("water_mesh")
 	if water_mesh:
@@ -1170,22 +1187,19 @@ func _apply_collision(shape: Shape3D) -> void:
 	add_child(body)
 
 ## ── rebuild_mesh: gọi khi block thay đổi (mine/place) ────────────────────────
-## Xoá mesh cũ, build lại từ block_data hiện tại. Chạy trên main thread.
+## Chỉ thay thế terrain mesh + collision, không đụng mesh khác (cỏ, nước, ...)
 func rebuild_mesh() -> void:
 	if block_data == null: return
 
-	# Xóa static body cũ (collision)
+	# Xóa collision cũ
 	for ch in get_children():
 		if ch is StaticBody3D:
 			ch.queue_free()
 
-	# Xóa terrain mesh cũ (nằm trong _mesh_container)
-	if _mesh_container != null:
-		for ch in _mesh_container.get_children():
-			if ch is MeshInstance3D:
-				var mi := ch as MeshInstance3D
-				if mi != _water_mesh_instance and mi != _aquatic_mesh_instance and mi != _sediment_mesh_instance:
-					mi.queue_free()
+	# Xóa terrain mesh cũ, giữ nguyên mesh khác (cỏ, nước, thuỷ sinh, ...)
+	if _terrain_mesh_instance != null and is_instance_valid(_terrain_mesh_instance):
+		_terrain_mesh_instance.queue_free()
+		_terrain_mesh_instance = null
 
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -1200,6 +1214,7 @@ func rebuild_mesh() -> void:
 		_mesh_container.add_child(mi)
 	else:
 		add_child(mi)
+	_terrain_mesh_instance = mi
 
 	var body := StaticBody3D.new()
 	var col := CollisionShape3D.new()

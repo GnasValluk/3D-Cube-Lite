@@ -25,6 +25,44 @@ enum BlockID {
 	OCEAN_MUD    = 17, # Bùn biển sâu — xanh xám đậm, đồng bằng sâu
 }
 
+## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
+const BLOCK_TO_ITEM: Dictionary = {
+	BlockID.GRASS:       "block_grass",
+	BlockID.DARK_GRASS:  "block_dark_grass",
+	BlockID.SAND:        "block_sand",
+	BlockID.DIRT:        "block_dirt",
+	BlockID.SILT:        "block_silt",
+	BlockID.STONE:       "block_stone",
+	BlockID.DARK_DIRT:   "block_dark_dirt",
+	BlockID.SAND_DEEP:   "block_sand_deep",
+	BlockID.TRAIL:       "block_trail",
+	BlockID.OCEAN_FLOOR: "block_ocean_floor",
+	BlockID.OCEAN_SAND:  "block_ocean_sand",
+	BlockID.MUDDY_SAND:  "block_muddy_sand",
+	BlockID.SEDIMENT:    "block_sediment",
+	BlockID.OCEAN_GRAVEL:"block_ocean_gravel",
+	BlockID.OCEAN_MUD:   "block_ocean_mud",
+}
+
+## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
+const ITEM_TO_BLOCK: Dictionary = {
+	"block_grass":        BlockID.GRASS,
+	"block_dark_grass":   BlockID.DARK_GRASS,
+	"block_sand":         BlockID.SAND,
+	"block_dirt":         BlockID.DIRT,
+	"block_silt":         BlockID.SILT,
+	"block_stone":        BlockID.STONE,
+	"block_dark_dirt":    BlockID.DARK_DIRT,
+	"block_sand_deep":    BlockID.SAND_DEEP,
+	"block_trail":        BlockID.TRAIL,
+	"block_ocean_floor":  BlockID.OCEAN_FLOOR,
+	"block_ocean_sand":   BlockID.OCEAN_SAND,
+	"block_muddy_sand":   BlockID.MUDDY_SAND,
+	"block_sediment":     BlockID.SEDIMENT,
+	"block_ocean_gravel": BlockID.OCEAN_GRAVEL,
+	"block_ocean_mud":    BlockID.OCEAN_MUD,
+}
+
 const VOXEL: float = 1.0
 const TILE_W: int = 5
 const TILE_D: int = 5

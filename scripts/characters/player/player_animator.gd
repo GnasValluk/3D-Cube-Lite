@@ -183,6 +183,7 @@ func _attack(delta: float, _t: float) -> void:
 	_last_remaining = remaining
 
 	var is_heavy: bool = player and player.equipped_weapon != null and (player.equipped_weapon.id == "riu" or player.equipped_weapon.id == "cup")
+	var is_gs: bool = player and player.equipped_weapon != null and player.equipped_weapon.id == "dai_kiem"
 
 	if is_heavy:
 		# ── Heavy overhead swing ──────────────────────────────────────────────
@@ -234,9 +235,85 @@ func _attack(delta: float, _t: float) -> void:
 			mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
 			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
 
+	elif is_gs:
+		# ── Đại kiếm: step 0 = chém dọc, step 1 = chém ngang ─────────────────
+		if prog < 0.40:
+			var p: float = prog / 0.40
+			match step:
+				0:  # Wind-up chém dọc — giơ kiếm lên cao
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, -40.0 + 90.0 * (1.0 - p), delta * 16.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 6.0 * p, delta * 14.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -4.0 * p, delta * 14.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.60 * p, delta * 20.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.05 * p, delta * 16.0)
+					mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.05 * p, delta * 14.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.06 * p, delta * 14.0)
+					mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.04 * p, delta * 12.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.10 * p, delta * 12.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.08 * p, delta * 12.0)
+				1:  # Wind-up chém ngang — vung kiếm sang phải
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 60.0, delta * 16.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 40.0, delta * 14.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -18.0, delta * 14.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.50 * p, delta * 20.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.22 * p, delta * 16.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.15 * p, delta * 14.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.22 * p, delta * 12.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.14 * p, delta * 12.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.06 * p, delta * 14.0)
+
+		# Strike (0.40 → 0.85)
+		elif prog < 0.85:
+			if not _slash_spawned:
+				_slash_spawned = true
+				_spawn_slash(step)
+			var p: float = (prog - 0.40) / 0.45
+			match step:
+				0:  # Chém dọc từ trên xuống
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 155.0, delta * 28.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -10.0, delta * 24.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 7.0, delta * 24.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.60 * p - 0.60 * (1.0 - p), delta * 30.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 24.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.18 * sin(p * PI), delta * 20.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.20 * sin(p * PI), delta * 18.0)
+					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.14 * sin(p * PI), delta * 16.0)
+					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.22 * sin(p * PI), delta * 14.0)
+				1:  # Chém ngang từ phải sang trái
+					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 118.0, delta * 28.0)
+					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -30.0, delta * 24.0)
+					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 24.0)
+					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.80 * p - 0.50 * (1.0 - p), delta * 32.0)
+					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.22 * sin(p * PI), delta * 26.0)
+					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.35 * sin(p * PI), delta * 22.0)
+					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.40 * sin(p * PI), delta * 20.0)
+					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.06 * sin(p * PI), delta * 16.0)
+					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.25 * sin(p * PI), delta * 18.0)
+					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.10 * p, delta * 20.0)
+			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.04 * sin(p * PI), delta * 18.0)
+			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.06 * p, delta * 16.0)
+
+		# Recovery (0.85 → 1.0)
+		else:
+			wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
+			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
+			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
+			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
+			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
+			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
+			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
+			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
+			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
+			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
+			mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
+			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
+			if remaining <= 0.0 and player and player.combo_timer <= 0.0:
+				player.combo_step = 0
+
 	else:
 		# ── Fast sword combo ──────────────────────────────────────────────────
-		# Wind-up (0.0 → 0.25)
 		if prog < 0.25:
 			var p: float = prog / 0.25
 			match step:
@@ -338,13 +415,14 @@ func _spawn_slash(step: int) -> void:
 		return
 	var wp := mesh.weapon_pivot
 	var is_heavy: bool = player.equipped_weapon.id == "riu" or player.equipped_weapon.id == "cup"
+	var is_gs: bool = player.equipped_weapon.id == "dai_kiem"
 
 	if is_heavy:
-		var is_axe: bool = player.equipped_weapon.id == "riu"
-		var vfx := SlashVFX.new(75.0 if is_axe else 60.0, 0.40 if is_axe else 0.30, 0.10, Color.WHITE)
-		wp.add_child(vfx)
-		vfx.position = Vector3(0, 0.40, 0)
-		vfx.rotation_degrees = Vector3(0, 90, 0)
+			var is_axe: bool = player.equipped_weapon.id == "riu"
+			var vfx := SlashVFX.new(75.0 if is_axe else 60.0, 0.40 if is_axe else 0.30, 0.10, Color.WHITE)
+			wp.add_child(vfx)
+			vfx.position = Vector3(0, 0.40, 0)
+			vfx.rotation_degrees = Vector3(0, 90, 0)
 	elif player.equipped_weapon.id == "kiem":
 		var vfx := SlashVFX.new(70.0, 0.5, 0.12, Color.WHITE)
 		wp.add_child(vfx)
@@ -353,3 +431,16 @@ func _spawn_slash(step: int) -> void:
 			0: vfx.rotation_degrees = Vector3(0, 0, 30)
 			1: vfx.rotation_degrees = Vector3(0, 0, -30)
 			2: vfx.rotation_degrees = Vector3(85, 0, 0)
+	elif is_gs:
+		var arc: float = 80.0 if step == 0 else 65.0
+		var radius: float = 0.55
+		var vfx := SlashVFX.new(arc, radius, 0.10, Color(0.85, 0.90, 1.00))
+		wp.add_child(vfx)
+		vfx.position = Vector3(0, 0.50, 0)
+		match step:
+			0: vfx.rotation_degrees = Vector3(0, 90, 0)
+			1: vfx.rotation_degrees = Vector3(90, 0, 30)
+	elif player.equipped_weapon.id == "gang_tay_da_thu":
+		var vfx := PunchVFX.new(1.0, Color(0.85, 0.72, 0.40))
+		wp.add_child(vfx)
+		vfx.position = Vector3(0, 0.25, 0.08)

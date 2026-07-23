@@ -1,10 +1,26 @@
 class_name ChestUI
 extends Control
 
-const SLOT_SIZE: float = 40.0
-const GAP: float = 3.0
+const S: float = 1.6
+const SS: float = 1.4
+
+const BG_DEEP := Color(0.06, 0.04, 0.12)
+const BG_PANEL := Color(0.10, 0.07, 0.18)
+const BG_CARD := Color(0.14, 0.10, 0.22)
+const PURPLE := Color(0.55, 0.35, 0.90)
+const TEAL := Color(0.15, 0.72, 0.68)
+const PINK := Color(0.82, 0.28, 0.52)
+const ORANGE := Color(0.92, 0.52, 0.12)
+const CYAN := Color(0.15, 0.62, 0.92)
+const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
+const TEXT_MAIN := Color(0.82, 0.78, 0.95)
+const TEXT_DIM := Color(0.55, 0.50, 0.72)
+const TEXT_MUTED := Color(0.35, 0.32, 0.50)
+
+const SLOT_SIZE: float = 56.0
+const GAP: float = 5.0
 const COLS: int = 9
-const PAD: float = 14.0
+const PAD: float = 20.0
 const GRID_W: float = COLS * (SLOT_SIZE + GAP) - GAP
 
 var _chest = null
@@ -26,16 +42,16 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_slot_style = StyleBoxFlat.new()
-	_slot_style.bg_color = Color(0.08, 0.08, 0.14, 0.70)
-	_slot_style.corner_radius_top_left = 4
-	_slot_style.corner_radius_top_right = 4
-	_slot_style.corner_radius_bottom_left = 4
-	_slot_style.corner_radius_bottom_right = 4
-	_slot_style.border_width_left = 1
-	_slot_style.border_width_right = 1
-	_slot_style.border_width_top = 1
-	_slot_style.border_width_bottom = 1
-	_slot_style.border_color = Color(1, 1, 1, 0.10)
+	_slot_style.bg_color = BG_PANEL
+	_slot_style.corner_radius_top_left = 6
+	_slot_style.corner_radius_top_right = 6
+	_slot_style.corner_radius_bottom_left = 6
+	_slot_style.corner_radius_bottom_right = 6
+	_slot_style.border_width_left = 2
+	_slot_style.border_width_right = 2
+	_slot_style.border_width_top = 2
+	_slot_style.border_width_bottom = 2
+	_slot_style.border_color = Color(0.85, 0.80, 0.95, 0.10)
 
 	_setup_background()
 	_setup_title()
@@ -52,16 +68,16 @@ func _build_layout() -> float:
 
 func _setup_background() -> void:
 	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = Color(0.08, 0.08, 0.14, 0.70)
-	bg_style.corner_radius_top_left = 10
-	bg_style.corner_radius_top_right = 10
-	bg_style.corner_radius_bottom_left = 10
-	bg_style.corner_radius_bottom_right = 10
-	bg_style.border_width_left = 1
-	bg_style.border_width_right = 1
-	bg_style.border_width_top = 1
-	bg_style.border_width_bottom = 1
-	bg_style.border_color = Color(1, 1, 1, 0.12)
+	bg_style.bg_color = BG_PANEL
+	bg_style.corner_radius_top_left = 14
+	bg_style.corner_radius_top_right = 14
+	bg_style.corner_radius_bottom_left = 14
+	bg_style.corner_radius_bottom_right = 14
+	bg_style.border_width_left = 2
+	bg_style.border_width_right = 2
+	bg_style.border_width_top = 2
+	bg_style.border_width_bottom = 2
+	bg_style.border_color = Color(0.85, 0.80, 0.95, 0.12)
 
 	var bg := Panel.new()
 	bg.size = Vector2(GRID_W + PAD * 2, _content_h)
@@ -73,13 +89,13 @@ func _setup_title() -> void:
 	var title := Label.new()
 	title.text = "Chest  -  Press F to close"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 15)
-	title.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
-	title.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	title.add_theme_font_size_override("font_size", int(S * 15))
+	title.add_theme_color_override("font_color", TEXT_BRIGHT)
+	title.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.6))
 	title.add_theme_constant_override("shadow_offset_x", 1)
 	title.add_theme_constant_override("shadow_offset_y", 1)
-	title.position = Vector2(PAD, PAD - 2)
-	title.size = Vector2(GRID_W, 22)
+	title.position = Vector2(PAD, PAD - 4)
+	title.size = Vector2(GRID_W, 30)
 	add_child(title)
 
 func _make_slot(px: float, py: float, faces: Array, counts: Array) -> Panel:
@@ -91,18 +107,18 @@ func _make_slot(px: float, py: float, faces: Array, counts: Array) -> Panel:
 	add_child(panel)
 
 	var face := ColorRect.new()
-	face.position = Vector2(2, 2)
-	face.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
-	face.color = Color(0.15, 0.15, 0.22, 0.4)
+	face.position = Vector2(3, 3)
+	face.size = Vector2(SLOT_SIZE - 6, SLOT_SIZE - 6)
+	face.color = Color(0.20, 0.15, 0.30, 0.4)
 	panel.add_child(face)
 	faces.append(face)
 
 	var cnt := Label.new()
-	cnt.position = Vector2(2, SLOT_SIZE - 16)
-	cnt.size = Vector2(SLOT_SIZE - 4, 14)
+	cnt.position = Vector2(3, SLOT_SIZE - 22)
+	cnt.size = Vector2(SLOT_SIZE - 6, 18)
 	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	cnt.add_theme_font_size_override("font_size", 10)
-	cnt.add_theme_color_override("font_color", Color(1, 1, 1, 0.70))
+	cnt.add_theme_font_size_override("font_size", int(S * 10))
+	cnt.add_theme_color_override("font_color", TEXT_DIM)
 	panel.add_child(cnt)
 	counts.append(cnt)
 
@@ -115,9 +131,9 @@ func _setup_chest_grid() -> void:
 
 	var lbl := Label.new()
 	lbl.text = "Chest"
-	lbl.position = Vector2(sx, sy - 18)
-	lbl.add_theme_font_size_override("font_size", 12)
-	lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.60))
+	lbl.position = Vector2(sx, sy - 24)
+	lbl.add_theme_font_size_override("font_size", int(S * 12))
+	lbl.add_theme_color_override("font_color", TEXT_DIM)
 	add_child(lbl)
 
 	for row in range(rows):
@@ -135,9 +151,9 @@ func _setup_player_grid() -> void:
 
 	var lbl := Label.new()
 	lbl.text = "Inventory"
-	lbl.position = Vector2(sx, py - 18)
-	lbl.add_theme_font_size_override("font_size", 12)
-	lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.60))
+	lbl.position = Vector2(sx, py - 24)
+	lbl.add_theme_font_size_override("font_size", int(S * 12))
+	lbl.add_theme_color_override("font_color", TEXT_DIM)
 	add_child(lbl)
 
 	for row in range(3):
@@ -212,7 +228,7 @@ func _process(_delta: float) -> void:
 
 	for i in range(min(ci.slots.size(), _chest_faces.size())):
 		var slot: ItemSlot = ci.slots[i]
-		var col: Color = Color(0.15, 0.15, 0.22, 0.4) if slot.is_empty() else slot.item.icon_color
+		var col: Color = Color(0.20, 0.15, 0.30, 0.4) if slot.is_empty() else slot.item.icon_color
 		_chest_faces[i].color = col
 		_chest_counts[i].text = "" if slot.is_empty() else (str(slot.count) if slot.count > 1 else "")
 
@@ -220,13 +236,13 @@ func _process(_delta: float) -> void:
 		var pidx: int = 9 + i
 		if pidx < pi.slots.size() and i < _player_faces.size():
 			var slot: ItemSlot = pi.slots[pidx]
-			var col: Color = Color(0.15, 0.15, 0.22, 0.4) if slot.is_empty() else slot.item.icon_color
+			var col: Color = Color(0.20, 0.15, 0.30, 0.4) if slot.is_empty() else slot.item.icon_color
 			_player_faces[i].color = col
 			_player_counts[i].text = "" if slot.is_empty() else (str(slot.count) if slot.count > 1 else "")
 
 	for i in range(9):
 		if i < pi.slots.size() and i < _hotbar_faces.size():
 			var slot: ItemSlot = pi.slots[i]
-			var col: Color = Color(0.15, 0.15, 0.22, 0.4) if slot.is_empty() else slot.item.icon_color
+			var col: Color = Color(0.20, 0.15, 0.30, 0.4) if slot.is_empty() else slot.item.icon_color
 			_hotbar_faces[i].color = col
 			_hotbar_counts[i].text = "" if slot.is_empty() else (str(slot.count) if slot.count > 1 else "")

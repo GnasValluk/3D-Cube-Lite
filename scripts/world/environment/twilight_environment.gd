@@ -35,7 +35,6 @@ func _ready() -> void:
 	if SettingsManager:
 		SettingsManager.on_preset_changed(_reapply_preset)
 
-	await get_tree().process_frame
 	_setup_lights()
 
 func _apply_graphics_preset(env: Environment) -> void:
@@ -193,9 +192,7 @@ func _process(delta: float) -> void:
 		raw = 0.5
 	var t: float = clamp(raw * 0.5 + 0.5, 0.3, 1.0)
 
-	var wi: float = 0.0
-	if TimeSystem:
-		wi = TimeSystem.get_weather_intensity()
+	var wi: float = RainManager.get_local_rain_intensity()
 	var rf: float = 1.0 - wi * 0.55
 
 	environment.background_color = DAY_BG.lerp(NIGHT_BG, 1.0 - t).lerp(Color(0.12, 0.14, 0.18), wi * 0.7)

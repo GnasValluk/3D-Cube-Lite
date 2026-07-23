@@ -40,12 +40,15 @@ func _sample_lighting(h: float) -> Dictionary:
 func _ready() -> void:
 	var env := Environment.new()
 
+	var h: float = _get_hour()
+	var k: Dictionary = _sample_lighting(h)
+
 	env.background_mode  = Environment.BG_COLOR
-	env.background_color = _keys[0]["bg"]
+	env.background_color = k["bg"]
 
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color  = _keys[0]["amb"]
-	env.ambient_light_energy = _keys[0]["ae"]
+	env.ambient_light_color  = k["amb"]
+	env.ambient_light_energy = k["ae"]
 
 	env.fog_enabled = true
 	env.fog_density = 0.0
@@ -60,7 +63,6 @@ func _ready() -> void:
 	if SettingsManager:
 		SettingsManager.on_preset_changed(_reapply_preset)
 
-	await get_tree().process_frame
 	_setup_lights()
 
 func _apply_graphics_preset(env: Environment) -> void:
@@ -182,9 +184,7 @@ func _process(delta: float) -> void:
 	var h: float = _get_hour()
 	var k: Dictionary = _sample_lighting(h)
 
-	var weather_intensity: float = 0.0
-	if TimeSystem:
-		weather_intensity = TimeSystem.get_weather_intensity()
+	var weather_intensity: float = RainManager.get_local_rain_intensity()
 
 	var rain_factor: float = 1.0 - weather_intensity * 0.55
 

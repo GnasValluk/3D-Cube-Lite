@@ -47,9 +47,18 @@ FILTER_FOOD,Food,Thức ăn
 FILTER_MATERIAL,Mat,NL
 FILTER_TOOL,Tool,Dụng cụ
 TOOLTIP_CLICK_ADD,"→ Click to add 1 to inventory","→ Click để thêm 1 vào kho"
-INVENTORY_TITLE,Inventory,Inventory
-STATS_TITLE,Stats,Stats
-EQUIPMENT_TITLE,Equipment,Equipment
+INVENTORY_TITLE,Inventory,TÚI ĐỒ
+STATS_TITLE,Stats,CHỈ SỐ
+EQUIPMENT_TITLE,Equipment,TRANG BỊ
+EQUIP_HEAD,Head,Đầu
+EQUIP_BODY,Body,Thân
+EQUIP_LEGS,Legs,Chân
+EQUIP_HANDS,Hands,Tay
+EQUIP_BACK,Back,Lưng
+EQUIP_SUB,Sub,Phụ
+STAT_ATK_BONUS,ATK: +%d,ATK: +%d
+STAT_DEF_BONUS,DEF: +%d,DEF: +%d
+STAT_HEAL,"Heal: +%d HP","Hồi: +%d HP"
 DROP_HINT,"Right-click = Use","Chuột phải = Sử dụng"
 USE_ITEM,Use,Sử dụng
 DROP_ITEM,Drop,Vứt
@@ -142,7 +151,6 @@ DEVICE_DESC,"Choose your device for optimized controls and UI","Chọn thiết b
 DEVICE_AUTO,Auto Detect,Tự Động
 DEVICE_PC,PC / Desktop,PC / Máy Tính
 DEVICE_MOBILE,Mobile / Phone,Điện Thoại
-DEVICE_CURRENT,"Active: %s  |  Detected: %s","Hiện tại: %s  |  Phát hiện: %s"
 DEVICE_CURRENT,Active: %s | Detected: %s,Hiện tại: %s | Phát hiện: %s
 MOBILE_FEATURES,Mobile Optimizations,Tối Ưu Điện Thoại
 PC_FEATURES,PC Optimizations,Tối Ưu Máy Tính
@@ -162,3 +170,49 @@ FEAT_CHUNK_HIGH,Full view distance,Tầm nhìn đầy đủ
 CREATURE_LIBRARY_TITLE,📚 Library,📚 Thư Viện
 CREATURE_3D_VIEW,3D Preview,Xem 3D
 CREATURE_BUTTON,Library,Thư viện
+BOW_NO_ARROWS,No arrows!,Hết tên! Chế tạo thêm.
+LIB_SEARCH_HINT,Search items... (name or id),Tìm đồ... (tên hoặc id)
+PARTY_CLOSE_HINT,"ESC / P — Close","ESC / P — Đóng"
+PARTY_CONFIRM,Confirm,XÁC NHẬN
+PARTY_QUICK_OFF,Quick Deploy: OFF,THIẾT LẬP NHANH: TẮT
+PARTY_QUICK_ON,Quick Deploy: ON,THIẾT LẬP NHANH: BẬT
+PARTY_CONFIRM_HINT,Press Confirm to apply,Ấn XÁC NHẬN để áp dụng
+PARTY_HP,HP: %d/%d,HP: %d/%d
+PARTY_MP,MP: %d/%d,MP: %d/%d
+PARTY_ATK,ATK: %d,ATK: %d
+PARTY_DEF,DEF: %d,DEF: %d
+PARTY_SPD,SPD: %.1f,SPD: %.1f
+PARTY_ELEMENT,Element: ,Hệ: 
+PARTY_CRIT_RATE,Crit Rate: %d%%,Tỉ lệ Crit: %d%%
+PARTY_CRIT_DMG,Crit Dmg: %d%%,Sát thương Crit: %d%%
+PARTY_MP_REGEN,MP Regen: %.1f/s,Hồi MP: %.1f/s
+PARTY_MP_REFUND,MP Refund: %d,Hoàn MP: %d
+PARTY_MP_COST,%d MP,%d MP
+PARTY_NEED_CHAR,Need at least 1 character,Cần ít nhất một nhân vật
+ELEM_ELECTRIC,Electric,Điện
+ELEM_FIRE,Fire,Hỏa
+ELEM_ICE,Ice,Băng
+ELEM_DARK,Dark,Hắc Ám
+ELEM_DECAY,Decay,Phân hủy
+ELEM_LIGHT,Light,Ánh Sáng
+LIB_TAB_CREATURES,Creatures,Sinh vật
+LIB_SECTION_PARTY,— PARTY —,— ĐỘI —
+LIB_SECTION_FISH,— FISH —,— CÁ —
+LIB_HEADER_STATS,STATS,CHỈ SỐ
+LIB_HEADER_SKILLS,SKILLS,KỸ NĂNG
+LIB_HEADER_SPAWN,SPAWN,XUẤT HIỆN
+LIB_STATS_FORMAT,"HP: %d   ATK: %d   DEF: %d   SPD: %.1f   MP: %d","HP: %d   ATK: %d   DEF: %d   SPD: %.1f   MP: %d"
+LIB_STATS_FORMAT2,"HP: %d   ATK: %d   DEF: %d   SPD: %.1f","HP: %d   ATK: %d   DEF: %d   SPD: %.1f"
+BUILD_INV_LABEL,Items in inventory:,Vật phẩm trong túi:
+BIOME_DESERT,Desert,Sa Mạc
+BIOME_HILLS,Hills,Đồng Bằng (đồi)
+BIOME_OCEAN,Ocean,Biển
+BIOME_LAKE_RIVER,Lake / River,Hồ / Sông
+BIOME_PLAINS,Plains,Đồng Bằng
+SEASON_SPRING,Spring,Xuân
+SEASON_SUMMER,Summer,Hạ
+SEASON_AUTUMN,Autumn,Thu
+SEASON_WINTER,Winter,Đông
+WEATHER_CLEAR,Clear,Trong
+WEATHER_RAIN,Rain,Mưa
+TEMP_FORMAT,%d°C,%d°C

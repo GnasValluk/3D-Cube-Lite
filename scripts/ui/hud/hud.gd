@@ -4,6 +4,22 @@
 extends CanvasLayer
 class_name HUD
 
+const S: float = 1.6
+const SS: float = 1.4
+
+const BG_DEEP := Color(0.06, 0.04, 0.12)
+const BG_PANEL := Color(0.10, 0.07, 0.18)
+const BG_CARD := Color(0.14, 0.10, 0.22)
+const PURPLE := Color(0.55, 0.35, 0.90)
+const TEAL := Color(0.15, 0.72, 0.68)
+const PINK := Color(0.82, 0.28, 0.52)
+const ORANGE := Color(0.92, 0.52, 0.12)
+const CYAN := Color(0.15, 0.62, 0.92)
+const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
+const TEXT_MAIN := Color(0.82, 0.78, 0.95)
+const TEXT_DIM := Color(0.55, 0.50, 0.72)
+const TEXT_MUTED := Color(0.35, 0.32, 0.50)
+
 var _tracked: CharacterBase = null
 var _dummy_label: Label
 var _dummy_tracked: CharacterBase = null
@@ -43,7 +59,6 @@ var _load_scene: String = "res://scenes/open_world.tscn"
 var _portal_timer: float = 0.0
 var _world_clock: Label
 var _oxygen_bar_bg: ColorRect
-var _b_key_held: bool = false
 var _oxygen_bar_fill: ColorRect
 var _debug_open: bool = false
 var _debug_panel: Panel
@@ -54,6 +69,7 @@ var _debug_weather_btn: Button
 var _time_label: Label
 var _coords_label: Label
 var _biome_label: Label  # hiển thị tên biome + continent value góc trái
+var _temperature_label: Label  # hiển thị nhiệt độ góc phải
 # Cache texture để tránh load() blocking mỗi frame trong _refresh_party_hud
 var _icon_cache: Dictionary = {}
 var _hud_throttle: float = 0.0
@@ -67,16 +83,25 @@ func _ready() -> void:
 	_setup_ui()
 	await get_tree().process_frame
 	_find_and_track()
-	var path := get_tree().current_scene.scene_file_path
-	if path == "res://scenes/open_world.tscn":
-		_load_scene = "res://scenes/open_world_real.tscn"
-	elif path == "res://scenes/open_world_real.tscn":
-		_load_scene = "res://scenes/open_world.tscn"
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED:
+		if _switch_hint: _switch_hint.text = tr("SWITCH_HINT")
+		if _portal_btn: _portal_btn.text = tr("PORTAL_BUTTON")
+		if _load_label: _load_label.text = tr("GENERATE_LABEL")
+		if _library_btn: _library_btn.tooltip_text = tr("CREATURE_BUTTON")
+
+	if what == NOTIFICATION_ENTER_TREE:
+		var path := get_tree().current_scene.scene_file_path if get_tree() and get_tree().current_scene else ""
+		if path == "res://scenes/open_world.tscn":
+			_load_scene = "res://scenes/open_world_real.tscn"
+		elif path == "res://scenes/open_world_real.tscn":
+			_load_scene = "res://scenes/open_world.tscn"
 
 func _setup_ui() -> void:
 	_dummy_label = Label.new()
-	_dummy_label.position = Vector2(20, 56)
-	_dummy_label.add_theme_font_size_override("font_size", 14)
+	_dummy_label.position = Vector2(28, 78)
+	_dummy_label.add_theme_font_size_override("font_size", 22)
 	_dummy_label.add_theme_color_override("font_color", Color(1.0, 0.5, 0.5, 0.8))
 	_dummy_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
 	_dummy_label.add_theme_constant_override("shadow_offset_x", 1)
@@ -89,6 +114,7 @@ func _setup_ui() -> void:
 
 	_hotbar = Hotbar.new()
 	_hotbar.visible = false
+	_hotbar.slot_changed.connect(_on_hotbar_slot_changed)
 	add_child(_hotbar)
 
 	_inventory_ui = InventoryUI.new()
@@ -98,9 +124,9 @@ func _setup_ui() -> void:
 	add_child(_chest_ui)
 
 	_switch_hint = Label.new()
-	_switch_hint.position = Vector2(60, 16)
-	_switch_hint.add_theme_font_size_override("font_size", 11)
-	_switch_hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.55))
+	_switch_hint.position = Vector2(84, 22)
+	_switch_hint.add_theme_font_size_override("font_size", 18)
+	_switch_hint.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.55))
 	_switch_hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	_switch_hint.add_theme_constant_override("shadow_offset_x", 1)
 	_switch_hint.add_theme_constant_override("shadow_offset_y", 1)
@@ -109,9 +135,9 @@ func _setup_ui() -> void:
 
 	var dim_label := Label.new()
 	dim_label.name = "DimensionLabel"
-	dim_label.position = Vector2(12, 40)
-	dim_label.add_theme_font_size_override("font_size", 10)
-	dim_label.add_theme_color_override("font_color", Color(0.55, 0.55, 0.65, 0.65))
+	dim_label.position = Vector2(17, 56)
+	dim_label.add_theme_font_size_override("font_size", 16)
+	dim_label.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.65))
 	dim_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	dim_label.add_theme_constant_override("shadow_offset_x", 1)
 	dim_label.add_theme_constant_override("shadow_offset_y", 1)
@@ -155,32 +181,32 @@ func _setup_ui() -> void:
 	add_child(_mini_map)
 
 	_build_hint = Label.new()
-	_build_hint.position = Vector2(12, 56)
-	_build_hint.add_theme_font_size_override("font_size", 11)
-	_build_hint.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.6))
+	_build_hint.position = Vector2(17, 78)
+	_build_hint.add_theme_font_size_override("font_size", 18)
+	_build_hint.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.6))
 	_build_hint.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	_build_hint.add_theme_constant_override("shadow_offset_x", 1)
 	_build_hint.add_theme_constant_override("shadow_offset_y", 1)
-	_build_hint.text = tr("BUILD_HINT_B")
+	_build_hint.text = ""
 	add_child(_build_hint)
 
 	_portal_btn = Button.new()
 	_portal_btn.position = Vector2(0, 0)
-	_portal_btn.size = Vector2(220, 50)
+	_portal_btn.size = Vector2(308, 70)
 	_portal_btn.text = tr("PORTAL_BUTTON")
-	_portal_btn.add_theme_font_size_override("font_size", 18)
-	_portal_btn.add_theme_color_override("font_color", Color(0.90, 0.90, 0.95, 0.95))
+	_portal_btn.add_theme_font_size_override("font_size", 28)
+	_portal_btn.add_theme_color_override("font_color", TEXT_BRIGHT)
 	var pb_bg := StyleBoxFlat.new()
-	pb_bg.bg_color = Color(0.10, 0.10, 0.18, 0.65)
+	pb_bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.65)
 	pb_bg.corner_radius_top_left = 10; pb_bg.corner_radius_top_right = 10
 	pb_bg.corner_radius_bottom_left = 10; pb_bg.corner_radius_bottom_right = 10
 	pb_bg.border_width_left = 1; pb_bg.border_width_right = 1
 	pb_bg.border_width_top = 1; pb_bg.border_width_bottom = 1
-	pb_bg.border_color = Color(1, 1, 1, 0.12)
+	pb_bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
 	_portal_btn.add_theme_stylebox_override("normal", pb_bg)
 	var pb_hover := pb_bg.duplicate()
-	pb_hover.bg_color = Color(0.15, 0.18, 0.30, 0.75)
-	pb_hover.border_color = Color(0.40, 0.55, 0.90, 0.40)
+	pb_hover.bg_color = Color(0.22, 0.18, 0.35, 0.75)
+	pb_hover.border_color = Color(TEAL.r, TEAL.g, TEAL.b, 0.40)
 	_portal_btn.add_theme_stylebox_override("hover", pb_hover)
 	_portal_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_portal_btn.pressed.connect(_on_portal_click)
@@ -232,42 +258,42 @@ func _setup_loading_overlay() -> void:
 
 	_load_label = Label.new()
 	_load_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_load_label.add_theme_font_size_override("font_size", 18)
-	_load_label.add_theme_color_override("font_color", Color(0.70, 0.70, 0.80, 0.9))
+	_load_label.add_theme_font_size_override("font_size", 28)
+	_load_label.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.9))
 	_load_label.text = tr("GENERATE_LABEL")
 	_load_label.visible = false
 	add_child(_load_label)
 
 	var bar_bg := ColorRect.new()
-	bar_bg.color = Color(0.08, 0.08, 0.14, 0.70)
+	bar_bg.color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.70)
 	bar_bg.visible = false
 	bar_bg.name = "LoadingBarBg"
 	_load_overlay.add_child(bar_bg)
 
 	_load_bar_fill = ColorRect.new()
-	_load_bar_fill.color = Color(0.35, 0.55, 0.90, 0.80)
+	_load_bar_fill.color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.80)
 	
 	_load_bar_fill.visible = false
 	_load_overlay.add_child(_load_bar_fill)
 
 func _setup_settings_icon() -> void:
 	_settings_icon = Button.new()
-	_settings_icon.position = Vector2(12, 10)
-	_settings_icon.size = Vector2(40, 40)
+	_settings_icon.position = Vector2(17, 14)
+	_settings_icon.size = Vector2(56, 56)
 	_settings_icon.text = "⚙"
-	_settings_icon.add_theme_font_size_override("font_size", 22)
-	_settings_icon.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.7))
+	_settings_icon.add_theme_font_size_override("font_size", 34)
+	_settings_icon.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
 	var icon_bg := StyleBoxFlat.new()
-	icon_bg.bg_color = Color(0.08, 0.08, 0.14, 0.65)
+	icon_bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.65)
 	icon_bg.corner_radius_top_left = 8; icon_bg.corner_radius_top_right = 8
 	icon_bg.corner_radius_bottom_left = 8; icon_bg.corner_radius_bottom_right = 8
 	icon_bg.border_width_left = 1; icon_bg.border_width_right = 1
 	icon_bg.border_width_top = 1; icon_bg.border_width_bottom = 1
-	icon_bg.border_color = Color(1, 1, 1, 0.10)
+	icon_bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.10)
 	_settings_icon.add_theme_stylebox_override("normal", icon_bg)
 	var hover_bg := icon_bg.duplicate()
-	hover_bg.bg_color = Color(0.15, 0.18, 0.30, 0.75)
-	hover_bg.border_color = Color(0.40, 0.55, 0.90, 0.40)
+	hover_bg.bg_color = Color(0.22, 0.18, 0.35, 0.75)
+	hover_bg.border_color = Color(TEAL.r, TEAL.g, TEAL.b, 0.40)
 	_settings_icon.add_theme_stylebox_override("hover", hover_bg)
 	_settings_icon.mouse_filter = Control.MOUSE_FILTER_STOP
 	_settings_icon.pressed.connect(_toggle_settings)
@@ -275,22 +301,22 @@ func _setup_settings_icon() -> void:
 
 func _setup_save_button() -> void:
 	_save_btn = Button.new()
-	_save_btn.position = Vector2(58, 10)
-	_save_btn.size = Vector2(40, 40)
+	_save_btn.position = Vector2(81, 14)
+	_save_btn.size = Vector2(56, 56)
 	_save_btn.text = "💾"
-	_save_btn.add_theme_font_size_override("font_size", 18)
-	_save_btn.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.7))
+	_save_btn.add_theme_font_size_override("font_size", 28)
+	_save_btn.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
 	var sb_bg := StyleBoxFlat.new()
-	sb_bg.bg_color = Color(0.08, 0.08, 0.14, 0.65)
+	sb_bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.65)
 	sb_bg.corner_radius_top_left = 8; sb_bg.corner_radius_top_right = 8
 	sb_bg.corner_radius_bottom_left = 8; sb_bg.corner_radius_bottom_right = 8
 	sb_bg.border_width_left = 1; sb_bg.border_width_right = 1
 	sb_bg.border_width_top = 1; sb_bg.border_width_bottom = 1
-	sb_bg.border_color = Color(1, 1, 1, 0.10)
+	sb_bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.10)
 	_save_btn.add_theme_stylebox_override("normal", sb_bg)
 	var sb_hover := sb_bg.duplicate()
-	sb_hover.bg_color = Color(0.15, 0.18, 0.30, 0.75)
-	sb_hover.border_color = Color(0.40, 0.55, 0.90, 0.40)
+	sb_hover.bg_color = Color(0.22, 0.18, 0.35, 0.75)
+	sb_hover.border_color = Color(TEAL.r, TEAL.g, TEAL.b, 0.40)
 	_save_btn.add_theme_stylebox_override("hover", sb_hover)
 	_save_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_save_btn.pressed.connect(_on_save_pressed)
@@ -298,23 +324,23 @@ func _setup_save_button() -> void:
 
 func _setup_library_button() -> void:
 	_library_btn = Button.new()
-	_library_btn.position = Vector2(104, 10)
-	_library_btn.size = Vector2(40, 40)
+	_library_btn.position = Vector2(146, 14)
+	_library_btn.size = Vector2(56, 56)
 	_library_btn.text = "📖"
 	_library_btn.tooltip_text = tr("CREATURE_BUTTON")
-	_library_btn.add_theme_font_size_override("font_size", 18)
-	_library_btn.add_theme_color_override("font_color", Color(0.6, 0.6, 0.7, 0.7))
+	_library_btn.add_theme_font_size_override("font_size", 28)
+	_library_btn.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
 	var lb_bg := StyleBoxFlat.new()
-	lb_bg.bg_color = Color(0.08, 0.08, 0.14, 0.65)
+	lb_bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.65)
 	lb_bg.corner_radius_top_left = 8; lb_bg.corner_radius_top_right = 8
 	lb_bg.corner_radius_bottom_left = 8; lb_bg.corner_radius_bottom_right = 8
 	lb_bg.border_width_left = 1; lb_bg.border_width_right = 1
 	lb_bg.border_width_top = 1; lb_bg.border_width_bottom = 1
-	lb_bg.border_color = Color(1, 1, 1, 0.10)
+	lb_bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.10)
 	_library_btn.add_theme_stylebox_override("normal", lb_bg)
 	var lb_hover := lb_bg.duplicate()
-	lb_hover.bg_color = Color(0.15, 0.18, 0.30, 0.75)
-	lb_hover.border_color = Color(0.40, 0.55, 0.90, 0.40)
+	lb_hover.bg_color = Color(0.22, 0.18, 0.35, 0.75)
+	lb_hover.border_color = Color(TEAL.r, TEAL.g, TEAL.b, 0.40)
 	_library_btn.add_theme_stylebox_override("hover", lb_hover)
 	_library_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_library_btn.pressed.connect(_on_library_pressed)
@@ -343,10 +369,10 @@ func _toggle_settings() -> void:
 		_settings_ui.show_settings()
 
 func _setup_party_hud() -> void:
-	var W: float = 80.0
-	var H: float = 78.0
-	var G: float = 4.0
-	var PLAYER_GAP: float = 16.0
+	var W: float = 112.0
+	var H: float = 109.0
+	var G: float = 6.0
+	var PLAYER_GAP: float = 22.0
 	var slot_count: int = 4
 
 	_party_hud = Control.new()
@@ -368,7 +394,7 @@ func _setup_party_hud() -> void:
 		_party_hud.add_child(panel)
 
 		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.08, 0.08, 0.14, 0.70)
+		bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.70)
 		bg.corner_radius_top_left = 8
 		bg.corner_radius_top_right = 8
 		bg.corner_radius_bottom_left = 8
@@ -377,46 +403,47 @@ func _setup_party_hud() -> void:
 		bg.border_width_right = 1
 		bg.border_width_top = 1
 		bg.border_width_bottom = 1
-		bg.border_color = Color(1, 1, 1, 0.12)
+		bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
 		panel.add_theme_stylebox_override("panel", bg)
 
 		var icon := TextureRect.new()
-		icon.position = Vector2(6, 6)
-		icon.size = Vector2(60, 60)
+		icon.position = Vector2(8, 8)
+		icon.size = Vector2(84, 84)
 		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		panel.add_child(icon)
 
 		var hp_bg := ColorRect.new()
-		hp_bg.position = Vector2(6, 66)
-		hp_bg.size = Vector2(60, 6)
-		hp_bg.color = Color(0.06, 0.06, 0.10, 0.60)
+		hp_bg.position = Vector2(8, 92)
+		hp_bg.size = Vector2(84, 8)
+		hp_bg.color = Color(BG_DEEP.r, BG_DEEP.g, BG_DEEP.b, 0.60)
 		panel.add_child(hp_bg)
 
 		var hp_bar := ColorRect.new()
-		hp_bar.position = Vector2(6, 66)
-		hp_bar.size = Vector2(60, 6)
+		hp_bar.position = Vector2(8, 92)
+		hp_bar.size = Vector2(84, 8)
 		hp_bar.color = Color(0.30, 0.85, 0.30, 0.85)
 		panel.add_child(hp_bar)
 
 		var shield_bar := ColorRect.new()
-		shield_bar.position = Vector2(6, 66)
-		shield_bar.size = Vector2(0, 6)
+		shield_bar.position = Vector2(8, 92)
+		shield_bar.size = Vector2(0, 8)
 		shield_bar.color = Color(1.0, 0.80, 0.20, 0.55)
 		panel.add_child(shield_bar)
 
 		var mana_bar := ColorRect.new()
-		mana_bar.position = Vector2(6, 72)
-		mana_bar.size = Vector2(0, 4)
-		mana_bar.color = Color(0.30, 0.55, 0.95, 0.60)
+		mana_bar.position = Vector2(8, 101)
+		mana_bar.size = Vector2(0, 6)
+		var slot_accents := [PURPLE, TEAL, PINK, ORANGE]
+		mana_bar.color = Color(slot_accents[i].r, slot_accents[i].g, slot_accents[i].b, 0.60)
 		panel.add_child(mana_bar)
 
 		var lbl := Label.new()
-		lbl.position = Vector2(2, 4)
-		lbl.size = Vector2(76, 16)
+		lbl.position = Vector2(3, 6)
+		lbl.size = Vector2(106, 22)
 		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.add_theme_font_size_override("font_size", 11)
-		lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.90, 0.8))
+		lbl.add_theme_font_size_override("font_size", 18)
+		lbl.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.8))
 		lbl.text = "P" if i == 3 else str(i + 1)
 		panel.add_child(lbl)
 
@@ -444,8 +471,6 @@ func _process(delta: float) -> void:
 		_placement_sys.update_placement()
 		_build_hint.text = tr("BUILD_HINT_PLACING")
 
-	_b_key_held = Input.is_key_pressed(KEY_B)
-
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	_hud_throttle -= delta
 
@@ -458,6 +483,13 @@ func _process(delta: float) -> void:
 			var m: int = TimeSystem.get_minute()
 			_world_clock.text = "%02d:%02d" % [h, m]
 			_time_label.text = "%s %d  |  %s  |  %s" % [TimeSystem.get_month_name(), TimeSystem.get_day(), TimeSystem.get_season_name(), TimeSystem.get_weather_name()]
+			var ts_player := _find_player_character()
+			var ts_tracked: CharacterBase = _mgr.get_current_character() if _mgr else null
+			var ts_src: Node3D = ts_player if ts_player else ts_tracked
+			if ts_src and is_instance_valid(ts_src) and ts_src.is_inside_tree():
+				_temperature_label.text = TimeSystem.get_temperature_string(ts_src.global_position.y)
+			else:
+				_temperature_label.text = TimeSystem.get_temperature_string()
 		else:
 			var env := get_parent().get_node_or_null("WorldEnvironment") as WorldEnvironment
 			if env and env.has_method("get_cycle_progress"):
@@ -481,29 +513,31 @@ func _process(delta: float) -> void:
 					_biome_label.text = ""
 
 	if _mgr:
-		_party_hud.position = Vector2(vp.x - 72, (vp.y - _party_hud.size.y) * 0.5)
+		_party_hud.position = Vector2(vp.x - 101, (vp.y - _party_hud.size.y) * 0.5)
 
 	if _mini_map:
 		_mini_map.visible = _explore_sys != null and get_parent().has_node("WorldManager") and not (_explore_map and _explore_map.visible)
 		if _mini_map.visible:
-			_mini_map.position = Vector2(vp.x - 162, vp.y - 162)
+			_mini_map.position = Vector2(vp.x - 227, vp.y - 227)
 
-	_world_clock.position = Vector2(vp.x - _world_clock.size.x - 12, 12)
-	_time_label.position = Vector2(vp.x - _time_label.size.x - 12, 30)
+	_world_clock.position = Vector2(vp.x - _world_clock.size.x - 17, 17)
+	_time_label.position = Vector2(vp.x - _time_label.size.x - 17, 42)
 
 	if _coords_label:
-		_coords_label.size = Vector2(220, 18)
-		_coords_label.position = Vector2(vp.x - _coords_label.size.x - 12, 46)
+		_coords_label.size = Vector2(308, 26)
+		_coords_label.position = Vector2(vp.x - _coords_label.size.x - 17, 64)
 		if _biome_label:
-			_biome_label.position = Vector2(12, 62)
+			_biome_label.position = Vector2(17, 87)
+	if _temperature_label:
+		_temperature_label.position = Vector2(vp.x - _temperature_label.size.x - 17, 86)
 
 	if _debug_open:
-		_debug_panel.position = Vector2(vp.x * 0.5 - 175, vp.y * 0.5 - 130)
+		_debug_panel.position = Vector2(vp.x * 0.5 - 228, vp.y * 0.5 - 169)
 		_update_debug_menu()
 
 	if _oxygen_bar_bg.visible:
-		var bx: float = (vp.x - 160.0) * 0.5
-		var by: float = vp.y - 80.0
+		var bx: float = (vp.x - 224.0) * 0.5
+		var by: float = vp.y - 112.0
 		_oxygen_bar_bg.position = Vector2(bx, by)
 		_oxygen_bar_fill.position = Vector2(bx, by)
 
@@ -586,22 +620,22 @@ func _refresh_party_hud() -> void:
 				0.3 + hp_ratio * 0.7,
 				0.2,
 				0.85)
-			d["hp_bar"].size.x = max(2.0, 60.0 * hp_ratio)
+			d["hp_bar"].size.x = max(3.0, 84.0 * hp_ratio)
 
 			var shield_ratio: float = clamp(float(ch.shield) / float(max_hp_val), 0.0, 1.0)
 			if shield_ratio > 0.0:
-				d["shield_bar"].size.x = max(2.0, 60.0 * shield_ratio)
-				d["shield_bar"].position.x = 6.0 + 60.0 * hp_ratio
+				d["shield_bar"].size.x = max(3.0, 84.0 * shield_ratio)
+				d["shield_bar"].position.x = 8.0 + 84.0 * hp_ratio
 			else:
 				d["shield_bar"].size.x = 0.0
 
 			var mana_ratio: float = clamp(float(ch.mana) / float(max(ch.max_mana, 1)), 0.0, 1.0)
-			d["mana_bar"].size.x = max(2.0, 60.0 * mana_ratio)
+			d["mana_bar"].size.x = max(3.0, 84.0 * mana_ratio)
 
 			d["lbl"].text = "Lv" + str(ch.level)
 
 			var elem: Variant = ch.get("element")
-			var ec: Color = Color(0.3, 0.3, 0.5)
+			var ec: Color = Color(0.38, 0.30, 0.55)
 			if elem is int and (elem as int) > 0:
 				var tmp: Variant = CharacterBase.ELEMENT_COLORS.get(elem as int)
 				if tmp is Color:
@@ -610,19 +644,19 @@ func _refresh_party_hud() -> void:
 			d["icon"].modulate = Color(1, 1, 1, 1)
 
 			if active and ch.character_name == active.character_name:
-				bg.border_color = Color(1, 1, 1, 0.50)
+				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.50)
 				bg.border_width_left = 2
 				bg.border_width_right = 2
 				bg.border_width_top = 2
 				bg.border_width_bottom = 2
 				bg.bg_color = Color(ec.r * 0.15 + 0.08, ec.g * 0.15 + 0.08, ec.b * 0.15 + 0.14, 0.70)
 			else:
-				bg.border_color = Color(1, 1, 1, 0.12)
+				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
 				bg.border_width_left = 1
 				bg.border_width_right = 1
 				bg.border_width_top = 1
 				bg.border_width_bottom = 1
-				bg.bg_color = Color(0.08, 0.08, 0.14, 0.55)
+				bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.55)
 		elif i < party.size():
 			var ch: CharacterBase = party[i]
 			d["hp_bar"].visible = true
@@ -636,22 +670,22 @@ func _refresh_party_hud() -> void:
 				0.3 + hp_ratio * 0.7,
 				0.2,
 				0.85)
-			d["hp_bar"].size.x = max(2.0, 60.0 * hp_ratio)
+			d["hp_bar"].size.x = max(3.0, 84.0 * hp_ratio)
 
 			var shield_ratio: float = clamp(float(ch.shield) / float(max_hp_val), 0.0, 1.0)
 			if shield_ratio > 0.0:
-				d["shield_bar"].size.x = max(2.0, 60.0 * shield_ratio)
-				d["shield_bar"].position.x = 6.0 + 60.0 * hp_ratio
+				d["shield_bar"].size.x = max(3.0, 84.0 * shield_ratio)
+				d["shield_bar"].position.x = 8.0 + 84.0 * hp_ratio
 			else:
 				d["shield_bar"].size.x = 0.0
 
 			var mana_ratio: float = clamp(float(ch.mana) / float(max(ch.max_mana, 1)), 0.0, 1.0)
-			d["mana_bar"].size.x = max(2.0, 60.0 * mana_ratio)
+			d["mana_bar"].size.x = max(3.0, 84.0 * mana_ratio)
 
 			d["lbl"].text = "Lv" + str(ch.level)
 
 			var elem: Variant = ch.get("element")
-			var ec: Color = Color(0.3, 0.3, 0.5)
+			var ec: Color = Color(0.38, 0.30, 0.55)
 			if elem is int and (elem as int) > 0:
 				var tmp: Variant = CharacterBase.ELEMENT_COLORS.get(elem as int)
 				if tmp is Color:
@@ -660,32 +694,32 @@ func _refresh_party_hud() -> void:
 			d["icon"].modulate = Color(1, 1, 1, 1)
 
 			if active and ch.character_name == active.character_name:
-				bg.border_color = Color(1, 1, 1, 0.50)
+				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.50)
 				bg.border_width_left = 2
 				bg.border_width_right = 2
 				bg.border_width_top = 2
 				bg.border_width_bottom = 2
 				bg.bg_color = Color(ec.r * 0.15 + 0.08, ec.g * 0.15 + 0.08, ec.b * 0.15 + 0.14, 0.70)
 			else:
-				bg.border_color = Color(1, 1, 1, 0.12)
+				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
 				bg.border_width_left = 1
 				bg.border_width_right = 1
 				bg.border_width_top = 1
 				bg.border_width_bottom = 1
-				bg.bg_color = Color(0.08, 0.08, 0.14, 0.55)
+				bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.55)
 		else:
 			d["hp_bar"].visible = false
 			d["shield_bar"].visible = false
 			d["mana_bar"].visible = false
 			d["icon"].texture = null
-			d["icon"].modulate = Color(0.08, 0.08, 0.14, 0.7)
+			d["icon"].modulate = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.7)
 			d["lbl"].text = "P" if i == 3 else str(i + 1)
-			bg.border_color = Color(1, 1, 1, 0.06)
+			bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.06)
 			bg.border_width_left = 1
 			bg.border_width_right = 1
 			bg.border_width_top = 1
 			bg.border_width_bottom = 1
-			bg.bg_color = Color(0.06, 0.06, 0.10, 0.45)
+			bg.bg_color = Color(BG_DEEP.r, BG_DEEP.g, BG_DEEP.b, 0.45)
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
@@ -693,7 +727,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if k.pressed and not k.echo:
 			var k_interact: int = ProjectSettings.get_setting("controls/interact", KEY_F)
 			var k_inventory: int = ProjectSettings.get_setting("controls/inventory", KEY_I)
-			var k_build: int = ProjectSettings.get_setting("controls/build", KEY_B)
 			var k_party: int = ProjectSettings.get_setting("controls/party", KEY_P)
 			var k_map: int = ProjectSettings.get_setting("controls/map", KEY_M)
 			var k_debug: int = ProjectSettings.get_setting("controls/debug", KEY_F2)
@@ -709,9 +742,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				return
 
 			if _placement_sys and _placement_sys.is_placing():
-				if k.keycode == KEY_ESCAPE or k.keycode == k_build:
+				if k.keycode == KEY_ESCAPE:
 					_placement_sys.cancel_placement()
-					_build_hint.text = tr("BUILD_HINT_B")
+					_build_hint.text = ""
 				return
 
 			if k.keycode >= KEY_1 and k.keycode <= KEY_9:
@@ -741,22 +774,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					_explore_map.close()
 				elif _explore_sys and not (_settings_ui and _settings_ui.visible) and not (_party_ui and _party_ui.visible):
 					_explore_map.open(_explore_sys)
-				return
-			if k.keycode == k_build:
-				if _build_menu and _build_menu.visible:
-					_build_menu.close()
-				else:
-					var player := _find_player_character()
-					if player:
-						if _placement_sys == null:
-							_placement_sys = PlacementSystem.new()
-							_placement_sys.name = "PlacementSystem"
-							var p := get_parent()
-							if p:
-								p.add_child(_placement_sys)
-						_placement_sys.set_player_inventory(player.inventory)
-					if not (_settings_ui and _settings_ui.visible) and not (_party_ui and _party_ui.visible):
-						_build_menu.open(player.inventory if player else null)
 				return
 			if k.keycode == k_party:
 				if _party_ui and _party_ui.visible:
@@ -809,13 +826,31 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
+			if mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+				if Input.is_key_pressed(KEY_CTRL) and _hotbar.visible:
+					var cur := _mgr.get_current_character() if _mgr else null
+					if cur is PlayerCharacter:
+						var idx: int = _hotbar.get_selected()
+						idx += -1 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else 1
+						idx = (idx + 9) % 9
+						_hotbar.select_slot(idx)
+						get_viewport().set_input_as_handled()
+					return
 			if _placement_sys and _placement_sys.is_placing():
 				if mb.button_index == MOUSE_BUTTON_LEFT:
 					_placement_sys.confirm_placement()
-					_build_hint.text = tr("BUILD_HINT_B")
+					_build_hint.text = ""
+					# Nếu vẫn cầm vật phẩm công trình và còn hàng → tự động place tiếp
+					var def := _hotbar.get_selected_item()
+					if def != null and _is_building_item(def):
+						var player := _find_player_character()
+						if player and player.inventory and player.inventory.get_item_count(def.id) > 0:
+							_placement_sys.set_player_inventory(player.inventory, player)
+							_placement_sys.start_placement(def.id)
+							_build_hint.text = tr("BUILD_HINT_PLACING")
 				elif mb.button_index == MOUSE_BUTTON_RIGHT:
 					_placement_sys.cancel_placement()
-					_build_hint.text = tr("BUILD_HINT_B")
+					_build_hint.text = ""
 
 func _find_and_track() -> void:
 	_mgr = _find_manager()
@@ -835,7 +870,7 @@ func _find_and_track() -> void:
 			p.add_child(_placement_sys, true)
 	var player := _find_player_character()
 	if player:
-		_placement_sys.set_player_inventory(player.inventory)
+		_placement_sys.set_player_inventory(player.inventory, player)
 	_explore_sys = _find_explore_system()
 	if _explore_sys:
 		_explore_sys.set_player(_mgr.get_current_character())
@@ -920,6 +955,7 @@ func _track_character(ch: CharacterBase) -> void:
 		if player_ch.inventory:
 			_hotbar.set_inventory(player_ch.inventory)
 			_hotbar.set_player(player_ch)
+			_on_hotbar_slot_changed(_hotbar.get_selected())
 			_inventory_ui.set_inventory(player_ch.inventory)
 			_inventory_ui.set_player(player_ch)
 	else:
@@ -947,16 +983,37 @@ func _on_build_selected(item_id: String) -> void:
 		_build_menu.close()
 		var player := _find_player_character()
 		if player:
-			_placement_sys.set_player_inventory(player.inventory)
+			_placement_sys.set_player_inventory(player.inventory, player)
 		_placement_sys.start_placement(item_id)
 
 func _on_build_menu_closed() -> void:
-	_build_hint.text = tr("BUILD_HINT_B")
+	_build_hint.text = ""
+
+func _on_hotbar_slot_changed(idx: int) -> void:
+	var def: ItemDef = _hotbar.get_selected_item()
+	if _placement_sys and _placement_sys.is_placing():
+		_placement_sys.cancel_placement()
+		_build_hint.text = ""
+	if def != null and _is_building_item(def):
+		if _placement_sys == null:
+			return
+		var player := _find_player_character()
+		if player:
+			_placement_sys.set_player_inventory(player.inventory, player)
+		_placement_sys.start_placement(def.id)
+		_build_hint.text = tr("BUILD_HINT_PLACING")
+
+func _is_building_item(def: ItemDef) -> bool:
+	if def.type == ItemDef.Type.BLOCK:
+		return true
+	if def.id in ["twilight_gate", "chest"]:
+		return true
+	return false
 
 func _setup_world_clock() -> void:
 	_world_clock = Label.new()
-	_world_clock.add_theme_font_size_override("font_size", 14)
-	_world_clock.add_theme_color_override("font_color", Color(0.60, 0.60, 0.70, 0.8))
+	_world_clock.add_theme_font_size_override("font_size", 22)
+	_world_clock.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.8))
 	_world_clock.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	_world_clock.add_theme_constant_override("shadow_offset_x", 1)
 	_world_clock.add_theme_constant_override("shadow_offset_y", 1)
@@ -965,8 +1022,8 @@ func _setup_world_clock() -> void:
 
 func _setup_time_label() -> void:
 	_time_label = Label.new()
-	_time_label.add_theme_font_size_override("font_size", 11)
-	_time_label.add_theme_color_override("font_color", Color(0.50, 0.50, 0.65, 0.7))
+	_time_label.add_theme_font_size_override("font_size", 18)
+	_time_label.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
 	_time_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
 	_time_label.add_theme_constant_override("shadow_offset_x", 1)
 	_time_label.add_theme_constant_override("shadow_offset_y", 1)
@@ -974,7 +1031,7 @@ func _setup_time_label() -> void:
 	add_child(_time_label)
 
 	_coords_label = Label.new()
-	_coords_label.add_theme_font_size_override("font_size", 11)
+	_coords_label.add_theme_font_size_override("font_size", 18)
 	_coords_label.add_theme_color_override("font_color", Color(0.65, 0.80, 0.65, 0.75))
 	_coords_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	_coords_label.add_theme_constant_override("shadow_offset_x", 1)
@@ -985,7 +1042,7 @@ func _setup_time_label() -> void:
 
 	# Biome label — góc trái, dưới coords
 	_biome_label = Label.new()
-	_biome_label.add_theme_font_size_override("font_size", 11)
+	_biome_label.add_theme_font_size_override("font_size", 18)
 	_biome_label.add_theme_color_override("font_color", Color(0.90, 0.85, 0.55, 0.85))
 	_biome_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
 	_biome_label.add_theme_constant_override("shadow_offset_x", 1)
@@ -993,12 +1050,21 @@ func _setup_time_label() -> void:
 	_biome_label.text = ""
 	add_child(_biome_label)
 
+	_temperature_label = Label.new()
+	_temperature_label.add_theme_font_size_override("font_size", 18)
+	_temperature_label.add_theme_color_override("font_color", Color(0.95, 0.60, 0.30, 0.80))
+	_temperature_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
+	_temperature_label.add_theme_constant_override("shadow_offset_x", 1)
+	_temperature_label.add_theme_constant_override("shadow_offset_y", 1)
+	_temperature_label.text = ""
+	add_child(_temperature_label)
+
 func _setup_debug_menu() -> void:
 	_debug_panel = Panel.new()
 	_debug_panel.visible = false
 	_debug_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.06, 0.06, 0.12, 0.90)
+	bg.bg_color = Color(BG_DEEP.r, BG_DEEP.g, BG_DEEP.b, 0.90)
 	bg.corner_radius_top_left = 8
 	bg.corner_radius_top_right = 8
 	bg.corner_radius_bottom_left = 8
@@ -1007,61 +1073,61 @@ func _setup_debug_menu() -> void:
 	bg.border_width_right = 1
 	bg.border_width_top = 1
 	bg.border_width_bottom = 1
-	bg.border_color = Color(1, 1, 1, 0.15)
+	bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.15)
 	_debug_panel.add_theme_stylebox_override("panel", bg)
 
 	var vp := get_viewport().get_visible_rect().size
-	_debug_panel.position = Vector2(vp.x * 0.5 - 175, vp.y * 0.5 - 160)
-	_debug_panel.size = Vector2(350, 320)
+	_debug_panel.position = Vector2(vp.x * 0.5 - 228, vp.y * 0.5 - 208)
+	_debug_panel.size = Vector2(455, 416)
 
 	var title := Label.new()
-	title.position = Vector2(12, 8)
-	title.size = Vector2(326, 28)
-	title.add_theme_font_size_override("font_size", 18)
-	title.add_theme_color_override("font_color", Color(0.80, 0.80, 0.90, 0.9))
+	title.position = Vector2(17, 11)
+	title.size = Vector2(424, 39)
+	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.9))
 	title.text = "DEBUG MENU"
 	_debug_panel.add_child(title)
 
 	var close_btn := Button.new()
-	close_btn.position = Vector2(320, 6)
-	close_btn.size = Vector2(24, 24)
+	close_btn.position = Vector2(416, 8)
+	close_btn.size = Vector2(31, 31)
 	close_btn.text = "X"
-	close_btn.add_theme_font_size_override("font_size", 12)
+	close_btn.add_theme_font_size_override("font_size", 18)
 	close_btn.pressed.connect(_toggle_debug)
 	_debug_panel.add_child(close_btn)
 
-	var y: float = 44
-	var line_h: float = 36
+	var y: float = 57
+	var line_h: float = 47
 
 	var ts_label := Label.new()
-	ts_label.position = Vector2(12, y)
-	ts_label.size = Vector2(326, 20)
-	ts_label.add_theme_font_size_override("font_size", 13)
-	ts_label.add_theme_color_override("font_color", Color(0.60, 0.60, 0.75, 0.85))
+	ts_label.position = Vector2(17, y)
+	ts_label.size = Vector2(424, 26)
+	ts_label.add_theme_font_size_override("font_size", 20)
+	ts_label.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.85))
 	ts_label.text = "Game Time:"
 	_debug_panel.add_child(ts_label)
-	y += 20
+	y += 28
 
 	_debug_ts_label = Label.new()
-	_debug_ts_label.position = Vector2(12, y)
-	_debug_ts_label.size = Vector2(326, 20)
-	_debug_ts_label.add_theme_font_size_override("font_size", 13)
-	_debug_ts_label.add_theme_color_override("font_color", Color(0.80, 0.80, 0.90, 0.9))
+	_debug_ts_label.position = Vector2(17, y)
+	_debug_ts_label.size = Vector2(424, 26)
+	_debug_ts_label.add_theme_font_size_override("font_size", 20)
+	_debug_ts_label.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.9))
 	_debug_ts_label.text = ""
 	_debug_panel.add_child(_debug_ts_label)
 	y += line_h
 
 	var hour_lbl := Label.new()
-	hour_lbl.position = Vector2(12, y)
-	hour_lbl.size = Vector2(80, 20)
-	hour_lbl.add_theme_font_size_override("font_size", 13)
-	hour_lbl.add_theme_color_override("font_color", Color(0.60, 0.60, 0.75, 0.85))
+	hour_lbl.position = Vector2(17, y)
+	hour_lbl.size = Vector2(104, 26)
+	hour_lbl.add_theme_font_size_override("font_size", 20)
+	hour_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.85))
 	hour_lbl.text = "Hour:"
 	_debug_panel.add_child(hour_lbl)
 
 	_debug_hour_slider = HSlider.new()
-	_debug_hour_slider.position = Vector2(90, y)
-	_debug_hour_slider.size = Vector2(240, 20)
+	_debug_hour_slider.position = Vector2(126, y)
+	_debug_hour_slider.size = Vector2(312, 26)
 	_debug_hour_slider.min_value = 0.0
 	_debug_hour_slider.max_value = 24.0
 	_debug_hour_slider.step = 0.5
@@ -1071,16 +1137,16 @@ func _setup_debug_menu() -> void:
 	y += line_h
 
 	var speed_lbl := Label.new()
-	speed_lbl.position = Vector2(12, y)
-	speed_lbl.size = Vector2(80, 20)
-	speed_lbl.add_theme_font_size_override("font_size", 13)
-	speed_lbl.add_theme_color_override("font_color", Color(0.60, 0.60, 0.75, 0.85))
+	speed_lbl.position = Vector2(17, y)
+	speed_lbl.size = Vector2(104, 26)
+	speed_lbl.add_theme_font_size_override("font_size", 20)
+	speed_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.85))
 	speed_lbl.text = "Speed:"
 	_debug_panel.add_child(speed_lbl)
 
 	_debug_speed_slider = HSlider.new()
-	_debug_speed_slider.position = Vector2(90, y)
-	_debug_speed_slider.size = Vector2(240, 20)
+	_debug_speed_slider.position = Vector2(126, y)
+	_debug_speed_slider.size = Vector2(312, 26)
 	_debug_speed_slider.min_value = 0.0
 	_debug_speed_slider.max_value = 50.0
 	_debug_speed_slider.step = 0.5
@@ -1090,17 +1156,17 @@ func _setup_debug_menu() -> void:
 	y += line_h
 
 	var weather_lbl := Label.new()
-	weather_lbl.position = Vector2(12, y)
-	weather_lbl.size = Vector2(80, 20)
-	weather_lbl.add_theme_font_size_override("font_size", 13)
-	weather_lbl.add_theme_color_override("font_color", Color(0.60, 0.60, 0.75, 0.85))
+	weather_lbl.position = Vector2(17, y)
+	weather_lbl.size = Vector2(104, 26)
+	weather_lbl.add_theme_font_size_override("font_size", 20)
+	weather_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.85))
 	weather_lbl.text = "Weather:"
 	_debug_panel.add_child(weather_lbl)
 
 	_debug_weather_btn = Button.new()
-	_debug_weather_btn.position = Vector2(90, y - 2)
-	_debug_weather_btn.size = Vector2(120, 24)
-	_debug_weather_btn.add_theme_font_size_override("font_size", 13)
+	_debug_weather_btn.position = Vector2(126, y - 2)
+	_debug_weather_btn.size = Vector2(168, 34)
+	_debug_weather_btn.add_theme_font_size_override("font_size", 20)
 	_debug_weather_btn.text = "Clear"
 	_debug_weather_btn.pressed.connect(_on_debug_weather_toggle)
 	_debug_panel.add_child(_debug_weather_btn)
@@ -1108,35 +1174,35 @@ func _setup_debug_menu() -> void:
 
 	# ── Teleport to Biome ─────────────────────────────────────────────────────
 	var tp_lbl := Label.new()
-	tp_lbl.position = Vector2(12, y)
-	tp_lbl.size = Vector2(326, 20)
-	tp_lbl.add_theme_font_size_override("font_size", 13)
-	tp_lbl.add_theme_color_override("font_color", Color(0.60, 0.60, 0.75, 0.85))
+	tp_lbl.position = Vector2(17, y)
+	tp_lbl.size = Vector2(424, 26)
+	tp_lbl.add_theme_font_size_override("font_size", 20)
+	tp_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.85))
 	tp_lbl.text = "Teleport to Biome:"
 	_debug_panel.add_child(tp_lbl)
-	y += 24
+	y += 34
 
 	var tp_plains_btn := Button.new()
-	tp_plains_btn.position = Vector2(12, y - 2)
-	tp_plains_btn.size = Vector2(155, 26)
-	tp_plains_btn.add_theme_font_size_override("font_size", 13)
+	tp_plains_btn.position = Vector2(17, y - 2)
+	tp_plains_btn.size = Vector2(202, 34)
+	tp_plains_btn.add_theme_font_size_override("font_size", 20)
 	tp_plains_btn.text = "🌿 Đồng Bằng"
 	tp_plains_btn.pressed.connect(_on_teleport_biome.bind("plains"))
 	_debug_panel.add_child(tp_plains_btn)
 
 	var tp_ocean_btn := Button.new()
-	tp_ocean_btn.position = Vector2(176, y - 2)
-	tp_ocean_btn.size = Vector2(155, 26)
-	tp_ocean_btn.add_theme_font_size_override("font_size", 13)
+	tp_ocean_btn.position = Vector2(234, y - 2)
+	tp_ocean_btn.size = Vector2(202, 34)
+	tp_ocean_btn.add_theme_font_size_override("font_size", 20)
 	tp_ocean_btn.text = "🌊 Biển Khơi"
 	tp_ocean_btn.pressed.connect(_on_teleport_biome.bind("ocean"))
 	_debug_panel.add_child(tp_ocean_btn)
 
-	y += 26
+	y += 34
 	var tp_desert_btn := Button.new()
-	tp_desert_btn.position = Vector2(12, y - 2)
-	tp_desert_btn.size = Vector2(155, 26)
-	tp_desert_btn.add_theme_font_size_override("font_size", 13)
+	tp_desert_btn.position = Vector2(17, y - 2)
+	tp_desert_btn.size = Vector2(202, 34)
+	tp_desert_btn.add_theme_font_size_override("font_size", 20)
 	tp_desert_btn.text = "🏜️ Sa Mạc"
 	tp_desert_btn.pressed.connect(_on_teleport_biome.bind("desert"))
 	_debug_panel.add_child(tp_desert_btn)
@@ -1266,28 +1332,28 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 			if n_ocean:
 				var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
 				if ov > 0.50:
-					return "🌊 Biển"
-				return "🏜️ Sa Mạc"
+					return "🌊 " + tr("BIOME_OCEAN")
+				return "🏜️ " + tr("BIOME_DESERT")
 
 	# DARK_GRASS (threshold = 0.40) → đồi, không thể là biển/hồ
 	if bio_n >= 0.40:
-		return "🌿 Đồng Bằng (đồi)"
+		return "🌿 " + tr("BIOME_HILLS")
 
 	# GRASS — check ocean trước (patch to hơn hồ)
 	var n_ocean: FastNoiseLite = nd.get("ocean")
 	if n_ocean:
 		var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
 		if ov > 0.50:
-			return "🌊 Biển"
+			return "🌊 " + tr("BIOME_OCEAN")
 
 	# GRASS — check lake
 	var n_lake: FastNoiseLite = nd.get("lake")
 	if n_lake:
 		var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
 		if lv > 0.50:
-			return "🏞 Hồ / Sông"
+			return "🏞 " + tr("BIOME_LAKE_RIVER")
 
-	return "🌿 Đồng Bằng"
+	return "🌿 " + tr("BIOME_PLAINS")
 
 func _update_debug_menu() -> void:
 	if not _debug_open or not TimeSystem:
@@ -1309,14 +1375,14 @@ func _update_debug_menu() -> void:
 
 func _setup_oxygen_bar() -> void:
 	_oxygen_bar_bg = ColorRect.new()
-	_oxygen_bar_bg.color = Color(0.08, 0.08, 0.14, 0.70)
-	_oxygen_bar_bg.size = Vector2(160, 14)
+	_oxygen_bar_bg.color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.70)
+	_oxygen_bar_bg.size = Vector2(224, 20)
 	_oxygen_bar_bg.visible = false
 	add_child(_oxygen_bar_bg)
 
 	_oxygen_bar_fill = ColorRect.new()
-	_oxygen_bar_fill.color = Color(0.25, 0.55, 0.90, 0.80)
-	_oxygen_bar_fill.size = Vector2(160, 14)
+	_oxygen_bar_fill.color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.80)
+	_oxygen_bar_fill.size = Vector2(224, 20)
 	_oxygen_bar_fill.visible = false
 	add_child(_oxygen_bar_fill)
 
@@ -1324,7 +1390,7 @@ func _on_oxygen_changed(current: int, max_oxy: int) -> void:
 	if max_oxy <= 0:
 		return
 	var ratio: float = clamp(float(current) / float(max_oxy), 0.0, 1.0)
-	_oxygen_bar_fill.size.x = 160.0 * ratio
+	_oxygen_bar_fill.size.x = 224.0 * ratio
 	_oxygen_bar_fill.color = Color(
 		0.2 + (1.0 - ratio) * 0.5,
 		0.55 - (1.0 - ratio) * 0.35,
@@ -1352,27 +1418,27 @@ func _on_portal_click() -> void:
 
 func _update_loading_overlay(vp: Vector2) -> void:
 	_load_overlay.size = vp
-	var bw: float = 300.0
-	var bh: float = 14.0
+	var bw: float = 420.0
+	var bh: float = 20.0
 	var cx: float = vp.x * 0.5
 	var cy: float = vp.y * 0.5
 
 	if _load_elapsed < 0.4:
 		_load_overlay.color.a = min(_load_elapsed / 0.4, 1.0) * 0.85
 
-	_load_label.position = Vector2(cx - 100, cy - 30)
-	_load_label.size = Vector2(200, 24)
+	_load_label.position = Vector2(cx - 140, cy - 42)
+	_load_label.size = Vector2(280, 34)
 	_load_label.visible = true
 
 	var bar_x: float = cx - bw * 0.5
-	var bar_y: float = cy + 4
+	var bar_y: float = cy + 6
 	var bar_bg := _load_overlay.get_node("LoadingBarBg") as ColorRect
 	if bar_bg:
 		bar_bg.position = Vector2(bar_x, bar_y)
 		bar_bg.size = Vector2(bw, bh)
 		bar_bg.visible = true
 
-	var fill_w: float = max(0.0, bw - 4.0) * _load_progress
-	_load_bar_fill.position = Vector2(bar_x + 2, bar_y + 2)
-	_load_bar_fill.size = Vector2(fill_w, bh - 4.0)
+	var fill_w: float = max(0.0, bw - 6.0) * _load_progress
+	_load_bar_fill.position = Vector2(bar_x + 3, bar_y + 3)
+	_load_bar_fill.size = Vector2(fill_w, bh - 6.0)
 	_load_bar_fill.visible = true

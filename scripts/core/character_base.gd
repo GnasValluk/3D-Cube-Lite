@@ -713,6 +713,14 @@ func _physics_process(delta: float) -> void:
 
 func _do_melee_hit() -> void:
 	_melee_hit_once = true
+	var range_scale: float = 1.0
+	var angle_threshold: float = 0.4
+	if _is_player:
+		var pc := self as PlayerCharacter
+		if pc and pc.equipped_weapon:
+			match pc.equipped_weapon.id:
+				"dai_kiem": range_scale = 1.5; angle_threshold = 0.25
+				"giao_dai": range_scale = 1.5
 	var mgr := _find_character_manager()
 	if mgr == null:
 		return
@@ -722,9 +730,9 @@ func _do_melee_hit() -> void:
 			var offset: Vector3 = ch.global_position - global_position
 			offset.y = 0.0
 			var dist: float = offset.length()
-			if dist <= melee_range:
+			if dist <= melee_range * range_scale:
 				var dot: float = fwd.dot(offset / dist)
-				if dot >= 0.4:
+				if dot >= angle_threshold:
 					SFXManager.play_damage_hit()
 					ch.take_damage(calc_skill_damage(melee_damage), self)
 	# Also hit fish in FishSpawner
@@ -735,9 +743,9 @@ func _do_melee_hit() -> void:
 				var offset: Vector3 = f.global_position - global_position
 				offset.y = 0.0
 				var dist: float = offset.length()
-				if dist <= melee_range:
+				if dist <= melee_range * range_scale:
 					var dot: float = fwd.dot(offset / dist)
-					if dot >= 0.4:
+					if dot >= angle_threshold:
 						SFXManager.play_damage_hit()
 						f.take_damage(calc_skill_damage(melee_damage), self)
 
@@ -760,9 +768,9 @@ func _do_melee_hit() -> void:
 		var offset: Vector3 = prop.global_position - global_position
 		offset.y = 0.0
 		var dist: float = offset.length()
-		if dist <= melee_range:
+		if dist <= melee_range * range_scale:
 			var dot: float = fwd.dot(offset / dist)
-			if dot >= 0.4:
+			if dot >= angle_threshold:
 				var dmg: int = 1
 				if _is_player:
 					var pc := self as PlayerCharacter

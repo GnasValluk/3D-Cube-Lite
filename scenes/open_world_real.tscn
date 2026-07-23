@@ -23,6 +23,9 @@
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1814531682]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 28.772238, 0)
 
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1736804692]
+script = ExtResource("2")
+
 [node name="WorldManager" type="Node3D" parent="." unique_id=1436753581]
 script = ExtResource("11")
 dimension_id = 1
@@ -80,9 +83,6 @@ script = ExtResource("3")
 target_path = NodePath("../CharacterManager/Raptor")
 
 [node name="Camera3D" type="Camera3D" parent="TPCameraRig" unique_id=1189458409]
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1736804692]
-script = ExtResource("2")
 
 [node name="ExploreSystem" type="Node" parent="." unique_id=502398904]
 script = ExtResource("12")

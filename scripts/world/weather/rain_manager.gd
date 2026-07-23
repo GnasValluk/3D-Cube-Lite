@@ -9,6 +9,16 @@ class Zone:
 	func _init(c: Vector2, r: float, lt: float):
 		center = c; radius = r; lifetime = lt
 
+static var _instance: RainManager = null
+var _local_rain_intensity: float = 0.0
+var _local_rain_intensity_smoothed: float = 0.0
+
+## Trả về cường độ mưa cục bộ tại vị trí người chơi (0 = không mưa, >0 = đang trong vùng mưa)
+static func get_local_rain_intensity() -> float:
+	if _instance == null:
+		return 0.0
+	return _instance._local_rain_intensity_smoothed
+
 var _zones: Array[Zone] = []
 var _drops: GPUParticles3D
 var _drop_mat: StandardMaterial3D
@@ -35,6 +45,7 @@ func clear_zones() -> void:
 	_zones.clear()
 
 func _ready() -> void:
+	_instance = self
 	if TimeSystem:
 		TimeSystem.weather_changed.connect(_on_weather_changed)
 	_setup_drops()
@@ -258,13 +269,22 @@ func _process(delta: float) -> void:
 			_drops.visible = true
 			_splash.emitting = true
 			_splash.visible = true
+		if TimeSystem:
+			_local_rain_intensity = TimeSystem.get_weather_intensity() * ratio
+		else:
+			_local_rain_intensity = ratio
 	else:
+		_local_rain_intensity = 0.0
 		_cloud_alpha_target = 0.0
 		if _drops.emitting:
 			_drops.emitting = false
 			_drops.visible = false
 			_splash.emitting = false
 			_splash.visible = false
+
+	_local_rain_intensity_smoothed = lerp(_local_rain_intensity_smoothed, _local_rain_intensity, delta * 4.0)
+	if abs(_local_rain_intensity_smoothed - _local_rain_intensity) < 0.001:
+		_local_rain_intensity_smoothed = _local_rain_intensity
 
 	_cloud_alpha = lerp(_cloud_alpha, _cloud_alpha_target, delta * 2.0)
 	if _cloud_mat:

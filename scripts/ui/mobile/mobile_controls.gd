@@ -74,7 +74,7 @@ func _build() -> void:
 	add_child(btn_jump)
 
 	# ── Nút Sprint (bên trái Jump) ──────────────────────────────────────────
-	var btn_sprint := _make_btn("»", bx - bsz - 10.0 * s, by, bsz, br, Color(0.35, 0.55, 0.90, 0.70))
+	var btn_sprint := _make_btn("»", bx - bsz - 10.0 * s, by, bsz, br, Color(0.50, 0.35, 0.80, 0.70))
 	btn_sprint.toggle_mode = true
 	btn_sprint.toggled.connect(func(on: bool):
 		sprint_held = on

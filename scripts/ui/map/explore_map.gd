@@ -2,6 +2,21 @@
 extends Control
 class_name ExploreMap
 
+const S: float = 1.6
+
+const BG_DEEP := Color(0.06, 0.04, 0.12)
+const BG_PANEL := Color(0.10, 0.07, 0.18)
+const BG_CARD := Color(0.14, 0.10, 0.22)
+const PURPLE := Color(0.55, 0.35, 0.90)
+const TEAL := Color(0.15, 0.72, 0.68)
+const PINK := Color(0.82, 0.28, 0.52)
+const ORANGE := Color(0.92, 0.52, 0.12)
+const CYAN := Color(0.15, 0.62, 0.92)
+const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
+const TEXT_MAIN := Color(0.82, 0.78, 0.95)
+const TEXT_DIM := Color(0.55, 0.50, 0.72)
+const TEXT_MUTED := Color(0.35, 0.32, 0.50)
+
 const CELL_PX_BASE: float = 4.0
 const PLAYER_RADIUS: float = 4.0
 const MIN_ZOOM: float = 1.0
@@ -52,8 +67,8 @@ func _ready() -> void:
 	visible = false
 	anchor_left = 0.0
 	anchor_top = 0.0
-	anchor_right = 1.0
-	anchor_bottom = 1.0
+	anchor_right = 0.0
+	anchor_bottom = 0.0
 	offset_left = 0
 	offset_top = 0
 	offset_right = 0
@@ -61,31 +76,43 @@ func _ready() -> void:
 
 	_node_title = Label.new()
 	_node_title.text = tr("MAP_TITLE")
-	_node_title.add_theme_font_size_override("font_size", 24)
+	_node_title.add_theme_font_size_override("font_size", int(S * 24))
 	_node_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_node_title.add_theme_color_override("font_color", PURPLE)
+	_node_title.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.8))
+	_node_title.add_theme_constant_override("shadow_offset_x", 2)
+	_node_title.add_theme_constant_override("shadow_offset_y", 2)
 	_node_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_node_title)
 
 	_node_death = Label.new()
 	_node_death.text = ""
-	_node_death.add_theme_font_size_override("font_size", 12)
+	_node_death.add_theme_font_size_override("font_size", int(S * 12))
 	_node_death.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_node_death)
 
 	_node_help = Label.new()
 	_node_help.text = ""
-	_node_help.add_theme_font_size_override("font_size", 11)
+	_node_help.add_theme_font_size_override("font_size", int(S * 11))
 	_node_help.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_node_help)
 
 	_node_coord = Label.new()
 	_node_coord.text = ""
-	_node_coord.add_theme_font_size_override("font_size", 14)
+	_node_coord.add_theme_font_size_override("font_size", int(S * 14))
+	_node_coord.add_theme_color_override("font_color", TEXT_DIM)
 	_node_coord.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_node_coord)
 
 	_cache_font = get_theme_default_font()
 	_build_toolbar()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED:
+		if _node_title:
+			_node_title.text = tr("MAP_TITLE")
+	if what == NOTIFICATION_RESIZED and visible:
+		_layout(); queue_redraw()
 
 func _build_toolbar() -> void:
 	_node_toolbar = Control.new()
@@ -93,9 +120,9 @@ func _build_toolbar() -> void:
 	_node_toolbar.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_node_toolbar)
 	var tools := [
-		["✕", Color(0.80, 0.20, 0.20), "_on_close"],
-		["+", Color(0.25, 0.55, 0.85), "_on_zoom_in"],
-		["−", Color(0.25, 0.55, 0.85), "_on_zoom_out"],
+		["✕", Color(0.82, 0.28, 0.52), "_on_close"],
+		["+", PURPLE, "_on_zoom_in"],
+		["−", PURPLE, "_on_zoom_out"],
 		["⟲", Color(0.50, 0.50, 0.50), "_on_reset"],
 		["Grid", Color(0.35, 0.45, 0.55), "_on_toggle_grid"],
 		["☽", Color(0.40, 0.35, 0.55), "_on_toggle_dark"],
@@ -106,16 +133,16 @@ func _build_toolbar() -> void:
 		btn.text = t[0]
 		btn.name = "TB" + str(idx)
 		btn.toggle_mode = (idx >= 4)
-		btn.size = Vector2(40, 32)
-		btn.add_theme_font_size_override("font_size", 16)
-		btn.add_theme_color_override("font_color", Color(1,1,1,0.95))
+		btn.size = Vector2(52, 42)
+		btn.add_theme_font_size_override("font_size", int(S * 16))
+		btn.add_theme_color_override("font_color", TEXT_BRIGHT)
 		var sty := StyleBoxFlat.new()
 		sty.bg_color = t[1]
 		sty.corner_radius_top_left = 4; sty.corner_radius_top_right = 4
 		sty.corner_radius_bottom_left = 4; sty.corner_radius_bottom_right = 4
 		sty.border_width_left = 1; sty.border_width_right = 1
 		sty.border_width_top = 1; sty.border_width_bottom = 1
-		sty.border_color = Color(1,1,1,0.15)
+		sty.border_color = Color(0.85, 0.80, 0.95, 0.15)
 		btn.add_theme_stylebox_override("normal", sty)
 		var sty_p := sty.duplicate() as StyleBoxFlat
 		sty_p.bg_color = Color(t[1].r * 1.4, t[1].g * 1.4, t[1].b * 1.4, t[1].a)
@@ -190,10 +217,6 @@ func open(sys: ExploreSystem) -> void:
 
 func close() -> void:
 	visible = false; _sys = null; _mgr = null; _redraw_pending = false
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_RESIZED and visible:
-		_layout(); queue_redraw()
 
 func _layout() -> void:
 	_vp = size
@@ -325,7 +348,7 @@ func _draw() -> void:
 		draw_circle(ws, 4.0, Color(0.0, 0.0, 0.0, 0.5))
 		draw_circle(ws, 2.0, Color(1.0, 0.84, 0.0))
 		var d := Vector2(wp.wx - _player_wx, wp.wz - _player_wz).length()
-		draw_string(_cache_font, ws + Vector2(10, -4), "WP (%.0fm)" % d, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1,1,1,0.85))
+		draw_string(_cache_font, ws + Vector2(10, -4), "WP (%.0fm)" % d, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, TEXT_BRIGHT)
 
 	if _show_grid:
 		var cs: float = ExploreSystem.CELL_SIZE

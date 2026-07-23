@@ -1,6 +1,19 @@
 extends Control
 class_name SettingsUI
 
+const BG_DEEP := Color(0.06, 0.04, 0.12)
+const BG_PANEL := Color(0.10, 0.07, 0.18)
+const BG_CARD := Color(0.14, 0.10, 0.22)
+const PURPLE := Color(0.55, 0.35, 0.90)
+const TEAL := Color(0.15, 0.72, 0.68)
+const PINK := Color(0.82, 0.28, 0.52)
+const ORANGE := Color(0.92, 0.52, 0.12)
+const CYAN := Color(0.15, 0.62, 0.92)
+const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
+const TEXT_MAIN := Color(0.82, 0.78, 0.95)
+const TEXT_DIM := Color(0.55, 0.50, 0.72)
+const TEXT_MUTED := Color(0.35, 0.32, 0.50)
+
 enum Tab { GENERAL, GRAPHICS, AUDIO, CONTROLS, MOBILE, DEVICE }
 
 var _current_tab: int = Tab.GENERAL
@@ -16,7 +29,6 @@ var _scroll: ScrollContainer
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_load_translations()
 	_build()
 
 func _load_translations() -> void:
@@ -44,8 +56,8 @@ func _load_translations() -> void:
 
 func _build() -> void:
 	var vp := get_viewport().get_visible_rect().size
-	var W: float = 640.0
-	var H: float = 500.0
+	var W: float = min(vp.x * 0.75, 860.0)
+	var H: float = vp.y * 0.7
 
 	var overlay := ColorRect.new()
 	overlay.color = Color(0.0, 0.0, 0.0, 0.8)
@@ -59,31 +71,37 @@ func _build() -> void:
 	_bg.position = Vector2((vp.x - W) * 0.5, (vp.y - H) * 0.5)
 	_bg.size = Vector2(W, H)
 	var bg_style := StyleBoxFlat.new()
-	bg_style.bg_color = Color(0.08, 0.08, 0.14, 0.95)
+	bg_style.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.95)
 	bg_style.corner_radius_top_left = 12; bg_style.corner_radius_top_right = 12
 	bg_style.corner_radius_bottom_left = 12; bg_style.corner_radius_bottom_right = 12
 	bg_style.border_width_left = 2; bg_style.border_width_right = 2
 	bg_style.border_width_top = 2; bg_style.border_width_bottom = 2
-	bg_style.border_color = Color(0.3, 0.3, 0.5, 0.6)
+	bg_style.border_color = Color(0.45, 0.35, 0.65, 0.5)
 	_bg.add_theme_stylebox_override("panel", bg_style)
 	add_child(_bg)
+
+	var accent := ColorRect.new()
+	accent.position = Vector2(2, 2)
+	accent.size = Vector2(W - 4, 3)
+	accent.color = PURPLE
+	_bg.add_child(accent)
 
 	_title_lbl = Label.new()
 	_title_lbl.text = tr("SETTINGS_TITLE")
 	_title_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title_lbl.add_theme_font_size_override("font_size", 26)
-	_title_lbl.add_theme_color_override("font_color", Color(1, 1, 1, 0.95))
+	_title_lbl.add_theme_font_size_override("font_size", 40)
+	_title_lbl.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.95))
 	_title_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
 	_title_lbl.add_theme_constant_override("shadow_offset_x", 2)
 	_title_lbl.add_theme_constant_override("shadow_offset_y", 2)
-	_title_lbl.position = Vector2(0, 14)
-	_title_lbl.size = Vector2(W, 36)
+	_title_lbl.position = Vector2(0, 20)
+	_title_lbl.size = Vector2(W, 50)
 	_bg.add_child(_title_lbl)
 
 	var line := ColorRect.new()
-	line.position = Vector2(20, 52)
+	line.position = Vector2(20, 68)
 	line.size = Vector2(W - 40, 1)
-	line.color = Color(0.3, 0.3, 0.5, 0.3)
+	line.color = Color(0.40, 0.30, 0.60, 0.3)
 	_bg.add_child(line)
 
 	var tab_w: float = (W - 28 - 15.0) / 6.0
@@ -91,29 +109,29 @@ func _build() -> void:
 	for i in range(6):
 		var btn := Button.new()
 		btn.text = tr(tab_names[i])
-		btn.position = Vector2(14 + i * (tab_w + 3), 58)
-		btn.size = Vector2(tab_w, 28)
-		btn.add_theme_font_size_override("font_size", 11)
-		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
+		btn.position = Vector2(14 + i * (tab_w + 3), 72)
+		btn.size = Vector2(tab_w, 40)
+		btn.add_theme_font_size_override("font_size", 18)
+		btn.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.75))
 		var tb_bg := StyleBoxFlat.new()
 		tb_bg.corner_radius_top_left = 6; tb_bg.corner_radius_top_right = 6
 		tb_bg.corner_radius_bottom_left = 6; tb_bg.corner_radius_bottom_right = 6
-		tb_bg.bg_color = Color(0.12, 0.12, 0.22, 0.7)
+		tb_bg.bg_color = Color(BG_CARD.r, BG_CARD.g, BG_CARD.b, 0.7)
 		tb_bg.border_width_left = 1; tb_bg.border_width_right = 1
 		tb_bg.border_width_top = 1; tb_bg.border_width_bottom = 1
-		tb_bg.border_color = Color(0.3, 0.3, 0.5, 0.4)
+		tb_bg.border_color = Color(0.40, 0.30, 0.60, 0.4)
 		btn.add_theme_stylebox_override("normal", tb_bg)
 		var tb_hover := tb_bg.duplicate()
-		tb_hover.bg_color = Color(0.18, 0.22, 0.38, 0.85)
-		tb_hover.border_color = Color(0.5, 0.6, 0.9, 0.5)
+		tb_hover.bg_color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.25)
+		tb_hover.border_color = Color(0.55, 0.45, 0.82, 0.5)
 		btn.add_theme_stylebox_override("hover", tb_hover)
 		btn.pressed.connect(_on_tab.bind(i))
 		_bg.add_child(btn)
 		_tab_btns.append(btn)
 
 	_scroll = ScrollContainer.new()
-	_scroll.position = Vector2(14, 92)
-	_scroll.size = Vector2(W - 28, H - 160)
+	_scroll.position = Vector2(14, 120)
+	_scroll.size = Vector2(W - 28, H - 190)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_bg.add_child(_scroll)
 
@@ -122,22 +140,22 @@ func _build() -> void:
 	_scroll.add_child(_content_vbox)
 
 	_close_btn = Button.new()
-	_close_btn.position = Vector2(W * 0.5 - 80, H - 38)
-	_close_btn.size = Vector2(160, 30)
+	_close_btn.position = Vector2(W * 0.5 - 100, H - 50)
+	_close_btn.size = Vector2(200, 42)
 	_close_btn.text = tr("CLOSE")
-	_close_btn.add_theme_font_size_override("font_size", 13)
-	_close_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
+	_close_btn.add_theme_font_size_override("font_size", 20)
+	_close_btn.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.8))
 	var close_bg := StyleBoxFlat.new()
-	close_bg.bg_color = Color(0.12, 0.12, 0.22, 0.8)
+	close_bg.bg_color = Color(BG_CARD.r, BG_CARD.g, BG_CARD.b, 0.8)
 	close_bg.corner_radius_top_left = 6; close_bg.corner_radius_top_right = 6
 	close_bg.corner_radius_bottom_left = 6; close_bg.corner_radius_bottom_right = 6
 	close_bg.border_width_left = 1; close_bg.border_width_right = 1
 	close_bg.border_width_top = 1; close_bg.border_width_bottom = 1
-	close_bg.border_color = Color(0.3, 0.3, 0.5, 0.5)
+	close_bg.border_color = Color(0.40, 0.30, 0.60, 0.5)
 	_close_btn.add_theme_stylebox_override("normal", close_bg)
 	var close_hover := close_bg.duplicate()
-	close_hover.bg_color = Color(0.18, 0.22, 0.38, 0.85)
-	close_hover.border_color = Color(0.5, 0.6, 0.9, 0.5)
+	close_hover.bg_color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.25)
+	close_hover.border_color = Color(0.55, 0.45, 0.82, 0.5)
 	_close_btn.add_theme_stylebox_override("hover", close_hover)
 	_close_btn.pressed.connect(_on_close)
 	_bg.add_child(_close_btn)
@@ -155,8 +173,8 @@ func _show_tab(tab: int) -> void:
 	for i in range(_tab_btns.size()):
 		var tb_bg := _tab_btns[i].get_theme_stylebox("normal") as StyleBoxFlat
 		if tb_bg:
-			tb_bg.bg_color = Color(0.18, 0.22, 0.38, 0.8) if i == tab else Color(0.12, 0.12, 0.22, 0.7)
-			tb_bg.border_color = Color(0.5, 0.6, 0.9, 0.5) if i == tab else Color(0.3, 0.3, 0.5, 0.4)
+			tb_bg.bg_color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.25) if i == tab else Color(BG_CARD.r, BG_CARD.g, BG_CARD.b, 0.7)
+			tb_bg.border_color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.5) if i == tab else Color(0.40, 0.30, 0.60, 0.4)
 
 	match tab:
 		Tab.GENERAL: _build_general_tab()
@@ -169,8 +187,8 @@ func _show_tab(tab: int) -> void:
 func _section_label(text: String) -> Label:
 	var lbl := Label.new()
 	lbl.text = text
-	lbl.add_theme_font_size_override("font_size", 14)
-	lbl.add_theme_color_override("font_color", Color(0.7, 0.7, 0.9, 0.85))
+	lbl.add_theme_font_size_override("font_size", 22)
+	lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.85))
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content_vbox.add_child(lbl)
 	return lbl
@@ -184,14 +202,14 @@ func _build_general_tab() -> void:
 	var vi_btn := Button.new()
 	vi_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vi_btn.text = tr("VIETNAMESE")
-	vi_btn.add_theme_font_size_override("font_size", 13)
-	vi_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+	vi_btn.add_theme_font_size_override("font_size", 20)
+	vi_btn.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.85))
 	var vi_bg := StyleBoxFlat.new()
 	vi_bg.corner_radius_top_left = 6; vi_bg.corner_radius_top_right = 6
 	vi_bg.corner_radius_bottom_left = 6; vi_bg.corner_radius_bottom_right = 6
 	vi_bg.border_width_left = 2; vi_bg.border_width_right = 2
 	vi_bg.border_width_top = 2; vi_bg.border_width_bottom = 2
-	vi_bg.border_color = Color(0.2, 0.5, 0.2, 0.7)
+	vi_bg.border_color = Color(0.15, 0.65, 0.15, 0.7)
 	vi_btn.add_theme_stylebox_override("normal", vi_bg)
 	vi_btn.add_theme_stylebox_override("hover", vi_bg)
 	vi_btn.pressed.connect(_on_set_language.bind("vi"))
@@ -200,14 +218,14 @@ func _build_general_tab() -> void:
 	var en_btn := Button.new()
 	en_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	en_btn.text = tr("ENGLISH")
-	en_btn.add_theme_font_size_override("font_size", 13)
-	en_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+	en_btn.add_theme_font_size_override("font_size", 20)
+	en_btn.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.85))
 	var en_bg := StyleBoxFlat.new()
 	en_bg.corner_radius_top_left = 6; en_bg.corner_radius_top_right = 6
 	en_bg.corner_radius_bottom_left = 6; en_bg.corner_radius_bottom_right = 6
 	en_bg.border_width_left = 2; en_bg.border_width_right = 2
 	en_bg.border_width_top = 2; en_bg.border_width_bottom = 2
-	en_bg.border_color = Color(0.2, 0.2, 0.5, 0.7)
+	en_bg.border_color = Color(0.35, 0.25, 0.65, 0.7)
 	en_btn.add_theme_stylebox_override("normal", en_bg)
 	en_btn.add_theme_stylebox_override("hover", en_bg)
 	en_btn.pressed.connect(_on_set_language.bind("en"))
@@ -219,9 +237,9 @@ func _build_graphics_tab() -> void:
 	_section_label(tr("GRAPHICS_PRESET"))
 	var cur_preset: int = SettingsManager.graphics_preset if SettingsManager else 0
 	var preset_data: Array[Dictionary] = [
-		{ "label": tr("PRESET_STANDARD"), "mode": 0, "col": Color(0.40, 0.55, 0.70, 0.75) },
-		{ "label": tr("PRESET_ENHANCED"), "mode": 1, "col": Color(0.40, 0.70, 0.50, 0.75) },
-		{ "label": tr("PRESET_REALISTIC"), "mode": 2, "col": Color(0.80, 0.55, 0.25, 0.75) },
+		{ "label": tr("PRESET_STANDARD"), "mode": 0, "col": Color(TEAL.r, TEAL.g, TEAL.b, 0.75) },
+		{ "label": tr("PRESET_ENHANCED"), "mode": 1, "col": Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.75) },
+		{ "label": tr("PRESET_REALISTIC"), "mode": 2, "col": Color(ORANGE.r, ORANGE.g, ORANGE.b, 0.75) },
 	]
 	var hbox := HBoxContainer.new()
 	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -231,15 +249,15 @@ func _build_graphics_tab() -> void:
 		var btn := Button.new()
 		btn.text = d["label"]
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.add_theme_font_size_override("font_size", 13)
-		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.90))
+		btn.add_theme_font_size_override("font_size", 20)
+		btn.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.90))
 		var sty := StyleBoxFlat.new()
 		if cur_preset == d["mode"]:
 			sty.bg_color = d["col"]
-			sty.border_color = Color(1, 1, 1, 0.45)
+			sty.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.45)
 		else:
 			sty.bg_color = Color(d["col"].r * 0.35, d["col"].g * 0.35, d["col"].b * 0.35, 0.55)
-			sty.border_color = Color(1, 1, 1, 0.12)
+			sty.border_color = Color(0.35, 0.28, 0.50, 0.25)
 		sty.corner_radius_top_left = 6; sty.corner_radius_top_right = 6
 		sty.corner_radius_bottom_left = 6; sty.corner_radius_bottom_right = 6
 		sty.border_width_left = 2; sty.border_width_right = 2
@@ -247,7 +265,7 @@ func _build_graphics_tab() -> void:
 		btn.add_theme_stylebox_override("normal", sty)
 		var sty_h := sty.duplicate()
 		sty_h.bg_color = d["col"]
-		sty_h.border_color = Color(1, 1, 1, 0.55)
+		sty_h.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.55)
 		btn.add_theme_stylebox_override("hover", sty_h)
 		var mode_val: int = d["mode"]
 		btn.pressed.connect(func():
@@ -260,8 +278,8 @@ func _build_graphics_tab() -> void:
 	var preset_names: Array[String] = [tr("PRESET_DESC_STANDARD"), tr("PRESET_DESC_ENHANCED"), tr("PRESET_DESC_REALISTIC")]
 	var desc := Label.new()
 	desc.text = preset_names[cur_preset] if cur_preset < preset_names.size() else ""
-	desc.add_theme_font_size_override("font_size", 11)
-	desc.add_theme_color_override("font_color", Color(0.55, 0.60, 0.70, 0.70))
+	desc.add_theme_font_size_override("font_size", 18)
+	desc.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.70))
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
 	desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content_vbox.add_child(desc)
@@ -290,8 +308,8 @@ func _build_controls_tab() -> void:
 	slider.value_changed.connect(_set_mouse_sensitivity)
 	hbox.add_child(slider)
 	var val_lbl := Label.new()
-	val_lbl.add_theme_font_size_override("font_size", 12)
-	val_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.8, 0.7))
+	val_lbl.add_theme_font_size_override("font_size", 18)
+	val_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
 	val_lbl.text = str(snapped(slider.value, 0.1))
 	slider.value_changed.connect(func(v): val_lbl.text = str(snapped(v, 0.1)))
 	hbox.add_child(val_lbl)
@@ -316,20 +334,20 @@ func _build_controls_tab() -> void:
 		var lbl := Label.new()
 		lbl.text = entry.action
 		lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		lbl.add_theme_font_size_override("font_size", 13)
-		lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9, 0.8))
+		lbl.add_theme_font_size_override("font_size", 20)
+		lbl.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.8))
 		row.add_child(lbl)
 		var key_btn := Button.new()
 		key_btn.text = _keycode_name(_get_keybinding(entry.key, entry.default))
-		key_btn.add_theme_font_size_override("font_size", 13)
-		key_btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.85))
+		key_btn.add_theme_font_size_override("font_size", 20)
+		key_btn.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.85))
 		var kb_bg := StyleBoxFlat.new()
 		kb_bg.corner_radius_top_left = 4; kb_bg.corner_radius_top_right = 4
 		kb_bg.corner_radius_bottom_left = 4; kb_bg.corner_radius_bottom_right = 4
 		kb_bg.border_width_left = 1; kb_bg.border_width_right = 1
 		kb_bg.border_width_top = 1; kb_bg.border_width_bottom = 1
-		kb_bg.border_color = Color(0.3, 0.3, 0.5, 0.4)
-		kb_bg.bg_color = Color(0.12, 0.12, 0.22, 0.7)
+		kb_bg.border_color = Color(0.40, 0.30, 0.60, 0.4)
+		kb_bg.bg_color = Color(BG_CARD.r, BG_CARD.g, BG_CARD.b, 0.7)
 		key_btn.add_theme_stylebox_override("normal", kb_bg)
 		key_btn.pressed.connect(_start_rebind.bind(entry.key, entry.default, key_btn))
 		key_btn.custom_minimum_size = Vector2(120, 0)
@@ -342,21 +360,21 @@ func _add_toggle(label: String, initial: bool, cb: Callable) -> void:
 	var lbl := Label.new()
 	lbl.text = label
 	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lbl.add_theme_font_size_override("font_size", 13)
-	lbl.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9, 0.8))
+	lbl.add_theme_font_size_override("font_size", 20)
+	lbl.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.8))
 	hbox.add_child(lbl)
 	var btn := Button.new()
 	btn.toggle_mode = true
 	btn.button_pressed = initial
 	btn.text = tr("ON") if initial else tr("OFF")
-	btn.add_theme_font_size_override("font_size", 12)
-	btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
+	btn.add_theme_font_size_override("font_size", 18)
+	btn.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.8))
 	var btn_bg := StyleBoxFlat.new()
 	btn_bg.corner_radius_top_left = 4; btn_bg.corner_radius_top_right = 4
 	btn_bg.corner_radius_bottom_left = 4; btn_bg.corner_radius_bottom_right = 4
 	btn_bg.border_width_left = 1; btn_bg.border_width_right = 1
 	btn_bg.border_width_top = 1; btn_bg.border_width_bottom = 1
-	btn_bg.border_color = Color(0.3, 0.3, 0.5, 0.4)
+	btn_bg.border_color = Color(0.40, 0.30, 0.60, 0.4)
 	btn.add_theme_stylebox_override("normal", btn_bg)
 	btn.toggled.connect(func(toggled: bool):
 		btn.text = tr("ON") if toggled else tr("OFF")
@@ -376,8 +394,8 @@ func _add_slider(initial: float, cb: Callable) -> void:
 	slider.value_changed.connect(cb)
 	hbox.add_child(slider)
 	var val_lbl := Label.new()
-	val_lbl.add_theme_font_size_override("font_size", 12)
-	val_lbl.add_theme_color_override("font_color", Color(0.6, 0.6, 0.8, 0.7))
+	val_lbl.add_theme_font_size_override("font_size", 18)
+	val_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
 	val_lbl.text = "%d%%" % initial
 	slider.value_changed.connect(func(v): val_lbl.text = "%d%%" % v)
 	hbox.add_child(val_lbl)
@@ -389,12 +407,16 @@ func _is_fullscreen() -> bool:
 
 func _set_fullscreen(v: bool) -> void:
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if v else DisplayServer.WINDOW_MODE_WINDOWED)
+	SettingsManager.fullscreen = v
+	SettingsData.save_settings()
 
 func _is_vsync() -> bool:
 	return DisplayServer.window_get_vsync_mode() == DisplayServer.VSYNC_ENABLED
 
 func _set_vsync(v: bool) -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if v else DisplayServer.VSYNC_DISABLED)
+	SettingsManager.vsync = v
+	SettingsData.save_settings()
 
 func _get_master_volume() -> float:
 	var idx: int = AudioServer.get_bus_index("Master")
@@ -407,6 +429,8 @@ func _set_master_volume(v: float) -> void:
 	if idx < 0: return
 	var db: float = v / 100.0 * 80.0 - 80.0
 	AudioServer.set_bus_volume_db(idx, db)
+	SettingsManager.master_volume = v
+	SettingsData.save_settings()
 
 func _get_music_volume() -> float:
 	var idx: int = AudioServer.get_bus_index("Music")
@@ -419,6 +443,8 @@ func _set_music_volume(v: float) -> void:
 	if idx < 0: return
 	var db: float = v / 100.0 * 80.0 - 80.0
 	AudioServer.set_bus_volume_db(idx, db)
+	SettingsManager.music_volume = v
+	SettingsData.save_settings()
 
 func _get_sfx_volume() -> float:
 	var idx: int = AudioServer.get_bus_index("SFX")
@@ -431,18 +457,24 @@ func _set_sfx_volume(v: float) -> void:
 	if idx < 0: return
 	var db: float = v / 100.0 * 80.0 - 80.0
 	AudioServer.set_bus_volume_db(idx, db)
+	SettingsManager.sfx_volume = v
+	SettingsData.save_settings()
 
 func _get_mouse_sensitivity() -> float:
 	return ProjectSettings.get_setting("input/pointing/mouse_sensitivity_modifier", 1.0)
 
 func _set_mouse_sensitivity(v: float) -> void:
 	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_modifier", v)
+	SettingsManager.mouse_sensitivity = v
+	SettingsData.save_settings()
 
 func _is_invert_y() -> bool:
 	return ProjectSettings.get_setting("controls/invert_y", false)
 
 func _set_invert_y(v: bool) -> void:
 	ProjectSettings.set_setting("controls/invert_y", v)
+	SettingsManager.invert_y = v
+	SettingsData.save_settings()
 
 # ── Language ─────────────────────────────────────────────────────────────────
 
@@ -459,11 +491,13 @@ func _refresh_lang_btns() -> void:
 						var is_en: bool = b.text == tr("ENGLISH")
 						if is_vi or is_en:
 							var is_active: bool = (cur == "vi" and is_vi) or (cur == "en" and is_en)
-							bg.border_color = Color(0.3, 0.75, 0.3, 0.9) if is_active else Color(0.2, 0.2, 0.4, 0.6)
-							bg.bg_color = Color(0.1, 0.25, 0.1, 0.6) if is_active else Color(0.08, 0.08, 0.15, 0.6)
+							bg.border_color = Color(0.2, 0.8, 0.2, 0.9) if is_active else Color(0.30, 0.20, 0.55, 0.6)
+							bg.bg_color = Color(0.08, 0.30, 0.08, 0.6) if is_active else Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.6)
 
 func _on_set_language(locale: String) -> void:
 	TranslationServer.set_locale(locale)
+	SettingsManager.locale = locale
+	SettingsData.save_settings()
 	_current_tab = Tab.GENERAL
 	_rebuild_texts()
 
@@ -502,23 +536,29 @@ func _is_touch_enabled() -> bool:
 
 func _set_touch_enabled(v: bool) -> void:
 	ProjectSettings.set_setting("mobile/touch_controls_enabled", v)
+	SettingsManager.touch_enabled = v
+	SettingsData.save_settings()
 
 func _get_joystick_sensitivity() -> float:
 	return ProjectSettings.get_setting("mobile/joystick_sensitivity", 1.0)
 
 func _set_joystick_sensitivity(v: float) -> void:
 	ProjectSettings.set_setting("mobile/joystick_sensitivity", v)
+	SettingsManager.joystick_sensitivity = v
+	SettingsData.save_settings()
 
 func _get_button_scale() -> float:
 	return ProjectSettings.get_setting("mobile/button_scale", 1.0)
 
 func _set_button_scale(v: float) -> void:
 	ProjectSettings.set_setting("mobile/button_scale", v)
+	SettingsManager.button_scale = v
+	SettingsData.save_settings()
 
 # ── Key bindings ─────────────────────────────────────────────────────────────
 
 func _get_keybinding(key: String, default_key: int) -> int:
-	return ProjectSettings.get_setting(key, default_key)
+	return SettingsManager.key_bindings.get(key, default_key)
 
 func _keycode_name(code: int) -> String:
 	if code >= KEY_A and code <= KEY_Z: return char(code)
@@ -556,13 +596,9 @@ func _input(event: InputEvent) -> void:
 			if k.keycode == KEY_ESCAPE:
 				_cancel_rebind()
 				return
-			var defaults: Dictionary = { "controls/interact": KEY_F, "controls/inventory": KEY_I, "controls/build": KEY_B, "controls/party": KEY_P, "controls/map": KEY_M, "controls/debug": KEY_F2 }
-			var saved: Dictionary = {}
-			for existing in defaults:
-				saved[existing] = ProjectSettings.get_setting(existing, defaults[existing])
 			var conflict: String = ""
-			for existing in saved:
-				if saved[existing] == k.keycode and existing != _rebinding_action:
+			for existing in SettingsManager.key_bindings:
+				if SettingsManager.key_bindings[existing] == k.keycode and existing != _rebinding_action:
 					conflict = existing
 					break
 			if not conflict.is_empty():
@@ -572,6 +608,8 @@ func _input(event: InputEvent) -> void:
 					_rebinding_btn.text = "..."
 				return
 			ProjectSettings.set_setting(_rebinding_action, k.keycode)
+			SettingsManager.key_bindings[_rebinding_action] = k.keycode
+			SettingsData.save_settings()
 			_rebinding_btn.text = _keycode_name(k.keycode)
 			_rebinding_btn.disabled = false
 			_rebinding_action = ""
@@ -579,8 +617,7 @@ func _input(event: InputEvent) -> void:
 
 func _cancel_rebind() -> void:
 	if _rebinding_btn and is_instance_valid(_rebinding_btn):
-		var defaults: Dictionary = { "controls/interact": KEY_F, "controls/inventory": KEY_I, "controls/build": KEY_B, "controls/party": KEY_P, "controls/map": KEY_M, "controls/debug": KEY_F2 }
-		var def: int = defaults.get(_rebinding_action, KEY_F)
+		var def: int = SettingsManager.key_bindings.get(_rebinding_action, KEY_F)
 		_rebinding_btn.text = _keycode_name(ProjectSettings.get_setting(_rebinding_action, def))
 		_rebinding_btn.disabled = false
 		_rebinding_btn = null
@@ -591,17 +628,17 @@ func _build_device_tab() -> void:
 	_section_label(tr("DEVICE_TYPE"))
 	var desc := Label.new()
 	desc.text = tr("DEVICE_DESC")
-	desc.add_theme_font_size_override("font_size", 12)
-	desc.add_theme_color_override("font_color", Color(0.60, 0.65, 0.75, 0.70))
+	desc.add_theme_font_size_override("font_size", 18)
+	desc.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.70))
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD
 	desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content_vbox.add_child(desc)
 
 	var cur_device: int = DeviceManager.get_device() if DeviceManager else 0
 	var btn_data: Array[Dictionary] = [
-		{ "label": tr("DEVICE_AUTO"), "mode": 0, "col": Color(0.35, 0.55, 0.80, 0.75) },
-		{ "label": "💻  " + tr("DEVICE_PC"),   "mode": 1, "col": Color(0.30, 0.70, 0.50, 0.75) },
-		{ "label": "📱  " + tr("DEVICE_MOBILE"), "mode": 2, "col": Color(0.80, 0.45, 0.20, 0.75) },
+		{ "label": tr("DEVICE_AUTO"), "mode": 0, "col": Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.75) },
+		{ "label": "💻  " + tr("DEVICE_PC"),   "mode": 1, "col": Color(TEAL.r, TEAL.g, TEAL.b, 0.75) },
+		{ "label": "📱  " + tr("DEVICE_MOBILE"), "mode": 2, "col": Color(ORANGE.r, ORANGE.g, ORANGE.b, 0.75) },
 	]
 	var hbox := HBoxContainer.new()
 	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -611,39 +648,41 @@ func _build_device_tab() -> void:
 		var btn := Button.new()
 		btn.text = d["label"]
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.add_theme_font_size_override("font_size", 13)
-		btn.add_theme_color_override("font_color", Color(1, 1, 1, 0.90))
+		btn.add_theme_font_size_override("font_size", 20)
+		btn.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.90))
 		var sty := StyleBoxFlat.new()
 		sty.bg_color = d["col"] if cur_device == d["mode"] else Color(d["col"].r * 0.4, d["col"].g * 0.4, d["col"].b * 0.4, 0.55)
 		sty.corner_radius_top_left = 8; sty.corner_radius_top_right = 8
 		sty.corner_radius_bottom_left = 8; sty.corner_radius_bottom_right = 8
 		sty.border_width_left = 2; sty.border_width_right = 2
 		sty.border_width_top = 2; sty.border_width_bottom = 2
-		sty.border_color = Color(1, 1, 1, 0.30) if cur_device == d["mode"] else Color(1, 1, 1, 0.10)
+		sty.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.30) if cur_device == d["mode"] else Color(0.35, 0.28, 0.50, 0.20)
 		btn.add_theme_stylebox_override("normal", sty)
 		var sty_h := sty.duplicate() as StyleBoxFlat
 		sty_h.bg_color = d["col"]
-		sty_h.border_color = Color(1, 1, 1, 0.55)
+		sty_h.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.55)
 		btn.add_theme_stylebox_override("hover", sty_h)
 		var mode_val: int = d["mode"]
 		btn.pressed.connect(func():
 			if DeviceManager: DeviceManager.set_device(mode_val)
+			SettingsManager.device_mode = mode_val
+			SettingsData.save_settings()
 			_show_tab(Tab.DEVICE)
 		)
-		btn.custom_minimum_size = Vector2(0, 52)
+		btn.custom_minimum_size = Vector2(0, 70)
 		hbox.add_child(btn)
 
 	var status_lbl := Label.new()
 	var is_mob: bool = DeviceManager.is_mobile() if DeviceManager else false
 	var detected: String = tr("DEVICE_MOBILE") if DeviceManager._detect_mobile() else tr("DEVICE_PC")
 	status_lbl.text = tr("DEVICE_CURRENT") % [tr("DEVICE_MOBILE") if is_mob else tr("DEVICE_PC"), detected]
-	status_lbl.add_theme_font_size_override("font_size", 12)
+	status_lbl.add_theme_font_size_override("font_size", 18)
 	status_lbl.add_theme_color_override("font_color", Color(0.70, 0.85, 0.70, 0.85))
 	status_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content_vbox.add_child(status_lbl)
 
 	var div := ColorRect.new()
-	div.color = Color(0.30, 0.40, 0.60, 0.20)
+	div.color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.20)
 	div.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	div.custom_minimum_size = Vector2(0, 1)
 	_content_vbox.add_child(div)
@@ -654,7 +693,7 @@ func _build_device_tab() -> void:
 		for ft in features:
 			var fl := Label.new()
 			fl.text = ft
-			fl.add_theme_font_size_override("font_size", 12)
+			fl.add_theme_font_size_override("font_size", 18)
 			fl.add_theme_color_override("font_color", Color(0.65, 0.90, 0.65, 0.80))
 			fl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			_content_vbox.add_child(fl)
@@ -664,7 +703,7 @@ func _build_device_tab() -> void:
 		for ft in features:
 			var fl := Label.new()
 			fl.text = ft
-			fl.add_theme_font_size_override("font_size", 12)
-			fl.add_theme_color_override("font_color", Color(0.65, 0.80, 0.90, 0.80))
+			fl.add_theme_font_size_override("font_size", 18)
+			fl.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.80))
 			fl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			_content_vbox.add_child(fl)

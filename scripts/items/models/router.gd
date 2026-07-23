@@ -14,6 +14,10 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"riu": ToolsMesh.axe_drop(parent)
 		"chest": StructuresMesh.chest(parent)
 		"can_cau": ToolsMesh.fishing_rod_drop(parent)
+		"dai_kiem": ToolsMesh.greatsword_drop(parent)
+		"gang_tay_da_thu": ToolsMesh.gauntlet_drop(parent)
+		"no": ToolsMesh.no_drop(parent)
+		"mui_ten": ToolsMesh.arrow_drop(parent)
 		"twilight_gate": StructuresMesh.gate(parent)
 		"carrot": FruitMeshes.carrot(parent)
 		"apple_green": FruitMeshes.apple_green(parent)
@@ -109,4 +113,8 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"tiger_skin": MaterialMeshes.hide(parent, Color(0.75, 0.50, 0.20))
 		"twilight_essence": MaterialMeshes.essence(parent)
 		"twilight_powder": MaterialMeshes.pile(parent, Color(0.35, 0.20, 0.45))
-		_: FallbackMesh.item_voxel(parent, item_id)
+		_:
+			if item_id.begins_with("block_"):
+				BlockMeshes.block_cube(parent, item_id)
+			else:
+				FallbackMesh.item_voxel(parent, item_id)

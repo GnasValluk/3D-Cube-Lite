@@ -36,10 +36,11 @@ func _setup_mesh():
 	root.position.y = 0.15
 
 	var item_id := item_def.id
-	if item_id in ["cup", "xeng", "riu", "kiem", "can_cau"]:
-		var pivot := Node3D.new()
-		root.add_child(pivot)
-		ToolsMesh.build_held(pivot, item_id)
+	if item_id in ["cup", "xeng", "riu", "kiem", "can_cau", "dai_kiem", "gang_tay_da_thu", "no", "mui_ten"]:
+		var scale_node := Node3D.new()
+		scale_node.scale = Vector3(1.8, 1.8, 1.8)
+		root.add_child(scale_node)
+		ToolsMesh.build_held(scale_node, item_id)
 	elif item_id in ["ca_chep", "ca_ro", "ca_dieu_hong", "ca_loc", "ca_la_han", "tom"]:
 		_build_fish_model(root, item_id)
 	elif item_id == "mon_ngot":
@@ -50,7 +51,7 @@ func _setup_mesh():
 		ItemMesh.build(root, item_id)
 	else:
 		var scale_pivot := Node3D.new()
-		scale_pivot.scale = Vector3(2.5, 2.5, 2.5)
+		scale_pivot.scale = Vector3(1.5, 1.5, 1.5)
 		root.add_child(scale_pivot)
 		ItemMesh.build(scale_pivot, item_id)
 

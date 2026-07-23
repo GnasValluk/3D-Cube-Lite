@@ -1,6 +1,19 @@
 extends CanvasLayer
 class_name LoadingScreen
 
+const BG_DEEP := Color(0.06, 0.04, 0.12)
+const BG_PANEL := Color(0.10, 0.07, 0.18)
+const BG_CARD := Color(0.14, 0.10, 0.22)
+const PURPLE := Color(0.55, 0.35, 0.90)
+const TEAL := Color(0.15, 0.72, 0.68)
+const PINK := Color(0.82, 0.28, 0.52)
+const ORANGE := Color(0.92, 0.52, 0.12)
+const CYAN := Color(0.15, 0.62, 0.92)
+const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
+const TEXT_MAIN := Color(0.82, 0.78, 0.95)
+const TEXT_DIM := Color(0.55, 0.50, 0.72)
+const TEXT_MUTED := Color(0.35, 0.32, 0.50)
+
 const MIN_DISPLAY_TIME: float = 2.0
 const FADE_IN_TIME: float = 0.7
 const FADE_OUT_TIME: float = 0.6
@@ -20,13 +33,24 @@ var _bar_container: Control
 var _title: Label
 var _sub: Label
 var _progress_lbl: Label
-var _bar_width: float = 400.0
-var _bar_height: float = 18.0
+var _bar_width: float
+var _bar_height: float = 26.0
 var _pulse: float = 0.0
 
 func _ready() -> void:
-	_load_translations()
 	_build()
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED:
+		_refresh_texts()
+
+func _refresh_texts() -> void:
+	if not _sub: return
+	if WorldSeed.world_name.length() > 0:
+		_sub.text = WorldSeed.world_name + "   |   " + tr("SEED").replace("%d", str(WorldSeed.seed_value))
+	else:
+		_sub.text = tr("SEED").replace("%d", str(WorldSeed.seed_value))
+	_progress_lbl.text = tr("LOADING_TEXT")
 
 func _load_translations() -> void:
 	var path: String = "res://translations/game.csv"
@@ -53,43 +77,44 @@ func _load_translations() -> void:
 
 func _build() -> void:
 	var vp := get_viewport().get_visible_rect().size
+	_bar_width = min(vp.x * 0.6, 560.0)
 
 	var bg := ColorRect.new()
-	bg.color = Color(0.06, 0.06, 0.10)
+	bg.color = BG_DEEP
 	bg.size = vp
 	add_child(bg)
 
 	var grid := ColorRect.new()
-	grid.color = Color(0.10, 0.10, 0.16, 0.4)
+	grid.color = Color(BG_CARD.r, BG_CARD.g, BG_CARD.b, 0.4)
 	grid.size = vp
 	grid.material = _make_grid_mat(vp)
 	add_child(grid)
 
 	_title = Label.new()
-	_title.text = "CubeLife Zero"
+	_title.text = "Tila'Adventure"
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.add_theme_font_size_override("font_size", 52)
-	_title.add_theme_color_override("font_color", Color(0.35, 0.85, 1.0, 0.95))
-	_title.add_theme_color_override("font_shadow_color", Color(0, 0.3, 0.6, 0.6))
+	_title.add_theme_font_size_override("font_size", 80)
+	_title.add_theme_color_override("font_color", Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.95))
+	_title.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.6))
 	_title.add_theme_constant_override("shadow_offset_x", 3)
 	_title.add_theme_constant_override("shadow_offset_y", 3)
-	_title.position = Vector2(0, vp.y * 0.5 - 90)
-	_title.size = Vector2(vp.x, 60)
+	_title.position = Vector2(0, vp.y * 0.5 - 120)
+	_title.size = Vector2(vp.x, 80)
 	add_child(_title)
 
 	_sub = Label.new()
 	if WorldSeed.world_name.length() > 0:
-		_sub.text = WorldSeed.world_name + "   |   " + tr("SEED") % WorldSeed.seed_value
+		_sub.text = WorldSeed.world_name + "   |   " + tr("SEED").replace("%d", str(WorldSeed.seed_value))
 	else:
-		_sub.text = tr("SEED") % WorldSeed.seed_value
+		_sub.text = tr("SEED").replace("%d", str(WorldSeed.seed_value))
 	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_sub.add_theme_font_size_override("font_size", 14)
-	_sub.add_theme_color_override("font_color", Color(0.45, 0.55, 0.70, 0.6))
+	_sub.add_theme_font_size_override("font_size", 22)
+	_sub.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.6))
 	_sub.add_theme_constant_override("shadow_offset_x", 1)
 	_sub.add_theme_constant_override("shadow_offset_y", 1)
 	_sub.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-	_sub.position = Vector2(0, vp.y * 0.5 - 36)
-	_sub.size = Vector2(vp.x, 20)
+	_sub.position = Vector2(0, vp.y * 0.5 - 50)
+	_sub.size = Vector2(vp.x, 30)
 	add_child(_sub)
 
 	_bar_container = Control.new()
@@ -98,13 +123,13 @@ func _build() -> void:
 	add_child(_bar_container)
 
 	_bar_bg = ColorRect.new()
-	_bar_bg.color = Color(0.12, 0.12, 0.18, 0.9)
+	_bar_bg.color = Color(BG_CARD.r, BG_CARD.g, BG_CARD.b, 0.9)
 	_bar_bg.size = Vector2(_bar_width, _bar_height)
 	_bar_bg.position = Vector2.ZERO
 	_bar_container.add_child(_bar_bg)
 
 	_bar_fill = ColorRect.new()
-	_bar_fill.color = Color(0.30, 0.85, 1.0, 0.85)
+	_bar_fill.color = Color(TEAL.r, TEAL.g, TEAL.b, 0.85)
 	_bar_fill.size = Vector2(0, _bar_height - 4)
 	_bar_fill.position = Vector2(2, 2)
 	_bar_container.add_child(_bar_fill)
@@ -112,10 +137,10 @@ func _build() -> void:
 	_progress_lbl = Label.new()
 	_progress_lbl.text = tr("LOADING_TEXT")
 	_progress_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_progress_lbl.add_theme_font_size_override("font_size", 11)
-	_progress_lbl.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65, 0.7))
-	_progress_lbl.position = Vector2(0, vp.y * 0.5 + 50)
-	_progress_lbl.size = Vector2(vp.x, 18)
+	_progress_lbl.add_theme_font_size_override("font_size", 18)
+	_progress_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
+	_progress_lbl.position = Vector2(0, _bar_container.position.y + _bar_height + 8)
+	_progress_lbl.size = Vector2(vp.x, 24)
 	add_child(_progress_lbl)
 
 	_fade = ColorRect.new()
@@ -140,7 +165,7 @@ void fragment() {
 	vec2 g = fract(uv * 30.0);
 	float l = min(g.x, g.y);
 	float a = smoothstep(0.04, 0.02, l) * 0.15;
-	COLOR = vec4(0.2, 0.6, 1.0, a);
+	COLOR = vec4(0.35, 0.25, 0.65, a);
 }
 """
 	return s
@@ -154,7 +179,7 @@ func _process(delta: float) -> void:
 		var ease := 1.0 - pow(1.0 - t, 3.0)
 		_fade.color.a = 1.0 - ease
 		var y_offset: float = (1.0 - ease) * 40.0
-		_title.position.y = (get_viewport().get_visible_rect().size.y * 0.5 - 90) - y_offset
+		_title.position.y = (get_viewport().get_visible_rect().size.y * 0.5 - 120) - y_offset
 		_sub.modulate.a = ease * 0.6
 		_bar_container.modulate.a = max(0.0, (t - 0.3) / 0.7)
 		if t >= 1.0:
@@ -188,12 +213,12 @@ func _process(delta: float) -> void:
 	var fill_w: float = max(0.0, _bar_width - 4.0) * _progress
 	_bar_fill.size.x = fill_w
 
-	var base_color := Color(0.30, 0.85, 1.0)
+	var base_color := TEAL
 	var bright := 0.85 + pulse_wave * 2.0
 	_bar_fill.color = Color(base_color.r * bright, base_color.g * bright, base_color.b * bright, 0.85)
 
 	_title.add_theme_color_override("font_color", Color(
-		0.35 + pulse_wave * 0.3, 0.85 + pulse_wave * 0.15, 1.0, 0.95))
+		PURPLE.r + pulse_wave * 0.2, PURPLE.g + pulse_wave * 0.15, PURPLE.b + pulse_wave * 0.1, 0.95))
 
 	if _done:
 		_progress_lbl.text = tr("READY_TEXT")

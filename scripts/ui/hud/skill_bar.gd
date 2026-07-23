@@ -4,14 +4,30 @@
 extends Control
 class_name SkillBar
 
+const S: float = 1.6
+const SS: float = 1.4
+
+const BG_DEEP := Color(0.06, 0.04, 0.12)
+const BG_PANEL := Color(0.10, 0.07, 0.18)
+const BG_CARD := Color(0.14, 0.10, 0.22)
+const PURPLE := Color(0.55, 0.35, 0.90)
+const TEAL := Color(0.15, 0.72, 0.68)
+const PINK := Color(0.82, 0.28, 0.52)
+const ORANGE := Color(0.92, 0.52, 0.12)
+const CYAN := Color(0.15, 0.62, 0.92)
+const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
+const TEXT_MAIN := Color(0.82, 0.78, 0.95)
+const TEXT_DIM := Color(0.55, 0.50, 0.72)
+const TEXT_MUTED := Color(0.35, 0.32, 0.50)
+
 var _slots: Array[Dictionary] = []
 var _tracked: CharacterBase = null
 var _skills: Array[Dictionary] = []
 
-var _element_color: Color = Color(0.3, 0.3, 0.5)
+var _element_color: Color = Color(0.38, 0.30, 0.55)
 
-var slot_size := Vector2(56, 56)
-var gap := 8.0
+var slot_size := Vector2(78, 78)
+var gap := 12.0
 
 func _ready() -> void:
 	_setup_slots()
@@ -23,9 +39,9 @@ func _setup_slots() -> void:
 	anchor_right = 0.5
 	anchor_bottom = 1.0
 	offset_left = -total_w * 0.5
-	offset_top = -(slot_size.y + 24)
+	offset_top = -(slot_size.y + 34)
 	offset_right = total_w * 0.5
-	offset_bottom = -24
+	offset_bottom = -34
 
 	for i in range(4):
 		var panel := Panel.new()
@@ -35,7 +51,7 @@ func _setup_slots() -> void:
 		add_child(panel)
 
 		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.06, 0.06, 0.10, 0.82)
+		bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.82)
 		bg.corner_radius_top_left = 10
 		bg.corner_radius_top_right = 10
 		bg.corner_radius_bottom_left = 10
@@ -44,20 +60,20 @@ func _setup_slots() -> void:
 		bg.border_width_right = 1
 		bg.border_width_top = 1
 		bg.border_width_bottom = 1
-		bg.border_color = Color(0.25, 0.25, 0.35, 0.5)
+		bg.border_color = Color(0.35, 0.28, 0.52, 0.5)
 		panel.add_theme_stylebox_override("panel", bg)
 
 		var icon := ColorRect.new()
-		icon.size = Vector2(40, 28)
-		icon.position = Vector2(8, 6)
-		icon.color = Color(0.2, 0.2, 0.3)
+		icon.size = Vector2(56, 40)
+		icon.position = Vector2(12, 8)
+		icon.color = Color(0.30, 0.22, 0.42)
 		icon.mouse_filter = MOUSE_FILTER_IGNORE
 		panel.add_child(icon)
 
 		var hotkey := Label.new()
-		hotkey.position = Vector2(6, 36)
-		hotkey.add_theme_font_size_override("font_size", 11)
-		hotkey.add_theme_color_override("font_color", Color(0.65, 0.65, 0.8, 0.7))
+		hotkey.position = Vector2(8, 52)
+		hotkey.add_theme_font_size_override("font_size", 18)
+		hotkey.add_theme_color_override("font_color", TEXT_DIM)
 		hotkey.add_theme_constant_override("shadow_offset_x", 1)
 		hotkey.add_theme_constant_override("shadow_offset_y", 1)
 		hotkey.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
@@ -73,12 +89,12 @@ func _setup_slots() -> void:
 		panel.add_child(cd_overlay)
 
 		var cd_label := Label.new()
-		cd_label.position = Vector2(0, 14)
+		cd_label.position = Vector2(0, 20)
 		cd_label.size = slot_size
 		cd_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cd_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		cd_label.add_theme_font_size_override("font_size", 20)
-		cd_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.9))
+		cd_label.add_theme_font_size_override("font_size", 32)
+		cd_label.add_theme_color_override("font_color", TEXT_BRIGHT)
 		cd_label.add_theme_constant_override("shadow_offset_x", 1)
 		cd_label.add_theme_constant_override("shadow_offset_y", 1)
 		cd_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
@@ -89,7 +105,7 @@ func _setup_slots() -> void:
 		var mana_dim := ColorRect.new()
 		mana_dim.size = slot_size
 		mana_dim.position = Vector2.ZERO
-		mana_dim.color = Color(0.15, 0.35, 0.80, 0.40)
+		mana_dim.color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.30)
 		mana_dim.mouse_filter = MOUSE_FILTER_IGNORE
 		mana_dim.visible = false
 		panel.add_child(mana_dim)
@@ -108,9 +124,9 @@ func _setup_slots() -> void:
 		sd["bg"] = bg
 
 		var stack_lbl := Label.new()
-		stack_lbl.position = Vector2(4, 4)
-		stack_lbl.add_theme_font_size_override("font_size", 14)
-		stack_lbl.add_theme_color_override("font_color", Color(1, 1, 0.6, 0.95))
+		stack_lbl.position = Vector2(6, 6)
+		stack_lbl.add_theme_font_size_override("font_size", 22)
+		stack_lbl.add_theme_color_override("font_color", Color(ORANGE.r, ORANGE.g, ORANGE.b, 0.95))
 		stack_lbl.add_theme_constant_override("shadow_offset_x", 1)
 		stack_lbl.add_theme_constant_override("shadow_offset_y", 1)
 		stack_lbl.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
@@ -186,7 +202,7 @@ func track(ch: CharacterBase) -> void:
 			if ec is Color:
 				_element_color = ec as Color
 	if _element_color == Color(0.0, 0.0, 0.0):
-		_element_color = Color(0.3, 0.3, 0.5)
+		_element_color = Color(0.38, 0.30, 0.55)
 
 	var skills: Array[Dictionary] = [
 		{ "idx": 0, "key": "LMB", "cd_var": "_lmb_cd", "max_cd_var": "lmb_cooldown", "mana_cost_var": "mana_cost_lmb" },

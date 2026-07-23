@@ -1,6 +1,7 @@
 extends Node
 class_name PlacementSystem
 
+const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const VOXEL: float = 0.50
 
 var _placing: bool = false
@@ -9,13 +10,16 @@ var _ghost: Node3D = null
 var _ghost_valid: bool = false
 var _ghost_pos: Vector3 = Vector3.ZERO
 var _player_inv: Inventory = null
+var _player: Node3D = null
 
 func _exit_tree() -> void:
 	if get_tree() != null and get_tree().root.has_meta("building_placement_active"):
 		get_tree().root.set_meta("building_placement_active", false)
 
-func set_player_inventory(inv: Inventory) -> void:
+func set_player_inventory(inv: Inventory, player_node: Node3D = null) -> void:
 	_player_inv = inv
+	if player_node != null:
+		_player = player_node
 
 func is_placing() -> bool:
 	return _placing
@@ -43,6 +47,17 @@ func _make_ghost() -> void:
 		_build_ghost_portal()
 	elif _item_id == "chest":
 		_build_ghost_chest()
+	elif _item_id.begins_with("block_"):
+		_build_ghost_block()
+
+func _build_ghost_block() -> void:
+	var block_mat := _ghost_mat(Color(0.80, 0.80, 0.80, 0.30), Color(0.40, 0.40, 0.40), 0.0)
+	var mi := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(VOXEL, VOXEL, VOXEL)
+	mi.mesh = box
+	mi.material_override = block_mat
+	_ghost.add_child(mi)
 
 func _build_ghost_portal() -> void:
 	var base_mat := _ghost_mat(Color(0.10, 0.30, 0.30, 0.25), Color(0.06, 0.18, 0.18), 0.2)
@@ -125,10 +140,20 @@ func update_placement() -> void:
 		return
 	var params := PhysicsRayQueryParameters3D.new()
 	params.from = from
-	params.to = from + dir * 50.0
+	params.to = from + dir * 300.0
 	params.collide_with_areas = false
 	params.collide_with_bodies = true
-	var result: Dictionary = space_state.intersect_ray(params)
+	# Skip through characters (player, NPCs) to hit terrain
+	var result: Dictionary = {}
+	var skips := 3
+	while skips > 0:
+		result = space_state.intersect_ray(params)
+		if result.is_empty():
+			break
+		if result.collider is StaticBody3D:
+			break  # hit terrain/structure
+		params.from = result.position + dir * 0.1  # advance past the character
+		skips -= 1
 	if result.is_empty():
 		_ghost.visible = false
 		_ghost_valid = false
@@ -140,6 +165,8 @@ func update_placement() -> void:
 	if _item_id == "twilight_gate":
 		y_offset = VOXEL
 	elif _item_id == "chest":
+		y_offset = 0.0
+	elif _item_id.begins_with("block_"):
 		y_offset = 0.0
 	_ghost_pos = snapped + Vector3(0, y_offset, 0)
 	_ghost.global_position = _ghost_pos
@@ -186,6 +213,13 @@ func confirm_placement() -> bool:
 		parent.add_child(chest_obj)
 		chest_obj.global_position = _ghost_pos
 		SFXManager.play_block_place()
+	elif _item_id.begins_with("block_"):
+		var block_id: int = _Data.ITEM_TO_BLOCK.get(_item_id, 0)
+		if block_id != 0:
+			var world_mgr: Node = _find_world_manager()
+			if world_mgr and world_mgr.has_method("place_block"):
+				world_mgr.place_block(_ghost_pos.x, _ghost_pos.y, _ghost_pos.z, block_id)
+				SFXManager.play_block_place()
 	_placing = false
 	_item_id = ""
 	get_tree().root.set_meta("building_placement_active", false)
@@ -196,6 +230,14 @@ func cancel_placement() -> void:
 	_item_id = ""
 	get_tree().root.set_meta("building_placement_active", false)
 	_remove_ghost()
+
+func _find_world_manager() -> Node:
+	var p := get_parent()
+	while p:
+		if p.has_node("WorldManager"):
+			return p.get_node("WorldManager")
+		p = p.get_parent()
+	return null
 
 func serialize() -> Array:
 	return []

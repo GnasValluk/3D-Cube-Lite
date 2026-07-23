@@ -82,7 +82,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton:
 		var e := event as InputEventMouseButton
-		if e.pressed:
+		if e.pressed and not Input.is_key_pressed(KEY_CTRL):
 			if e.button_index == MOUSE_BUTTON_WHEEL_UP:
 				zoom_in()
 				get_viewport().set_input_as_handled()
