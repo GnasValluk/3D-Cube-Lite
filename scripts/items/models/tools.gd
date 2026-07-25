@@ -14,7 +14,10 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"dai_kiem": _build_dai_kiem(pivot)
 		"gang_tay_da_thu": _build_gang_tay(pivot)
 		"no": _build_no(pivot)
+		"phao_dua_hau": _build_phao_dua_hau(pivot)
 		"mui_ten": _build_mui_ten(pivot)
+		"dan_hat_nhan_dua_hau": _build_dan_hat_nhan_dua_hau(pivot)
+		"phao_coi_bi_do": _build_phao_coi(pivot)
 
 static func _mat(col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -452,3 +455,156 @@ static func _build_mui_ten(p: Node3D) -> void:
 	_box(p, Vector3(0, -0.04 * s, 0.060 * s), Vector3(0.004 * s, 0.14 * s, 0.034 * s), fletch_dark)
 	_box(p, Vector3(0, -0.04 * s, -0.060 * s), Vector3(0.004 * s, 0.14 * s, 0.034 * s), fletch_dark)
 	_cyl(p, Vector3(0, -0.12 * s, 0), 0.040 * s, 0.012 * s, wrap)
+
+# ── Pháo Dưa Hấu (Watermelon Cannon) — to, lực, chi tiết ─────────────────
+static func _build_phao_dua_hau(p: Node3D) -> void:
+	var gunmetal := _mat(Color(0.35, 0.36, 0.40))
+	var gunmetal2:= _mat(Color(0.42, 0.43, 0.48))
+	var steel    := _mat(Color(0.55, 0.56, 0.62))
+	var brass    := _mat(Color(0.55, 0.42, 0.12))
+	var wood     := _mat(Color(0.40, 0.24, 0.10))
+	var wood_d   := _mat(Color(0.28, 0.16, 0.06))
+	var green    := _mat(Color(0.22, 0.52, 0.16))
+	var green_l  := _mat(Color(0.30, 0.60, 0.22))
+	var stripe_c := _mat(Color(0.12, 0.32, 0.08))
+	var dark     := _mat(Color(0.18, 0.18, 0.20))
+	# Bệ đỡ vai (shoulder stock) — dày, chắc, nhiều chi tiết
+	_box(p, Vector3(0, -0.14, -0.10), Vector3(0.14, 0.06, 0.18), wood_d)
+	_box(p, Vector3(0, -0.10, -0.14), Vector3(0.16, 0.06, 0.08), wood)
+	_box(p, Vector3(0, -0.06, -0.16), Vector3(0.10, 0.04, 0.05), wood_d)
+	_cyl(p, Vector3(0, -0.10, -0.12), 0.025, 0.08, brass)
+	# Khung thân pháo chính (main frame)
+	_box(p, Vector3(0, 0.02, 0.02),  Vector3(0.18, 0.16, 0.18), gunmetal)
+	_box(p, Vector3(0, 0.06, 0.08),  Vector3(0.16, 0.08, 0.06), green)
+	_box(p, Vector3(0, 0.12, 0.08),  Vector3(0.005, 0.04, 0.07), stripe_c)
+	_box(p, Vector3(0, 0.06, 0.08),  Vector3(0.005, 0.04, 0.07), stripe_c)
+	# Đai ốc / tán giữ
+	_box(p, Vector3(-0.08, 0.02, 0.02), Vector3(0.02, 0.12, 0.16), dark)
+	_box(p, Vector3(0.08, 0.02, 0.02), Vector3(0.02, 0.12, 0.16), dark)
+	# Đai tăng cường (reinforcement bands)
+	_box(p, Vector3(0, 0.14, 0.02), Vector3(0.20, 0.04, 0.20), steel)
+	_cyl(p, Vector3(0, 0.14, 0.02), 0.10, 0.04, steel)
+	_box(p, Vector3(0, 0.28, 0.02), Vector3(0.18, 0.04, 0.18), steel)
+	_cyl(p, Vector3(0, 0.28, 0.02), 0.09, 0.04, steel)
+	# Thân nòng (barrel) — dày hơn, dài hơn
+	_cyl(p, Vector3(0, 0.10, 0.02), 0.09, 0.18, gunmetal2)
+	_cyl(p, Vector3(0, 0.22, 0.02), 0.08, 0.12, gunmetal)
+	_cyl(p, Vector3(0, 0.34, 0.02), 0.07, 0.10, gunmetal2)
+	# Họa tiết dưa hấu dọc thân nòng
+	_box(p, Vector3(0, 0.10, 0.10),  Vector3(0.14, 0.22, 0.02), green_l)
+	_box(p, Vector3(0, 0.16, 0.10),  Vector3(0.006, 0.05, 0.025), stripe_c)
+	_box(p, Vector3(0, 0.24, 0.10),  Vector3(0.006, 0.05, 0.025), stripe_c)
+	# Nòng pháo (muzzle) — loe to, uy lực
+	_cyl(p, Vector3(0, 0.40, 0.02), 0.09, 0.04, steel)
+	_cyl(p, Vector3(0, 0.42, 0.02), 0.11, 0.03, gunmetal)
+	_cyl(p, Vector3(0, 0.40, 0.02), 0.06, 0.08, dark)
+	# Tay cầm / cò súng
+	_box(p, Vector3(0, -0.04, -0.06), Vector3(0.04, 0.05, 0.06), wood)
+	_box(p, Vector3(0, -0.06, -0.04), Vector3(0.025, 0.02, 0.03), steel)
+	# Bộ phận ngắm (sight) — trên nòng
+	_box(p, Vector3(0, 0.20, 0.10), Vector3(0.01, 0.03, 0.02), brass)
+	_box(p, Vector3(0, 0.35, 0.10), Vector3(0.01, 0.03, 0.02), brass)
+
+static func _build_dan_hat_nhan_dua_hau(p: Node3D) -> void:
+	# Mini watermelon projectile model — vỏ xanh, ruột đỏ
+	var green_d := Color(0.18, 0.50, 0.12)
+	var green_l := Color(0.28, 0.60, 0.20)
+	var red_f := Color(0.75, 0.15, 0.18)
+	var m_core := MeshBuilder.emit_mat(red_f, Color(1.0, 0.2, 0.25), 4.0)
+	MeshBuilder.sphere(p, Vector3.ZERO, 0.08, m_core)
+	var m_glow := MeshBuilder.emit_mat(green_d, green_l, 3.0)
+	var glow := MeshBuilder.sphere(p, Vector3.ZERO, 0.16, m_glow)
+	glow.scale = Vector3(1.0, 0.6, 1.0)
+	var m_ring := MeshBuilder.emit_mat(green_l, green_l, 3.0)
+	var tor := TorusMesh.new(); tor.inner_radius = 0.22; tor.outer_radius = 0.02
+	var ri := MeshInstance3D.new(); ri.mesh = tor; ri.material_override = m_ring
+	ri.rotation = Vector3(0.5, 0.3, 0.1); p.add_child(ri)
+
+static func phao_dua_hau_drop(p: Node3D) -> void:
+	var steel_c := Color(0.55, 0.56, 0.62)
+	var wood_c  := Color(0.40, 0.24, 0.10)
+	var green_c := Color(0.22, 0.52, 0.16)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 1.8, 2.8, 2.0, steel_c)
+	ItemMeshShared.add_cube(p, 0, -2.0, 0, 2.0, 1.2, 1.6, wood_c)
+	ItemMeshShared.add_cube(p, 0, 2.0, 0, 2.0, 1.2, 1.8, steel_c)
+	ItemMeshShared.add_cube(p, 0, -1.0, 1.0, 1.6, 2.0, 0.4, green_c)
+	ItemMeshShared.add_cube(p, 0, 1.5, 0, 1.4, 0.4, 1.6, steel_c)
+	ItemMeshShared.add_cube(p, 0, 2.6, 0, 2.2, 0.4, 2.2, steel_c)
+
+# ── Pháo Cối Bí Đỏ (Pumpkin Mortar) — nòng ngắn, bệ đỡ, bí đỏ trang trí ─────
+static func _build_phao_coi(p: Node3D) -> void:
+	var metal_d := _mat(Color(0.30, 0.30, 0.35))
+	var metal   := _mat(Color(0.45, 0.45, 0.50))
+	var metal_l := _mat(Color(0.55, 0.55, 0.62))
+	var brass   := _mat(Color(0.55, 0.42, 0.12))
+	var orange  := _mat(Color(1.0, 0.55, 0.0))
+	var green   := _mat(Color(0.15, 0.55, 0.10))
+	var dark    := _mat(Color(0.18, 0.18, 0.20))
+
+	var pivot := Node3D.new()
+	pivot.rotation_degrees = Vector3(-45, 0, 0)
+	p.add_child(pivot)
+
+	# Bệ đỡ (base plate)
+	_box(pivot, Vector3(0, -0.06, 0), Vector3(0.20, 0.04, 0.22), metal_d)
+	_box(pivot, Vector3(0, -0.12, 0), Vector3(0.16, 0.08, 0.18), dark)
+	# Chân đế (legs)
+	_box(pivot, Vector3(-0.08, -0.18, 0.06), Vector3(0.04, 0.08, 0.05), metal_d)
+	_box(pivot, Vector3(0.08, -0.18, 0.06), Vector3(0.04, 0.08, 0.05), metal_d)
+	_box(pivot, Vector3(-0.08, -0.18, -0.06), Vector3(0.04, 0.08, 0.05), metal_d)
+	_box(pivot, Vector3(0.08, -0.18, -0.06), Vector3(0.04, 0.08, 0.05), metal_d)
+
+	# Giá đỡ nòng (barrel mount)
+	_box(pivot, Vector3(0, 0.02, -0.04), Vector3(0.10, 0.08, 0.10), metal_d)
+	_box(pivot, Vector3(0, 0.06, -0.04), Vector3(0.12, 0.04, 0.12), metal)
+
+	# Nòng pháo (barrel) — ống ngắn, dày
+	_cyl(pivot, Vector3(0, 0.10, 0.06), 0.07, 0.18, metal_d)
+	_cyl(pivot, Vector3(0, 0.14, 0.10), 0.06, 0.10, metal)
+	_cyl(pivot, Vector3(0, 0.22, 0.08), 0.065, 0.06, metal_l)
+	# Miệng nòng (muzzle)
+	_cyl(pivot, Vector3(0, 0.26, 0.06), 0.08, 0.03, metal_d)
+	_cyl(pivot, Vector3(0, 0.28, 0.06), 0.09, 0.02, metal_l)
+	# Lỗ nòng
+	_cyl(pivot, Vector3(0, 0.14, 0.10), 0.03, 0.20, dark)
+
+	# Kích hoạt / cò (trigger mechanism)
+	_box(pivot, Vector3(0, -0.02, -0.08), Vector3(0.03, 0.04, 0.03), brass)
+	_box(pivot, Vector3(0, -0.04, -0.06), Vector3(0.015, 0.02, 0.02), metal_l)
+
+	# Ngòi nổ / dây cháy chậm (fuse) — trên nòng
+	var fuse := MeshInstance3D.new()
+	var fuse_mesh := CylinderMesh.new()
+	fuse_mesh.top_radius = 0.005
+	fuse_mesh.bottom_radius = 0.005
+	fuse_mesh.height = 0.06
+	fuse.mesh = fuse_mesh
+	fuse.material_override = _mat(Color(0.55, 0.40, 0.25))
+	fuse.position = Vector3(0, 0.30, 0.06)
+	fuse.rotation = Vector3(0.3, 0, 0)
+	fuse.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	pivot.add_child(fuse)
+
+	# Quả bí đỏ trang trí trên miệng nòng
+	var pumpkin := MeshInstance3D.new()
+	var sph := SphereMesh.new()
+	sph.radius = 0.05
+	sph.height = 0.10
+	sph.radial_segments = 8
+	sph.rings = 6
+	pumpkin.mesh = sph
+	pumpkin.material_override = orange
+	pumpkin.position = Vector3(0.05, 0.28, 0.10)
+	pumpkin.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	pivot.add_child(pumpkin)
+
+	var stem := MeshInstance3D.new()
+	var stem_mesh := CylinderMesh.new()
+	stem_mesh.top_radius = 0.005
+	stem_mesh.bottom_radius = 0.002
+	stem_mesh.height = 0.025
+	stem.mesh = stem_mesh
+	stem.material_override = green
+	stem.position = Vector3(0.05, 0.31, 0.10)
+	stem.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	p.add_child(stem)

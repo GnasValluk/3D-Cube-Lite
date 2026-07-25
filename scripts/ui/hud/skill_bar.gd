@@ -195,14 +195,7 @@ func track(ch: CharacterBase) -> void:
 	if ch == null:
 		return
 
-	if "element" in ch:
-		var elem: Variant = ch.get("element")
-		if elem is int and (elem as int) > 0:
-			var ec: Variant = CharacterBase.ELEMENT_COLORS.get(elem as int)
-			if ec is Color:
-				_element_color = ec as Color
-	if _element_color == Color(0.0, 0.0, 0.0):
-		_element_color = Color(0.38, 0.30, 0.55)
+	_element_color = Color(0.38, 0.30, 0.55)
 
 	var skills: Array[Dictionary] = [
 		{ "idx": 0, "key": "LMB", "cd_var": "_lmb_cd", "max_cd_var": "lmb_cooldown", "mana_cost_var": "mana_cost_lmb" },

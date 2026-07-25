@@ -17,6 +17,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"dai_kiem": ToolsMesh.greatsword_drop(parent)
 		"gang_tay_da_thu": ToolsMesh.gauntlet_drop(parent)
 		"no": ToolsMesh.no_drop(parent)
+		"phao_dua_hau": ToolsMesh.phao_dua_hau_drop(parent)
 		"mui_ten": ToolsMesh.arrow_drop(parent)
 		"twilight_gate": StructuresMesh.gate(parent)
 		"carrot": FruitMeshes.carrot(parent)

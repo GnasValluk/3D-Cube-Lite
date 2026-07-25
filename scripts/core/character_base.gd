@@ -14,16 +14,23 @@ signal oxygen_changed(current: int, max_oxygen: int)
 signal level_up(new_level: int)
 signal submerged(underwater: bool)
 
-# ── Element system ─────────────────────────────────────────────────────────────
-enum Element { NONE, DIEN, BANG, DECAY, HOA, HAC_AM, ANH_SANG }
-const ELEMENT_COLORS: Dictionary = {
-	Element.NONE:    Color(1.0, 1.0, 1.0),
-	Element.DIEN:    Color(1.0, 0.85, 0.0),
-	Element.BANG:    Color(0.40, 0.80, 1.0),
-	Element.DECAY:   Color(0.40, 1.0, 0.40),
-	Element.HOA:     Color(1.0, 0.40, 0.0),
-	Element.HAC_AM:  Color(1.0, 0.55, 1.0),
-	Element.ANH_SANG: Color(1.0, 0.85, 0.0)
+# ── Damage type system ─────────────────────────────────────────────────────────
+enum DamageType { PHYSICAL, POISON, FIRE, WATER, LIGHTNING, ICE }
+const DAMAGE_TYPE_COLORS: Dictionary = {
+	DamageType.PHYSICAL:   Color(1.0, 1.0, 1.0),
+	DamageType.POISON:     Color(0.20, 0.85, 0.20),
+	DamageType.FIRE:       Color(1.0, 0.35, 0.05),
+	DamageType.WATER:      Color(0.20, 0.55, 1.0),
+	DamageType.LIGHTNING:  Color(1.0, 0.85, 0.0),
+	DamageType.ICE:        Color(0.40, 0.85, 1.0),
+}
+const DAMAGE_TYPE_NAMES: Dictionary = {
+	DamageType.PHYSICAL:   "Dmg Vật Lý",
+	DamageType.POISON:     "Dmg Độc",
+	DamageType.FIRE:       "Dmg Lửa",
+	DamageType.WATER:      "Dmg Nước",
+	DamageType.LIGHTNING:  "Dmg Điện",
+	DamageType.ICE:        "Dmg Băng",
 }
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
@@ -70,7 +77,7 @@ var _sprint_mana_acc: float = 0.0
 
 var is_alive: bool = true
 var character_name: String = ""
-var element: int = Element.NONE
+var element: int = 0
 var shield: int = 0
 var _melee_hit_once: bool = false
 var _melee_hit_progress: float = 0.25
@@ -213,9 +220,6 @@ func _process(delta: float) -> void:
 		_drown_timer = 0.0
 
 # ── Overrideable interface ────────────────────────────────────────────────────
-func get_element() -> int:
-	return element
-
 func _build_character() -> void:      pass
 func _animate(_delta: float) -> void: pass
 func _animate_swim(_delta: float) -> void: pass
@@ -270,31 +274,9 @@ func calc_hp_skill_damage(percent: float) -> int:
 	return maxi(1, int(max_hp * percent / 100.0))
 
 # ── HP / Damage ───────────────────────────────────────────────────────────────
-func take_damage(amount: int, attacker: Node3D = null) -> void:
+func take_damage(amount: int, attacker: Node3D = null, damage_type: int = 0) -> void:
 	if not is_alive or _invul_timer > 0.0:
 		return
-	if attacker != null and "is_han_bang_buffed" in attacker and attacker.is_han_bang_buffed():
-		var saved_invul := _invul_timer
-		var ice_dmg: int = 15
-		if attacker.has_method("calc_hp_skill_damage"):
-			ice_dmg = attacker.calc_hp_skill_damage(2.0)
-		elif attacker.has_method("calc_skill_damage"):
-			ice_dmg = attacker.calc_skill_damage(15)
-		ice_dmg = maxi(1, ice_dmg - defense)
-		if shield > 0:
-			var absorbed := mini(shield, ice_dmg)
-			shield -= absorbed
-			ice_dmg -= absorbed
-			shield_changed.emit(shield)
-		if ice_dmg > 0:
-			hp = maxi(0, hp - ice_dmg)
-			_spawn_damage_number(ice_dmg, null)
-			hp_changed.emit(hp, max_hp)
-			damage_taken.emit(ice_dmg, null)
-		if hp <= 0:
-			_die(attacker)
-			return
-		_invul_timer = saved_invul
 	var dmg := maxi(1, amount - defense)
 	if shield > 0:
 		var absorbed := mini(shield, dmg)
@@ -306,7 +288,7 @@ func take_damage(amount: int, attacker: Node3D = null) -> void:
 		_invul_timer = 0.05
 		_hit_timer = 0.18
 		_hit_flash()
-		_spawn_damage_number(dmg, attacker)
+		_spawn_damage_number(dmg, attacker, damage_type)
 		SFXManager.play_hurt()
 		_state = State.HIT
 		_attack_timer = 0.0
@@ -896,17 +878,17 @@ func _start_forward_lunge(speed: float, duration: float) -> void:
 	_action_lunge_speed = speed
 	_action_lunge_timer = duration
 
-func _spawn_damage_number(dmg: int, attacker: Node3D = null) -> void:
+func _spawn_damage_number(dmg: int, attacker: Node3D = null, damage_type: int = 0) -> void:
 	var world := get_tree().current_scene
 	if world == null:
 		return
-	var elem: int = Element.NONE
-	if attacker != null and attacker.has_method("get_element"):
-		elem = attacker.get_element()
-	var col: Color = ELEMENT_COLORS.get(elem, Color.WHITE)
+	if damage_type < 0 or damage_type >= DamageType.size():
+		damage_type = 0
+	var col: Color = DAMAGE_TYPE_COLORS.get(damage_type, Color.WHITE)
+	var type_name: String = DAMAGE_TYPE_NAMES.get(damage_type, "")
 	var dn := FloatingDamage.new()
 	world.add_child(dn)
-	dn.setup(dmg, global_position + Vector3(0, 1.5, 0), col)
+	dn.setup(dmg, global_position + Vector3(0, 1.5, 0), col, type_name)
 
 # ── Camera toggle ─────────────────────────────────────────────────────────────
 func _toggle_camera() -> void:
@@ -937,7 +919,7 @@ func play_spawn_animation() -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
-	var col: Color = ELEMENT_COLORS.get(element, Color(0.5, 0.8, 1.0))
+	var col: Color = Color(0.5, 0.8, 1.0)
 	scale = Vector3.ZERO
 	var pos := global_position
 	var sphere_mat := StandardMaterial3D.new()

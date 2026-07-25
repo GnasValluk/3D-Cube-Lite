@@ -1,12 +1,7 @@
 @tool
 extends Node
 
-const CHAR_DATA: Array = [
-	{ "path": "res://scripts/characters/raptor/raptor_character.gd",		"file": "raptor.png" },
-	{ "path": "res://scripts/characters/dragon/dragon_character.gd",		"file": "dragon.png" },
-	{ "path": "res://scripts/characters/warrior/warrior_character.gd",	"file": "warrior.png" },
-	{ "path": "res://scripts/characters/beyordeath/beyordeath_character.gd","file": "beyordeath.png" },
-]
+const CHAR_DATA: Array = []
 const OUT := "res://assets/icon_character/"
 
 func _ready() -> void:

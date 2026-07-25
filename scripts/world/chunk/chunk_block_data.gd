@@ -7,14 +7,14 @@ const _Data = preload("chunk_data.gd")
 
 var size_x: int = 0
 var size_z: int = 0
+var _chunk_h: int = 21
 
 ## Y range: world Y từ Y_MIN đến Y_MAX (inclusive)
 ## SLAB_HEIGHT = 0.5, WATER_Y = 0.5
 ## Terrain cao nhất (DARK_GRASS) = 1.0
-## Mở rộng depth: Y_MIN = -18 → đáy biển sâu đến -8.0 world units
 const Y_MIN: int = -18
-const Y_MAX: int = 2
-const CHUNK_H: int = Y_MAX - Y_MIN + 1   # = 21 slab layers
+const Y_MAX: int = 50
+const CHUNK_H: int = Y_MAX - Y_MIN + 1   # = 69
 const SLAB_HEIGHT: float = 0.5
 
 var _data: PackedByteArray
@@ -23,24 +23,25 @@ var dirty: bool = false
 func init(sx: int, sz: int) -> void:
 	size_x = sx
 	size_z = sz
+	_chunk_h = Y_MAX - Y_MIN + 1
 	_data = PackedByteArray()
-	_data.resize(size_x * CHUNK_H * size_z)
+	_data.resize(size_x * _chunk_h * size_z)
 	_data.fill(0)
 
 func _idx(x: int, y: int, z: int) -> int:
-	return x * CHUNK_H * size_z + y * size_z + z
+	return x * _chunk_h * size_z + y * size_z + z
 
 func get_block(x: int, y: int, z: int) -> int:
 	if x < 0 or x >= size_x or z < 0 or z >= size_z:
 		return _Data.BlockID.AIR
-	if y < 0 or y >= CHUNK_H:
+	if y < 0 or y >= _chunk_h:
 		return _Data.BlockID.AIR
 	return _data[_idx(x, y, z)]
 
 func set_block(x: int, y: int, z: int, block_id: int) -> void:
 	if x < 0 or x >= size_x or z < 0 or z >= size_z:
 		return
-	if y < 0 or y >= CHUNK_H:
+	if y < 0 or y >= _chunk_h:
 		return
 	var i: int = _idx(x, y, z)
 	if _data[i] != block_id:
@@ -54,8 +55,8 @@ static func world_y_to_layer(wy: float) -> int:
 	return floori(wy / SLAB_HEIGHT) - Y_MIN
 
 ## Slab layer index → world-Y (float, tâm slab)
-## layer 0 (Y_MIN=-8) → world_y = -4.0 + 0.25 = -3.75
-## layer 1 → -3.25, layer 2 → -2.75 ...
+## layer 0 (Y_MIN=-18) → world_y = -8.75
+## layer 1 → -8.25, layer 2 → -7.75 ...
 static func layer_to_world_y(layer: int) -> float:
 	return (float(layer + Y_MIN) + 0.5) * SLAB_HEIGHT
 
@@ -66,4 +67,5 @@ func from_bytes(bytes: PackedByteArray, sx: int, sz: int) -> void:
 	size_x = sx
 	size_z = sz
 	_data = bytes.duplicate()
+	_chunk_h = _data.size() / (size_x * size_z)
 	dirty = false

@@ -31,7 +31,6 @@ var _inventory_open: bool = false
 var _chest_open: bool = false
 var _current_chest: Chest = null
 var _switch_hint: Label
-var _party_ui
 var _settings_ui
 var _settings_icon: Button
 var _save_btn: Button
@@ -76,7 +75,6 @@ var _hud_throttle: float = 0.0
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _ChestUI = preload("res://scripts/items/ui/chest_ui.gd")
-const _PartyUI = preload("res://scripts/ui/party/party_ui.gd")
 const _Library = preload("res://scripts/ui/library/creature_library.gd")
 
 func _ready() -> void:
@@ -152,9 +150,6 @@ func _setup_ui() -> void:
 	_setup_save_button()
 	_setup_library_button()
 	_setup_party_hud()
-
-	_party_ui = _PartyUI.new()
-	add_child(_party_ui)
 
 	_settings_ui = SettingsUI.new()
 	add_child(_settings_ui)
@@ -364,8 +359,6 @@ func _toggle_settings() -> void:
 	if _settings_ui and _settings_ui.visible:
 		_settings_ui.hide_settings()
 	else:
-		if _party_ui and _party_ui.visible:
-			_party_ui.hide_party()
 		_settings_ui.show_settings()
 
 func _setup_party_hud() -> void:
@@ -634,12 +627,6 @@ func _refresh_party_hud() -> void:
 
 			d["lbl"].text = "Lv" + str(ch.level)
 
-			var elem: Variant = ch.get("element")
-			var ec: Color = Color(0.38, 0.30, 0.55)
-			if elem is int and (elem as int) > 0:
-				var tmp: Variant = CharacterBase.ELEMENT_COLORS.get(elem as int)
-				if tmp is Color:
-					ec = tmp as Color
 			d["icon"].texture = _load_icon(ch.character_name)
 			d["icon"].modulate = Color(1, 1, 1, 1)
 
@@ -649,7 +636,7 @@ func _refresh_party_hud() -> void:
 				bg.border_width_right = 2
 				bg.border_width_top = 2
 				bg.border_width_bottom = 2
-				bg.bg_color = Color(ec.r * 0.15 + 0.08, ec.g * 0.15 + 0.08, ec.b * 0.15 + 0.14, 0.70)
+				bg.bg_color = Color(0.20, 0.15, 0.30, 0.70)
 			else:
 				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
 				bg.border_width_left = 1
@@ -684,12 +671,6 @@ func _refresh_party_hud() -> void:
 
 			d["lbl"].text = "Lv" + str(ch.level)
 
-			var elem: Variant = ch.get("element")
-			var ec: Color = Color(0.38, 0.30, 0.55)
-			if elem is int and (elem as int) > 0:
-				var tmp: Variant = CharacterBase.ELEMENT_COLORS.get(elem as int)
-				if tmp is Color:
-					ec = tmp as Color
 			d["icon"].texture = _load_icon(ch.character_name)
 			d["icon"].modulate = Color(1, 1, 1, 1)
 
@@ -699,7 +680,7 @@ func _refresh_party_hud() -> void:
 				bg.border_width_right = 2
 				bg.border_width_top = 2
 				bg.border_width_bottom = 2
-				bg.bg_color = Color(ec.r * 0.15 + 0.08, ec.g * 0.15 + 0.08, ec.b * 0.15 + 0.14, 0.70)
+				bg.bg_color = Color(0.20, 0.15, 0.30, 0.70)
 			else:
 				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
 				bg.border_width_left = 1
@@ -727,7 +708,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if k.pressed and not k.echo:
 			var k_interact: int = ProjectSettings.get_setting("controls/interact", KEY_F)
 			var k_inventory: int = ProjectSettings.get_setting("controls/inventory", KEY_I)
-			var k_party: int = ProjectSettings.get_setting("controls/party", KEY_P)
 			var k_map: int = ProjectSettings.get_setting("controls/map", KEY_M)
 			var k_debug: int = ProjectSettings.get_setting("controls/debug", KEY_F2)
 
@@ -772,22 +752,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			if k.keycode == k_map:
 				if _explore_map and _explore_map.visible:
 					_explore_map.close()
-				elif _explore_sys and not (_settings_ui and _settings_ui.visible) and not (_party_ui and _party_ui.visible):
+					return
+				elif _explore_sys and not (_settings_ui and _settings_ui.visible):
 					_explore_map.open(_explore_sys)
-				return
-			if k.keycode == k_party:
-				if _party_ui and _party_ui.visible:
-					_party_ui.hide_party()
-				elif _mgr and not (_settings_ui and _settings_ui.visible):
-					_party_ui.show_party(_mgr)
-				return
+					return
 			if k.keycode == KEY_ESCAPE:
 				if _explore_map and _explore_map.visible:
 					_explore_map.close()
 				elif _build_menu and _build_menu.visible:
 					_build_menu.close()
-				elif _party_ui and _party_ui.visible:
-					_party_ui.hide_party()
 				elif _settings_ui and _settings_ui.visible:
 					_settings_ui.hide_settings()
 				else:

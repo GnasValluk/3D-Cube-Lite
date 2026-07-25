@@ -6,22 +6,7 @@ const CREATURES := [
 	  "hp": 500, "atk": 80, "def": 20, "spd": 3.6, "mp": 200,
 	  "skills": "LMB: Vụt kiếm (0s)\nQ: Vụt sáng 80st (0.6s)\nR: Chém Xoáy 150st (1.0s)\nSPACE: Nhảy",
 	  "spawn": "Overworld" },
-	{ "id": "raptor",     "name": "Raptor",      "cat": "party", "element": 1,
-	  "hp": 340, "atk": 135, "def": 26, "spd": 6.5, "mp": 200,
-	  "skills": "LMB: Bắn 3 phát (0.6s)\nQ: Lướt điện xuyên 3 lần (1.5s)\nR: Tia sét 75st + Buff tốc 3s (5s)\nSPACE: Lướt nhanh",
-	  "spawn": "Overworld" },
-	{ "id": "dragon",     "name": "Dragon",      "cat": "party", "element": 5,
-	  "hp": 600, "atk": 140, "def": 30, "spd": 3.6, "mp": 200,
-	  "skills": "LMB: Cầu lửa nổ vùng (1.0s)\nQ: Lao vụt 2 stack (5s/stack)\nR: Quả cầu hạt nhân 25st/tick (5s)\nSPACE: Bay 10s",
-	  "spawn": "Overworld" },
-	{ "id": "warrior",    "name": "Warrior",     "cat": "party", "element": 2,
-	  "hp": 800, "atk": 140, "def": 40, "spd": 3.2, "mp": 200,
-	  "skills": "LMB: Chém tia băng (2.0s)\nQ: Dậm băng 250st + Buff (25s)\nR: Nhảy đập 150st + Khiên 20%HP (10s)\nSPACE: Lướt",
-	  "spawn": "Overworld" },
-	{ "id": "beyordeath", "name": "Beyordeath",  "cat": "party", "element": 3,
-	  "hp": 450, "atk": 165, "def": 12, "spd": 5.0, "mp": 200,
-	  "skills": "LMB: Bắn 6 phát (1.0s)\nQ: Lướt / Thả bom (3.0s)\nR: 2 hoả tiễn 100st + AOE (7.0s)\nSPACE: Biến chiến cơ 10s",
-	  "spawn": "Overworld" },
+
 	{ "id": "carp",       "name": "Carp",        "cat": "fish", "fi": 0,
 	  "hp": 60, "atk": 0, "def": 0, "spd": 1.4, "spawn": "Silt / Sand lakes" },
 	{ "id": "perch",      "name": "Climbing Perch", "cat": "fish", "fi": 1,
@@ -35,7 +20,6 @@ const CREATURES := [
 	{ "id": "shrimp",     "name": "Freshwater Shrimp", "cat": "fish", "fi": 5,
 	  "hp": 15, "atk": 0, "def": 0, "spd": 0.8, "spawn": "Silt / Sand lakes (bottom)" },
 ]
-const ELEMENT_SYMBOLS := { 1: "⚡", 2: "❄", 3: "☣", 5: "🌑", 6: "☀" }
 
 const BG_DEEP := Color(0.06, 0.04, 0.12)
 const BG_PANEL := Color(0.10, 0.07, 0.18)
@@ -396,10 +380,8 @@ func _update_preview() -> void:
 	_preview_name.text = data["name"]
 
 	if data["cat"] == "party":
-		var el := data["element"] as int
-		var sym: String = ELEMENT_SYMBOLS.get(el, "")
-		var en: String = _get_element_name(el)
-		_preview_element.text = "%s  %s" % [sym, en]
+		var en: String = _get_element_name(data.get("element", 0))
+		_preview_element.text = en
 		_preview_stats.text = tr("LIB_STATS_FORMAT") % [data["hp"], data["atk"], data["def"], data["spd"], data["mp"]]
 		_preview_skills.text = data.get("skills", "")
 		_preview_spawn.text = "📍 " + data["spawn"]

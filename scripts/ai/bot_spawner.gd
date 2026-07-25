@@ -10,11 +10,7 @@ class_name BotSpawner
 var _bot_types: Array[Script] = []
 
 func _ready() -> void:
-	_bot_types = [
-		load("res://scripts/characters/raptor/raptor_character.gd"),
-		load("res://scripts/characters/dragon/dragon_character.gd"),
-		load("res://scripts/characters/warrior/warrior_character.gd"),
-	]
+	_bot_types = []
 	await get_tree().process_frame
 	await get_tree().create_timer(0.5).timeout
 	_spawn_bots()

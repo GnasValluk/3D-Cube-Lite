@@ -8,6 +8,7 @@ var _direction: Vector3
 var _max_range: float = 50.0
 var _dist_traveled: float = 0.0
 var _hit_something: bool = false
+var _trail_timer: float = 0.0
 
 func setup(dir: Vector3, dmg: int, spd: float, max_rng: float, shooter: Node) -> void:
 	_direction = dir
@@ -71,12 +72,19 @@ func _ready() -> void:
 	fletch2.material_override = fmat
 	add_child(fletch2)
 
+var _spawn_dist: float = 0.0
+
 func _physics_process(delta: float) -> void:
 	if _hit_something:
 		return
 	var step := _direction * _speed * delta
 	global_position += step
 	_dist_traveled += step.length()
+	_spawn_dist += step.length()
+	_trail_timer -= delta
+	if _trail_timer <= 0.0:
+		_trail_timer = 0.03
+		_spawn_trail()
 	if _dist_traveled >= _max_range:
 		_drop_arrow()
 		queue_free()
@@ -84,15 +92,42 @@ func _physics_process(delta: float) -> void:
 func _on_hit(body: Node) -> void:
 	if _hit_something:
 		return
+	if _spawn_dist < 0.3:
+		return
 	if body == _shooter:
 		return
 	_hit_something = true
 	if body is CharacterBase and body.is_alive:
-		body.take_damage(_damage, _shooter)
+		body.take_damage(_damage, _shooter, 0) # PHYSICAL
 		queue_free()
 		return
 	_drop_arrow()
 	queue_free()
+
+func _spawn_trail() -> void:
+	var parent := get_parent()
+	if parent == null:
+		return
+	var mat := MeshBuilder.emit_mat(
+		Color(0.75, 0.70, 0.55, 0.6),
+		Color(0.90, 0.85, 0.70), 4.0)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var mi := MeshInstance3D.new()
+	var sph := SphereMesh.new()
+	sph.radius = 0.06
+	sph.height = 0.12
+	mi.mesh = sph
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(mi)
+	mi.global_position = global_position - _direction * 0.08
+
+	var tw := mi.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(mi, "scale", Vector3(0.15, 0.15, 0.15), 0.35)
+	tw.tween_property(mat, "emission_energy_multiplier", 0.0, 0.35)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.35)
+	tw.tween_callback(mi.queue_free).set_delay(0.4)
 
 func _drop_arrow() -> void:
 	var def := ItemDatabase.items_db.get("mui_ten") as ItemDef

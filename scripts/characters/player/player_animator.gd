@@ -55,10 +55,13 @@ func _idle(delta: float, t: float) -> void:
 	mesh.body.rotation.x = lerp(mesh.body.rotation.x, b * 0.015, delta * 5.0)
 	mesh.backpack.position.z = lerp(mesh.backpack.position.z, -0.02, delta * 5.0)
 	# Tay đung đưa nhẹ
-	mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06 + b * 0.03, delta * 5.0)
-	mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06 + b * 0.03, delta * 5.0)
-	mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z,  0.04 + b * 0.02, delta * 4.0)
-	mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04 - b * 0.02, delta * 4.0)
+	var arm_bob: float = 1.0
+	if player and player.equipped_weapon and player.equipped_weapon.id == "phao_dua_hau":
+		arm_bob = 0.3
+	mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, (-0.06 + b * 0.03) * arm_bob, delta * 5.0)
+	mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, (-0.06 + b * 0.03) * arm_bob, delta * 5.0)
+	mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z,  (0.04 + b * 0.02) * arm_bob, delta * 4.0)
+	mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, (-0.04 - b * 0.02) * arm_bob, delta * 4.0)
 	# Chân nhỏ đứng yên
 	mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 6.0)
 	mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 6.0)
@@ -76,8 +79,11 @@ func _walk(delta: float, t: float, mult: float) -> void:
 	mesh.backpack.position.z = lerp(mesh.backpack.position.z, -0.02 + abs(sin(cyc * 0.5)) * 0.015, delta * 5.0)
 	mesh.backpack.rotation.x = sin(cyc * 0.5) * 0.04
 	# Tay đánh nhịp
-	mesh.arm_l.rotation.x = sin(cyc + PI) * (0.28 + mult * 0.08)
-	mesh.arm_r.rotation.x = sin(cyc) * (0.28 + mult * 0.08)
+	var arm_swing: float = 0.28 + mult * 0.08
+	if player and player.equipped_weapon and player.equipped_weapon.id == "phao_dua_hau":
+		arm_swing *= 0.35
+	mesh.arm_l.rotation.x = sin(cyc + PI) * arm_swing
+	mesh.arm_r.rotation.x = sin(cyc) * arm_swing
 	mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 0.04, delta * 6.0)
 	mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 6.0)
 	# Chân ngắn chibi bước rộng hơn để cute

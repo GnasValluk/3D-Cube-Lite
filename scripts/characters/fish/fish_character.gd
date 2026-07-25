@@ -490,7 +490,7 @@ func _hunt_behavior(delta: float) -> Vector3:
 		if dist < HUNT_ATTACK_DIST:
 			if _hunt_cooldown <= 0.0:
 				_hunt_cooldown = 1.0
-				prey.take_damage(attack_power, self)
+				prey.take_damage(attack_power, self, 0) # PHYSICAL
 			return to_prey.normalized()
 		elif _is_prey_alone(prey):
 			# Rượt đuổi khi con mồi đi lẻ
@@ -505,8 +505,8 @@ func _hunt_behavior(delta: float) -> Vector3:
 	else:
 		return _wander_dir()
 
-func take_damage(dmg: int, attacker: Node3D = null) -> void:
-	super.take_damage(dmg, attacker)
+func take_damage(dmg: int, attacker: Node3D = null, damage_type: int = 0) -> void:
+	super.take_damage(dmg, attacker, damage_type)
 	if is_alive:
 		if _is_predator():
 			_hunt_target = null

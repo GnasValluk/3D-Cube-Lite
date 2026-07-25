@@ -4,10 +4,6 @@
 [ext_resource type="Script" uid="uid://w3yc7hqcm2jj" path="res://scripts/world/environment/real_world_environment.gd" id="2"]
 [ext_resource type="Script" uid="uid://ex08qqw2wr71" path="res://scripts/camera/third_person_camera.gd" id="3"]
 [ext_resource type="Script" uid="uid://lovun7bimwf2" path="res://scripts/core/character_manager.gd" id="4"]
-[ext_resource type="Script" uid="uid://den6kxko002et" path="res://scripts/characters/raptor/raptor_character.gd" id="5"]
-[ext_resource type="Script" uid="uid://bb6reyoc40wal" path="res://scripts/characters/dragon/dragon_character.gd" id="6"]
-[ext_resource type="Script" uid="uid://bvbthgld4avv8" path="res://scripts/characters/warrior/warrior_character.gd" id="7"]
-[ext_resource type="Script" uid="uid://dthqtmc7qtis2" path="res://scripts/characters/beyordeath/beyordeath_character.gd" id="8"]
 [ext_resource type="Script" uid="uid://cr6ww1q7fv2gt" path="res://scripts/ui/hud/hud.gd" id="9"]
 [ext_resource type="Script" uid="uid://c18toistxeefu" path="res://scripts/world/open_world_manager.gd" id="11"]
 [ext_resource type="Script" uid="uid://d1j7p8kmsrbnd" path="res://scripts/world/explore/explore_system.gd" id="12"]
@@ -40,47 +36,19 @@ script = ExtResource("13")
 [node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Player" unique_id=777547506]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
 
-[node name="Raptor" type="CharacterBody3D" parent="CharacterManager" unique_id=1721412517]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
-script = ExtResource("5")
-
-[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Raptor" unique_id=1873499960]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
-
-[node name="Dragon" type="CharacterBody3D" parent="CharacterManager" unique_id=1000285949]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
-script = ExtResource("6")
-
-[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Dragon" unique_id=1950378378]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
-
-[node name="Warrior" type="CharacterBody3D" parent="CharacterManager" unique_id=441403970]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
-script = ExtResource("7")
-
-[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Warrior" unique_id=827153180]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
-
-[node name="Beyordeath" type="CharacterBody3D" parent="CharacterManager" unique_id=1498260285]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
-script = ExtResource("8")
-
-[node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Beyordeath" unique_id=1047694786]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
-
 [node name="PlacementSystem" type="Node" parent="." unique_id=1798667591]
 script = ExtResource("14")
 
 [node name="CameraRig" type="Node3D" parent="." unique_id=127552826]
 script = ExtResource("1")
-target_path = NodePath("../CharacterManager/Raptor")
+target_path = NodePath("../CharacterManager/Player")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig" unique_id=1867721998]
 current = true
 
 [node name="TPCameraRig" type="Node3D" parent="." unique_id=176838688]
 script = ExtResource("3")
-target_path = NodePath("../CharacterManager/Raptor")
+target_path = NodePath("../CharacterManager/Player")
 
 [node name="Camera3D" type="Camera3D" parent="TPCameraRig" unique_id=1189458409]
 

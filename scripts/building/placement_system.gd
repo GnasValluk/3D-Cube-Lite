@@ -202,6 +202,15 @@ func confirm_placement() -> bool:
 		get_tree().root.set_meta("building_placement_active", false)
 		return false
 	if _item_id == "twilight_gate":
+		if not _can_place_portal():
+			var item_def := ItemDatabase.items_db.get(_item_id) as ItemDef
+			if item_def:
+				_player_inv.add_item(item_def, 1)
+			_placing = false
+			_item_id = ""
+			_remove_ghost()
+			get_tree().root.set_meta("building_placement_active", false)
+			return false
 		var portal := PortalGate.new()
 		portal.name = "PortalGate"
 		parent.add_child(portal)
@@ -230,6 +239,23 @@ func cancel_placement() -> void:
 	_item_id = ""
 	get_tree().root.set_meta("building_placement_active", false)
 	_remove_ghost()
+
+func _can_place_portal() -> bool:
+	var world_mgr := _find_world_manager()
+	if world_mgr == null or not world_mgr.has_method("get_block"):
+		return true
+	var pos := _ghost_pos
+	# Check all 9x7x8 voxels in the portal volume
+	for x in range(9):
+		for z in range(7):
+			for y in range(8):
+				var wx: float = pos.x - 2.0 + x * VOXEL + VOXEL * 0.5
+				var wz: float = pos.z - 1.5 + z * VOXEL + VOXEL * 0.5
+				var wy: float = pos.y - VOXEL * 0.5 + y * VOXEL + VOXEL * 0.5
+				var blk: int = world_mgr.get_block(wx, wy, wz)
+				if blk != 0:
+					return false
+	return true
 
 func _find_world_manager() -> Node:
 	var p := get_parent()

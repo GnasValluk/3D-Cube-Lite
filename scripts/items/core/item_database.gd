@@ -22,6 +22,7 @@ static func create_item_db() -> Dictionary:
 	_add(db, "dai_kiem","Đại Kiếm",   ItemDef.Type.WEAPON, Color(0.40, 0.45, 0.60), "🗡", "Chém mạnh một nhát, sát thương cực cao", false, 1, 0, 16, 0)
 	_add(db, "gang_tay_da_thu","Găng Tay Da Thú", ItemDef.Type.WEAPON, Color(0.55, 0.32, 0.14), "🥊", "Đấm nhanh liên hoàn, sát thương thấp", false, 1, 0, 7, 0)
 	_add(db, "no",          "Nỏ",          ItemDef.Type.WEAPON, Color(0.55, 0.35, 0.18), "🏹", "Nỏ — bắn tên từ xa, giữ chuột để nạp và tăng sát thương", false, 1, 0, 8, 0)
+	_add(db, "phao_dua_hau","Pháo Dưa Hấu Hạt Nhân", ItemDef.Type.WEAPON, Color(0.20, 0.55, 0.15), "🍉", "Bắn đạn hạt nhân dưa hấu phát nổ gây sát thương vùng. Cần đạn hạt nhân dưa hấu!", false, 1, 0, 12, 0)
 
 	# ── Câu cá ────────────────────────────────────────────────────────────────
 	_add(db, "can_cau", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0)
@@ -138,6 +139,8 @@ static func create_item_db() -> Dictionary:
 	_add(db, "twilight_essence", "Twilight Essence", ItemDef.Type.MATERIAL, Color(0.55, 0.35, 0.75), "RM", "Crafting material", true, 64)
 	_add(db, "twilight_powder", "Twilight Powder", ItemDef.Type.MATERIAL, Color(0.35, 0.20, 0.45), "RM", "Crafting material", true, 64)
 	_add(db, "mui_ten", "Mũi Tên", ItemDef.Type.MATERIAL, Color(0.60, 0.50, 0.35), "🪶", "Đạn cho nỏ — tiêu hao khi bắn", true, 64)
+	_add(db, "dan_hat_nhan_dua_hau", "Đạn Hạt Nhân Dưa Hấu", ItemDef.Type.MATERIAL, Color(0.18, 0.50, 0.12), "☢", "Đạn cho pháo dưa hấu hạt nhân — tiêu hao khi bắn", true, 32)
+	_add(db, "phao_coi_bi_do", "Pháo Cối Bí Đỏ", ItemDef.Type.WEAPON, Color(0.80, 0.50, 0.15), "🎃", "Pháo cối bí đỏ — bắn đạn bí đỏ theo đường parabal, gây sát thương vùng + để lại bãi lầy làm chậm. Cần bí đỏ!", false, 1, 0, 12, 0)
 
 	# ── Khối (đào từ thế giới) ─────────────────────────────────────────────────
 	_add(db, "block_grass",       "Cỏ",        ItemDef.Type.BLOCK, Color(0.22, 0.58, 0.14), "🧱", "Khối cỏ",           true, 64)
@@ -259,6 +262,8 @@ static func get_icon_2d_path(item_id: String) -> String:
 		"tiger_skin": return "res://assets/icon_items/resource_mats/tiger_skin.png"
 		"twilight_essence": return "res://assets/icon_items/resource_mats/twilight_essence.png"
 		"twilight_powder": return "res://assets/icon_items/resource_mats/twilight_powder.png"
+
+		"phao_coi_bi_do": return "res://assets/icon_items/frutti/Pumpkin.png"
 
 	return ""
 

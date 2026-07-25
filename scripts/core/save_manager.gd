@@ -94,8 +94,7 @@ func _collect_player_data(cm: CharacterManager) -> Dictionary:
 		"oxygen": ch.oxygen, "max_oxygen": ch.max_oxygen,
 		"level": ch.level, "exp": ch.exp,
 		"shield": ch.shield,
-		"character_name": ch.character_name,
-		"element": ch.element
+		"character_name": ch.character_name
 	}
 	if ch is PlayerCharacter:
 		var pc = ch as PlayerCharacter
@@ -120,8 +119,7 @@ func _collect_party_data(cm: CharacterManager) -> Array:
 			"name": ch.character_name,
 			"hp": ch.hp, "max_hp": ch.max_hp,
 			"mana": ch.mana, "max_mana": ch.max_mana,
-			"level": ch.level, "exp": ch.exp,
-			"element": ch.element
+			"level": ch.level, "exp": ch.exp
 		})
 	return result
 

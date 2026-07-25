@@ -5,16 +5,13 @@ const CATEGORY_NAMES := ["Blocks", "Items", "Characters", "Environment"]
 
 const BLOCK_IDS := [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]
 const ITEM_IDS := ["cup", "xeng", "riu", "kiem", "can_cau", "chest", "twilight_gate"]
-const CHAR_NAMES := ["Player", "Raptor", "Dragon", "Warrior", "Beyordeath", "Dummy",
+const CHAR_NAMES := ["Player", "Dummy",
 	"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh", "Ca La Han", "Tom"]
 const ENV_NAMES := ["Rong Nhiet Doi", "Sen Thach Anh"]
 
 const CHAR_ANIMS := {
 	"Player": ["IDLE", "WALK", "SPRINT", "CROUCH", "DASH", "ATTACK", "JUMP", "FALL", "SWIM", "HIT", "DEAD"],
-	"Raptor": ["IDLE", "WALK", "SPRINT", "DASH", "ATTACK", "DEVOUR", "JUMP", "FALL", "HIT", "DEAD"],
-	"Dragon": ["IDLE", "WALK", "SPRINT", "DASH", "ATTACK", "DEVOUR", "JUMP", "FALL", "HIT", "DEAD", "FLY"],
-	"Warrior": ["IDLE", "WALK", "SPRINT", "DASH", "ATTACK", "DEVOUR", "JUMP", "FALL", "HIT", "DEAD"],
-	"Beyordeath": ["IDLE", "WALK", "SPRINT", "DASH", "ATTACK", "DEVOUR", "JUMP", "FALL", "HIT", "DEAD"],
+
 	"Dummy": ["Rotate"],
 	"Ca Chep": ["SWIM", "IDLE"],
 	"Ca Ro": ["SWIM", "IDLE"],
@@ -33,10 +30,6 @@ const ITEM_ANIMS := {
 const _CD = preload("res://scripts/world/chunk/chunk_data.gd")
 const _WM = preload("res://scripts/items/models/tools.gd")
 const _PlayerMesh = preload("res://scripts/characters/player/player_mesh.gd")
-const _RaptorMesh = preload("res://scripts/characters/raptor/raptor_mesh.gd")
-const _DragonMesh = preload("res://scripts/characters/dragon/dragon_mesh.gd")
-const _WarriorMesh = preload("res://scripts/characters/warrior/warrior_mesh.gd")
-const _BeyordeathMesh = preload("res://scripts/characters/beyordeath/beyordeath_mesh.gd")
 const _FishMesh = preload("res://scripts/characters/fish/fish_mesh.gd")
 const _FishAnim = preload("res://scripts/characters/fish/fish_animator.gd")
 const _Aquatic = preload("res://scripts/world/chunk/chunk_aquatic.gd")
@@ -461,26 +454,6 @@ func _show_character() -> void:
 			root.add_child(body)
 			var pm := _PlayerMesh.new()
 			pm.build(body)
-		"Raptor":
-			var body := CharacterBody3D.new()
-			root.add_child(body)
-			var rm := _RaptorMesh.new()
-			rm.build(body)
-		"Dragon":
-			var body := CharacterBody3D.new()
-			root.add_child(body)
-			var dm := _DragonMesh.new()
-			dm.build(body)
-		"Warrior":
-			var body := CharacterBody3D.new()
-			root.add_child(body)
-			var wm := _WarriorMesh.new()
-			wm.build(body)
-		"Beyordeath":
-			var body := CharacterBody3D.new()
-			root.add_child(body)
-			var bm := _BeyordeathMesh.new()
-			bm.build(body)
 		"Dummy":
 			var mat_body := MeshBuilder.emit_mat(Color(0.90, 0.05, 0.10), Color(0,0,0), 0.0)
 			MeshBuilder.box(root, Vector3(0, 1.0, 0), Vector3(1.0, 2.0, 1.0), mat_body)
