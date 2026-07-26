@@ -23,6 +23,13 @@ enum BlockID {
 	SEDIMENT    = 15,  # Trầm tích hồ — màu đỏ đồng pha nâu đất
 	OCEAN_GRAVEL = 16, # Sỏi biển — nâu xám, đáy gần bờ
 	OCEAN_MUD    = 17, # Bùn biển sâu — xanh xám đậm, đồng bằng sâu
+	COPPER_ORE   = 18,
+	BAUXITE_ORE  = 19,
+	SILVER_ORE   = 20,
+	IRON_ORE     = 21,
+	GOLD_ORE     = 22,
+	TITAN_ORE    = 23,
+	PLATINUM_ORE = 24,
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -42,6 +49,13 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.SEDIMENT:    "block_sediment",
 	BlockID.OCEAN_GRAVEL:"block_ocean_gravel",
 	BlockID.OCEAN_MUD:   "block_ocean_mud",
+	BlockID.COPPER_ORE:   "copper_ore",
+	BlockID.BAUXITE_ORE:  "bauxite_ore",
+	BlockID.SILVER_ORE:   "silver_ore",
+	BlockID.IRON_ORE:     "iron_ore",
+	BlockID.GOLD_ORE:     "gold_ore",
+	BlockID.TITAN_ORE:    "titan_ore",
+	BlockID.PLATINUM_ORE: "platinum_ore",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -61,6 +75,13 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"block_sediment":     BlockID.SEDIMENT,
 	"block_ocean_gravel": BlockID.OCEAN_GRAVEL,
 	"block_ocean_mud":    BlockID.OCEAN_MUD,
+	"copper_ore":         BlockID.COPPER_ORE,
+	"bauxite_ore":        BlockID.BAUXITE_ORE,
+	"silver_ore":         BlockID.SILVER_ORE,
+	"iron_ore":           BlockID.IRON_ORE,
+	"gold_ore":           BlockID.GOLD_ORE,
+	"titan_ore":          BlockID.TITAN_ORE,
+	"platinum_ore":       BlockID.PLATINUM_ORE,
 }
 
 const VOXEL: float = 1.0
@@ -115,6 +136,13 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.50, 0.20, 0.10),           # 15 SEDIMENT — trầm tích đỏ đồng nâu đất
 	Color(0.35, 0.30, 0.25),           # 16 OCEAN_GRAVEL — sỏi biển nâu xám
 	Color(0.16, 0.20, 0.22),           # 17 OCEAN_MUD — bùn biển sâu xanh xám
+	Color(0.38, 0.29, 0.18),           # 18 COPPER_ORE
+	Color(0.55, 0.35, 0.25),           # 19 BAUXITE_ORE
+	Color(0.35, 0.35, 0.38),           # 20 SILVER_ORE
+	Color(0.36, 0.31, 0.26),           # 21 IRON_ORE
+	Color(0.37, 0.33, 0.29),           # 22 GOLD_ORE
+	Color(0.35, 0.30, 0.40),           # 23 TITAN_ORE
+	Color(0.30, 0.30, 0.35),           # 24 PLATINUM_ORE
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -136,6 +164,13 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.10, 0.06, 0.04),           # 15 SEDIMENT
 	Color(0.08, 0.10, 0.06),           # 16 OCEAN_GRAVEL
 	Color(0.04, 0.08, 0.10),           # 17 OCEAN_MUD
+	Color(0.38, 0.29, 0.18),           # 18 COPPER_ORE
+	Color(0.55, 0.35, 0.25),           # 19 BAUXITE_ORE
+	Color(0.35, 0.35, 0.38),           # 20 SILVER_ORE
+	Color(0.36, 0.31, 0.26),           # 21 IRON_ORE
+	Color(0.37, 0.33, 0.29),           # 22 GOLD_ORE
+	Color(0.35, 0.30, 0.40),           # 23 TITAN_ORE
+	Color(0.30, 0.30, 0.35),           # 24 PLATINUM_ORE
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void

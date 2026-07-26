@@ -67,77 +67,58 @@ static func create_item_db() -> Dictionary:
 	_add(db, "mon_ngot", "Môn ngọt (Taro)", ItemDef.Type.FOOD, Color(0.25, 0.50, 0.15), "🌿", "Củ môn ngọt — có thể nấu ăn", true, 16, 12)
 	_add(db, "rong_nhiet_doi", "Rong nhiệt đới", ItemDef.Type.MATERIAL, Color(0.08, 0.55, 0.10), "🌊", "Rong nhiệt đới — nguyên liệu chế tạo", true, 32)
 
-	# ── Resource materials (named) ─────────────────────────────────────────
-	_add(db, "bear_skin", "Bear Skin", ItemDef.Type.MATERIAL, Color(0.286, 0.192, 0.145), "RM", "Crafting material", true, 64)
-	_add(db, "bone", "Bone", ItemDef.Type.MATERIAL, Color(0.420, 0.400, 0.427), "RM", "Crafting material", true, 64)
-	_add(db, "clay", "Clay", ItemDef.Type.MATERIAL, Color(0.557, 0.357, 0.243), "RM", "Crafting material", true, 64)
-	_add(db, "coal_ore", "Coal Ore", ItemDef.Type.MATERIAL, Color(0.141, 0.141, 0.137), "RM", "Crafting material", true, 64)
-	_add(db, "copper_coins", "Copper Coins", ItemDef.Type.MATERIAL, Color(0.525, 0.302, 0.275), "RM", "Crafting material", true, 64)
-	_add(db, "copper_ingot", "Copper Ingot", ItemDef.Type.MATERIAL, Color(0.475, 0.267, 0.231), "RM", "Crafting material", true, 64)
-	_add(db, "copper_ore", "Copper Ore", ItemDef.Type.MATERIAL, Color(0.380, 0.290, 0.180), "RM", "Crafting material", true, 64)
-	_add(db, "dark_wood", "Dark Wood", ItemDef.Type.MATERIAL, Color(0.310, 0.176, 0.125), "RM", "Crafting material", true, 64)
-	_add(db, "dark_wooden_planks", "Dark Wooden Planks", ItemDef.Type.MATERIAL, Color(0.400, 0.235, 0.157), "RM", "Crafting material", true, 64)
-	_add(db, "diamond", "Diamond", ItemDef.Type.MATERIAL, Color(0.267, 0.373, 0.467), "RM", "Crafting material", true, 64)
-	_add(db, "egg", "Egg", ItemDef.Type.MATERIAL, Color(0.631, 0.573, 0.514), "RM", "Crafting material", true, 64)
-	_add(db, "pearl_elemental", "Elemental Pearl", ItemDef.Type.MATERIAL, Color(0.341, 0.298, 0.290), "RM", "Crafting material", true, 64)
-	_add(db, "feather", "Feather", ItemDef.Type.MATERIAL, Color(0.478, 0.459, 0.490), "RM", "Crafting material", true, 64)
-	_add(db, "gold_coins", "Gold Coins", ItemDef.Type.MATERIAL, Color(0.651, 0.369, 0.169), "RM", "Crafting material", true, 64)
-	_add(db, "gold_ingot", "Gold Ingot", ItemDef.Type.MATERIAL, Color(0.596, 0.357, 0.196), "RM", "Crafting material", true, 64)
-	_add(db, "gold_ore", "Gold Ore", ItemDef.Type.MATERIAL, Color(0.369, 0.329, 0.290), "RM", "Crafting material", true, 64)
-	_add(db, "copper_high_ingot", "Copper High Ingot", ItemDef.Type.MATERIAL, Color(0.659, 0.486, 0.365), "RM", "Crafting material", true, 64)
-	_add(db, "gold_high_ingot", "Gold High Ingot", ItemDef.Type.MATERIAL, Color(0.573, 0.482, 0.408), "RM", "Crafting material", true, 64)
-	_add(db, "copper_high_grade", "Copper High Grade", ItemDef.Type.MATERIAL, Color(0.486, 0.263, 0.220), "RM", "Crafting material", true, 64)
-	_add(db, "gold_high_grade", "Gold High Grade", ItemDef.Type.MATERIAL, Color(0.620, 0.349, 0.165), "RM", "Crafting material", true, 64)
-	_add(db, "iron_high_grade", "Iron High Grade", ItemDef.Type.MATERIAL, Color(0.345, 0.388, 0.475), "RM", "Crafting material", true, 64)
-	_add(db, "red_iron_high_grade", "Red Iron High Grade", ItemDef.Type.MATERIAL, Color(0.243, 0.086, 0.106), "RM", "Crafting material", true, 64)
-	_add(db, "steel_high_grade", "Steel High Grade", ItemDef.Type.MATERIAL, Color(0.200, 0.204, 0.216), "RM", "Crafting material", true, 64)
-	_add(db, "iron_high_ingot", "Iron High Ingot", ItemDef.Type.MATERIAL, Color(0.557, 0.510, 0.608), "RM", "Crafting material", true, 64)
-	_add(db, "red_iron_high_ingot", "Red Iron High Ingot", ItemDef.Type.MATERIAL, Color(0.412, 0.184, 0.157), "RM", "Crafting material", true, 64)
-	_add(db, "steel_high_ingot", "Steel High Ingot", ItemDef.Type.MATERIAL, Color(0.275, 0.275, 0.314), "RM", "Crafting material", true, 64)
-	_add(db, "iron_coins", "Iron Coins", ItemDef.Type.MATERIAL, Color(0.506, 0.494, 0.569), "RM", "Crafting material", true, 64)
-	_add(db, "iron_ingot", "Iron Ingot", ItemDef.Type.MATERIAL, Color(0.357, 0.357, 0.404), "RM", "Crafting material", true, 64)
-	_add(db, "iron_ore", "Iron Ore", ItemDef.Type.MATERIAL, Color(0.361, 0.306, 0.263), "RM", "Crafting material", true, 64)
-	_add(db, "magic_wood", "Magic Wood", ItemDef.Type.MATERIAL, Color(0.345, 0.298, 0.247), "RM", "Crafting material", true, 64)
-	_add(db, "magic_wooden_planks", "Magic Wooden Planks", ItemDef.Type.MATERIAL, Color(0.361, 0.298, 0.235), "RM", "Crafting material", true, 64)
-	_add(db, "normal_wood", "Normal Wood", ItemDef.Type.MATERIAL, Color(0.396, 0.282, 0.200), "RM", "Crafting material", true, 64)
-	_add(db, "normal_wooden_planks", "Normal Wooden Planks", ItemDef.Type.MATERIAL, Color(0.553, 0.380, 0.259), "RM", "Crafting material", true, 64)
-	_add(db, "paper", "Paper", ItemDef.Type.MATERIAL, Color(0.647, 0.655, 0.659), "RM", "Crafting material", true, 64)
-	_add(db, "sapphire_purple", "Purple Sapphire", ItemDef.Type.MATERIAL, Color(0.416, 0.192, 0.510), "RM", "Crafting material", true, 64)
-	_add(db, "red_iron_ingot", "Red Iron Ingot", ItemDef.Type.MATERIAL, Color(0.275, 0.090, 0.114), "RM", "Crafting material", true, 64)
-	_add(db, "red_iron_ore", "Red Iron Ore", ItemDef.Type.MATERIAL, Color(0.400, 0.271, 0.259), "RM", "Crafting material", true, 64)
-	_add(db, "ruby", "Ruby", ItemDef.Type.MATERIAL, Color(0.569, 0.173, 0.184), "RM", "Crafting material", true, 64)
-	_add(db, "steel_ingot", "Steel Ingot", ItemDef.Type.MATERIAL, Color(0.204, 0.196, 0.208), "RM", "Crafting material", true, 64)
-	_add(db, "wolf_skin", "Wolf Skin", ItemDef.Type.MATERIAL, Color(0.169, 0.173, 0.200), "RM", "Crafting material", true, 64)
-	_add(db, "wooden_stick", "Wooden Stick", ItemDef.Type.MATERIAL, Color(0.235, 0.169, 0.141), "RM", "Crafting material", true, 64)
+	# ── Quặng & Kim loại ──────────────────────────────────────────────────────
+	# Copper (Đồng)
+	_add(db, "copper_ore",             "Copper Ore",            ItemDef.Type.BLOCK,    Color(0.38, 0.29, 0.18), "🧱", "Quặng đồng thô — nung thành Copper Ingot", true, 64)
+	_add(db, "copper_ingot",           "Copper Ingot",          ItemDef.Type.MATERIAL, Color(0.70, 0.55, 0.15), "RM", "Thỏi đồng — kim loại cơ bản", true, 64)
+	_add(db, "copper_high_ingot",      "Copper High Ingot",     ItemDef.Type.MATERIAL, Color(0.85, 0.70, 0.20), "RM", "Thỏi đồng tinh luyện cao — sáng bóng", true, 64)
+	_add(db, "copper_purified_ingot",  "Copper Purified Ingot", ItemDef.Type.MATERIAL, Color(0.92, 0.78, 0.30), "RM", "Thỏi đồng tinh khiết — phát sáng nhẹ", true, 64)
 
-	# ── New materials ───────────────────────────────────────────────
-	_add(db, "bauxite_ore", "Bauxite Ore", ItemDef.Type.MATERIAL, Color(0.55, 0.35, 0.25), "RM", "Crafting material", true, 64)
-	_add(db, "bauxite_ingot", "Bauxite Ingot", ItemDef.Type.MATERIAL, Color(0.65, 0.55, 0.50), "RM", "Crafting material", true, 64)
-	_add(db, "bauxite_high_ingot", "Bauxite High Ingot", ItemDef.Type.MATERIAL, Color(0.75, 0.65, 0.60), "RM", "Crafting material", true, 64)
-	_add(db, "bauxite_high_grade", "Bauxite High Grade", ItemDef.Type.MATERIAL, Color(0.60, 0.40, 0.30), "RM", "Crafting material", true, 64)
-	_add(db, "dark_metal_high_ingot", "Dark Metal High Ingot", ItemDef.Type.MATERIAL, Color(0.25, 0.25, 0.28), "RM", "Crafting material", true, 64)
-	_add(db, "dark_metal_high_grade", "Dark Metal High Grade", ItemDef.Type.MATERIAL, Color(0.18, 0.18, 0.20), "RM", "Crafting material", true, 64)
-	_add(db, "glow_iron_ore", "Glow Iron Ore", ItemDef.Type.MATERIAL, Color(0.30, 0.35, 0.25), "RM", "Crafting material", true, 64)
-	_add(db, "glow_iron_ingot", "Glow Iron Ingot", ItemDef.Type.MATERIAL, Color(0.35, 0.70, 0.35), "RM", "Crafting material", true, 64)
-	_add(db, "glow_iron_high_grade", "Glow Iron High Grade", ItemDef.Type.MATERIAL, Color(0.30, 0.75, 0.30), "RM", "Crafting material", true, 64)
-	_add(db, "magic_metal_high_ingot", "Magic Metal High Ingot", ItemDef.Type.MATERIAL, Color(0.55, 0.35, 0.65), "RM", "Crafting material", true, 64)
-	_add(db, "titan_ingot", "Titan Ingot", ItemDef.Type.MATERIAL, Color(0.55, 0.60, 0.70), "RM", "Crafting material", true, 64)
-	_add(db, "titan_high_ingot", "Titan High Ingot", ItemDef.Type.MATERIAL, Color(0.70, 0.75, 0.85), "RM", "Crafting material", true, 64)
-	_add(db, "titan_high_grade", "Titan High Grade", ItemDef.Type.MATERIAL, Color(0.50, 0.55, 0.65), "RM", "Crafting material", true, 64)
-	_add(db, "diamond_red", "Red Diamond", ItemDef.Type.MATERIAL, Color(0.90, 0.40, 0.35), "RM", "Crafting material", true, 64)
-	_add(db, "ruby_twilight", "Twilight Ruby", ItemDef.Type.MATERIAL, Color(0.70, 0.25, 0.50), "RM", "Crafting material", true, 64)
-	_add(db, "sapphire_blue", "Blue Sapphire", ItemDef.Type.MATERIAL, Color(0.40, 0.60, 0.90), "RM", "Crafting material", true, 64)
-	_add(db, "sapphire_red", "Red Sapphire", ItemDef.Type.MATERIAL, Color(0.85, 0.35, 0.35), "RM", "Crafting material", true, 64)
-	_add(db, "bull_skin", "Bull Skin", ItemDef.Type.MATERIAL, Color(0.45, 0.30, 0.20), "RM", "Crafting material", true, 64)
-	_add(db, "deer_skin", "Deer Skin", ItemDef.Type.MATERIAL, Color(0.55, 0.42, 0.30), "RM", "Crafting material", true, 64)
-	_add(db, "fire_fox_skin", "Fire Fox Skin", ItemDef.Type.MATERIAL, Color(0.75, 0.35, 0.15), "RM", "Crafting material", true, 64)
-	_add(db, "frost_ermine_skin", "Frost Ermine Skin", ItemDef.Type.MATERIAL, Color(0.85, 0.85, 0.88), "RM", "Crafting material", true, 64)
-	_add(db, "panther_skin", "Panther Skin", ItemDef.Type.MATERIAL, Color(0.15, 0.15, 0.18), "RM", "Crafting material", true, 64)
-	_add(db, "rhino_skin", "Rhino Skin", ItemDef.Type.MATERIAL, Color(0.30, 0.28, 0.25), "RM", "Crafting material", true, 64)
-	_add(db, "snow_rat_skin", "Snow Rat Skin", ItemDef.Type.MATERIAL, Color(0.65, 0.65, 0.70), "RM", "Crafting material", true, 64)
-	_add(db, "tiger_skin", "Tiger Skin", ItemDef.Type.MATERIAL, Color(0.75, 0.50, 0.20), "RM", "Crafting material", true, 64)
-	_add(db, "twilight_essence", "Twilight Essence", ItemDef.Type.MATERIAL, Color(0.55, 0.35, 0.75), "RM", "Crafting material", true, 64)
-	_add(db, "twilight_powder", "Twilight Powder", ItemDef.Type.MATERIAL, Color(0.35, 0.20, 0.45), "RM", "Crafting material", true, 64)
+	# Bauxite → Aluminium (Nhôm)
+	_add(db, "bauxite_ore",             "Bauxite Ore",              ItemDef.Type.BLOCK,    Color(0.55, 0.35, 0.25), "🧱", "Quặng bô-xít — nung thành Aluminium Ingot", true, 64)
+	_add(db, "aluminium_ingot",         "Aluminium Ingot",          ItemDef.Type.MATERIAL, Color(0.65, 0.65, 0.68), "RM", "Thỏi nhôm — nhẹ, bền", true, 64)
+	_add(db, "aluminium_high_ingot",    "Aluminium High Ingot",     ItemDef.Type.MATERIAL, Color(0.80, 0.80, 0.85), "RM", "Thỏi nhôm tinh luyện cao — sáng bóng", true, 64)
+	_add(db, "aluminium_purified_ingot","Aluminium Purified Ingot", ItemDef.Type.MATERIAL, Color(0.90, 0.90, 0.95), "RM", "Thỏi nhôm tinh khiết — phát sáng nhẹ", true, 64)
+
+	# Silver (Bạc)
+	_add(db, "silver_ore",             "Silver Ore",            ItemDef.Type.BLOCK,    Color(0.35, 0.35, 0.38), "🧱", "Quặng bạc thô — nung thành Silver Ingot", true, 64)
+	_add(db, "silver_ingot",           "Silver Ingot",          ItemDef.Type.MATERIAL, Color(0.75, 0.75, 0.80), "RM", "Thỏi bạc — kim loại quý", true, 64)
+	_add(db, "silver_high_ingot",      "Silver High Ingot",     ItemDef.Type.MATERIAL, Color(0.88, 0.88, 0.92), "RM", "Thỏi bạc tinh luyện cao — sáng bóng", true, 64)
+	_add(db, "silver_purified_ingot",  "Silver Purified Ingot", ItemDef.Type.MATERIAL, Color(0.95, 0.95, 1.00), "RM", "Thỏi bạc tinh khiết — phát sáng nhẹ", true, 64)
+
+	# Iron (Sắt)
+	_add(db, "iron_ore",               "Iron Ore",              ItemDef.Type.BLOCK,    Color(0.36, 0.31, 0.26), "🧱", "Quặng sắt thô — nung thành Iron Ingot", true, 64)
+	_add(db, "iron_ingot",             "Iron Ingot",            ItemDef.Type.MATERIAL, Color(0.55, 0.55, 0.60), "RM", "Thỏi sắt — kim loại cơ bản", true, 64)
+	_add(db, "iron_high_ingot",        "Iron High Ingot",       ItemDef.Type.MATERIAL, Color(0.72, 0.72, 0.78), "RM", "Thỏi sắt tinh luyện cao — sáng bóng", true, 64)
+	_add(db, "iron_purified_ingot",    "Iron Purified Ingot",   ItemDef.Type.MATERIAL, Color(0.85, 0.85, 0.90), "RM", "Thỏi sắt tinh khiết — phát sáng nhẹ", true, 64)
+
+	# Gold (Vàng)
+	_add(db, "gold_ore",               "Gold Ore",              ItemDef.Type.BLOCK,    Color(0.37, 0.33, 0.29), "🧱", "Quặng vàng thô — nung thành Gold Ingot", true, 64)
+	_add(db, "gold_ingot",             "Gold Ingot",            ItemDef.Type.MATERIAL, Color(0.85, 0.65, 0.10), "RM", "Thỏi vàng — kim loại quý", true, 64)
+	_add(db, "gold_high_ingot",        "Gold High Ingot",       ItemDef.Type.MATERIAL, Color(0.92, 0.75, 0.15), "RM", "Thỏi vàng tinh luyện cao — sáng bóng", true, 64)
+	_add(db, "gold_purified_ingot",    "Gold Purified Ingot",   ItemDef.Type.MATERIAL, Color(0.97, 0.82, 0.25), "RM", "Thỏi vàng tinh khiết — phát sáng nhẹ", true, 64)
+
+	# Steel (Thép) — hợp kim, không có quặng thô
+	_add(db, "steel_ingot",            "Steel Ingot",           ItemDef.Type.MATERIAL, Color(0.50, 0.50, 0.55), "RM", "Thỏi thép — hợp kim bền chắc", true, 64)
+	_add(db, "steel_high_ingot",       "Steel High Ingot",      ItemDef.Type.MATERIAL, Color(0.60, 0.60, 0.65), "RM", "Thỏi thép tinh luyện cao — sáng bóng", true, 64)
+	_add(db, "steel_purified_ingot",   "Steel Purified Ingot",  ItemDef.Type.MATERIAL, Color(0.75, 0.75, 0.82), "RM", "Thỏi thép tinh khiết — phát sáng nhẹ", true, 64)
+
+	# Titan (Titanium)
+	_add(db, "titan_ore",              "Titan Ore",             ItemDef.Type.BLOCK,    Color(0.35, 0.30, 0.40), "🧱", "Quặng titan thô — nung thành Titan Ingot", true, 64)
+	_add(db, "titan_ingot",            "Titan Ingot",           ItemDef.Type.MATERIAL, Color(0.55, 0.60, 0.70), "RM", "Thỏi titan — siêu bền, chịu nhiệt", true, 64)
+	_add(db, "titan_high_ingot",       "Titan High Ingot",      ItemDef.Type.MATERIAL, Color(0.70, 0.75, 0.85), "RM", "Thỏi titan tinh luyện cao — sáng bóng", true, 64)
+	_add(db, "titan_purified_ingot",   "Titan Purified Ingot",  ItemDef.Type.MATERIAL, Color(0.85, 0.88, 0.95), "RM", "Thỏi titan tinh khiết — phát sáng nhẹ", true, 64)
+
+	# Platinum (Bạch kim)
+	_add(db, "platinum_ore",           "Platinum Ore",          ItemDef.Type.BLOCK,    Color(0.30, 0.30, 0.35), "🧱", "Quặng bạch kim thô — nung thành Platinum Ingot", true, 64)
+	_add(db, "platinum_ingot",         "Platinum Ingot",        ItemDef.Type.MATERIAL, Color(0.80, 0.82, 0.88), "RM", "Thỏi bạch kim — kim loại quý hiếm", true, 64)
+	_add(db, "platinum_high_ingot",    "Platinum High Ingot",   ItemDef.Type.MATERIAL, Color(0.90, 0.92, 0.96), "RM", "Thỏi bạch kim tinh luyện cao — sáng bóng", true, 64)
+	_add(db, "platinum_purified_ingot","Platinum Purified Ingot",ItemDef.Type.MATERIAL, Color(0.97, 0.98, 1.00), "RM", "Thỏi bạch kim tinh khiết — phát sáng nhẹ", true, 64)
+
+	# Dark Metal (Kim loại tối) — chỉ có dạng tinh luyện cao
+	_add(db, "dark_metal_high_ingot",   "Dark Metal High Ingot",   ItemDef.Type.MATERIAL, Color(0.25, 0.25, 0.28), "RM", "Thỏi kim loại tối tinh luyện — ma thuật", true, 64)
+	_add(db, "dark_metal_purified_ingot","Dark Metal Purified Ingot",ItemDef.Type.MATERIAL, Color(0.30, 0.20, 0.45), "RM", "Thỏi kim loại tối tinh khiết — hào quang tím", true, 64)
+
 	_add(db, "mui_ten", "Mũi Tên", ItemDef.Type.MATERIAL, Color(0.60, 0.50, 0.35), "🪶", "Đạn cho nỏ — tiêu hao khi bắn", true, 64)
 	_add(db, "dan_hat_nhan_dua_hau", "Đạn Hạt Nhân Dưa Hấu", ItemDef.Type.MATERIAL, Color(0.18, 0.50, 0.12), "☢", "Đạn cho pháo dưa hấu hạt nhân — tiêu hao khi bắn", true, 32)
 	_add(db, "phao_coi_bi_do", "Pháo Cối Bí Đỏ", ItemDef.Type.WEAPON, Color(0.80, 0.50, 0.15), "🎃", "Pháo cối bí đỏ — bắn đạn bí đỏ theo đường parabal, gây sát thương vùng + để lại bãi lầy làm chậm. Cần bí đỏ!", false, 1, 0, 12, 0)
@@ -194,75 +175,6 @@ static func get_icon_2d_path(item_id: String) -> String:
 		"strawberry": return "res://assets/icon_items/frutti/Strawberry.png"
 		"tomato": return "res://assets/icon_items/frutti/Tomato.png"
 		"watermelon": return "res://assets/icon_items/frutti/Watermelon.png"
-		"bear_skin": return "res://assets/icon_items/resource_mats/bear_skin.png"
-		"bone": return "res://assets/icon_items/resource_mats/bone.png"
-		"clay": return "res://assets/icon_items/resource_mats/clay.png"
-		"coal_ore": return "res://assets/icon_items/resource_mats/coal_ore.png"
-		"copper_coins": return "res://assets/icon_items/resource_mats/copper_coins.png"
-		"copper_ingot": return "res://assets/icon_items/resource_mats/copper_ingot.png"
-		"copper_ore": return "res://assets/icon_items/resource_mats/copper_ore.png"
-		"dark_wood": return "res://assets/icon_items/resource_mats/dark_wood.png"
-		"dark_wooden_planks": return "res://assets/icon_items/resource_mats/dark_wooden_planks.png"
-		"diamond": return "res://assets/icon_items/resource_mats/diamond.png"
-		"egg": return "res://assets/icon_items/resource_mats/egg.png"
-		"pearl_elemental": return "res://assets/icon_items/resource_mats/pearl_elemental.png"
-		"feather": return "res://assets/icon_items/resource_mats/feather.png"
-		"gold_coins": return "res://assets/icon_items/resource_mats/gold_coins.png"
-		"gold_ingot": return "res://assets/icon_items/resource_mats/gold_ingot.png"
-		"gold_ore": return "res://assets/icon_items/resource_mats/gold_ore.png"
-		"copper_high_ingot": return "res://assets/icon_items/resource_mats/copper_high_ingot.png"
-		"gold_high_ingot": return "res://assets/icon_items/resource_mats/gold_high_ingot.png"
-		"copper_high_grade": return "res://assets/icon_items/resource_mats/copper_high_grade.png"
-		"gold_high_grade": return "res://assets/icon_items/resource_mats/gold_high_grade.png"
-		"iron_high_grade": return "res://assets/icon_items/resource_mats/iron_high_grade.png"
-		"red_iron_high_grade": return "res://assets/icon_items/resource_mats/red_iron_high_grade.png"
-		"steel_high_grade": return "res://assets/icon_items/resource_mats/steel_high_grade.png"
-		"iron_high_ingot": return "res://assets/icon_items/resource_mats/iron_high_ingot.png"
-		"red_iron_high_ingot": return "res://assets/icon_items/resource_mats/red_iron_high_ingot.png"
-		"steel_high_ingot": return "res://assets/icon_items/resource_mats/steel_high_ingot.png"
-		"iron_coins": return "res://assets/icon_items/resource_mats/iron_coins.png"
-		"iron_ingot": return "res://assets/icon_items/resource_mats/iron_ingot.png"
-		"iron_ore": return "res://assets/icon_items/resource_mats/iron_ore.png"
-		"magic_wood": return "res://assets/icon_items/resource_mats/magic_wood.png"
-		"magic_wooden_planks": return "res://assets/icon_items/resource_mats/magic_wooden_planks.png"
-		"normal_wood": return "res://assets/icon_items/resource_mats/normal_wood.png"
-		"normal_wooden_planks": return "res://assets/icon_items/resource_mats/normal_wooden_planks.png"
-		"paper": return "res://assets/icon_items/resource_mats/paper.png"
-		"sapphire_purple": return "res://assets/icon_items/resource_mats/sapphire_purple.png"
-		"red_iron_ingot": return "res://assets/icon_items/resource_mats/red_iron_ingot.png"
-		"red_iron_ore": return "res://assets/icon_items/resource_mats/red_iron_ore.png"
-		"ruby": return "res://assets/icon_items/resource_mats/ruby.png"
-		"steel_ingot": return "res://assets/icon_items/resource_mats/steel_ingot.png"
-		"wolf_skin": return "res://assets/icon_items/resource_mats/wolf_skin.png"
-		"wooden_stick": return "res://assets/icon_items/resource_mats/wooden_stick.png"
-		"bauxite_ore": return "res://assets/icon_items/resource_mats/bauxite_ore.png"
-		"bauxite_ingot": return "res://assets/icon_items/resource_mats/bauxite_ingot.png"
-		"bauxite_high_ingot": return "res://assets/icon_items/resource_mats/bauxite_high_ingot.png"
-		"bauxite_high_grade": return "res://assets/icon_items/resource_mats/bauxite_high_grade.png"
-		"dark_metal_high_ingot": return "res://assets/icon_items/resource_mats/dark_metal_high_ingot.png"
-		"dark_metal_high_grade": return "res://assets/icon_items/resource_mats/dark_metal_high_grade.png"
-		"glow_iron_ore": return "res://assets/icon_items/resource_mats/glow_iron_ore.png"
-		"glow_iron_ingot": return "res://assets/icon_items/resource_mats/glow_iron_ingot.png"
-		"glow_iron_high_grade": return "res://assets/icon_items/resource_mats/glow_iron_high_grade.png"
-		"magic_metal_high_ingot": return "res://assets/icon_items/resource_mats/magic_metal_high_ingot.png"
-		"titan_ingot": return "res://assets/icon_items/resource_mats/titan_ingot.png"
-		"titan_high_ingot": return "res://assets/icon_items/resource_mats/titan_high_ingot.png"
-		"titan_high_grade": return "res://assets/icon_items/resource_mats/titan_high_grade.png"
-		"diamond_red": return "res://assets/icon_items/resource_mats/diamond_red.png"
-		"ruby_twilight": return "res://assets/icon_items/resource_mats/ruby_twilight.png"
-		"sapphire_blue": return "res://assets/icon_items/resource_mats/sapphire_blue.png"
-		"sapphire_red": return "res://assets/icon_items/resource_mats/sapphire_red.png"
-		"bull_skin": return "res://assets/icon_items/resource_mats/bull_skin.png"
-		"deer_skin": return "res://assets/icon_items/resource_mats/deer_skin.png"
-		"fire_fox_skin": return "res://assets/icon_items/resource_mats/fire_fox_skin.png"
-		"frost_ermine_skin": return "res://assets/icon_items/resource_mats/Frost Ermine_skin.png"
-		"panther_skin": return "res://assets/icon_items/resource_mats/panther_skin.png"
-		"rhino_skin": return "res://assets/icon_items/resource_mats/rhino_skin.png"
-		"snow_rat_skin": return "res://assets/icon_items/resource_mats/snow_rat_skin.png"
-		"tiger_skin": return "res://assets/icon_items/resource_mats/tiger_skin.png"
-		"twilight_essence": return "res://assets/icon_items/resource_mats/twilight_essence.png"
-		"twilight_powder": return "res://assets/icon_items/resource_mats/twilight_powder.png"
-
 		"phao_coi_bi_do": return "res://assets/icon_items/frutti/Pumpkin.png"
 
 	return ""

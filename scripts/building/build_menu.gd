@@ -7,11 +7,11 @@ const SS: float = 1.35
 const BG_DEEP := Color(0.06, 0.04, 0.12)
 const BG_PANEL := Color(0.10, 0.07, 0.18)
 const BG_CARD := Color(0.14, 0.10, 0.22)
-const PURPLE := Color(0.55, 0.35, 0.90)
-const TEAL := Color(0.15, 0.72, 0.68)
-const PINK := Color(0.82, 0.28, 0.52)
-const ORANGE := Color(0.92, 0.52, 0.12)
-const CYAN := Color(0.15, 0.62, 0.92)
+const PURPLE := Color(0.22, 0.62, 0.28)
+const TEAL := Color(0.12, 0.52, 0.32)
+const PINK := Color(0.88, 0.35, 0.32)
+const ORANGE := Color(0.92, 0.62, 0.15)
+const CYAN := Color(0.18, 0.72, 0.52)
 const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
 const TEXT_MAIN := Color(0.82, 0.78, 0.95)
 const TEXT_DIM := Color(0.55, 0.50, 0.72)
@@ -41,7 +41,7 @@ func _ready() -> void:
 	# Add blocks from ItemDatabase
 	for item_id in ItemDatabase.items_db:
 		var def: ItemDef = ItemDatabase.items_db[item_id] as ItemDef
-		if def and def.type == ItemDef.Type.BLOCK and item_id.begins_with("block_"):
+		if def and def.type == ItemDef.Type.BLOCK:
 			_building_ids.append(item_id)
 			_building_names.append(def.name)
 

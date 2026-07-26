@@ -224,7 +224,12 @@ func _physics_process(delta: float) -> void:
 		_avoid_walls()
 
 	# Smooth steering
-	_swim_dir = _swim_dir.slerp(_target_dir, delta * _turn_rate).normalized()
+	var t_dir := _target_dir
+	if t_dir.length_squared() > 0.001:
+		t_dir = t_dir.normalized()
+		_swim_dir = _swim_dir.slerp(t_dir, delta * _turn_rate).normalized()
+	else:
+		_swim_dir = _swim_dir.lerp(t_dir, delta * _turn_rate).normalized()
 
 	# Organic perturbation
 	var perturb := Vector3(

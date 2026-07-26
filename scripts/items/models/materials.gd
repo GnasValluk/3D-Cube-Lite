@@ -1,19 +1,21 @@
 class_name MaterialMeshes
 
 static func ingot(p: Node3D, metal: Color, dark: Color) -> void:
-	ItemMeshShared.add_cube(p, 0, 0, 0, 3.2, 1.6, 2.2, metal)
-	ItemMeshShared.add_cube(p, 0, 0.7, 0, 3.0, 0.5, 2.0, metal.lightened(0.12))
-	ItemMeshShared.add_cube(p, 0, -0.7, 0, 2.8, 0.5, 1.8, dark)
-	ItemMeshShared.add_cube(p, -1.6, 0.9, 0, 0.3, 0.3, 1.8, metal.lightened(0.20))
-	ItemMeshShared.add_cube(p, 1.6, 0.9, 0, 0.3, 0.3, 1.8, metal.lightened(0.20))
-	ItemMeshShared.add_cube(p, 0, 0.9, -1.1, 2.6, 0.3, 0.3, metal.lightened(0.15))
-	ItemMeshShared.add_cube(p, 0, 0.9, 1.1, 2.6, 0.3, 0.3, metal.lightened(0.15))
-	ItemMeshShared.add_cube(p, -1.5, -0.9, 0, 0.3, 0.3, 1.6, dark.darkened(0.10))
-	ItemMeshShared.add_cube(p, 1.5, -0.9, 0, 0.3, 0.3, 1.6, dark.darkened(0.10))
-	ItemMeshShared.add_cube(p, 0, -0.9, -1.0, 2.4, 0.3, 0.3, dark.darkened(0.08))
-	ItemMeshShared.add_cube(p, 0, -0.9, 1.0, 2.4, 0.3, 0.3, dark.darkened(0.08))
-	ItemMeshShared.add_cube(p, 0, 1.0, 0, 1.2, 0.2, 0.8, dark)
-	ItemMeshShared.add_cube(p, -0.3, 1.0, 0.3, 0.4, 0.2, 0.4, dark.lightened(0.15))
+	ItemMeshShared.add_cube(p, 0, 0, 0, 4.5, 2.4, 3.0, metal)
+	ItemMeshShared.add_cube(p, 0, 0.9, 0, 3.9, 0.6, 2.4, metal.lightened(0.12))
+	ItemMeshShared.add_cube(p, 0, -0.9, 0, 3.9, 0.6, 2.4, dark)
+
+static func ingot_high(p: Node3D, metal: Color, dark: Color) -> void:
+	var mid := metal.lightened(0.15)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 5.1, 2.7, 3.6, metal)
+	ItemMeshShared.add_cube(p, 0, 1.05, 0, 4.5, 0.6, 3.0, mid)
+	ItemMeshShared.add_cube(p, 0, -1.05, 0, 4.5, 0.6, 3.0, dark)
+
+static func ingot_purified(p: Node3D, metal: Color, dark: Color) -> void:
+	var mid := metal.lightened(0.18)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 5.7, 3.0, 4.2, metal)
+	ItemMeshShared.add_cube(p, 0, 1.2, 0, 4.8, 0.6, 3.3, mid)
+	ItemMeshShared.add_cube(p, 0, -1.2, 0, 4.8, 0.6, 3.3, dark)
 
 static func ore(p: Node3D, stone: Color, mineral: Color) -> void:
 	ItemMeshShared.add_cube(p, 0, 0, 0, 3.0, 2.5, 3.0, stone)

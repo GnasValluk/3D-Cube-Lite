@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ctdus12l17tts"
-path="res://.godot/imported/sapphire_blue.png-605ff42abd9109b9f84ab5138fbd4892.ctex"
+uid="uid://bulsnk8fgowgc"
+path="res://.godot/imported/bgbeta.png-645bde103791c22405674cb2134139d6.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icon_items/resource_mats/sapphire_blue.png"
-dest_files=["res://.godot/imported/sapphire_blue.png-605ff42abd9109b9f84ab5138fbd4892.ctex"]
+source_file="res://assets/bg/bgbeta.png"
+dest_files=["res://.godot/imported/bgbeta.png-645bde103791c22405674cb2134139d6.ctex"]
 
 [params]
 

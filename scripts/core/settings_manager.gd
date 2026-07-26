@@ -21,12 +21,11 @@ static var button_scale: float = 1.0
 static var device_mode: int = 0
 static var key_bindings: Dictionary = {
 	"controls/interact": KEY_F,
-	"controls/inventory": KEY_I,
+	"controls/inventory": KEY_E,
 	"controls/build": KEY_B,
-	"controls/party": KEY_P,
 	"controls/map": KEY_M,
 	"controls/debug": KEY_F2,
-}
+	}
 
 static var _preset_changed_callbacks: Array[Callable] = []
 
@@ -34,6 +33,10 @@ func _ready() -> void:
 	_load_translations()
 	load_settings()
 	_apply_all()
+
+	# Luôn set inventory key = E (bất kể setting cũ có bị đổi)
+	key_bindings["controls/inventory"] = KEY_E
+	ProjectSettings.set_setting("controls/inventory", KEY_E)
 
 static func _load_translations() -> void:
 	var path: String = "res://translations/game.csv"

@@ -7,11 +7,11 @@ const S: float = 1.6
 const BG_DEEP := Color(0.06, 0.04, 0.12)
 const BG_PANEL := Color(0.10, 0.07, 0.18)
 const BG_CARD := Color(0.14, 0.10, 0.22)
-const PURPLE := Color(0.55, 0.35, 0.90)
-const TEAL := Color(0.15, 0.72, 0.68)
-const PINK := Color(0.82, 0.28, 0.52)
-const ORANGE := Color(0.92, 0.52, 0.12)
-const CYAN := Color(0.15, 0.62, 0.92)
+const PURPLE := Color(0.22, 0.62, 0.28)
+const TEAL := Color(0.12, 0.52, 0.32)
+const PINK := Color(0.88, 0.35, 0.32)
+const ORANGE := Color(0.92, 0.62, 0.15)
+const CYAN := Color(0.18, 0.72, 0.52)
 const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
 const TEXT_MAIN := Color(0.82, 0.78, 0.95)
 const TEXT_DIM := Color(0.55, 0.50, 0.72)
@@ -19,8 +19,8 @@ const TEXT_MUTED := Color(0.35, 0.32, 0.50)
 
 const CELL_PX_BASE: float = 4.0
 const PLAYER_RADIUS: float = 4.0
-const MIN_ZOOM: float = 1.0
-const MAX_ZOOM: float = 8.0
+const MIN_ZOOM: float = 0.5
+const MAX_ZOOM: float = 16.0
 const CHUNK_SIZE: int = 32
 const REDRAW_DELAY: float = 0.1
 
@@ -47,6 +47,8 @@ var _dark_mode: bool = false
 
 var _mgr: CharacterManager = null
 var _redraw_pending: bool = false
+
+signal closed()
 
 var _node_coord: Label = null
 var _node_help: Label = null
@@ -120,7 +122,7 @@ func _build_toolbar() -> void:
 	_node_toolbar.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_node_toolbar)
 	var tools := [
-		["✕", Color(0.82, 0.28, 0.52), "_on_close"],
+		["✕", Color(0.88, 0.35, 0.32), "_on_close"],
 		["+", PURPLE, "_on_zoom_in"],
 		["−", PURPLE, "_on_zoom_out"],
 		["⟲", Color(0.50, 0.50, 0.50), "_on_reset"],
@@ -217,6 +219,7 @@ func open(sys: ExploreSystem) -> void:
 
 func close() -> void:
 	visible = false; _sys = null; _mgr = null; _redraw_pending = false
+	closed.emit()
 
 func _layout() -> void:
 	_vp = size
@@ -268,11 +271,7 @@ func _input(event: InputEvent) -> void:
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_zoom = clampf(_zoom * 1.2, MIN_ZOOM, MAX_ZOOM); queue_redraw()
-		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_zoom = clampf(_zoom / 1.2, MIN_ZOOM, MAX_ZOOM); queue_redraw()
-		elif mb.button_index == MOUSE_BUTTON_LEFT:
+		if mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed: _dragging = true; _drag_start = mb.position; _drag_offset = _pan_offset
 			elif _dragging and _drag_start.distance_to(mb.position) < 5.0: _add_waypoint_at(mb.position); _dragging = false
 			else: _dragging = false

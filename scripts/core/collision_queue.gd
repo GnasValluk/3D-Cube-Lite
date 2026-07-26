@@ -7,7 +7,7 @@
 
 extends Node
 
-const MAX_PER_FRAME: int = 1
+const MAX_PER_FRAME: int = 4
 
 ## Mỗi entry: [chunk, shape] dạng Variant array
 ## để tránh crash khi chunk bị freed trước khi entry được xử lý.

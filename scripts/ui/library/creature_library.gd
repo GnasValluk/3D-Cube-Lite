@@ -24,11 +24,11 @@ const CREATURES := [
 const BG_DEEP := Color(0.06, 0.04, 0.12)
 const BG_PANEL := Color(0.10, 0.07, 0.18)
 const BG_CARD := Color(0.14, 0.10, 0.22)
-const PURPLE := Color(0.55, 0.35, 0.90)
-const TEAL := Color(0.15, 0.72, 0.68)
-const PINK := Color(0.82, 0.28, 0.52)
-const ORANGE := Color(0.92, 0.52, 0.12)
-const CYAN := Color(0.15, 0.62, 0.92)
+const PURPLE := Color(0.22, 0.62, 0.28)
+const TEAL := Color(0.12, 0.52, 0.32)
+const PINK := Color(0.88, 0.35, 0.32)
+const ORANGE := Color(0.92, 0.62, 0.15)
+const CYAN := Color(0.18, 0.72, 0.52)
 const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
 const TEXT_MAIN := Color(0.82, 0.78, 0.95)
 const TEXT_DIM := Color(0.55, 0.50, 0.72)
@@ -222,7 +222,7 @@ func _update_tab_styles() -> void:
 		var bg := StyleBoxFlat.new()
 		if active:
 			bg.bg_color = Color(0.30, 0.20, 0.45, 0.95)
-			bg.border_color = Color(0.55, 0.35, 0.90, 0.5)
+			bg.border_color = Color(0.22, 0.62, 0.28, 0.5)
 		else:
 			bg.bg_color = Color(0.10, 0.07, 0.18, 0.85)
 			bg.border_color = Color(0.40, 0.30, 0.60, 0.5)
@@ -356,7 +356,7 @@ func _update_selection() -> void:
 		var bg := StyleBoxFlat.new()
 		if selected:
 			bg.bg_color = Color(0.30, 0.20, 0.45, 0.9)
-			bg.border_color = Color(0.55, 0.35, 0.90, 0.5)
+			bg.border_color = Color(0.22, 0.62, 0.28, 0.5)
 		else:
 			bg.bg_color = Color(0.14, 0.10, 0.22, 0.85)
 			bg.border_color = Color(0.40, 0.30, 0.60, 0.5)

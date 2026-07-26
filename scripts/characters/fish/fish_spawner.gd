@@ -1,9 +1,3 @@
-## fish/fish_spawner.gd
-## Spawn cá nước ngọt tại các vùng nước trong REAL_WORLD.
-## - Vùng có phù sa (SILT): spawn nhiều, đa dạng loài
-## - Vùng không có phù sa (SAND): spawn ít đến vừa
-## Đặt node này trong cùng scene với WorldManager.
-
 extends Node3D
 class_name FishSpawner
 
@@ -11,70 +5,85 @@ const _FishChar = preload("res://scripts/characters/fish/fish_character.gd")
 const _Dim      = preload("res://scripts/world/dimension_defs.gd")
 const _Data     = preload("res://scripts/world/chunk/chunk_data.gd")
 
-# Số cá tối đa toàn scene
-@export var max_fish: int = 25
-# Bán kính xung quanh player để thử spawn
+@export var max_fish: int = 60
 @export var spawn_check_radius: float = 48.0
-# Khoảng cách tối thiểu giữa các cá
+@export var despawn_distance: float = 80.0
 @export var min_fish_spacing: float = 3.5
-# Interval kiểm tra spawn (giây)
 @export var check_interval: float = 6.0
+@export var spawn_attempts: int = 16
 
 var _world_mgr: OpenWorldManager = null
+var _player: Node3D = null
 var _fish_list: Array[FishCharacter] = []
 var _timer: float = 0.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
-# Noise để phân biệt vùng SILT vs SAND (phải khớp với world_chunk logic)
 var _noise: FastNoiseLite = null
+
+var _n_oc: FastNoiseLite = null
+var _ow: FastNoiseLite = null
+var _has_ocean: bool = false
+var _ocean_ok: bool = false
 
 func _ready() -> void:
 	_rng.randomize()
+	_timer = _rng.randf_range(0.0, check_interval)
+
 	_noise = FastNoiseLite.new()
 	_noise.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	_noise.seed = WorldSeed.seed_value + 1000 + 5555   # khớp n_lake của REAL_WORLD
+	_noise.seed = WorldSeed.seed_value + 1000 + 5555
 	_noise.frequency = 0.025
 
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_world_mgr = _find_world_manager()
+	if _world_mgr:
+		var nd: Dictionary = WorldChunk._noise_for_dim(1)
+		_has_ocean = nd.has("ocean") and nd.has("ocean_warp")
+		if _has_ocean:
+			_n_oc = nd.get("ocean") as FastNoiseLite
+			_ow = nd.get("ocean_warp") as FastNoiseLite
+			_ocean_ok = true
 
 func _process(delta: float) -> void:
 	if _world_mgr == null:
 		_world_mgr = _find_world_manager()
 		return
 
-	# Dọn cá đã chết hoặc bị xoá (tối đa 1 lần/giây)
 	_timer += delta
 	if _timer < check_interval:
 		return
-	_timer = 0.0
+	_timer -= check_interval
+
+	_player = _find_player()
+	if _player == null:
+		return
+
+	var player_pos := _player.global_position
+	var despawn_sq := despawn_distance * despawn_distance
 
 	_fish_list = _fish_list.filter(func(f): return is_instance_valid(f) and f.is_alive)
+
+	var any_despawned := false
+	var i := _fish_list.size() - 1
+	while i >= 0:
+		var f := _fish_list[i]
+		if f.global_position.distance_squared_to(player_pos) > despawn_sq:
+			f.queue_free()
+			_fish_list.remove_at(i)
+			any_despawned = true
+		i -= 1
 
 	if _fish_list.size() >= max_fish:
 		return
 
-	_try_spawn_batch()
+	_try_spawn_batch(player_pos)
 
-func _try_spawn_batch() -> void:
-	# Tìm player để spawn quanh đó
-	var player := _find_player()
-	if player == null:
-		return
+func _try_spawn_batch(player_pos: Vector3) -> void:
+	var px := player_pos.x
+	var pz := player_pos.z
 
-	var px: float = player.global_position.x
-	var pz: float = player.global_position.z
-
-	# Thử vài vị trí ngẫu nhiên mỗi tick
-	var attempts: int = 8
-	# Cache ocean noise lookup
-	var nd: Dictionary = WorldChunk._noise_for_dim(1)
-	var has_ocean: bool = nd.has("ocean") and nd.has("ocean_warp")
-	var n_oc: FastNoiseLite = nd.get("ocean") as FastNoiseLite
-	var ow: FastNoiseLite = nd.get("ocean_warp") as FastNoiseLite
-
-	for _i in range(attempts):
+	for _i in range(spawn_attempts):
 		if _fish_list.size() >= max_fish:
 			break
 
@@ -82,31 +91,27 @@ func _try_spawn_batch() -> void:
 		var radius: float = _rng.randf_range(12.0, spawn_check_radius)
 		var wx: float = px + cos(angle) * radius
 		var wz: float = pz + sin(angle) * radius
-		# Bơi ở độ cao nước
 		var wy: float = 0.15
 
-		# Kiểm tra có phải vùng nước không
 		if not _world_mgr.is_in_water(wx, wz, wy):
 			continue
 
-		# Không spawn cá trong biển — domain warping khớp với world_chunk
-		if has_ocean:
-			var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
-			var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
-			var ov: float = (n_oc.get_noise_2d(wx + warp_x, wz + warp_z) + 1.0) * 0.5
+		if _ocean_ok:
+			var warp_x: float = _ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
+			var warp_z: float = _ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
+			var ov: float = (_n_oc.get_noise_2d(wx + warp_x, wz + warp_z) + 1.0) * 0.5
 			if ov > _Data.OCEAN_THRESHOLD:
 				continue
 
-		# Kiểm tra khoảng cách với cá khác
 		var too_close := false
+		var spawn_pos := Vector3(wx, wy, wz)
 		for existing in _fish_list:
-			if existing.global_position.distance_to(Vector3(wx, wy, wz)) < min_fish_spacing:
+			if existing.global_position.distance_squared_to(spawn_pos) < min_fish_spacing * min_fish_spacing:
 				too_close = true
 				break
 		if too_close:
 			continue
 
-		# Tính loại hồ — khớp với world_chunk n_lake logic (seed+5555, freq 0.018)
 		var lake_val: float = (_noise.get_noise_2d(wx, wz) + 1.0) * 0.5
 		var has_silt: bool = lake_val > 0.58
 
@@ -116,25 +121,23 @@ func _spawn_fish(wx: float, wy: float, wz: float, has_silt: bool) -> void:
 	var fish := CharacterBody3D.new() as CharacterBody3D
 	fish.set_script(_FishChar)
 
-	# Vùng phù sa: chép, rô, điêu hồng, lóc, la hán
-	# Vùng không phù sa: chủ yếu điêu hồng, lóc
 	var variant: int
 	if has_silt:
 		var r := _rng.randf()
-		if r < 0.18:   variant = FishCharacter.FishVariant.CARP       # 18%
-		elif r < 0.32: variant = FishCharacter.FishVariant.PERCH      # 14%
-		elif r < 0.46: variant = FishCharacter.FishVariant.TILAPIA    # 14%
-		elif r < 0.63: variant = FishCharacter.FishVariant.SNAKEHEAD  # 17%
-		elif r < 0.85: variant = FishCharacter.FishVariant.SHRIMP     # 22%
-		else:          variant = FishCharacter.FishVariant.FLOWERHORN  # 15%
+		if r < 0.18:   variant = FishCharacter.FishVariant.CARP
+		elif r < 0.32: variant = FishCharacter.FishVariant.PERCH
+		elif r < 0.46: variant = FishCharacter.FishVariant.TILAPIA
+		elif r < 0.63: variant = FishCharacter.FishVariant.SNAKEHEAD
+		elif r < 0.85: variant = FishCharacter.FishVariant.SHRIMP
+		else:          variant = FishCharacter.FishVariant.FLOWERHORN
 	else:
 		var r := _rng.randf()
-		if r < 0.07:   variant = FishCharacter.FishVariant.CARP       # 7%
-		elif r < 0.20: variant = FishCharacter.FishVariant.PERCH      # 13%
-		elif r < 0.46: variant = FishCharacter.FishVariant.TILAPIA    # 26%
-		elif r < 0.63: variant = FishCharacter.FishVariant.SNAKEHEAD  # 17%
-		elif r < 0.85: variant = FishCharacter.FishVariant.SHRIMP     # 22%
-		else:          variant = FishCharacter.FishVariant.FLOWERHORN  # 15%
+		if r < 0.07:   variant = FishCharacter.FishVariant.CARP
+		elif r < 0.20: variant = FishCharacter.FishVariant.PERCH
+		elif r < 0.46: variant = FishCharacter.FishVariant.TILAPIA
+		elif r < 0.63: variant = FishCharacter.FishVariant.SNAKEHEAD
+		elif r < 0.85: variant = FishCharacter.FishVariant.SHRIMP
+		else:          variant = FishCharacter.FishVariant.FLOWERHORN
 
 	fish.set("fish_variant", variant)
 	fish.set("fish_scale", _rng.randf_range(0.85, 1.15))
@@ -143,7 +146,6 @@ func _spawn_fish(wx: float, wy: float, wz: float, has_silt: bool) -> void:
 
 	add_child(fish)
 	fish.global_position = Vector3(wx, wy, wz)
-	# Xoay ngẫu nhiên
 	fish.rotation.y = _rng.randf_range(0.0, TAU)
 
 	if fish is FishCharacter:

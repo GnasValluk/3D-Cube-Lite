@@ -1,5 +1,5 @@
 ## ui/hud.gd
-## HUD chính: skill bar + party HUD + party UI overlay.
+## HUD chính: skill bar, hotbar, inventory, map, phone, etc.
 
 extends CanvasLayer
 class_name HUD
@@ -10,11 +10,11 @@ const SS: float = 1.4
 const BG_DEEP := Color(0.06, 0.04, 0.12)
 const BG_PANEL := Color(0.10, 0.07, 0.18)
 const BG_CARD := Color(0.14, 0.10, 0.22)
-const PURPLE := Color(0.55, 0.35, 0.90)
-const TEAL := Color(0.15, 0.72, 0.68)
-const PINK := Color(0.82, 0.28, 0.52)
-const ORANGE := Color(0.92, 0.52, 0.12)
-const CYAN := Color(0.15, 0.62, 0.92)
+const PURPLE := Color(0.22, 0.62, 0.28)
+const TEAL := Color(0.12, 0.52, 0.32)
+const PINK := Color(0.88, 0.35, 0.32)
+const ORANGE := Color(0.92, 0.62, 0.15)
+const CYAN := Color(0.18, 0.72, 0.52)
 const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
 const TEXT_MAIN := Color(0.82, 0.78, 0.95)
 const TEXT_DIM := Color(0.55, 0.50, 0.72)
@@ -32,12 +32,7 @@ var _chest_open: bool = false
 var _current_chest: Chest = null
 var _switch_hint: Label
 var _settings_ui
-var _settings_icon: Button
-var _save_btn: Button
-var _library_btn: Button
 var _library
-var _party_hud: Control
-var _party_indicators: Array[Panel] = []
 var _mgr: CharacterManager
 var _portal_btn: Button
 var _build_menu: BuildMenu
@@ -46,6 +41,7 @@ var _build_hint: Label
 var _explore_map: ExploreMap
 var _explore_sys: ExploreSystem
 var _mini_map: MiniMap
+var _phone_ui: PhoneUI
 
 enum { LOAD_IDLE, LOAD_LOADING, LOAD_READY, LOAD_FADEOUT }
 var _load_state: int = LOAD_IDLE
@@ -69,8 +65,6 @@ var _time_label: Label
 var _coords_label: Label
 var _biome_label: Label  # hiển thị tên biome + continent value góc trái
 var _temperature_label: Label  # hiển thị nhiệt độ góc phải
-# Cache texture để tránh load() blocking mỗi frame trong _refresh_party_hud
-var _icon_cache: Dictionary = {}
 var _hud_throttle: float = 0.0
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
@@ -87,7 +81,6 @@ func _notification(what: int) -> void:
 		if _switch_hint: _switch_hint.text = tr("SWITCH_HINT")
 		if _portal_btn: _portal_btn.text = tr("PORTAL_BUTTON")
 		if _load_label: _load_label.text = tr("GENERATE_LABEL")
-		if _library_btn: _library_btn.tooltip_text = tr("CREATURE_BUTTON")
 
 	if what == NOTIFICATION_ENTER_TREE:
 		var path := get_tree().current_scene.scene_file_path if get_tree() and get_tree().current_scene else ""
@@ -146,11 +139,6 @@ func _setup_ui() -> void:
 		dim_label.text = "REAL WORLD"
 	add_child(dim_label)
 
-	_setup_settings_icon()
-	_setup_save_button()
-	_setup_library_button()
-	_setup_party_hud()
-
 	_settings_ui = SettingsUI.new()
 	add_child(_settings_ui)
 
@@ -174,6 +162,9 @@ func _setup_ui() -> void:
 					_explore_map.open(_explore_sys)
 	)
 	add_child(_mini_map)
+
+	_phone_ui = PhoneUI.new()
+	add_child(_phone_ui)
 
 	_build_hint = Label.new()
 	_build_hint.position = Vector2(17, 78)
@@ -271,76 +262,6 @@ func _setup_loading_overlay() -> void:
 	_load_bar_fill.visible = false
 	_load_overlay.add_child(_load_bar_fill)
 
-func _setup_settings_icon() -> void:
-	_settings_icon = Button.new()
-	_settings_icon.position = Vector2(17, 14)
-	_settings_icon.size = Vector2(56, 56)
-	_settings_icon.text = "⚙"
-	_settings_icon.add_theme_font_size_override("font_size", 34)
-	_settings_icon.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
-	var icon_bg := StyleBoxFlat.new()
-	icon_bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.65)
-	icon_bg.corner_radius_top_left = 8; icon_bg.corner_radius_top_right = 8
-	icon_bg.corner_radius_bottom_left = 8; icon_bg.corner_radius_bottom_right = 8
-	icon_bg.border_width_left = 1; icon_bg.border_width_right = 1
-	icon_bg.border_width_top = 1; icon_bg.border_width_bottom = 1
-	icon_bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.10)
-	_settings_icon.add_theme_stylebox_override("normal", icon_bg)
-	var hover_bg := icon_bg.duplicate()
-	hover_bg.bg_color = Color(0.22, 0.18, 0.35, 0.75)
-	hover_bg.border_color = Color(TEAL.r, TEAL.g, TEAL.b, 0.40)
-	_settings_icon.add_theme_stylebox_override("hover", hover_bg)
-	_settings_icon.mouse_filter = Control.MOUSE_FILTER_STOP
-	_settings_icon.pressed.connect(_toggle_settings)
-	add_child(_settings_icon)
-
-func _setup_save_button() -> void:
-	_save_btn = Button.new()
-	_save_btn.position = Vector2(81, 14)
-	_save_btn.size = Vector2(56, 56)
-	_save_btn.text = "💾"
-	_save_btn.add_theme_font_size_override("font_size", 28)
-	_save_btn.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
-	var sb_bg := StyleBoxFlat.new()
-	sb_bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.65)
-	sb_bg.corner_radius_top_left = 8; sb_bg.corner_radius_top_right = 8
-	sb_bg.corner_radius_bottom_left = 8; sb_bg.corner_radius_bottom_right = 8
-	sb_bg.border_width_left = 1; sb_bg.border_width_right = 1
-	sb_bg.border_width_top = 1; sb_bg.border_width_bottom = 1
-	sb_bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.10)
-	_save_btn.add_theme_stylebox_override("normal", sb_bg)
-	var sb_hover := sb_bg.duplicate()
-	sb_hover.bg_color = Color(0.22, 0.18, 0.35, 0.75)
-	sb_hover.border_color = Color(TEAL.r, TEAL.g, TEAL.b, 0.40)
-	_save_btn.add_theme_stylebox_override("hover", sb_hover)
-	_save_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_save_btn.pressed.connect(_on_save_pressed)
-	add_child(_save_btn)
-
-func _setup_library_button() -> void:
-	_library_btn = Button.new()
-	_library_btn.position = Vector2(146, 14)
-	_library_btn.size = Vector2(56, 56)
-	_library_btn.text = "📖"
-	_library_btn.tooltip_text = tr("CREATURE_BUTTON")
-	_library_btn.add_theme_font_size_override("font_size", 28)
-	_library_btn.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
-	var lb_bg := StyleBoxFlat.new()
-	lb_bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.65)
-	lb_bg.corner_radius_top_left = 8; lb_bg.corner_radius_top_right = 8
-	lb_bg.corner_radius_bottom_left = 8; lb_bg.corner_radius_bottom_right = 8
-	lb_bg.border_width_left = 1; lb_bg.border_width_right = 1
-	lb_bg.border_width_top = 1; lb_bg.border_width_bottom = 1
-	lb_bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.10)
-	_library_btn.add_theme_stylebox_override("normal", lb_bg)
-	var lb_hover := lb_bg.duplicate()
-	lb_hover.bg_color = Color(0.22, 0.18, 0.35, 0.75)
-	lb_hover.border_color = Color(TEAL.r, TEAL.g, TEAL.b, 0.40)
-	_library_btn.add_theme_stylebox_override("hover", lb_hover)
-	_library_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_library_btn.pressed.connect(_on_library_pressed)
-	add_child(_library_btn)
-
 	_library = _Library.new()
 	add_child(_library)
 
@@ -361,99 +282,6 @@ func _toggle_settings() -> void:
 	else:
 		_settings_ui.show_settings()
 
-func _setup_party_hud() -> void:
-	var W: float = 112.0
-	var H: float = 109.0
-	var G: float = 6.0
-	var PLAYER_GAP: float = 22.0
-	var slot_count: int = 4
-
-	_party_hud = Control.new()
-	_party_hud.size = Vector2(W, H * slot_count + G * (slot_count - 1) + PLAYER_GAP)
-	var vp := get_viewport().get_visible_rect().size
-	_party_hud.position = Vector2(vp.x - W, (vp.y - _party_hud.size.y) * 0.5)
-	add_child(_party_hud)
-
-	for i in range(slot_count):
-		var y: float = i * (H + G)
-		if i == 3:
-			y += PLAYER_GAP
-
-		var panel := Panel.new()
-		panel.size = Vector2(W, H)
-		panel.position = Vector2(0, y)
-		panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		panel.gui_input.connect(_on_party_indicator_input.bind(i))
-		_party_hud.add_child(panel)
-
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.70)
-		bg.corner_radius_top_left = 8
-		bg.corner_radius_top_right = 8
-		bg.corner_radius_bottom_left = 8
-		bg.corner_radius_bottom_right = 8
-		bg.border_width_left = 1
-		bg.border_width_right = 1
-		bg.border_width_top = 1
-		bg.border_width_bottom = 1
-		bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
-		panel.add_theme_stylebox_override("panel", bg)
-
-		var icon := TextureRect.new()
-		icon.position = Vector2(8, 8)
-		icon.size = Vector2(84, 84)
-		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		panel.add_child(icon)
-
-		var hp_bg := ColorRect.new()
-		hp_bg.position = Vector2(8, 92)
-		hp_bg.size = Vector2(84, 8)
-		hp_bg.color = Color(BG_DEEP.r, BG_DEEP.g, BG_DEEP.b, 0.60)
-		panel.add_child(hp_bg)
-
-		var hp_bar := ColorRect.new()
-		hp_bar.position = Vector2(8, 92)
-		hp_bar.size = Vector2(84, 8)
-		hp_bar.color = Color(0.30, 0.85, 0.30, 0.85)
-		panel.add_child(hp_bar)
-
-		var shield_bar := ColorRect.new()
-		shield_bar.position = Vector2(8, 92)
-		shield_bar.size = Vector2(0, 8)
-		shield_bar.color = Color(1.0, 0.80, 0.20, 0.55)
-		panel.add_child(shield_bar)
-
-		var mana_bar := ColorRect.new()
-		mana_bar.position = Vector2(8, 101)
-		mana_bar.size = Vector2(0, 6)
-		var slot_accents := [PURPLE, TEAL, PINK, ORANGE]
-		mana_bar.color = Color(slot_accents[i].r, slot_accents[i].g, slot_accents[i].b, 0.60)
-		panel.add_child(mana_bar)
-
-		var lbl := Label.new()
-		lbl.position = Vector2(3, 6)
-		lbl.size = Vector2(106, 22)
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.add_theme_font_size_override("font_size", 18)
-		lbl.add_theme_color_override("font_color", Color(TEXT_MAIN.r, TEXT_MAIN.g, TEXT_MAIN.b, 0.8))
-		lbl.text = "P" if i == 3 else str(i + 1)
-		panel.add_child(lbl)
-
-		var d: Dictionary = { "panel": panel, "bg": bg, "icon": icon, "hp_bar": hp_bar, "shield_bar": shield_bar, "mana_bar": mana_bar, "lbl": lbl }
-		panel.set_meta("data", d)
-		_party_indicators.append(panel)
-
-func _on_party_indicator_input(event: InputEvent, idx: int) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if _mgr:
-			if idx == 3:
-				_mgr.switch_by_name("Player")
-			else:
-				var party := _mgr.get_party_characters()
-				if idx < party.size():
-					_mgr.switch_by_name(party[idx].character_name)
-
 func _process(delta: float) -> void:
 	if _dummy_tracked:
 		_dummy_label.text = tr("DUMMY_FORMAT") % [_dummy_tracked.hp, _dummy_tracked.max_hp]
@@ -463,14 +291,14 @@ func _process(delta: float) -> void:
 	if _placement_sys and _placement_sys.is_placing():
 		_placement_sys.update_placement()
 		_build_hint.text = tr("BUILD_HINT_PLACING")
+	else:
+		_build_hint.text = ""
 
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	_hud_throttle -= delta
 
 	if _hud_throttle <= 0:
 		_hud_throttle = 0.08
-		if _mgr:
-			_refresh_party_hud()
 		if TimeSystem:
 			var h: int = TimeSystem.get_hour_int()
 			var m: int = TimeSystem.get_minute()
@@ -504,9 +332,6 @@ func _process(delta: float) -> void:
 				_coords_label.text = ""
 				if _biome_label:
 					_biome_label.text = ""
-
-	if _mgr:
-		_party_hud.position = Vector2(vp.x - 101, (vp.y - _party_hud.size.y) * 0.5)
 
 	if _mini_map:
 		_mini_map.visible = _explore_sys != null and get_parent().has_node("WorldManager") and not (_explore_map and _explore_map.visible)
@@ -578,146 +403,22 @@ func _process(delta: float) -> void:
 			var packed := ResourceLoader.load_threaded_get(_load_scene)
 			get_tree().change_scene_to_packed(packed)
 
-func _load_icon(character_name: String) -> Texture2D:
-	if _icon_cache.has(character_name):
-		return _icon_cache[character_name]
-	var tex_path: String = "res://assets/icon_character/" + character_name.to_lower() + ".png"
-	var tex: Texture2D = load(tex_path) as Texture2D
-	_icon_cache[character_name] = tex
-	return tex
-
-func _refresh_party_hud() -> void:
-	var party: Array[CharacterBase] = _mgr.get_party_characters()
-	var active: CharacterBase = _mgr.get_current_character()
-	var player_ch: CharacterBase = null
-	for ch in _mgr._characters:
-		if ch.character_name == "Player":
-			player_ch = ch
-			break
-
-	for i in range(_party_indicators.size()):
-		var panel: Panel = _party_indicators[i]
-		var d: Dictionary = panel.get_meta("data")
-		var bg: StyleBoxFlat = d["bg"]
-
-		if i == 3 and player_ch != null:
-			var ch: CharacterBase = player_ch
-			d["hp_bar"].visible = true
-			d["shield_bar"].visible = true
-			d["mana_bar"].visible = true
-
-			var max_hp_val: int = max(ch.max_hp, 1)
-			var hp_ratio: float = float(ch.hp) / float(max_hp_val)
-			d["hp_bar"].color = Color(
-				1.0 - hp_ratio,
-				0.3 + hp_ratio * 0.7,
-				0.2,
-				0.85)
-			d["hp_bar"].size.x = max(3.0, 84.0 * hp_ratio)
-
-			var shield_ratio: float = clamp(float(ch.shield) / float(max_hp_val), 0.0, 1.0)
-			if shield_ratio > 0.0:
-				d["shield_bar"].size.x = max(3.0, 84.0 * shield_ratio)
-				d["shield_bar"].position.x = 8.0 + 84.0 * hp_ratio
-			else:
-				d["shield_bar"].size.x = 0.0
-
-			var mana_ratio: float = clamp(float(ch.mana) / float(max(ch.max_mana, 1)), 0.0, 1.0)
-			d["mana_bar"].size.x = max(3.0, 84.0 * mana_ratio)
-
-			d["lbl"].text = "Lv" + str(ch.level)
-
-			d["icon"].texture = _load_icon(ch.character_name)
-			d["icon"].modulate = Color(1, 1, 1, 1)
-
-			if active and ch.character_name == active.character_name:
-				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.50)
-				bg.border_width_left = 2
-				bg.border_width_right = 2
-				bg.border_width_top = 2
-				bg.border_width_bottom = 2
-				bg.bg_color = Color(0.20, 0.15, 0.30, 0.70)
-			else:
-				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
-				bg.border_width_left = 1
-				bg.border_width_right = 1
-				bg.border_width_top = 1
-				bg.border_width_bottom = 1
-				bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.55)
-		elif i < party.size():
-			var ch: CharacterBase = party[i]
-			d["hp_bar"].visible = true
-			d["shield_bar"].visible = true
-			d["mana_bar"].visible = true
-
-			var max_hp_val: int = max(ch.max_hp, 1)
-			var hp_ratio: float = float(ch.hp) / float(max_hp_val)
-			d["hp_bar"].color = Color(
-				1.0 - hp_ratio,
-				0.3 + hp_ratio * 0.7,
-				0.2,
-				0.85)
-			d["hp_bar"].size.x = max(3.0, 84.0 * hp_ratio)
-
-			var shield_ratio: float = clamp(float(ch.shield) / float(max_hp_val), 0.0, 1.0)
-			if shield_ratio > 0.0:
-				d["shield_bar"].size.x = max(3.0, 84.0 * shield_ratio)
-				d["shield_bar"].position.x = 8.0 + 84.0 * hp_ratio
-			else:
-				d["shield_bar"].size.x = 0.0
-
-			var mana_ratio: float = clamp(float(ch.mana) / float(max(ch.max_mana, 1)), 0.0, 1.0)
-			d["mana_bar"].size.x = max(3.0, 84.0 * mana_ratio)
-
-			d["lbl"].text = "Lv" + str(ch.level)
-
-			d["icon"].texture = _load_icon(ch.character_name)
-			d["icon"].modulate = Color(1, 1, 1, 1)
-
-			if active and ch.character_name == active.character_name:
-				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.50)
-				bg.border_width_left = 2
-				bg.border_width_right = 2
-				bg.border_width_top = 2
-				bg.border_width_bottom = 2
-				bg.bg_color = Color(0.20, 0.15, 0.30, 0.70)
-			else:
-				bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.12)
-				bg.border_width_left = 1
-				bg.border_width_right = 1
-				bg.border_width_top = 1
-				bg.border_width_bottom = 1
-				bg.bg_color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.55)
-		else:
-			d["hp_bar"].visible = false
-			d["shield_bar"].visible = false
-			d["mana_bar"].visible = false
-			d["icon"].texture = null
-			d["icon"].modulate = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.7)
-			d["lbl"].text = "P" if i == 3 else str(i + 1)
-			bg.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.06)
-			bg.border_width_left = 1
-			bg.border_width_right = 1
-			bg.border_width_top = 1
-			bg.border_width_bottom = 1
-			bg.bg_color = Color(BG_DEEP.r, BG_DEEP.g, BG_DEEP.b, 0.45)
-
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
-			var k_interact: int = ProjectSettings.get_setting("controls/interact", KEY_F)
-			var k_inventory: int = ProjectSettings.get_setting("controls/inventory", KEY_I)
-			var k_map: int = ProjectSettings.get_setting("controls/map", KEY_M)
-			var k_debug: int = ProjectSettings.get_setting("controls/debug", KEY_F2)
+			var kb := SettingsData.key_bindings if SettingsData else {}
+			var k_interact: int = kb.get("controls/interact", KEY_F)
+			var k_inventory: int = kb.get("controls/inventory", KEY_E)
+			var k_debug: int = kb.get("controls/debug", KEY_F2)
 
 			if _chest_open:
-				if k.keycode == k_interact or k.keycode == KEY_ESCAPE or k.keycode == k_inventory or k.keycode == KEY_E:
+				if k.keycode == k_interact or k.keycode == KEY_ESCAPE or k.keycode == k_inventory:
 					close_chest()
 				return
 
 			if _inventory_open:
-				if k.keycode == k_inventory or k.keycode == KEY_E or k.keycode == KEY_ESCAPE:
+				if k.keycode == k_inventory or k.keycode == KEY_ESCAPE:
 					_toggle_inventory()
 				return
 
@@ -739,7 +440,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					player.interact_with_nearby()
 				return
 
-			if k.keycode == k_inventory or k.keycode == KEY_E:
+			if k.keycode == k_inventory:
 				var cur := _mgr.get_current_character() if _mgr else null
 				if cur is PlayerCharacter:
 					_toggle_inventory()
@@ -749,13 +450,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				_toggle_debug()
 				return
 
-			if k.keycode == k_map:
-				if _explore_map and _explore_map.visible:
-					_explore_map.close()
-					return
-				elif _explore_sys and not (_settings_ui and _settings_ui.visible):
-					_explore_map.open(_explore_sys)
-					return
+			if k.keycode == KEY_F3:
+				if _phone_ui:
+					if _phone_ui.visible:
+						_phone_ui.close()
+					else:
+						_phone_ui.open()
+				return
+
 			if k.keycode == KEY_ESCAPE:
 				if _explore_map and _explore_map.visible:
 					_explore_map.close()
@@ -763,6 +465,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					_build_menu.close()
 				elif _settings_ui and _settings_ui.visible:
 					_settings_ui.hide_settings()
+				elif _library and _library.visible:
+					_library.visible = false
+				elif _inventory_open:
+					_toggle_inventory()
+				elif _phone_ui and _phone_ui.visible:
+					_phone_ui.close()
 				else:
 					_toggle_settings()
 
@@ -813,14 +521,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				if mb.button_index == MOUSE_BUTTON_LEFT:
 					_placement_sys.confirm_placement()
 					_build_hint.text = ""
-					# Nếu vẫn cầm vật phẩm công trình và còn hàng → tự động place tiếp
-					var def := _hotbar.get_selected_item()
-					if def != null and _is_building_item(def):
-						var player := _find_player_character()
-						if player and player.inventory and player.inventory.get_item_count(def.id) > 0:
-							_placement_sys.set_player_inventory(player.inventory, player)
-							_placement_sys.start_placement(def.id)
-							_build_hint.text = tr("BUILD_HINT_PLACING")
 				elif mb.button_index == MOUSE_BUTTON_RIGHT:
 					_placement_sys.cancel_placement()
 					_build_hint.text = ""

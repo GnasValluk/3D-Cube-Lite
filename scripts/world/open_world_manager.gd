@@ -20,22 +20,32 @@ var _last_pos: Vector3 = Vector3(99999, 99999, 99999)
 var _pending: Array[Vector2i] = []
 
 var _initial_generated: bool = false
+var _loading_ready: bool = false
+var _total_initial: int = 0
+var _loaded_initial: int = 0
+
+signal initial_chunks_ready
 
 func _ready() -> void:
 	dimension_name = tr(_Dim.DIM_NAME_KEY.get(dimension_id, ""))
 
-	# Xóa noise cache để buộc rebuild với frequency mới nhất từ chunk_data.gd
-	# (chunk đầu tiên sẽ dùng noise FRESH, không phải noise cũ từ journey trước)
 	WorldChunk.clear_noise_cache()
 	WorldChunk._noise_for_dim(dimension_id)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.TWILIGHT)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.REAL_WORLD)
 
-	# Generate center chunk immediately so ground collision exists
-	# before any physics frame runs (player spawns at (0,3,0) → chunk (0,0))
+	# Generate center chunk synchronously để có ground ngay frame đầu
 	var cx := 0
 	var cz := 0
 	_last_chunk = Vector2i(cx, cz)
+	# Count all chunks first before any loading
+	_total_initial = 1  # center chunk
+	for dx in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
+		for dz in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
+			var key := Vector2i(cx + dx, cz + dz)
+			if key != Vector2i(cx, cz):
+				_total_initial += 1
+
 	_start_loading(Vector2i(cx, cz), true)
 
 	for dx in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
@@ -52,6 +62,7 @@ func _ready() -> void:
 			_start_loading(key, false)
 
 	_initial_generated = true
+	_check_initial_ready()
 
 func _find_player() -> void:
 	var mgr := get_node("../CharacterManager") as CharacterManager
@@ -79,6 +90,7 @@ func _process(_delta: float) -> void:
 			if SaveManager:
 				SaveManager.apply_block_modifications_for_chunk(chunk, ck.x, ck.y)
 			promoted += 1
+			_check_initial_ready()
 
 	var cx: int = int(floor(ppos.x / CHUNK_SIZE))
 	var cz: int = int(floor(ppos.z / CHUNK_SIZE))
@@ -134,6 +146,19 @@ func _start_loading(key: Vector2i, sync: bool) -> void:
 		_chunks[key] = chunk
 		if SaveManager:
 			SaveManager.apply_block_modifications_for_chunk(chunk, key.x, key.y)
+
+func _check_initial_ready() -> void:
+	if _loading_ready or _total_initial == 0: return
+	_loaded_initial = 0
+	for key in _chunks:
+		if _chunks[key]._built:
+			_loaded_initial += 1
+	for key in _loading:
+		if _loading[key]._built:
+			_loaded_initial += 1
+	if _loaded_initial >= _total_initial:
+		_loading_ready = true
+		initial_chunks_ready.emit()
 
 func _sort_chunks(a: Vector2i, b: Vector2i) -> bool:
 	var da := (a - _last_chunk).length_squared()

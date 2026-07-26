@@ -47,16 +47,15 @@ static func _add_tropical_weed(st: SurfaceTool, _wx: int, _wz: int, pos: Vector3
 		r1: float, r2: float, r3: float, r4: float, h1: int, _h2: int,
 		water_gap: float, has_silt: bool, lotus_lights: Array[Vector3]) -> void:
 
-	var chance: float = 0.18 if has_silt else 0.08
+	var chance: float = 0.10 if has_silt else 0.04
 	if r1 >= chance: return
 
-	var max_segs: int = clampi(int(water_gap / _Data.VOXEL), 1, 5)
+	var max_segs: int = clampi(int(water_gap / _Data.VOXEL), 1, 4)
 	var seg_count: int
-	if   r2 < 0.15: seg_count = 1
-	elif r2 < 0.35: seg_count = 2
-	elif r2 < 0.60: seg_count = 3
-	elif r2 < 0.82: seg_count = 4
-	else:            seg_count = 5
+	if   r2 < 0.20: seg_count = 1
+	elif r2 < 0.45: seg_count = 2
+	elif r2 < 0.75: seg_count = 3
+	else:            seg_count = 4
 	seg_count = mini(seg_count, max_segs)
 	if seg_count < 1: seg_count = 1
 
@@ -83,28 +82,21 @@ static func _add_tropical_weed(st: SurfaceTool, _wx: int, _wz: int, pos: Vector3
 		var ny := cur_y + _Data.VOXEL
 		var mid := Vector3((cur_x + nx) * 0.5, (cur_y + ny) * 0.5, (cur_z + nz) * 0.5)
 
-		# Thân đốt mảnh 4 mặt
 		_add_quad(st, mid, Vector3(sw,0,0), Vector3(0,_Data.VOXEL*0.5,0), Vector3(0,0, 1), col_stem)
 		_add_quad(st, mid, Vector3(sw,0,0), Vector3(0,_Data.VOXEL*0.5,0), Vector3(0,0,-1), col_stem)
-		_add_quad(st, mid, Vector3(0,0,sw), Vector3(0,_Data.VOXEL*0.5,0), Vector3( 1,0,0), col_stem)
-		_add_quad(st, mid, Vector3(0,0,sw), Vector3(0,_Data.VOXEL*0.5,0), Vector3(-1,0,0), col_stem)
 
-		# Vòng râu 6 cái tỏa tròn quanh đốt
 		s = _draw_whorls(st, s, nx, nz, cur_y, sw, col_br1, col_br2, seg)
 
-		# 3 cành phân nhánh 120° (trừ đốt đáy)
 		if seg > 0 or seg_count == 1:
 			s = _draw_branches(st, s, nx, nz, cur_y, sw, lean_x, lean_z, dx, dz, col_br1, col_br2)
 
 		cur_x = nx; cur_z = nz; cur_y = ny
 
-	# Chùm quả vàng phát sáng — ở gốc cây
 	s = _draw_fruit_cluster(st, s, bx, bz, by, lean_x, lean_z, sw, lotus_lights)
 
-# Vòng 6 râu tỏa tròn quanh đốt, mỗi râu chẻ đôi ở đầu
 static func _draw_whorls(st: SurfaceTool, s: int, nx: float, nz: float, cur_y: float,
 		sw: float, col_br1: Color, col_br2: Color, seg: int) -> int:
-	var whorls: int = 6
+	var whorls: int = 4
 	var woff: float = float(seg) * (PI / float(whorls))
 	var wroot := Vector3(nx, cur_y + _Data.VOXEL * 0.55, nz)
 	for wi in range(whorls):
@@ -116,25 +108,15 @@ static func _draw_whorls(st: SurfaceTool, s: int, nx: float, nz: float, cur_y: f
 		var ww: float = sw * 0.55
 		_add_quad(st, wroot + wdir*wlen*0.5, wperp*ww, wdir*wlen*0.5,  wperp.cross(wdir).normalized(), col_br1)
 		_add_quad(st, wroot + wdir*wlen*0.5, wperp*ww, wdir*wlen*0.5, -wperp.cross(wdir).normalized(), col_br1)
-		var wtip: Vector3 = wroot + wdir * wlen
-		for fork in [0, 1]:
-			s = s * 16807 + 1; var fr := float(s & 0x7FFFFFFF) / 2147483648.0
-			var fa: float = wa + (float(fork) - 0.5) * 0.60 + (fr - 0.5) * 0.15
-			var fdir := Vector3(cos(fa), 0.18 + fr * 0.10, sin(fa)).normalized()
-			var fperp := Vector3(-sin(fa), 0.0, cos(fa)).normalized()
-			var flen: float = wlen * 0.50; var fw: float = ww * 0.55
-			_add_quad(st, wtip + fdir*flen*0.5, fperp*fw, fdir*flen*0.5,  fperp.cross(fdir).normalized(), col_br2)
-			_add_quad(st, wtip + fdir*flen*0.5, fperp*fw, fdir*flen*0.5, -fperp.cross(fdir).normalized(), col_br2)
 	return s
 
-# 3 cành phân nhánh đều 120° từ thân, mỗi cành có râu nhỏ + chẻ 2 lần
 static func _draw_branches(st: SurfaceTool, s: int, nx: float, nz: float, cur_y: float,
 		sw: float, lean_x: float, lean_z: float, dx: float, dz: float,
 		col_br1: Color, col_br2: Color) -> int:
 	var bbase := Vector3(nx, cur_y + _Data.VOXEL * 0.75, nz)
 	var base_angle: float = atan2(lean_z + dz, lean_x + dx) + PI * 0.5
-	for bi in range(3):
-		var ba: float = base_angle + float(bi) * TAU / 3.0
+	for bi in range(2):
+		var ba: float = base_angle + float(bi) * TAU / 2.0
 		s = s * 16807 + 1; var br := float(s & 0x7FFFFFFF) / 2147483648.0
 		ba += (br - 0.5) * 0.3
 		s = s * 16807 + 1; var bup := float(s & 0x7FFFFFFF) / 2147483648.0
@@ -145,18 +127,6 @@ static func _draw_branches(st: SurfaceTool, s: int, nx: float, nz: float, cur_y:
 		_add_quad(st, bbase + bdir*blen*0.5, bperp*bw, bdir*blen*0.5,  bperp.cross(bdir).normalized(), col_br1)
 		_add_quad(st, bbase + bdir*blen*0.5, bperp*bw, bdir*blen*0.5, -bperp.cross(bdir).normalized(), col_br1)
 
-		# Vòng râu nhỏ ở giữa cành (4 râu)
-		var branch_mid := bbase + bdir * blen * 0.5
-		for wi2 in range(4):
-			var wa2: float = float(wi2) / 4.0 * TAU + ba
-			s = s * 16807 + 1; var wr2 := float(s & 0x7FFFFFFF) / 2147483648.0
-			var wd2 := Vector3(cos(wa2), 0.08 + wr2 * 0.08, sin(wa2)).normalized()
-			var wp2 := Vector3(-sin(wa2), 0.0, cos(wa2)).normalized()
-			var wl2: float = 0.08 + wr2 * 0.05; var ww3: float = sw * 0.40
-			_add_quad(st, branch_mid + wd2*wl2*0.5, wp2*ww3, wd2*wl2*0.5,  wp2.cross(wd2).normalized(), col_br2)
-			_add_quad(st, branch_mid + wd2*wl2*0.5, wp2*ww3, wd2*wl2*0.5, -wp2.cross(wd2).normalized(), col_br2)
-
-		# Đầu cành chẻ đôi 2 lần
 		var btip := bbase + bdir * blen
 		for fork in [0, 1]:
 			s = s * 16807 + 1; var fr := float(s & 0x7FFFFFFF) / 2147483648.0
@@ -166,18 +136,8 @@ static func _draw_branches(st: SurfaceTool, s: int, nx: float, nz: float, cur_y:
 			var flen: float = blen * 0.52; var fw2: float = bw * 0.55
 			_add_quad(st, btip + fdir*flen*0.5, fperp2*fw2, fdir*flen*0.5,  fperp2.cross(fdir).normalized(), col_br2)
 			_add_quad(st, btip + fdir*flen*0.5, fperp2*fw2, fdir*flen*0.5, -fperp2.cross(fdir).normalized(), col_br2)
-			var ftip := btip + fdir * flen
-			for fork2 in [0, 1]:
-				s = s * 16807 + 1; var fr2 := float(s & 0x7FFFFFFF) / 2147483648.0
-				var fa2: float = fa + (float(fork2) - 0.5) * 0.50 + (fr2 - 0.5) * 0.15
-				var f2dir := Vector3(cos(fa2), 0.25 + fr2 * 0.10, sin(fa2)).normalized()
-				var f2perp := Vector3(-sin(fa2), 0.0, cos(fa2)).normalized()
-				var f2len: float = flen * 0.45; var f2w: float = fw2 * 0.50
-				_add_quad(st, ftip + f2dir*f2len*0.5, f2perp*f2w, f2dir*f2len*0.5,  f2perp.cross(f2dir).normalized(), col_br2)
-				_add_quad(st, ftip + f2dir*f2len*0.5, f2perp*f2w, f2dir*f2len*0.5, -f2perp.cross(f2dir).normalized(), col_br2)
 	return s
 
-# ── Chùm quả vàng phát sáng (thay thế hoa cũ) ─────────────────────────────
 static func _draw_fruit_cluster(st: SurfaceTool, s: int, cur_x: float, cur_z: float, cur_y: float,
 		lean_x: float, lean_z: float, sw: float, lotus_lights: Array[Vector3]) -> int:
 	s = s * 16807 + 1
@@ -189,8 +149,7 @@ static func _draw_fruit_cluster(st: SurfaceTool, s: int, cur_x: float, cur_z: fl
 	var fa: float = lean_x + lean_z + fc1 * TAU
 	var base_pos := Vector3(cur_x, cur_y + _Data.VOXEL * 0.6, cur_z) + Vector3(cos(fa), 0, sin(fa)) * (sw + 0.05)
 
-	# Chùm 7~12 trái to hơn, màu vàng óng
-	var num_berries: int = 7 + (s & 3) + ((s >> 2) & 1) + ((s >> 3) & 1)
+	var num_berries: int = 3 + (s & 1) + ((s >> 2) & 1)
 	var col_fruit := Color(1.0, 0.82, 0.08, 1.0)
 	var col_fruit_dark := Color(0.80, 0.65, 0.05, 1.0)
 
@@ -209,7 +168,6 @@ static func _draw_fruit_cluster(st: SurfaceTool, s: int, cur_x: float, cur_z: fl
 		_add_quad(st, berry_pos, Vector3(berry_radius,0,0), Vector3(0,berry_radius,0), Vector3(0,0,1), col_berry)
 		_add_quad(st, berry_pos, Vector3(0,0,berry_radius), Vector3(0,berry_radius,0), Vector3(1,0,0), col_berry)
 
-	# Đăng ký ánh sáng phát quang
 	lotus_lights.append(Vector3(base_pos.x + 500.0, base_pos.y, base_pos.z))
 	return s
 

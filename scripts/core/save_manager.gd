@@ -70,7 +70,6 @@ func _collect_save_data() -> Dictionary:
 	var cm = scene.get_node_or_null("CharacterManager") as CharacterManager
 	if cm:
 		data["player"] = _collect_player_data(cm)
-		data["party"] = _collect_party_data(cm)
 	var wm = scene.get_node_or_null("WorldManager") as OpenWorldManager
 	if wm:
 		data["dimension"] = wm.dimension_id
@@ -110,18 +109,6 @@ func _collect_player_data(cm: CharacterManager) -> Dictionary:
 		pd["equipped_back"] = pc.equipped_back.id if pc.equipped_back else ""
 		pd["equipped_sub"] = pc.equipped_sub.id if pc.equipped_sub else ""
 	return pd
-
-func _collect_party_data(cm: CharacterManager) -> Array:
-	var result = []
-	var party = cm.get_party_characters()
-	for ch in party:
-		result.append({
-			"name": ch.character_name,
-			"hp": ch.hp, "max_hp": ch.max_hp,
-			"mana": ch.mana, "max_mana": ch.max_mana,
-			"level": ch.level, "exp": ch.exp
-		})
-	return result
 
 func _collect_block_data(wm: OpenWorldManager) -> Dictionary:
 	var dim_id = wm.dimension_id
@@ -171,8 +158,6 @@ func _apply_save_data(data: Dictionary) -> void:
 	var cm = scene.get_node_or_null("CharacterManager") as CharacterManager
 	if cm and data.has("player"):
 		_apply_player_data(cm, data["player"])
-	if cm and data.has("party"):
-		_apply_party_data(cm, data["party"])
 	if data.has("time"):
 		_apply_time_data(data["time"])
 	var es = scene.get_node_or_null("ExploreSystem") as ExploreSystem
@@ -237,20 +222,6 @@ func _apply_player_data(cm: CharacterManager, pd: Dictionary) -> void:
 		var wm = scene.get_node_or_null("WorldManager") as OpenWorldManager
 		if wm:
 			wm._last_pos = Vector3(99999, 99999, 99999)
-
-func _apply_party_data(cm: CharacterManager, party_data: Array) -> void:
-	var party = cm.get_party_characters()
-	for pd in party_data:
-		var name = pd.get("name", "")
-		for ch in party:
-			if ch.character_name == name:
-				ch.hp = pd.get("hp", ch.max_hp)
-				ch.max_hp = pd.get("max_hp", ch.max_hp)
-				ch.mana = pd.get("mana", ch.max_mana)
-				ch.max_mana = pd.get("max_mana", ch.max_mana)
-				ch.level = pd.get("level", 1)
-				ch.exp = pd.get("exp", 0)
-				break
 
 func _apply_time_data(td: Dictionary) -> void:
 	if not TimeSystem: return

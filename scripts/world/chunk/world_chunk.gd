@@ -35,6 +35,7 @@ var _terrain_mesh_instance: MeshInstance3D = null
 var _water_mesh_instance: MeshInstance3D = null
 var _aquatic_mesh_instance: MeshInstance3D = null
 var _sediment_mesh_instance: MeshInstance3D = null
+var _textured_block_mesh_instances: Dictionary[int, MeshInstance3D] = {}
 var _mesh_container: Node3D = null
 var _lotus_lights: Array[OmniLight3D] = []
 var _prop_queue: Array = []
@@ -89,7 +90,8 @@ func setup(cx: int, cz: int, size: int,
 		return
 
 	if sync:
-		apply_chunk(compute_chunk(cx, cz, size, dimension_id))
+		apply_chunk(compute_chunk(cx, cz, size, dimension_id, true))
+		call_deferred("_schedule_decorative_rebuild")
 		return
 
 	_pending_chunks[ck] = self
@@ -104,7 +106,7 @@ static func _thread_build(ck: String, cx: int, cz: int, size: int, dim_id: int) 
 		chunk.call_deferred("apply_chunk", data)
 
 ## ── compute_chunk: tạo block data + build mesh ───────────────────────────────
-static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionary:
+static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: bool = false) -> Dictionary:
 	var cols: int = int(size / _Data.VOXEL)
 	var world_ox: float = cx * size
 	var world_oz: float = cz * size
@@ -474,30 +476,29 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 
 	# ── 6b. Detail mesh — đường mòn, sỏi cát, hoạ tiết đất ──────────────────
 	var st_grass: SurfaceTool = null
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD and not fast_mode:
 		st_grass = SurfaceTool.new()
 		st_grass.begin(Mesh.PRIMITIVE_TRIANGLES)
-		for vx in range(cols):
-			for vz in range(cols):
-				var b: int  = biome_grid[vx][vz]
-				var h: float = height_grid[vx][vz]
-				var px: float = -half + (float(vx) + 0.5) * _Data.VOXEL
-				var pz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
-				var pos := Vector3(px, h, pz)
-				var is_road: bool = road_grid.size() > 0 and road_grid[vx * cols + vz] != 0
+	for vx in range(cols):
+		for vz in range(cols):
+			var b: int  = biome_grid[vx][vz]
+			var h: float = height_grid[vx][vz]
+			var px: float = -half + (float(vx) + 0.5) * _Data.VOXEL
+			var pz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
+			var pos := Vector3(px, h, pz)
+			var is_road: bool = road_grid.size() > 0 and road_grid[vx * cols + vz] != 0
 
-				if is_road and b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND:
-					_Detail.add_trail_detail(st, cx, cz, size, vx, vz, pos, 0.0)
+			if is_road and b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND:
+				_Detail.add_trail_detail(st, cx, cz, size, vx, vz, pos, 0.0)
 
-				# Sỏi xám trên cát vàng hồ — cát trắng biển không có sỏi
-				if b == _Data.TileType.SAND and h >= _Data.VOXEL * 0.9:
-					_Detail.add_sand_gravel(st, cx, cz, size, vx, vz, pos, 0.0)
+			if b == _Data.TileType.SAND and h >= _Data.VOXEL * 0.9:
+				_Detail.add_sand_gravel(st, cx, cz, size, vx, vz, pos, 0.0)
 
-				if b == _Data.TileType.DIRT:
-					_Detail.add_dirt_mounds(st, cx, cz, size, vx, vz, pos, 0.0)
+			if b == _Data.TileType.DIRT:
+				_Detail.add_dirt_mounds(st, cx, cz, size, vx, vz, pos, 0.0)
 
-				if (b == _Data.TileType.GRASS or b == _Data.TileType.DARK_GRASS) and not is_road and h >= _Data.VOXEL * 0.9:
-					_Grass.add_grass_cluster(st_grass, cx, cz, size, vx, vz, pos, 0.0)
+			if not fast_mode and st_grass and (b == _Data.TileType.GRASS or b == _Data.TileType.DARK_GRASS) and not is_road and h >= _Data.VOXEL * 0.9:
+				_Grass.add_grass_cluster(st_grass, cx, cz, size, vx, vz, pos, 0.0)
 	var mesh := st.commit()
 	var grass_mesh: ArrayMesh = st_grass.commit() if st_grass else null
 	if mesh == null:
@@ -587,7 +588,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 
 	# ── 9. Lamp positions ──────────────────────────────────────────────────────
 	var lamp_positions: Array = []
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+	if not fast_mode and dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		lamp_positions = _compute_lamp_positions_static(cx, cz, size, biome_grid, height_grid, cols)
 
 	return {
@@ -595,7 +596,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int) -> Dictionar
 		"grass_mesh": grass_mesh,
 		"lotus_lights": lotus_lights, "biome_grid": biome_grid, "cols": cols,
 		"block_data_bytes": bd.to_bytes(), "lamp_positions": lamp_positions,
-		"sediment_mesh": _build_sediment_mesh(bd, cols),
+		"sediment_mesh": (null if fast_mode else _build_sediment_mesh(bd, cols)),
+		"textured_block_meshes": ({} if fast_mode else _build_textured_block_meshes(bd, cols)),
 		"plant_props": plant_props
 	}
 
@@ -610,13 +612,60 @@ static func _add_quad_uv(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector
 	st.set_uv(Vector2(1, 1)); st.add_vertex(center + u + v)
 	st.set_uv(Vector2(0, 1)); st.add_vertex(center - u + v)
 
-## ── _get_sediment_material: tạo 8x8 texture procedural kiểu Minecraft ──────
-static var _sediment_mat: Material = null
-static func _get_sediment_material() -> Material:
-	if _sediment_mat != null:
-		return _sediment_mat
+## ── _get_textured_block_material: tạo 8x8 texture procedural theo block ────
+static var _textured_block_mats: Dictionary[int, Material] = {}
+static func _get_textured_block_material(block_id: int) -> Material:
+	if _textured_block_mats.has(block_id):
+		return _textured_block_mats[block_id]
+	var base: Color
+	var speck_dark: Color
+	var speck_light: Color
+	var is_ore: bool = false
+	match block_id:
+		_Data.BlockID.SEDIMENT:
+			base = Color(0.50, 0.20, 0.10)
+			speck_dark = Color(0.55, 0.18, 0.08)
+			speck_light = Color(0.65, 0.30, 0.12)
+		_Data.BlockID.COPPER_ORE:
+			is_ore = true
+			base = Color(0.38, 0.35, 0.32)
+			speck_dark = Color(0.30, 0.28, 0.25)
+			speck_light = Color(0.80, 0.55, 0.25)
+		_Data.BlockID.BAUXITE_ORE:
+			is_ore = true
+			base = Color(0.38, 0.35, 0.32)
+			speck_dark = Color(0.30, 0.28, 0.25)
+			speck_light = Color(0.70, 0.70, 0.72)
+		_Data.BlockID.SILVER_ORE:
+			is_ore = true
+			base = Color(0.38, 0.38, 0.40)
+			speck_dark = Color(0.30, 0.30, 0.32)
+			speck_light = Color(0.85, 0.85, 0.92)
+		_Data.BlockID.IRON_ORE:
+			is_ore = true
+			base = Color(0.36, 0.33, 0.28)
+			speck_dark = Color(0.28, 0.25, 0.20)
+			speck_light = Color(0.55, 0.50, 0.45)
+		_Data.BlockID.GOLD_ORE:
+			is_ore = true
+			base = Color(0.38, 0.35, 0.30)
+			speck_dark = Color(0.30, 0.28, 0.22)
+			speck_light = Color(0.95, 0.80, 0.30)
+		_Data.BlockID.TITAN_ORE:
+			is_ore = true
+			base = Color(0.36, 0.34, 0.38)
+			speck_dark = Color(0.28, 0.26, 0.30)
+			speck_light = Color(0.65, 0.55, 0.80)
+		_Data.BlockID.PLATINUM_ORE:
+			is_ore = true
+			base = Color(0.38, 0.36, 0.38)
+			speck_dark = Color(0.30, 0.28, 0.30)
+			speck_light = Color(0.80, 0.85, 0.95)
+		_:
+			base = Color(0.50, 0.50, 0.50)
+			speck_dark = Color(0.30, 0.30, 0.30)
+			speck_light = Color(0.70, 0.70, 0.70)
 	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
-	var base := Color(0.50, 0.20, 0.10)
 	for y in range(8):
 		for x in range(8):
 			var h: int = x * 374761393 + y * 668265263 + 12345
@@ -624,29 +673,46 @@ static func _get_sediment_material() -> Material:
 			h = h ^ (h >> 16)
 			var r := float(h & 0x7FFFFFFF) / 2147483648.0
 			var c := Color(
-				base.r + (r - 0.5) * 0.25,
+				base.r + (r - 0.5) * 0.20,
 				base.g + (r - 0.5) * 0.15,
-				base.b + (r - 0.5) * 0.10
+				base.b + (r - 0.5) * 0.12
 			)
-			# Thêm hạt khoáng đỏ đồng và nâu đất xen kẽ
 			h = h * 16807 + 1
 			var speck := float(h & 0x7FFFFFFF) / 2147483648.0
-			if speck > 0.92:
-				c = Color(0.55, 0.18, 0.08)  # hạt nâu đậm
-			elif speck < 0.06:
-				c = Color(0.65, 0.30, 0.12)  # hạt đỏ đồng sáng
+			if is_ore:
+				if speck > 0.82:
+					c = speck_dark
+				elif speck < 0.15:
+					c = speck_light
+			else:
+				if speck > 0.92:
+					c = speck_dark
+				elif speck < 0.06:
+					c = speck_light
 			img.set_pixel(x, y, c)
 	var tex := ImageTexture.create_from_image(img)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_texture = tex
 	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	mat.roughness = 0.9
-	mat.metallic_specular = 0.0
-	_sediment_mat = mat
+	if is_ore:
+		mat.roughness = 0.65
+		mat.metallic_specular = 0.15
+		mat.emission_enabled = true
+		mat.emission_texture = tex
+		mat.emission_energy_multiplier = 0.25
+	else:
+		mat.roughness = 0.9
+		mat.metallic_specular = 0.0
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	mat.render_priority = 1
+	_textured_block_mats[block_id] = mat
 	return mat
 
-## ── _build_sediment_mesh: tách SEDIMENT ra mesh riêng có UV ─────────────────
-static func _build_sediment_mesh(bd: _BlockData, cols: int) -> ArrayMesh:
+static func _get_sediment_material() -> Material:
+	return _get_textured_block_material(_Data.BlockID.SEDIMENT)
+
+## ── _build_textured_block_mesh: mesh có UV cho block có texture ─────────────
+static func _build_textured_block_mesh(bd: _BlockData, cols: int, target_block_id: int) -> ArrayMesh:
 	const Y_MIN := _BlockData.Y_MIN
 	const CHUNK_H := _BlockData.CHUNK_H
 	const SLAB := _BlockData.SLAB_HEIGHT
@@ -654,14 +720,13 @@ static func _build_sediment_mesh(bd: _BlockData, cols: int) -> ArrayMesh:
 	var hw: float = _Data.VOXEL * 0.5
 	var half: float = float(cols) * _Data.VOXEL * 0.5
 
-	# Tìm top layer SEDIMENT cho mỗi column
 	var top_ly := PackedInt32Array()
 	top_ly.resize(cols * cols)
 	top_ly.fill(-1)
 	for x in range(cols):
 		for z in range(cols):
 			for ly in range(CHUNK_H - 1, -1, -1):
-				if bd.get_block(x, ly, z) == B.SEDIMENT:
+				if bd.get_block(x, ly, z) == target_block_id:
 					top_ly[x * cols + z] = ly
 					break
 
@@ -677,18 +742,15 @@ static func _build_sediment_mesh(bd: _BlockData, cols: int) -> ArrayMesh:
 			var cy_top: float = float(ly + Y_MIN) * SLAB + SLAB
 			var cy_bot: float = float(ly + Y_MIN) * SLAB
 
-			# Top face (offset 0.005 để overlay lên main mesh tránh z-fighting)
-			_add_quad_uv(st, Vector3(cx_f, cy_top + 0.005, cz_f),
+			_add_quad_uv(st, Vector3(cx_f, cy_top + 0.01, cz_f),
 				Vector3(hw, 0, 0), Vector3(0, 0, hw), Vector3(0, 1, 0))
 
-			# Bottom face (chỉ render nếu block bên dưới là AIR/WATER)
 			if ly > 0:
 				var below: int = bd.get_block(x, ly - 1, z)
 				if below == B.AIR or below == B.WATER:
 					_add_quad_uv(st, Vector3(cx_f, cy_bot, cz_f),
 						Vector3(-hw, 0, 0), Vector3(0, 0, hw), Vector3(0, -1, 0))
 
-			# Side faces — render khi kế bên không có SEDIMENT hoặc thấp hơn
 			var checks: Array = [
 				[z > 0, x, z - 1, Vector3(0, 0, -1), Vector3(0, 0, -hw)],
 				[z < cols - 1, x, z + 1, Vector3(0, 0, 1), Vector3(0, 0, hw)],
@@ -706,10 +768,45 @@ static func _build_sediment_mesh(bd: _BlockData, cols: int) -> ArrayMesh:
 				if side_h <= 0: continue
 				var cy_mid: float = cy_top - side_h * 0.5
 				var side_u: Vector3 = Vector3(hw, 0, 0) if abs(off.x) < 0.01 else Vector3(0, 0, hw)
-				_add_quad_uv(st, Vector3(cx_f + off.x * 0.5, cy_mid, cz_f + off.z * 0.5),
+				_add_quad_uv(st, Vector3(cx_f + off.x + nrm.x * 0.01, cy_mid, cz_f + off.z + nrm.z * 0.01),
 					side_u, Vector3(0, side_h * 0.5, 0), nrm)
 
 	return st.commit()
+
+static func _build_sediment_mesh(bd: _BlockData, cols: int) -> ArrayMesh:
+	return _build_textured_block_mesh(bd, cols, _Data.BlockID.SEDIMENT)
+
+const _TEXTURED_BLOCK_IDS: Array[int] = [
+	_Data.BlockID.COPPER_ORE,
+	_Data.BlockID.BAUXITE_ORE,
+	_Data.BlockID.SILVER_ORE,
+	_Data.BlockID.IRON_ORE,
+	_Data.BlockID.GOLD_ORE,
+	_Data.BlockID.TITAN_ORE,
+	_Data.BlockID.PLATINUM_ORE,
+]
+
+static func _build_textured_block_meshes(bd: _BlockData, cols: int) -> Dictionary[int, ArrayMesh]:
+	const CHUNK_H := _BlockData.CHUNK_H
+	# Pre-scan 1 pass: tìm ore type nào thực sự có block
+	var found: Dictionary = {}
+	for bid in _TEXTURED_BLOCK_IDS:
+		found[bid] = false
+	for x in range(cols):
+		for z in range(cols):
+			for ly in range(CHUNK_H - 1, -1, -1):
+				var blk := bd.get_block(x, ly, z)
+				if found.has(blk) and not found[blk]:
+					found[blk] = true
+	# Build mesh chỉ cho type có block
+	var result: Dictionary[int, ArrayMesh] = {}
+	for bid in _TEXTURED_BLOCK_IDS:
+		if not found[bid]:
+			continue
+		var m := _build_textured_block_mesh(bd, cols, bid)
+		if m and m.get_surface_count() > 0:
+			result[bid] = m
+	return result
 
 ## ── _fill_blocks: map biome/height → slab block IDs ─────────────────────────
 ## BEDROCK LAYER: Layer 0 (Y_MIN) luôn là BEDROCK (không thể phá vỡ)
@@ -1047,6 +1144,7 @@ func apply_chunk(data: Dictionary) -> void:
 	_water_mesh_instance = null
 	_aquatic_mesh_instance = null
 	_sediment_mesh_instance = null
+	_textured_block_mesh_instances.clear()
 	for light in _lotus_lights:
 		LotusLightManager.unregister(light)
 	_lotus_lights.clear()
@@ -1084,6 +1182,17 @@ func apply_chunk(data: Dictionary) -> void:
 		mi_s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		container.add_child(mi_s)
 		_sediment_mesh_instance = mi_s
+
+	var textured_block_meshes: Dictionary = data.get("textured_block_meshes", {})
+	for bid in textured_block_meshes:
+		var ore_mesh: ArrayMesh = textured_block_meshes[bid] as ArrayMesh
+		if ore_mesh:
+			var mi_o := MeshInstance3D.new()
+			mi_o.mesh = ore_mesh
+			mi_o.material_override = _get_textured_block_material(bid)
+			mi_o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			container.add_child(mi_o)
+			_textured_block_mesh_instances[bid] = mi_o
 
 	var grass_mesh: ArrayMesh = data.get("grass_mesh")
 	if grass_mesh:
@@ -1186,6 +1295,77 @@ func _apply_collision(shape: Shape3D) -> void:
 	body.add_child(col)
 	add_child(body)
 
+## ── Decorative rebuild (async) for elements skipped in fast_mode ──────────
+func _schedule_decorative_rebuild() -> void:
+	if block_data == null or _biome_grid.is_empty():
+		return
+	var ck: String = _cache_key(_cx, _cz, _dimension_id)
+	_pending_chunks[ck] = self
+	WorkerThreadPool.add_task(
+		_thread_rebuild_decorative.bind(ck, _cx, _cz, _size, _dimension_id),
+		true, "decorative")
+
+static func _thread_rebuild_decorative(ck: String, cx: int, cz: int, size: int, dim_id: int) -> void:
+	var data: Dictionary = compute_chunk(cx, cz, size, dim_id)
+	var chunk = _pending_chunks.get(ck)
+	_pending_chunks.erase(ck)
+	if chunk == null or not is_instance_valid(chunk) or not chunk.is_inside_tree():
+		return
+	chunk.call_deferred("apply_decorative", {
+		"grass_mesh": data.get("grass_mesh"),
+		"sediment_mesh": data.get("sediment_mesh"),
+		"textured_block_meshes": data.get("textured_block_meshes", {}),
+		"lamp_positions": data.get("lamp_positions", [])
+	})
+
+func apply_decorative(data: Dictionary) -> void:
+	if not is_inside_tree():
+		return
+	var container := _mesh_container
+	if container == null:
+		container = Node3D.new()
+		add_child(container)
+		_mesh_container = container
+
+	var grass_mesh := data.get("grass_mesh") as ArrayMesh
+	if grass_mesh:
+		var mi_g := MeshInstance3D.new()
+		mi_g.mesh = grass_mesh
+		if not _mat_cache[_dimension_id].has("grass"):
+			var gmat := StandardMaterial3D.new()
+			gmat.vertex_color_use_as_albedo = true
+			gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			_mat_cache[_dimension_id]["grass"] = gmat
+		mi_g.material_override = _mat_cache[_dimension_id]["grass"]
+		mi_g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		container.add_child(mi_g)
+
+	var sediment_mesh := data.get("sediment_mesh") as ArrayMesh
+	if sediment_mesh:
+		if _sediment_mesh_instance != null and is_instance_valid(_sediment_mesh_instance):
+			_sediment_mesh_instance.queue_free()
+		var mi_s := MeshInstance3D.new()
+		mi_s.mesh = sediment_mesh
+		mi_s.material_override = _get_sediment_material()
+		mi_s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		container.add_child(mi_s)
+		_sediment_mesh_instance = mi_s
+
+	var ore_meshes: Dictionary = data.get("textured_block_meshes", {})
+	for bid in ore_meshes:
+		var ore_mesh := ore_meshes[bid] as ArrayMesh
+		if ore_mesh and not _textured_block_mesh_instances.has(bid):
+			var mi_o := MeshInstance3D.new()
+			mi_o.mesh = ore_mesh
+			mi_o.material_override = _get_textured_block_material(bid)
+			mi_o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			container.add_child(mi_o)
+			_textured_block_mesh_instances[bid] = mi_o
+
+	var lamp_positions: Array = data.get("lamp_positions", [])
+	if not lamp_positions.is_empty() and _dimension_id == _Data._Dim.DimensionID.REAL_WORLD:
+		_lamp_spawn_coroutine(lamp_positions)
+
 ## ── rebuild_mesh: gọi khi block thay đổi (mine/place) ────────────────────────
 ## Chỉ thay thế terrain mesh + collision, không đụng mesh khác (cỏ, nước, ...)
 func rebuild_mesh() -> void:
@@ -1200,6 +1380,13 @@ func rebuild_mesh() -> void:
 	if _terrain_mesh_instance != null and is_instance_valid(_terrain_mesh_instance):
 		_terrain_mesh_instance.queue_free()
 		_terrain_mesh_instance = null
+
+	# Xóa overlay mesh instances cũ (ore blocks) — nay đã bake vào terrain mesh
+	for bid in _textured_block_mesh_instances:
+		var old := _textured_block_mesh_instances[bid]
+		if is_instance_valid(old):
+			old.queue_free()
+	_textured_block_mesh_instances.clear()
 
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -1221,6 +1408,21 @@ func rebuild_mesh() -> void:
 	col.shape = mesh.create_trimesh_shape()
 	body.add_child(col)
 	add_child(body)
+
+	# Rebuild textured block (ore) overlay meshes
+	var ore_meshes := _build_textured_block_meshes(block_data, _cols)
+	for bid in ore_meshes:
+		var ore_mesh: ArrayMesh = ore_meshes[bid]
+		if ore_mesh:
+			var mi_o := MeshInstance3D.new()
+			mi_o.mesh = ore_mesh
+			mi_o.material_override = _get_textured_block_material(bid)
+			mi_o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if _mesh_container != null:
+				_mesh_container.add_child(mi_o)
+			else:
+				add_child(mi_o)
+			_textured_block_mesh_instances[bid] = mi_o
 
 	block_data.dirty = false
 

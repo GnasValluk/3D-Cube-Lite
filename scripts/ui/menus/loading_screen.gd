@@ -1,21 +1,8 @@
 extends CanvasLayer
 class_name LoadingScreen
 
-const BG_DEEP := Color(0.06, 0.04, 0.12)
-const BG_PANEL := Color(0.10, 0.07, 0.18)
-const BG_CARD := Color(0.14, 0.10, 0.22)
-const PURPLE := Color(0.55, 0.35, 0.90)
-const TEAL := Color(0.15, 0.72, 0.68)
-const PINK := Color(0.82, 0.28, 0.52)
-const ORANGE := Color(0.92, 0.52, 0.12)
-const CYAN := Color(0.15, 0.62, 0.92)
-const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
-const TEXT_MAIN := Color(0.82, 0.78, 0.95)
-const TEXT_DIM := Color(0.55, 0.50, 0.72)
-const TEXT_MUTED := Color(0.35, 0.32, 0.50)
-
 const MIN_DISPLAY_TIME: float = 2.0
-const FADE_IN_TIME: float = 0.7
+const FADE_IN_TIME: float = 1.0
 const FADE_OUT_TIME: float = 0.6
 
 var _progress: float = 0.0
@@ -25,19 +12,17 @@ var _started: bool = false
 var _entering: bool = true
 var _exiting: bool = false
 var _exit_progress: float = 0.0
+var _world_ready: bool = false
+var _world_instance: Node = null
 
+var _bg: ColorRect
 var _fade: ColorRect
-var _bar_bg: ColorRect
-var _bar_fill: ColorRect
-var _bar_container: Control
-var _title: Label
-var _sub: Label
-var _progress_lbl: Label
-var _bar_width: float
-var _bar_height: float = 26.0
-var _pulse: float = 0.0
+var _spinner: ColorRect
+var _world_info: Label
+var _spinner_container: Control
 
 func _ready() -> void:
+	layer = 100
 	_build()
 
 func _notification(what: int) -> void:
@@ -45,12 +30,16 @@ func _notification(what: int) -> void:
 		_refresh_texts()
 
 func _refresh_texts() -> void:
-	if not _sub: return
+	if not _world_info: return
+	_update_world_info()
+
+func _update_world_info() -> void:
+	var info: String = ""
 	if WorldSeed.world_name.length() > 0:
-		_sub.text = WorldSeed.world_name + "   |   " + tr("SEED").replace("%d", str(WorldSeed.seed_value))
+		info = WorldSeed.world_name + "  |  " + tr("SEED").replace("%d", str(WorldSeed.seed_value))
 	else:
-		_sub.text = tr("SEED").replace("%d", str(WorldSeed.seed_value))
-	_progress_lbl.text = tr("LOADING_TEXT")
+		info = tr("SEED").replace("%d", str(WorldSeed.seed_value))
+	_world_info.text = info
 
 func _load_translations() -> void:
 	var path: String = "res://translations/game.csv"
@@ -77,71 +66,35 @@ func _load_translations() -> void:
 
 func _build() -> void:
 	var vp := get_viewport().get_visible_rect().size
-	_bar_width = min(vp.x * 0.6, 560.0)
 
-	var bg := ColorRect.new()
-	bg.color = BG_DEEP
-	bg.size = vp
-	add_child(bg)
+	_bg = ColorRect.new()
+	_bg.color = Color(0, 0, 0, 1.0)
+	_bg.size = vp
+	add_child(_bg)
 
-	var grid := ColorRect.new()
-	grid.color = Color(BG_CARD.r, BG_CARD.g, BG_CARD.b, 0.4)
-	grid.size = vp
-	grid.material = _make_grid_mat(vp)
-	add_child(grid)
+	var margin: float = 24.0
+	var spinner_size: float = 28.0
 
-	_title = Label.new()
-	_title.text = "Tila'Adventure"
-	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_title.add_theme_font_size_override("font_size", 80)
-	_title.add_theme_color_override("font_color", Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.95))
-	_title.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.6))
-	_title.add_theme_constant_override("shadow_offset_x", 3)
-	_title.add_theme_constant_override("shadow_offset_y", 3)
-	_title.position = Vector2(0, vp.y * 0.5 - 120)
-	_title.size = Vector2(vp.x, 80)
-	add_child(_title)
+	_spinner_container = Control.new()
+	_spinner_container.position = Vector2(vp.x - 180 - margin, vp.y - 80 - margin)
+	_spinner_container.size = Vector2(180, 80)
+	add_child(_spinner_container)
 
-	_sub = Label.new()
-	if WorldSeed.world_name.length() > 0:
-		_sub.text = WorldSeed.world_name + "   |   " + tr("SEED").replace("%d", str(WorldSeed.seed_value))
-	else:
-		_sub.text = tr("SEED").replace("%d", str(WorldSeed.seed_value))
-	_sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_sub.add_theme_font_size_override("font_size", 22)
-	_sub.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.6))
-	_sub.add_theme_constant_override("shadow_offset_x", 1)
-	_sub.add_theme_constant_override("shadow_offset_y", 1)
-	_sub.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-	_sub.position = Vector2(0, vp.y * 0.5 - 50)
-	_sub.size = Vector2(vp.x, 30)
-	add_child(_sub)
+	_spinner = ColorRect.new()
+	_spinner.color = Color(0.22, 0.62, 0.28, 0.85)
+	_spinner.size = Vector2(spinner_size, spinner_size)
+	_spinner.position = Vector2(0, 80 - spinner_size)
+	_spinner_container.add_child(_spinner)
 
-	_bar_container = Control.new()
-	_bar_container.position = Vector2((vp.x - _bar_width) * 0.5, vp.y * 0.5 + 20)
-	_bar_container.size = Vector2(_bar_width, _bar_height)
-	add_child(_bar_container)
-
-	_bar_bg = ColorRect.new()
-	_bar_bg.color = Color(BG_CARD.r, BG_CARD.g, BG_CARD.b, 0.9)
-	_bar_bg.size = Vector2(_bar_width, _bar_height)
-	_bar_bg.position = Vector2.ZERO
-	_bar_container.add_child(_bar_bg)
-
-	_bar_fill = ColorRect.new()
-	_bar_fill.color = Color(TEAL.r, TEAL.g, TEAL.b, 0.85)
-	_bar_fill.size = Vector2(0, _bar_height - 4)
-	_bar_fill.position = Vector2(2, 2)
-	_bar_container.add_child(_bar_fill)
-
-	_progress_lbl = Label.new()
-	_progress_lbl.text = tr("LOADING_TEXT")
-	_progress_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_progress_lbl.add_theme_font_size_override("font_size", 18)
-	_progress_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
-	_progress_lbl.position = Vector2(0, _bar_container.position.y + _bar_height + 8)
-	_progress_lbl.size = Vector2(vp.x, 24)
-	add_child(_progress_lbl)
+	_world_info = Label.new()
+	_update_world_info()
+	_world_info.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_world_info.add_theme_font_size_override("font_size", 16)
+	_world_info.add_theme_color_override("font_color", Color(0.55, 0.50, 0.72, 0.5))
+	_world_info.position = Vector2(0, 0)
+	_world_info.size = Vector2(180, 60)
+	_world_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_spinner_container.add_child(_world_info)
 
 	_fade = ColorRect.new()
 	_fade.color = Color(0.0, 0.0, 0.0, 1.0)
@@ -149,56 +102,35 @@ func _build() -> void:
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_fade)
 
-func _make_grid_mat(vp: Vector2) -> Material:
-	var m := ShaderMaterial.new()
-	m.shader = _grid_shader()
-	m.set_shader_parameter("vp", vp)
-	return m
-
-static func _grid_shader() -> Shader:
-	var s := Shader.new()
-	s.code = """
-shader_type canvas_item;
-uniform vec2 vp;
-void fragment() {
-	vec2 uv = FRAGCOORD.xy / vp;
-	vec2 g = fract(uv * 30.0);
-	float l = min(g.x, g.y);
-	float a = smoothstep(0.04, 0.02, l) * 0.15;
-	COLOR = vec4(0.35, 0.25, 0.65, a);
-}
-"""
-	return s
-
 func _process(delta: float) -> void:
 	_elapsed += delta
-	_pulse += delta
 
 	if _entering:
 		var t: float = min(_elapsed / FADE_IN_TIME, 1.0)
 		var ease := 1.0 - pow(1.0 - t, 3.0)
 		_fade.color.a = 1.0 - ease
-		var y_offset: float = (1.0 - ease) * 40.0
-		_title.position.y = (get_viewport().get_visible_rect().size.y * 0.5 - 120) - y_offset
-		_sub.modulate.a = ease * 0.6
-		_bar_container.modulate.a = max(0.0, (t - 0.3) / 0.7)
+		_spinner_container.modulate.a = ease
 		if t >= 1.0:
 			_entering = false
 		return
 
 	if _exiting:
+		if _exit_progress == 0.0:
+			_world_instance.visible = true
+			_bg.visible = false
+			_fade.color.a = 1.0
 		_exit_progress += delta
 		var t: float = min(_exit_progress / FADE_OUT_TIME, 1.0)
 		var ease := t * t
-		_fade.color.a = ease
+		_fade.color.a = 1.0 - ease
 		if t >= 1.0:
-			var res := ResourceLoader.load_threaded_get(WorldSeed.target_scene)
-			get_tree().change_scene_to_packed(res)
+			_finish_transition()
 		return
 
 	if not _started:
 		_started = true
 		ResourceLoader.load_threaded_request(WorldSeed.target_scene)
+		return
 
 	if not _done:
 		var st: Array = []
@@ -206,23 +138,48 @@ func _process(delta: float) -> void:
 		if ret == ResourceLoader.THREAD_LOAD_LOADED:
 			_done = true
 			_progress = 1.0
+			_start_world()
 		elif st.size() > 0:
 			_progress = st[0] as float
 
-	var pulse_wave := sin(_pulse * 3.0) * 0.03
-	var fill_w: float = max(0.0, _bar_width - 4.0) * _progress
-	_bar_fill.size.x = fill_w
-
-	var base_color := TEAL
-	var bright := 0.85 + pulse_wave * 2.0
-	_bar_fill.color = Color(base_color.r * bright, base_color.g * bright, base_color.b * bright, 0.85)
-
-	_title.add_theme_color_override("font_color", Color(
-		PURPLE.r + pulse_wave * 0.2, PURPLE.g + pulse_wave * 0.15, PURPLE.b + pulse_wave * 0.1, 0.95))
-
-	if _done:
-		_progress_lbl.text = tr("READY_TEXT")
+	if _done and _world_ready:
 		if _elapsed >= MIN_DISPLAY_TIME:
 			_exiting = true
 			_exit_progress = 0.0
 			_fade.color.a = 0.0
+
+	# Rotate spinner
+	_spinner.rotation_degrees += delta * 360.0 * 0.6
+
+func _start_world() -> void:
+	var packed: PackedScene = ResourceLoader.load_threaded_get(WorldSeed.target_scene)
+	_world_instance = packed.instantiate()
+	_world_instance.visible = false
+	get_tree().root.add_child(_world_instance)
+
+	# Find the world manager and wait for initial chunks
+	var mgr := _find_world_manager(_world_instance)
+	if mgr:
+		if mgr.get("_loading_ready"):
+			_world_ready = true
+		else:
+			mgr.initial_chunks_ready.connect(_on_world_ready)
+	else:
+		_world_ready = true
+
+func _find_world_manager(node: Node) -> Node:
+	if node.has_signal("initial_chunks_ready"):
+		return node
+	for c in node.get_children():
+		var found = _find_world_manager(c)
+		if found:
+			return found
+	return null
+
+func _on_world_ready() -> void:
+	_world_ready = true
+
+func _finish_transition() -> void:
+	if _world_instance:
+		get_tree().current_scene = _world_instance
+	queue_free()
