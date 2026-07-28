@@ -288,6 +288,46 @@ func _build_graphics_tab() -> void:
 	_add_toggle(tr("FULLSCREEN"), _is_fullscreen(), func(v): _set_fullscreen(v))
 	_add_toggle(tr("VSYNC"), _is_vsync(), func(v): _set_vsync(v))
 
+	_section_label(tr("FRAMERATE"))
+	var cur_fps: int = SettingsManager.framerate_limit if SettingsManager else 0
+	var fps_data: Array[Dictionary] = [
+		{ "label": "60", "mode": 0, "col": Color(TEAL.r, TEAL.g, TEAL.b, 0.75) },
+		{ "label": "120", "mode": 1, "col": Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.75) },
+		{ "label": tr("FPS_UNLIMITED"), "mode": 2, "col": Color(ORANGE.r, ORANGE.g, ORANGE.b, 0.75) },
+	]
+	var fps_hbox := HBoxContainer.new()
+	fps_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(fps_hbox)
+	for i in range(3):
+		var d: Dictionary = fps_data[i]
+		var btn := Button.new()
+		btn.text = d["label"]
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		btn.add_theme_font_size_override("font_size", 20)
+		btn.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.90))
+		var sty := StyleBoxFlat.new()
+		if cur_fps == d["mode"]:
+			sty.bg_color = d["col"]
+			sty.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.45)
+		else:
+			sty.bg_color = Color(d["col"].r * 0.35, d["col"].g * 0.35, d["col"].b * 0.35, 0.55)
+			sty.border_color = Color(0.35, 0.28, 0.50, 0.25)
+		sty.corner_radius_top_left = 6; sty.corner_radius_top_right = 6
+		sty.corner_radius_bottom_left = 6; sty.corner_radius_bottom_right = 6
+		sty.border_width_left = 2; sty.border_width_right = 2
+		sty.border_width_top = 2; sty.border_width_bottom = 2
+		btn.add_theme_stylebox_override("normal", sty)
+		var sty_h := sty.duplicate()
+		sty_h.bg_color = d["col"]
+		sty_h.border_color = Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.55)
+		btn.add_theme_stylebox_override("hover", sty_h)
+		var mode_val: int = d["mode"]
+		btn.pressed.connect(func():
+			_set_framerate(mode_val)
+			_show_tab(Tab.GRAPHICS)
+		)
+		fps_hbox.add_child(btn)
+
 func _build_audio_tab() -> void:
 	_section_label(tr("MASTER_VOLUME"))
 	_add_slider(_get_master_volume(), func(v): _set_master_volume(v))
@@ -415,6 +455,14 @@ func _is_vsync() -> bool:
 func _set_vsync(v: bool) -> void:
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if v else DisplayServer.VSYNC_DISABLED)
 	SettingsManager.vsync = v
+	SettingsData.save_settings()
+
+func _set_framerate(mode: int) -> void:
+	SettingsManager.framerate_limit = mode
+	match mode:
+		0: Engine.max_fps = 60
+		1: Engine.max_fps = 120
+		2: Engine.max_fps = 0
 	SettingsData.save_settings()
 
 func _get_master_volume() -> float:

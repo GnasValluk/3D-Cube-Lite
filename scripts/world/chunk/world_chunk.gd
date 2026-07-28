@@ -10,6 +10,7 @@ const _Grass = preload("chunk_grass.gd")
 const _Aquatic = preload("chunk_aquatic.gd")
 const _BlockData = preload("chunk_block_data.gd")
 const _WoodLamp = preload("res://scripts/world/props/wood_lamp.gd")
+const _PalmProp = preload("res://scripts/world/props/palm_prop.gd")
 
 ## Khoảng cách giữa 2 đèn đường dọc theo curve (world units) — thưa
 const LAMP_SPACING: float = 28.0
@@ -475,10 +476,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	_build_terrain_mesh(st, bd, cols, dim_id)
 
 	# ── 6b. Detail mesh — đường mòn, sỏi cát, hoạ tiết đất ──────────────────
-	var st_grass: SurfaceTool = null
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD and not fast_mode:
-		st_grass = SurfaceTool.new()
-		st_grass.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var grass_xforms: Array = []
+	var grass_colors: Array = []
 	for vx in range(cols):
 		for vz in range(cols):
 			var b: int  = biome_grid[vx][vz]
@@ -497,10 +496,9 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 			if b == _Data.TileType.DIRT:
 				_Detail.add_dirt_mounds(st, cx, cz, size, vx, vz, pos, 0.0)
 
-			if not fast_mode and st_grass and (b == _Data.TileType.GRASS or b == _Data.TileType.DARK_GRASS) and not is_road and h >= _Data.VOXEL * 0.9:
-				_Grass.add_grass_cluster(st_grass, cx, cz, size, vx, vz, pos, 0.0)
+			if not fast_mode and (b == _Data.TileType.GRASS or b == _Data.TileType.DARK_GRASS) and not is_road and h >= _Data.VOXEL * 0.9:
+				_Grass.add_voxel_grass(vx, vz, pos, grass_xforms, grass_colors)
 	var mesh := st.commit()
-	var grass_mesh: ArrayMesh = st_grass.commit() if st_grass else null
 	if mesh == null:
 		return { "mesh": null, "water_mesh": null, "biome_grid": biome_grid,
 				"cols": cols, "block_data_bytes": bd.to_bytes() }
@@ -577,7 +575,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				var h: float = height_grid[vx][vz]
 				# Chỉ SAND/SILT dưới mặt nước — biển (OCEAN_DEEP) không có rong
 				if b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND: continue
-				if h >= _Data.WATER_Y: continue
+				if h > _Data.WATER_Y: continue
 				var px2: float = -half + (float(vx) + 0.5) * _Data.VOXEL
 				var pz2: float = -half + (float(vz) + 0.5) * _Data.VOXEL
 				var pos2 := Vector3(px2, h, pz2)
@@ -586,6 +584,35 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					b == _Data.TileType.SILT, b, lotus_lights, plant_props, is_river)
 		mesh_aquatic = st_aq.commit()
 
+	# ── 8b. Palm trees — on GRASS/DARK_GRASS land, ≥2 cells from water ─────
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				if biome_grid[vx][vz] != _Data.TileType.GRASS and biome_grid[vx][vz] != _Data.TileType.DARK_GRASS:
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				var near_close := false
+				var near_far := false
+				for dx in range(-3, 4):
+					for dz in range(-3, 4):
+						var nx := vx + dx; var nz := vz + dz
+						if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
+							continue
+						if height_grid[nx][nz] <= _Data.WATER_Y:
+							var dist: int = maxi(abs(dx), abs(dz))
+							if dist <= 1:
+								near_close = true
+							elif dist <= 3:
+								near_far = true
+				if near_far and not near_close and randf() < 0.008:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					# Sink slightly into terrain, but never below water surface
+					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "palm", "pos": Vector3(px, y, pz), "variant": "river"})
+
 	# ── 9. Lamp positions ──────────────────────────────────────────────────────
 	var lamp_positions: Array = []
 	if not fast_mode and dim_id == _Data._Dim.DimensionID.REAL_WORLD:
@@ -593,7 +620,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 
 	return {
 		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
-		"grass_mesh": grass_mesh,
+		"grass_blade_data": { "xforms": grass_xforms, "colors": grass_colors },
 		"lotus_lights": lotus_lights, "biome_grid": biome_grid, "cols": cols,
 		"block_data_bytes": bd.to_bytes(), "lamp_positions": lamp_positions,
 		"sediment_mesh": (null if fast_mode else _build_sediment_mesh(bd, cols)),
@@ -1194,18 +1221,28 @@ func apply_chunk(data: Dictionary) -> void:
 			container.add_child(mi_o)
 			_textured_block_mesh_instances[bid] = mi_o
 
-	var grass_mesh: ArrayMesh = data.get("grass_mesh")
-	if grass_mesh:
-		var mi_g := MeshInstance3D.new()
-		mi_g.mesh = grass_mesh
-		if not _mat_cache[_dimension_id].has("grass"):
-			var gmat := StandardMaterial3D.new()
-			gmat.vertex_color_use_as_albedo = true
-			gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			_mat_cache[_dimension_id]["grass"] = gmat
-		mi_g.material_override = _mat_cache[_dimension_id]["grass"]
-		mi_g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		container.add_child(mi_g)
+	var gbd: Dictionary = data.get("grass_blade_data", {})
+	var gxforms: Array = gbd.get("xforms", [])
+	var gcolors: Array = gbd.get("colors", [])
+	if gxforms.size() > 0:
+		var cube := BoxMesh.new()
+		cube.size = Vector3.ONE
+		var mat := StandardMaterial3D.new()
+		mat.vertex_color_use_as_albedo = true
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cube.material = mat
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = cube
+		mm.instance_count = gxforms.size()
+		for i in range(gxforms.size()):
+			mm.set_instance_transform(i, gxforms[i] as Transform3D)
+			mm.set_instance_color(i, gcolors[i] as Color)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		container.add_child(mmi)
 
 	var lotus_positions: Array[Vector3] = data.get("lotus_lights", [] as Array[Vector3])
 	for lpos in lotus_positions:
@@ -1267,12 +1304,18 @@ func _process(_delta: float) -> void:
 			break
 		var pd: Dictionary = _prop_queue.pop_front()
 		var ptype: String = pd.get("type", "weed")
-		var prop := PlantProp.new(50, DestroyableProp.WeaponReq.SWORD,
-			"rong_nhiet_doi" if ptype == "weed" else "mon_ngot")
-		prop.position = pd["pos"]
-		prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0),
-			pd.get("has_silt", false), pd.get("water_gap", 1.0))
-		add_child(prop)
+		if ptype == "palm":
+			var prop := _PalmProp.new(150, DestroyableProp.WeaponReq.AXE, "palm_wood")
+			prop.position = pd["pos"]
+			prop.setup(pd.get("variant", "river"))
+			add_child(prop)
+		else:
+			var prop := PlantProp.new(50, DestroyableProp.WeaponReq.SWORD,
+				"rong_nhiet_doi" if ptype == "weed" else "mon_ngot")
+			prop.position = pd["pos"]
+			prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0),
+				pd.get("has_silt", false), pd.get("water_gap", 1.0))
+			add_child(prop)
 	if _prop_queue.is_empty():
 		set_process(false)
 
@@ -1312,7 +1355,7 @@ static func _thread_rebuild_decorative(ck: String, cx: int, cz: int, size: int, 
 	if chunk == null or not is_instance_valid(chunk) or not chunk.is_inside_tree():
 		return
 	chunk.call_deferred("apply_decorative", {
-		"grass_mesh": data.get("grass_mesh"),
+		"grass_blade_data": data.get("grass_blade_data", {}),
 		"sediment_mesh": data.get("sediment_mesh"),
 		"textured_block_meshes": data.get("textured_block_meshes", {}),
 		"lamp_positions": data.get("lamp_positions", [])
@@ -1327,18 +1370,28 @@ func apply_decorative(data: Dictionary) -> void:
 		add_child(container)
 		_mesh_container = container
 
-	var grass_mesh := data.get("grass_mesh") as ArrayMesh
-	if grass_mesh:
-		var mi_g := MeshInstance3D.new()
-		mi_g.mesh = grass_mesh
-		if not _mat_cache[_dimension_id].has("grass"):
-			var gmat := StandardMaterial3D.new()
-			gmat.vertex_color_use_as_albedo = true
-			gmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-			_mat_cache[_dimension_id]["grass"] = gmat
-		mi_g.material_override = _mat_cache[_dimension_id]["grass"]
-		mi_g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		container.add_child(mi_g)
+	var gbd: Dictionary = data.get("grass_blade_data", {})
+	var gxforms: Array = gbd.get("xforms", [])
+	var gcolors: Array = gbd.get("colors", [])
+	if gxforms.size() > 0:
+		var cube := BoxMesh.new()
+		cube.size = Vector3.ONE
+		var mat := StandardMaterial3D.new()
+		mat.vertex_color_use_as_albedo = true
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		cube.material = mat
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = cube
+		mm.instance_count = gxforms.size()
+		for i in range(gxforms.size()):
+			mm.set_instance_transform(i, gxforms[i] as Transform3D)
+			mm.set_instance_color(i, gcolors[i] as Color)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		container.add_child(mmi)
 
 	var sediment_mesh := data.get("sediment_mesh") as ArrayMesh
 	if sediment_mesh:

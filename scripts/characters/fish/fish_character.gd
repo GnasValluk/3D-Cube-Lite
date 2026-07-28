@@ -51,7 +51,8 @@ const VARIANT_PATTERN: Array[Color] = [
 const VARIANT_BODY_Z: Array[float] = [1.0, 1.0, 1.0, 1.8, 1.0, 1.0]
 
 const VARIANT_NAMES: Array[String] = ["Carp", "Climbing Perch", "Red Tilapia", "Snakehead", "Flowerhorn", "Freshwater Shrimp"]
-const VARIANT_HP: Array[int]       = [60,         40,               50,             70,           70,           15]
+const VARIANT_HP: Array[int]       = [15,         10,               12,             20,           15,           5]
+const VARIANT_ATK: Array[int]     = [0,          0,                0,              3,            5,            0]
 const VARIANT_SPEED: Array[float]  = [1.4,        2.0,              1.8,            1.5,          1.2,          0.8]
 const VARIANT_SCALE: Array[float]  = [1.2,        0.75,             0.70,           1.0,          1.3,          0.7]
 
@@ -124,9 +125,9 @@ func _build_character() -> void:
 	hp           = max_hp
 	move_speed   = VARIANT_SPEED[fish_variant] * _speed_mod
 	sprint_speed = move_speed * FLEE_SPEED_MULT
-	defense      = 5 if _is_predator() else 0
-	attack_power = 25 if _is_predator() else 0
-	melee_damage = attack_power
+	defense      = 0
+	attack_power = VARIANT_ATK[fish_variant]
+	# melee_damage đã bỏ — damage tính từ attack_power
 	jump_height  = 0.3
 
 	var sc: float = VARIANT_SCALE[fish_variant] * fish_scale
@@ -227,7 +228,10 @@ func _physics_process(delta: float) -> void:
 	var t_dir := _target_dir
 	if t_dir.length_squared() > 0.001:
 		t_dir = t_dir.normalized()
-		_swim_dir = _swim_dir.slerp(t_dir, delta * _turn_rate).normalized()
+		if _swim_dir.length_squared() < 0.001:
+			_swim_dir = t_dir
+		else:
+			_swim_dir = _swim_dir.normalized().slerp(t_dir, delta * _turn_rate).normalized()
 	else:
 		_swim_dir = _swim_dir.lerp(t_dir, delta * _turn_rate).normalized()
 
@@ -306,7 +310,7 @@ func _is_solitary() -> bool:
 	return fish_variant == FishVariant.SNAKEHEAD or fish_variant == FishVariant.FLOWERHORN
 
 func _is_predator() -> bool:
-	return fish_variant == FishVariant.FLOWERHORN
+	return fish_variant in [FishVariant.SNAKEHEAD, FishVariant.FLOWERHORN]
 
 func _wander_dir() -> Vector3:
 	# Đổi hướng liên tục theo thời gian — bơi vòng quanh hồ

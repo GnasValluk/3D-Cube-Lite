@@ -52,7 +52,7 @@ var _selected_slot: int = -1
 var _tooltip: Label
 var _tooltip_bg: ColorRect
 var _hp_label: Label
-var _mp_label: Label
+var _stamina_label: Label
 var _atk_label: Label
 var _def_label: Label
 var _count_label: Label
@@ -111,8 +111,31 @@ var _lib_search_box: LineEdit
 var _glass_style: StyleBoxFlat
 var _slot_style: StyleBoxFlat
 var _slot_hl_style: StyleBoxFlat
+var _slot_hover_style: StyleBoxFlat
+var _slot_drop_style: StyleBoxFlat
 var _lib_slot_style: StyleBoxFlat
 var _lib_slot_hover_style: StyleBoxFlat
+
+var _slot_script: GDScript = null
+
+func _make_slot_script() -> GDScript:
+	if _slot_script != null:
+		return _slot_script
+	var s := GDScript.new()
+	s.source_code = """
+extends Panel
+var _inv_ui = null
+var _slot_idx = -1
+func _get_drag_data(at_position):
+	return _inv_ui._slot_get_drag_data(_slot_idx, at_position) if _inv_ui else null
+func _can_drop_data(position, data):
+	return _inv_ui._slot_can_drop_data(_slot_idx, position, data) if _inv_ui else false
+func _drop_data(position, data):
+	if _inv_ui: _inv_ui._slot_drop_data(_slot_idx, position, data)
+"""
+	s.reload()
+	_slot_script = s
+	return s
 
 func _ready() -> void:
 	size = Vector2(CONTENT_W, CONTENT_H)
@@ -138,6 +161,14 @@ func _ready() -> void:
 	_slot_hl_style = _slot_style.duplicate()
 	_slot_hl_style.bg_color = Color(0.30, 0.20, 0.40, 0.75)
 	_slot_hl_style.border_color = Color(0.55, 0.57, 0.62, 0.70)
+
+	_slot_hover_style = _slot_style.duplicate()
+	_slot_hover_style.bg_color = Color(0.22, 0.18, 0.35, 0.80)
+	_slot_hover_style.border_color = Color(0.55, 0.57, 0.62, 0.60)
+
+	_slot_drop_style = _slot_style.duplicate()
+	_slot_drop_style.bg_color = Color(0.18, 0.35, 0.22, 0.75)
+	_slot_drop_style.border_color = Color(0.22, 0.62, 0.28, 0.60)
 
 	_lib_slot_style = StyleBoxFlat.new()
 	_lib_slot_style.bg_color = Color(0.10, 0.07, 0.18, 0.75)
@@ -570,6 +601,7 @@ func _setup_grid() -> void:
 	var ox: float = LIB_W + LIB_MARGIN
 	var grid_y: float = PAD + 40
 	var rows: int = 4
+	var slot_scr := _make_slot_script()
 
 	for row in range(rows):
 		for col in range(COLS):
@@ -582,6 +614,9 @@ func _setup_grid() -> void:
 			panel.position = Vector2(px, py)
 			panel.add_theme_stylebox_override("panel", _slot_style)
 			panel.mouse_filter = Control.MOUSE_FILTER_STOP
+			panel.set_script(slot_scr)
+			panel._inv_ui = self
+			panel._slot_idx = i
 			panel.gui_input.connect(_on_slot_gui_input.bind(i))
 			panel.mouse_entered.connect(_on_slot_mouse_entered.bind(i))
 			panel.mouse_exited.connect(_on_slot_mouse_exited)
@@ -623,7 +658,7 @@ func _setup_status_panel() -> void:
 
 	var stat := Panel.new()
 	stat.position = Vector2(sx, sy)
-	stat.size = Vector2(STAT_W, 180)
+	stat.size = Vector2(STAT_W, 220)
 	var st_style := _glass_style.duplicate() as StyleBoxFlat
 	st_style.bg_color = Color(0.10, 0.07, 0.18, 0.65)
 	st_style.corner_radius_top_left = 12; st_style.corner_radius_top_right = 12
@@ -642,9 +677,9 @@ func _setup_status_panel() -> void:
 	_hp_label.add_theme_font_size_override("font_size", 20)
 	_hp_label.add_theme_color_override("font_color", TEAL); add_child(_hp_label)
 
-	_mp_label = Label.new(); _mp_label.position = Vector2(sx + 12, sy + 70)
-	_mp_label.add_theme_font_size_override("font_size", 20)
-	_mp_label.add_theme_color_override("font_color", PURPLE); add_child(_mp_label)
+	_stamina_label = Label.new(); _stamina_label.position = Vector2(sx + 12, sy + 70)
+	_stamina_label.add_theme_font_size_override("font_size", 20)
+	_stamina_label.add_theme_color_override("font_color", PURPLE); add_child(_stamina_label)
 
 	_atk_label = Label.new(); _atk_label.position = Vector2(sx + 12, sy + 96)
 	_atk_label.add_theme_font_size_override("font_size", 20)
@@ -660,6 +695,27 @@ func _setup_status_panel() -> void:
 	_drop_hint_label.add_theme_font_size_override("font_size", 16)
 	_drop_hint_label.add_theme_color_override("font_color", TEXT_MUTED)
 	add_child(_drop_hint_label)
+
+	var sort_btn := Button.new()
+	sort_btn.text = "⇅ " + tr("SORT_BUTTON")
+	sort_btn.position = Vector2(sx + 12, sy + 180)
+	sort_btn.size = Vector2(STAT_W - 24, 28)
+	sort_btn.add_theme_font_size_override("font_size", 16)
+	var sb_style := StyleBoxFlat.new()
+	sb_style.bg_color = Color(0.14, 0.10, 0.22, 0.75)
+	sb_style.corner_radius_top_left = 6; sb_style.corner_radius_top_right = 6
+	sb_style.corner_radius_bottom_left = 6; sb_style.corner_radius_bottom_right = 6
+	sb_style.border_width_left = 1; sb_style.border_width_right = 1
+	sb_style.border_width_top = 1; sb_style.border_width_bottom = 1
+	sb_style.border_color = Color(0.40, 0.32, 0.55, 0.25)
+	sort_btn.add_theme_stylebox_override("normal", sb_style)
+	var sb_hover := sb_style.duplicate() as StyleBoxFlat
+	sb_hover.bg_color = Color(0.30, 0.20, 0.40, 0.85)
+	sb_hover.border_color = Color(0.22, 0.62, 0.28, 0.50)
+	sort_btn.add_theme_stylebox_override("hover", sb_hover)
+	sort_btn.add_theme_color_override("font_color", TEAL)
+	sort_btn.pressed.connect(_on_sort_pressed)
+	add_child(sort_btn)
 
 func _setup_equipment_panel() -> void:
 	var ox: float = LIB_W + LIB_MARGIN
@@ -944,7 +1000,7 @@ func _on_detail_use() -> void:
 	# After use, the slot may be empty (e.g. food consumed)
 	if slot.is_empty():
 		_selected_slot = -1
-		_clear_selection()
+		_reset_slot_styles()
 
 func _on_detail_drop() -> void:
 	if _player_ref == null or _inventory == null: return
@@ -954,44 +1010,49 @@ func _on_detail_drop() -> void:
 	if slot.is_empty(): return
 	_player_ref.drop_item(idx)
 	_selected_slot = -1
-	_clear_selection()
+	_reset_slot_styles()
 
 # ── Inventory slot events ──────────────────────────────────────────────────────
 func _on_slot_gui_input(event: InputEvent, idx: int) -> void:
 	if not visible or _inventory == null: return
 	if event is InputEventMouseButton and event.pressed:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			_handle_left_click(idx); accept_event()
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_handle_right_click(idx); accept_event()
+		var btn := (event as InputEventMouseButton).button_index
+		if btn == MOUSE_BUTTON_LEFT:
+			_on_slot_left_click(idx); accept_event()
+		elif btn == MOUSE_BUTTON_RIGHT:
+			_on_slot_right_click(idx); accept_event()
 
-func _handle_left_click(idx: int) -> void:
+func _on_slot_left_click(idx: int) -> void:
 	if _inventory.slots[idx].is_empty():
-		_selected_slot = -1; _clear_selection(); return
-	var player := _player_ref
-	if player == null or not player._inventory_open: return
-	var held: Dictionary = player._held_item
-	if held.is_empty():
-		player._held_item = {"from_idx": idx}; _selected_slot = idx; _highlight_slot(idx)
-	else:
-		var from_idx: int = held.from_idx
-		if from_idx == idx:
-			player._held_item = {}; _selected_slot = -1; _clear_selection(); return
-		if _inventory.can_transfer(from_idx, idx): _inventory.transfer(from_idx, idx)
-		else: _inventory.swap(from_idx, idx)
-		player._held_item = {}; _selected_slot = -1; _clear_selection()
+		_selected_slot = -1; _reset_slot_styles(); return
+	if _selected_slot != idx:
+		_reset_slot_styles()
+	_selected_slot = idx
+	_slots[idx].add_theme_stylebox_override("panel", _slot_hl_style)
 
-func _handle_right_click(idx: int) -> void:
+func _on_slot_right_click(idx: int) -> void:
 	var slot: ItemSlot = _inventory.slots[idx]
 	if slot.is_empty(): return
-	var player := _player_ref
-	if player == null: return
-	_selected_slot = idx; _highlight_slot(idx)
-	player.use_item_from_inventory(idx)
+	# If count > 1, pick half
+	if slot.count > 1 and slot.item.stackable:
+		var half: int = slot.count / 2
+		var new_idx := _inventory.split_stack(idx, half)
+		if new_idx >= 0:
+			_selected_slot = new_idx
+		return
+	# If single item, use it
+	_selected_slot = idx
+	if _player_ref:
+		_player_ref.use_item_from_inventory(idx)
 
 func _on_slot_mouse_entered(idx: int) -> void:
 	var slot: ItemSlot = _inventory.slots[idx]
-	if slot.is_empty(): _tooltip.visible = false; _tooltip_bg.visible = false; return
+	# Don't override selected slot highlight
+	if idx != _selected_slot:
+		_slots[idx].add_theme_stylebox_override("panel", _slot_hover_style)
+	if slot.is_empty():
+		_tooltip.visible = false; _tooltip_bg.visible = false
+		return
 	var tt: String = slot.item.name
 	if slot.item.desc.length() > 0: tt += "\n" + slot.item.desc
 	if slot.item.atk_bonus > 0: tt += "\n" + tr("STAT_ATK_BONUS") % slot.item.atk_bonus
@@ -1004,16 +1065,103 @@ func _on_slot_mouse_entered(idx: int) -> void:
 	_tooltip_bg.size = _tooltip.size + Vector2(8, 8)
 	_tooltip_bg.visible = true; _tooltip.visible = true
 
+func _on_sort_pressed() -> void:
+	if _inventory == null:
+		return
+	_inventory.sort()
+	_selected_slot = -1
+
 func _on_slot_mouse_exited() -> void:
 	_tooltip.visible = false; _tooltip_bg.visible = false
+	_reset_slot_styles()
 
-func _highlight_slot(idx: int) -> void:
-	for i in range(_slots.size()):
-		_slots[i].add_theme_stylebox_override("panel", _slot_hl_style if i == idx else _slot_style)
-
-func _clear_selection() -> void:
+func _reset_slot_styles() -> void:
 	for i in range(_slots.size()):
 		_slots[i].add_theme_stylebox_override("panel", _slot_style)
+	if _selected_slot >= 0 and _selected_slot < _slots.size():
+		_slots[_selected_slot].add_theme_stylebox_override("panel", _slot_hl_style)
+
+# ── Drag & Drop ────────────────────────────────────────────────────────────────
+func _slot_get_drag_data(idx: int, _at_position: Vector2):
+	var slot: ItemSlot = _inventory.slots[idx]
+	if slot.is_empty():
+		return null
+	var data := { "from_idx": idx, "from_inv": _inventory, "item_id": slot.item.id, "count": slot.count }
+	# Build drag preview
+	var preview := Panel.new()
+	preview.size = Vector2(SLOT_SIZE, SLOT_SIZE)
+	var preview_style := _slot_style.duplicate()
+	preview_style.bg_color = Color(0.14, 0.10, 0.22, 0.90)
+	preview_style.border_color = Color(0.22, 0.62, 0.28, 0.70)
+	preview.add_theme_stylebox_override("panel", preview_style)
+	var face := ColorRect.new()
+	face.position = Vector2(2, 2)
+	face.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
+	face.color = slot.item.icon_color
+	preview.add_child(face)
+	var lbl := Label.new()
+	lbl.position = Vector2(2, SLOT_SIZE - 24)
+	lbl.size = Vector2(SLOT_SIZE - 4, 18)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	lbl.add_theme_font_size_override("font_size", 18)
+	lbl.add_theme_color_override("font_color", Color(0.95, 0.92, 1.0, 0.90))
+	lbl.text = str(slot.count) if slot.count > 1 else ""
+	preview.add_child(lbl)
+	set_drag_preview(preview)
+	return data
+
+func _slot_can_drop_data(idx: int, _position: Vector2, data) -> bool:
+	_reset_slot_styles()
+	if data == null or not (data is Dictionary):
+		return false
+	if not data.has("from_idx") or not data.has("from_inv"):
+		return false
+	var from_inv: Inventory = data["from_inv"]
+	var from_idx: int = data["from_idx"]
+	# Can't drop on same slot
+	if from_inv == _inventory and from_idx == idx:
+		return false
+	var src_slot: ItemSlot = from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
+	if src_slot == null or src_slot.is_empty():
+		return false
+	var dst_slot: ItemSlot = _inventory.slots[idx]
+	if dst_slot.is_empty():
+		_slots[idx].add_theme_stylebox_override("panel", _slot_drop_style)
+		return true
+	if from_inv == _inventory:
+		_slots[idx].add_theme_stylebox_override("panel", _slot_drop_style)
+		return true
+	if dst_slot.item.id == src_slot.item.id and dst_slot.item.stackable and dst_slot.count < dst_slot.item.max_stack:
+		_slots[idx].add_theme_stylebox_override("panel", _slot_drop_style)
+		return true
+	return false
+
+func _slot_drop_data(idx: int, _position: Vector2, data) -> void:
+	_reset_slot_styles()
+	if data == null or not (data is Dictionary):
+		return
+	if not data.has("from_idx") or not data.has("from_inv"):
+		return
+	var from_inv: Inventory = data["from_inv"]
+	var from_idx: int = data["from_idx"]
+	if from_inv == _inventory:
+		# Same inventory: transfer if possible, else swap
+		if _inventory.can_transfer(from_idx, idx):
+			_inventory.transfer(from_idx, idx)
+		else:
+			_inventory.swap(from_idx, idx)
+	else:
+		# Cross-inventory (e.g. chest -> player)
+		var src_slot: ItemSlot = from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
+		if src_slot == null or src_slot.is_empty():
+			return
+		var item: ItemDef = src_slot.item
+		var count: int = src_slot.count
+		var remaining: int = _inventory.add_item(item, count)
+		if remaining < count:
+			from_inv.remove_item(from_idx, count - remaining)
+
+
 
 func set_inventory(inv: Inventory) -> void:
 	_inventory = inv
@@ -1042,7 +1190,7 @@ func _process(delta: float) -> void:
 
 	if _player_ref:
 		_hp_label.text  = "HP: %d / %d"   % [_player_ref.hp, _player_ref.max_hp]
-		_mp_label.text  = "MANA: %d / %d" % [_player_ref.mana, _player_ref.max_mana]
+		_stamina_label.text  = "STAMINA: %d / %d" % [_player_ref.stamina, _player_ref.max_stamina]
 		_atk_label.text = "ATK: %d"        % _player_ref.get_total_atk()
 		_def_label.text = "DEF: %d"        % _player_ref.get_total_def()
 		_update_equipment_display(_player_ref)

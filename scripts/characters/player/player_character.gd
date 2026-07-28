@@ -40,6 +40,15 @@ var _bow_indicator_aoe: MeshInstance3D = null
 var _bow_indicator_root: Node3D = null
 var _bow_string_node: Node3D = null
 
+const HALBERD_CHARGE_TIME: float = 0.7
+const HALBERD_MIN_RANGE: float = 6.0
+const HALBERD_MAX_RANGE: float = 16.67
+var _halberd_charge_time: float = -1.0
+var _halberd_throwing: bool = false
+var _halberd_aim_dir: Vector3 = Vector3.FORWARD
+var _halberd_dashing: bool = false
+var _halberd_dash_hit: Dictionary = {}
+
 func _init_highlight() -> void:
 	_block_highlight = _BlockHighlight.new()
 	_block_highlight.visible = false
@@ -52,21 +61,24 @@ func _init_highlight() -> void:
 func _build_character() -> void:
 	combo_step = 0
 	combo_timer = 0.0
-	move_speed = 3.6
-	sprint_speed = 6.8
+	move_speed = 4.2
+	sprint_speed = 7.5
 	jump_height = 1.1
-	dash_speed = 16.0
+	dash_speed = 10.0
 	attack_duration = 0.50
-	attack_power = 80
-	defense = 20
-	melee_damage = 12
+	attack_power = 1
+	defense = 25
 	lmb_cooldown = 0.0
 	q_cooldown = 0.60
 	r_cooldown = 1.0
-	max_hp = 500
-	mana_cost_lmb = 0
-	mana_cost_q = 0
-	mana_cost_r = 9999
+	max_hp = 20
+	max_stamina = 150
+	stamina = 150
+	stamina_regen = 10.0
+	sprint_stamina_cost = 0.0
+	stamina_cost_lmb = 0
+	stamina_cost_q = 0
+	stamina_cost_r = 0
 	character_name = "Player"
 	element = 0
 
@@ -255,7 +267,7 @@ func _update_weapon_mesh() -> void:
 		if _bow_aiming:
 			_cancel_bow_aim()
 		return
-	if item_id in ["cup", "xeng", "riu", "kiem", "can_cau", "dai_kiem", "gang_tay_da_thu", "no", "mui_ten", "phao_dua_hau", "dan_hat_nhan_dua_hau", "phao_coi_bi_do"]:
+	if item_id in ["cup", "xeng", "riu", "kiem", "can_cau", "dai_kiem", "gang_tay_da_thu", "no", "mui_ten", "phao_dua_hau", "dan_hat_nhan_dua_hau", "phao_coi_bi_do", "iron_halberd"]:
 		ToolsMesh.build_held(pivot, item_id)
 		if item_id == "no":
 			_bow_string_node = null
@@ -272,7 +284,7 @@ func equip_weapon_direct(item: ItemDef) -> void:
 	call_deferred("_update_weapon_mesh")
 
 func get_total_atk() -> int:
-	var base: int = melee_damage
+	var base: int = attack_power
 	if equipped_weapon != null:
 		base += equipped_weapon.atk_bonus
 	return base
@@ -300,6 +312,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					else:
 						_cancel_bow_aim()
 					return
+			if (_halberd_charge_time >= 0.0 or _halberd_throwing) and k.keycode in [KEY_E, KEY_B, KEY_I, KEY_ESCAPE]:
+				_cancel_halberd_aim()
+				return
 			if k.keycode == KEY_SPACE and _freeze_timer <= 0.0:
 				_jbuf = JUMP_BUFFER
 			if k.keycode == KEY_F1:
@@ -328,6 +343,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_fire_watermelon_cannon()
 				_cancel_bow_aim()
 			return
+		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _halberd_charge_time >= 0.0:
+			if _halberd_throwing:
+				_fire_halberd_throw()
+			else:
+				_do_halberd_melee()
+			return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
 			if _bow_aiming:
 				var is_mortar := equipped_weapon != null and equipped_weapon.id == "phao_coi_bi_do"
@@ -336,33 +357,19 @@ func _unhandled_input(event: InputEvent) -> void:
 				else:
 					_cancel_bow_aim()
 				return
-			if equipped_weapon != null and equipped_weapon.id == "cup" and _has_target:
-				var old_block: int = _open_world_manager().break_block(_target_block.x, _target_block.y, _target_block.z)
-				if old_block != 0:
-					var item_id: String = _Data.BLOCK_TO_ITEM.get(old_block, "")
-					if not item_id.is_empty():
-						var def: ItemDef = ItemDatabase.items_db.get(item_id) as ItemDef
-						if def:
-							var world: Node = _open_world_manager()
-							var drop_pos := Vector3(_target_block.x, _target_block.y, _target_block.z)
-							DroppedItem.spawn(world, def, drop_pos)
-				SFXManager.play_block_break()
-			return
+			if _halberd_charge_time >= 0.0 or _halberd_throwing:
+				_cancel_halberd_aim()
+				return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			if _bow_aiming:
 				return
-			if equipped_weapon != null and equipped_weapon.id == "no":
-				_start_bow_aim()
-				return
-			if equipped_weapon != null and equipped_weapon.id == "phao_coi_bi_do":
-				_start_mortar_aim()
-				return
-			if equipped_weapon != null and equipped_weapon.id == "phao_dua_hau":
-				_start_cannon_aim()
-				return
-			if equipped_weapon != null and equipped_weapon.id == "can_cau":
-				_fishing_action()
-				return
+			if equipped_weapon != null:
+				match equipped_weapon.id:
+					"no": _start_bow_aim(); return
+					"phao_coi_bi_do": _start_mortar_aim(); return
+					"phao_dua_hau": _start_cannon_aim(); return
+					"can_cau": _fishing_action(); return
+					"iron_halberd": return
 			if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
 				var wep_id: String = equipped_weapon.id if equipped_weapon else ""
 				var is_heavy: bool = wep_id == "riu" or wep_id == "cup"
@@ -378,7 +385,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					else:
 						return
 					combo_timer = COMBO_WINDOW
-				if not try_skill(mana_cost_lmb):
+				if not try_skill(stamina_cost_lmb):
 					return
 				_aim_dir = _calc_aim_dir()
 				var fwd := global_transform.basis.z
@@ -394,6 +401,25 @@ func _unhandled_input(event: InputEvent) -> void:
 				_attack_timer = attack_duration * (2.0 if _underwater else 1.0)
 				_state = State.ATTACK
 				_melee_hit_once = false
+			return
+		if _has_target and equipped_weapon != null:
+			var wep_id: String = equipped_weapon.id
+			var old_block: int = 0
+			if wep_id == "cup" and not _is_soft_block(_target_block.x, _target_block.y, _target_block.z):
+				old_block = _open_world_manager().break_block(_target_block.x, _target_block.y, _target_block.z)
+			elif wep_id == "xeng" and _is_soft_block(_target_block.x, _target_block.y, _target_block.z):
+				old_block = _open_world_manager().break_block(_target_block.x, _target_block.y, _target_block.z)
+			if old_block != 0:
+				var item_id: String = _Data.BLOCK_TO_ITEM.get(old_block, "")
+				if not item_id.is_empty():
+					var def: ItemDef = ItemDatabase.items_db.get(item_id) as ItemDef
+					if def:
+						var world: Node = _open_world_manager()
+						var drop_pos := Vector3(_target_block.x, _target_block.y, _target_block.z)
+						DroppedItem.spawn(world, def, drop_pos)
+			if old_block != 0:
+				SFXManager.play_block_break()
+		return
 
 func _fishing_action() -> void:
 	var holding_rod := equipped_weapon != null and equipped_weapon.id == "can_cau"
@@ -683,7 +709,7 @@ func _fire_bow() -> void:
 	var charge_pct: float = _bow_charge / _bow_max_charge
 	var range_len: float = lerp(8.0, 50.0, charge_pct)
 	var arrow_speed: float = lerp(15.0, 50.0, charge_pct)
-	var base_dmg: int = (equipped_weapon.atk_bonus if equipped_weapon else 8) + melee_damage
+	var base_dmg: int = attack_power + (equipped_weapon.atk_bonus if equipped_weapon else 8)
 	var total_dmg: int = int(base_dmg * lerp(0.5, 1.5, charge_pct))
 
 	var arrow := ArrowProjectile.new()
@@ -696,14 +722,14 @@ func _fire_bow() -> void:
 	arrow.setup(_bow_aim_dir, total_dmg, arrow_speed, range_len, self)
 
 func _fire_watermelon_cannon() -> void:
-	if not try_skill(mana_cost_lmb):
+	if not try_skill(stamina_cost_lmb):
 		return
 	if not equipped_weapon or equipped_weapon.id != "phao_dua_hau":
 		return
 	if not _consume_watermelon_ammo():
 		return
 	var dir := _calc_aim_dir()
-	var base_dmg: int = equipped_weapon.atk_bonus + melee_damage
+	var base_dmg: int = attack_power + equipped_weapon.atk_bonus
 	var proj := WatermelonProjectile.new()
 	var world := get_tree().current_scene
 	if world:
@@ -901,7 +927,7 @@ func _fire_mortar() -> void:
 	if _bow_indicator_root:
 		_bow_indicator_root.visible = false
 
-	if not try_skill(mana_cost_lmb):
+	if not try_skill(stamina_cost_lmb):
 		return
 	if not _consume_ammo("pumpkin"):
 		_scroll_inventory_message(tr("NO_MORTAR_AMMO"))
@@ -913,7 +939,7 @@ func _fire_mortar() -> void:
 	var cp: float = _bow_charge / _bow_max_charge
 	var h_speed: float = lerp(2.0, 15.0, cp)
 	var v_speed: float = lerp(3.0, 12.0, cp)
-	var base_dmg: int = (equipped_weapon.atk_bonus if equipped_weapon else 12) + melee_damage
+	var base_dmg: int = attack_power + (equipped_weapon.atk_bonus if equipped_weapon else 12)
 
 	var proj := PumpkinProjectile.new()
 	var world := get_tree().current_scene
@@ -985,11 +1011,18 @@ func _cancel_bow_aim() -> void:
 	if _bow_indicator_root:
 		_bow_indicator_root.visible = false
 
+func _is_soft_block(bx: float, by: float, bz: float) -> bool:
+	var owm := _open_world_manager()
+	if owm == null:
+		return false
+	var blk: int = owm.get_block(bx, by, bz)
+	return blk == _Data.BlockID.SAND or blk == _Data.BlockID.SAND_DEEP or blk == _Data.BlockID.OCEAN_SAND or blk == _Data.BlockID.MUDDY_SAND or blk == _Data.BlockID.OCEAN_GRAVEL or blk == _Data.BlockID.DIRT or blk == _Data.BlockID.DARK_DIRT or blk == _Data.BlockID.GRASS or blk == _Data.BlockID.DARK_GRASS
+
 func _update_block_target() -> void:
 	if _block_highlight == null:
 		return
-	var holding_cup := equipped_weapon != null and equipped_weapon.id == "cup"
-	if not holding_cup:
+	var can_mine := equipped_weapon != null and (equipped_weapon.id == "cup" or equipped_weapon.id == "xeng")
+	if not can_mine:
 		_block_highlight.visible = false
 		_has_target = false
 		return
@@ -1024,7 +1057,7 @@ func _update_block_target() -> void:
 func _process(delta: float) -> void:
 	var is_cannon_aiming := _bow_aiming and equipped_weapon != null and equipped_weapon.id == "phao_dua_hau"
 	var is_mortar_aiming := _bow_aiming and equipped_weapon != null and equipped_weapon.id == "phao_coi_bi_do"
-	var is_bow_aim_no_cannon := _bow_aiming and not is_cannon_aiming and not is_mortar_aiming
+	var is_bow_aim_no_cannon := _bow_aiming and not is_cannon_aiming and not is_mortar_aiming and not _halberd_throwing
 	if is_bow_aim_no_cannon:
 		var reduced := 3.6 * 0.55
 		move_speed = reduced
@@ -1032,6 +1065,10 @@ func _process(delta: float) -> void:
 	elif is_cannon_aiming or is_mortar_aiming:
 		move_speed = 3.6 * 0.70
 		sprint_speed = 6.8 * 0.70
+	elif _halberd_charge_time >= 0.0 or _halberd_throwing:
+		var reduced := 3.6 * 0.55
+		move_speed = reduced
+		sprint_speed = reduced
 	else:
 		move_speed = 3.6
 		sprint_speed = 6.8
@@ -1039,6 +1076,15 @@ func _process(delta: float) -> void:
 	combo_timer = max(combo_timer - delta, 0.0)
 	_update_block_target()
 	_update_bow_pose()
+	if equipped_weapon != null and equipped_weapon.id == "iron_halberd":
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			if _halberd_charge_time < 0.0:
+				_halberd_charge_time = 0.0
+			_halberd_charge_time += delta
+			if _halberd_charge_time >= HALBERD_CHARGE_TIME and not _halberd_throwing:
+				_start_halberd_throw_aim()
+			if _halberd_throwing:
+				_update_halberd_aim(delta)
 	if _bow_aiming:
 		if _state == State.HIT:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "phao_coi_bi_do"
@@ -1052,6 +1098,223 @@ func _process(delta: float) -> void:
 				_update_mortar_aim(delta)
 			else:
 				_update_bow_aim(delta)
+	if _halberd_throwing and _state == State.HIT:
+		_cancel_halberd_aim()
+
+func _start_halberd_throw_aim() -> void:
+	_halberd_throwing = true
+	_bow_aiming = false
+	if _bow_indicator_root == null:
+		_bow_indicator_root = Node3D.new()
+		_bow_indicator_root.name = "BowAimIndicator"
+		get_tree().current_scene.add_child(_bow_indicator_root)
+	else:
+		for ch in _bow_indicator_root.get_children():
+			ch.queue_free()
+	var line_mat := StandardMaterial3D.new()
+	line_mat.albedo_color = Color(0.3, 0.8, 0.6, 0.35)
+	line_mat.emission_enabled = true
+	line_mat.emission_color = Color(0.3, 0.8, 0.6)
+	line_mat.emission_energy_multiplier = 0.5
+	line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	line_mat.no_depth_test = true
+	_bow_indicator_line = MeshInstance3D.new()
+	_bow_indicator_line.mesh = BoxMesh.new()
+	_bow_indicator_line.material_override = line_mat
+	_bow_indicator_root.add_child(_bow_indicator_line)
+	var ring_mat := StandardMaterial3D.new()
+	ring_mat.albedo_color = Color(0.3, 0.8, 0.6, 0.50)
+	ring_mat.emission_enabled = true
+	ring_mat.emission_color = Color(0.3, 0.8, 0.6)
+	ring_mat.emission_energy_multiplier = 0.6
+	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring_mat.no_depth_test = true
+	_bow_indicator_target = MeshInstance3D.new()
+	var ring := CylinderMesh.new()
+	ring.top_radius = 0.5
+	ring.bottom_radius = 0.5
+	ring.height = 0.05
+	ring.radial_segments = 16
+	_bow_indicator_target.mesh = ring
+	_bow_indicator_target.material_override = ring_mat
+	_bow_indicator_target.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_bow_indicator_root.add_child(_bow_indicator_target)
+	_bow_indicator_root.visible = true
+
+func _update_halberd_aim(delta: float) -> void:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null: return
+	var mouse_pos := get_viewport().get_mouse_position()
+	var from: Vector3 = cam.project_ray_origin(mouse_pos)
+	var dir: Vector3 = cam.project_ray_normal(mouse_pos)
+	var plane_y: float = global_position.y
+	_halberd_aim_dir = global_transform.basis.z
+	if abs(dir.y) > 0.001:
+		var t: float = (plane_y - from.y) / dir.y
+		var ground_hit: Vector3 = from + dir * max(t, 0.0)
+		var to_target: Vector3 = ground_hit - global_position
+		to_target.y = 0.0
+		if to_target.length_squared() > 0.01:
+			_halberd_aim_dir = to_target.normalized()
+	rotation.y = atan2(_halberd_aim_dir.x, _halberd_aim_dir.z)
+	var charge_pct: float = _halberd_charge_time / (HALBERD_CHARGE_TIME + _bow_max_charge)
+	charge_pct = clamp(charge_pct, 0.0, 1.0)
+	var range_len: float = lerp(HALBERD_MIN_RANGE, HALBERD_MAX_RANGE, charge_pct)
+	var end_pos := _halberd_aim_dir * range_len
+	end_pos.y = plane_y
+	if _bow_indicator_root == null or _bow_indicator_line == null or _bow_indicator_target == null: return
+	_bow_indicator_root.global_position = global_position + Vector3(0, 0.3, 0)
+	_bow_indicator_line.position = end_pos * 0.5
+	_bow_indicator_line.mesh.size = Vector3(0.04, 0.04, range_len)
+	_bow_indicator_line.look_at(_bow_indicator_root.global_position + end_pos, Vector3.UP)
+	_bow_indicator_target.global_position = _bow_indicator_root.global_position + end_pos
+	var line_color := Color(0.3, 0.8, 0.6).lerp(Color(1.0, 0.4, 0.3), charge_pct)
+	line_color.a = 0.35
+	_bow_indicator_line.material_override.albedo_color = line_color
+	var ring_color := Color(0.3, 0.8, 0.6).lerp(Color(1.0, 0.4, 0.3), charge_pct)
+	ring_color.a = 0.50
+	_bow_indicator_target.material_override.albedo_color = ring_color
+
+func _fire_halberd_throw() -> void:
+	_halberd_throwing = false
+	var saved_charge: float = _halberd_charge_time
+	_halberd_charge_time = -1.0
+	if _bow_indicator_root:
+		_bow_indicator_root.visible = false
+	if not try_skill(stamina_cost_lmb):
+		return
+	var dir := _halberd_aim_dir
+	if dir.length_squared() < 0.01:
+		dir = -global_transform.basis.z
+	var halberd_slot_idx: int = -1
+	for i in range(inventory.slots.size()):
+		var slot: ItemSlot = inventory.slots[i]
+		if not slot.is_empty() and slot.item.id == "iron_halberd":
+			halberd_slot_idx = i
+			break
+	if halberd_slot_idx < 0:
+		return
+	inventory.remove_item(halberd_slot_idx, 1)
+	if equipped_weapon != null and equipped_weapon.id == "iron_halberd":
+		equipped_weapon = null
+		_update_weapon_mesh()
+	var charge_pct: float = clamp(saved_charge / (HALBERD_CHARGE_TIME + _bow_max_charge), 0.0, 1.0)
+	var range_len: float = lerp(HALBERD_MIN_RANGE, HALBERD_MAX_RANGE, charge_pct)
+	var plane_y: float = global_position.y
+	var landing_pos: Vector3 = global_position + dir * range_len
+	landing_pos.y = plane_y
+	var space := get_world_3d().direct_space_state
+	if space:
+		var q := PhysicsRayQueryParameters3D.new()
+		q.from = landing_pos + Vector3(0, 2.0, 0)
+		q.to = landing_pos + Vector3(0, -4.0, 0)
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			landing_pos.y = hit.position.y
+	var world := get_tree().current_scene
+	if world:
+		var def: ItemDef = ItemDatabase.items_db.get("iron_halberd")
+		if def:
+			var launch_pos := global_position + Vector3(0, 0.6, 0) + dir * 0.5
+			if _mesh and _mesh.weapon_pivot:
+				launch_pos = _mesh.weapon_pivot.global_transform * Vector3(0, 0.35, 0)
+			var h_dist := Vector2(landing_pos.x - launch_pos.x, landing_pos.z - launch_pos.z).length()
+			var h_speed: float = lerp(14.0, 24.0, charge_pct)
+			var flight_time: float = maxf(h_dist / maxf(h_speed, 0.1), 0.1)
+			var vx: float = (landing_pos.x - launch_pos.x) / flight_time
+			var vz: float = (landing_pos.z - launch_pos.z) / flight_time
+			var vy: float = (landing_pos.y - launch_pos.y) / flight_time
+			var item := DroppedItem.spawn(world, def, launch_pos, 1)
+			var ground_y: float = landing_pos.y
+			var base_dmg: int = attack_power + (equipped_weapon.atk_bonus if equipped_weapon else 10)
+			item.fly_straight(Vector3(vx, vy, vz), ground_y, base_dmg, self)
+	var msg: String = tr("THREW_MSG") if tr("THREW_MSG") != "THREW_MSG" else "Đã ném Kích Sắt"
+	_scroll_inventory_message(msg)
+
+func _cancel_halberd_aim() -> void:
+	_halberd_throwing = false
+	_halberd_charge_time = -1.0
+	if _bow_indicator_root:
+		_bow_indicator_root.visible = false
+
+func _on_dash() -> void:
+	if equipped_weapon and equipped_weapon.id == "iron_halberd":
+		_halberd_dashing = true
+		_halberd_dash_hit = {}
+
+func _physics_process(delta: float) -> void:
+	super._physics_process(delta)
+	if _halberd_dashing:
+		if _state == State.DASH:
+			_check_halberd_dash_hit()
+		else:
+			_halberd_dashing = false
+
+func _check_halberd_dash_hit() -> void:
+	var dir := _dash_dir
+	if dir.length_squared() < 0.01:
+		return
+	var fwd := dir.normalized()
+	var right := Vector3.UP.cross(fwd).normalized()
+	var box_center := global_position + fwd * 1.2 + Vector3(0, 0.4, 0)
+	var half := Vector3(0.5, 0.4, 1.6)
+
+	var mgr := _find_character_manager()
+	if mgr:
+		for ch in mgr.get_children():
+			if ch is CharacterBase and ch != self and ch.is_alive and ch._active:
+				_try_dash_hit(ch, box_center, right, fwd, half)
+
+	var pig_nodes := get_tree().get_nodes_in_group("pig")
+	for pn in pig_nodes:
+		if is_instance_valid(pn) and pn.get("is_alive"):
+			_try_dash_hit(pn as CharacterBase, box_center, right, fwd, half)
+
+	var spawner := _find_fish_spawner()
+	if spawner:
+		for f in spawner.get_children():
+			if f is FishCharacter and f.is_alive:
+				_try_dash_hit(f as CharacterBase, box_center, right, fwd, half)
+
+func _try_dash_hit(ch: CharacterBase, box_center: Vector3, right: Vector3, fwd: Vector3, half: Vector3) -> void:
+	if _halberd_dash_hit.has(ch.get_instance_id()):
+		return
+	var to_target := ch.global_position - box_center
+	var local := Vector3(to_target.dot(right), to_target.dot(Vector3.UP), to_target.dot(fwd))
+	if abs(local.x) < half.x and abs(local.y) < half.y and abs(local.z) < half.z:
+		_halberd_dash_hit[ch.get_instance_id()] = true
+		var dmg: int = get_total_atk()
+		ch.take_damage(dmg, self)
+		SFXManager.play_damage_hit()
+
+func _do_halberd_melee() -> void:
+	_halberd_charge_time = -1.0
+	if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+		var max_step: int = 1
+		if combo_timer > 0.0 and combo_step < max_step:
+			combo_step += 1
+		elif _attack_timer <= 0.0:
+			combo_step = 0
+		else:
+			return
+		combo_timer = COMBO_WINDOW
+		if not try_skill(stamina_cost_lmb):
+			return
+		_aim_dir = _calc_aim_dir()
+		var fwd := global_transform.basis.z
+		if _aim_dir.dot(fwd) < 0.99:
+			rotation.y = atan2(_aim_dir.x, _aim_dir.z)
+		_lmb_cd = 0.0
+		match combo_step:
+			0:
+				attack_duration = 0.85
+				_melee_hit_progress = 0.35
+			1:
+				attack_duration = 0.70
+				_melee_hit_progress = 0.30
+		_attack_timer = attack_duration * (2.0 if _underwater else 1.0)
+		_state = State.ATTACK
+		_melee_hit_once = false
 
 func _ready() -> void:
 	await super._ready()

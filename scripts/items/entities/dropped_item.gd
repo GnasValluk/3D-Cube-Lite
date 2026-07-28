@@ -10,8 +10,11 @@ var item_count: int = 1
 var _time_alive: float = 0.0
 var can_pickup: bool = false
 var _flying: bool = false
+var _straight_flight: bool = false
 var _velocity: Vector3 = Vector3.ZERO
 var _ground_y: float = 0.0
+var _throw_damage: int = 0
+var _throw_attacker: Node3D = null
 var _player: Node3D = null
 
 const MAGNET_RANGE: float = 3.0
@@ -36,7 +39,7 @@ func _setup_mesh():
 	root.position.y = 0.15
 
 	var item_id := item_def.id
-	if item_id in ["cup", "xeng", "riu", "kiem", "can_cau", "dai_kiem", "gang_tay_da_thu", "no", "mui_ten", "phao_dua_hau", "dan_hat_nhan_dua_hau", "phao_coi_bi_do"]:
+	if item_id in ["cup", "xeng", "riu", "kiem", "can_cau", "dai_kiem", "gang_tay_da_thu", "no", "mui_ten", "phao_dua_hau", "dan_hat_nhan_dua_hau", "phao_coi_bi_do", "iron_halberd"]:
 		var scale_node := Node3D.new()
 		scale_node.scale = Vector3(1.8, 1.8, 1.8)
 		root.add_child(scale_node)
@@ -103,6 +106,14 @@ func launch(initial_velocity: Vector3, ground_y: float) -> void:
 	_velocity = initial_velocity
 	_ground_y = ground_y
 
+func fly_straight(initial_velocity: Vector3, ground_y: float, damage: int = 0, attacker: Node3D = null) -> void:
+	_flying = true
+	_straight_flight = true
+	_velocity = initial_velocity
+	_ground_y = ground_y
+	_throw_damage = damage
+	_throw_attacker = attacker
+
 func _find_player() -> void:
 	var world := get_tree().current_scene
 	if world == null: return
@@ -122,15 +133,52 @@ func _process(delta: float):
 	if not is_instance_valid(self): return
 	_time_alive += delta
 	if _flying:
-		_velocity.y -= 9.8 * delta
-		position += _velocity * delta
-		rotation.x += delta * 6.0
-		rotation.z += delta * 4.0
-		if position.y <= _ground_y:
-			position.y = _ground_y
-			_flying = false
-			rotation.x = 0.0
-			rotation.z = 0.0
+		if _straight_flight:
+			var parent := get_parent()
+			var parent_inv: Transform3D = parent.global_transform.affine_inverse() if parent != null else Transform3D.IDENTITY
+			var next_pos := position + _velocity * delta
+			var space := get_world_3d().direct_space_state
+			var hit_obstacle := false
+			if space:
+				var q := PhysicsRayQueryParameters3D.new()
+				q.from = to_global(position) if parent != null else position
+				q.to = to_global(next_pos) if parent != null else next_pos
+				q.collide_with_areas = false
+				q.collide_with_bodies = true
+				q.exclude = [self]
+				var hit := space.intersect_ray(q)
+				if not hit.is_empty():
+					next_pos = parent_inv * hit.position if parent != null else hit.position
+					hit_obstacle = true
+					if _throw_damage > 0:
+						var col := hit.get("collider") as Object
+						if is_instance_valid(col) and col.has_method("take_damage"):
+							col.take_damage(_throw_damage, _throw_attacker)
+			position = next_pos
+			var dir := _velocity.normalized()
+			if dir.length_squared() > 0.001:
+				var up_ref := Vector3.UP if abs(dir.y) < 0.99 else Vector3.FORWARD
+				var x_axis := up_ref.cross(dir).normalized()
+				var y_axis := dir
+				var z_axis := x_axis.cross(y_axis).normalized()
+				transform.basis = Basis(x_axis, y_axis, z_axis)
+			if position.y <= _ground_y or hit_obstacle:
+				if hit_obstacle:
+					position.y = maxf(position.y, _ground_y)
+				else:
+					position.y = _ground_y
+				_flying = false
+				_straight_flight = false
+		else:
+			_velocity.y -= 9.8 * delta
+			position += _velocity * delta
+			rotation.x += delta * 6.0
+			rotation.z += delta * 4.0
+			if position.y <= _ground_y:
+				position.y = _ground_y
+				_flying = false
+				rotation.x = 0.0
+				rotation.z = 0.0
 	else:
 		# Magnet: bay về phía người chơi khi đủ gần
 		if can_pickup and _player and is_instance_valid(_player):

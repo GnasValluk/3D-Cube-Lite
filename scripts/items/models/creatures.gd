@@ -13,6 +13,14 @@ static func fish(p: Node3D, body_color: Color) -> void:
 	ItemMeshShared.add_cube(p, -2, 1, 1.5, 0.6, 0.6, 0.6, Color(0.05, 0.05, 0.05))
 	ItemMeshShared.add_cube(p, -2, 1, -1.5, 0.6, 0.6, 0.6, Color(0.05, 0.05, 0.05))
 
+static func meat(p: Node3D) -> void:
+	var fat := Color(0.92, 0.75, 0.60)
+	var meat_c := Color(0.82, 0.45, 0.38)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 5, 3, 4, meat_c)
+	ItemMeshShared.add_cube(p, 3, 0, 0, 4, 2.5, 3, meat_c.darkened(0.15))
+	ItemMeshShared.add_cube(p, -3, 0, 0, 3, 2, 2.5, fat)
+	ItemMeshShared.add_cube(p, 0, 3, 0, 4, 1.5, 2.5, fat)
+
 static func shrimp(p: Node3D) -> void:
 	var body := Color(0.85, 0.35, 0.20)
 	var dark := body.darkened(0.25)

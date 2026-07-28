@@ -33,6 +33,8 @@ var _tooltip_bg: ColorRect = null
 var _slot_style: StyleBoxFlat
 var _slot_hl_style: StyleBoxFlat
 var _slot_sel_style: StyleBoxFlat
+var _slot_hover_style: StyleBoxFlat
+var _slot_drop_style: StyleBoxFlat
 
 func _ready() -> void:
 	var ss: float = 62.0
@@ -67,6 +69,28 @@ func _ready() -> void:
 	_slot_sel_style.bg_color = Color(0.22, 0.18, 0.35, 0.75)
 	_slot_sel_style.border_color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.45)
 
+	_slot_hover_style = _slot_style.duplicate()
+	_slot_hover_style.bg_color = Color(0.22, 0.18, 0.35, 0.80)
+	_slot_hover_style.border_color = Color(0.55, 0.57, 0.62, 0.60)
+
+	_slot_drop_style = _slot_style.duplicate()
+	_slot_drop_style.bg_color = Color(0.18, 0.35, 0.22, 0.75)
+	_slot_drop_style.border_color = Color(0.22, 0.62, 0.28, 0.60)
+
+	var slot_scr := GDScript.new()
+	slot_scr.source_code = """
+extends Panel
+var _hb_ui = null
+var _hb_idx = -1
+func _get_drag_data(at_position):
+	return _hb_ui._slot_get_drag_data(_hb_idx, at_position) if _hb_ui else null
+func _can_drop_data(position, data):
+	return _hb_ui._slot_can_drop_data(_hb_idx, position, data) if _hb_ui else false
+func _drop_data(position, data):
+	if _hb_ui: _hb_ui._slot_drop_data(_hb_idx, position, data)
+"""
+	slot_scr.reload()
+
 	for i in range(9):
 		var panel := Panel.new()
 		panel.size = Vector2(ss, ss)
@@ -76,6 +100,9 @@ func _ready() -> void:
 		panel.mouse_entered.connect(_on_slot_mouse_entered.bind(i))
 		panel.mouse_exited.connect(_on_slot_mouse_exited)
 		panel.add_theme_stylebox_override("panel", _slot_style)
+		panel.set_script(slot_scr)
+		panel._hb_ui = self
+		panel._hb_idx = i
 		add_child(panel)
 
 		var face := ColorRect.new()
@@ -147,8 +174,18 @@ func _on_slot_gui_input(event: InputEvent, idx: int) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			_select(idx)
-			_handle_left_click(idx)
-		# Right-click đã bỏ — không drop/equip bằng right-click nữa
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			_on_slot_right_click(idx)
+
+func _on_slot_right_click(idx: int) -> void:
+	if _inventory == null:
+		return
+	var slot: ItemSlot = _inventory.slots[idx]
+	if slot.is_empty() or not slot.item.stackable:
+		return
+	if slot.count > 1:
+		var half: int = slot.count / 2
+		_inventory.split_stack(idx, half)
 
 func _on_slot_mouse_entered(idx: int) -> void:
 	if _inventory == null:
@@ -157,37 +194,95 @@ func _on_slot_mouse_entered(idx: int) -> void:
 	if slot.is_empty():
 		_tooltip.visible = false
 		_tooltip_bg.visible = false
+		_slots[idx].add_theme_stylebox_override("panel", _slot_hover_style)
 		return
 	_tooltip.text = slot.item.name
 	_tooltip_bg.size.x = max(170, _tooltip.get_minimum_size().x + 8)
 	_tooltip_bg.visible = true
 	_tooltip.visible = true
+	_slots[idx].add_theme_stylebox_override("panel", _slot_hover_style)
 
 func _on_slot_mouse_exited() -> void:
 	_tooltip.visible = false
 	_tooltip_bg.visible = false
+	_update_highlight()
 
-func _handle_left_click(idx: int) -> void:
-	var player: PlayerCharacter = _player_ref
-	if player == null:
+# ── Drag & Drop ────────────────────────────────────────────────────────────────
+func _slot_get_drag_data(idx: int, _at_position: Vector2):
+	if _inventory == null:
+		return null
+	var slot: ItemSlot = _inventory.slots[idx]
+	if slot.is_empty():
+		return null
+	var data := { "from_idx": idx, "from_inv": _inventory, "item_id": slot.item.id, "count": slot.count }
+	var preview := Panel.new()
+	var ss: float = 62.0
+	preview.size = Vector2(ss, ss)
+	var ps := _slot_style.duplicate()
+	ps.bg_color = Color(0.14, 0.10, 0.22, 0.90)
+	ps.border_color = Color(0.22, 0.62, 0.28, 0.70)
+	preview.add_theme_stylebox_override("panel", ps)
+	var face := ColorRect.new()
+	face.position = Vector2(3, 3)
+	face.size = Vector2(ss - 6, ss - 6)
+	face.color = slot.item.icon_color
+	preview.add_child(face)
+	var cnt := Label.new()
+	cnt.position = Vector2(3, ss - 24)
+	cnt.size = Vector2(ss - 6, 20)
+	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	cnt.add_theme_font_size_override("font_size", 16)
+	cnt.add_theme_color_override("font_color", Color(0.95, 0.92, 1.0, 0.90))
+	cnt.text = str(slot.count) if slot.count > 1 else ""
+	preview.add_child(cnt)
+	set_drag_preview(preview)
+	return data
+
+func _slot_can_drop_data(idx: int, _position: Vector2, data) -> bool:
+	_update_highlight()
+	if _inventory == null or data == null or not (data is Dictionary):
+		return false
+	if not data.has("from_idx") or not data.has("from_inv"):
+		return false
+	var from_inv: Inventory = data["from_inv"]
+	var from_idx: int = data["from_idx"]
+	if from_inv == _inventory and from_idx == idx:
+		return false
+	var src := from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
+	if src == null or src.is_empty():
+		return false
+	var dst := _inventory.slots[idx]
+	if dst.is_empty():
+		_slots[idx].add_theme_stylebox_override("panel", _slot_drop_style)
+		return true
+	if from_inv == _inventory:
+		_slots[idx].add_theme_stylebox_override("panel", _slot_drop_style)
+		return true
+	if dst.item.id == src.item.id and dst.item.stackable and dst.count < dst.item.max_stack:
+		_slots[idx].add_theme_stylebox_override("panel", _slot_drop_style)
+		return true
+	return false
+
+func _slot_drop_data(idx: int, _position: Vector2, data) -> void:
+	_update_highlight()
+	if _inventory == null or data == null or not (data is Dictionary):
 		return
-	if not player._inventory_open:
+	if not data.has("from_idx") or not data.has("from_inv"):
 		return
-	var held: Dictionary = player._held_item
-	if held.is_empty():
-		if _inventory.slots[idx].is_empty():
-			return
-		player._held_item = {"from_idx": idx}
-	else:
-		var from_idx: int = held.from_idx
-		if from_idx == idx:
-			player._held_item = {}
-			return
+	var from_inv: Inventory = data["from_inv"]
+	var from_idx: int = data["from_idx"]
+	if from_inv == _inventory:
 		if _inventory.can_transfer(from_idx, idx):
 			_inventory.transfer(from_idx, idx)
 		else:
 			_inventory.swap(from_idx, idx)
-		player._held_item = {}
+	else:
+		var src := from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
+		if src == null or src.is_empty():
+			return
+		var remaining: int = _inventory.add_item(src.item, src.count)
+		if remaining < src.count:
+			from_inv.remove_item(from_idx, src.count - remaining)
 
 func _auto_equip_selected() -> void:
 	var player: PlayerCharacter = _player_ref
@@ -250,11 +345,10 @@ func _select(idx: int) -> void:
 
 func _update_highlight() -> void:
 	for i in range(_slots.size()):
-		var s: Panel = _slots[i]
 		if i == _selected:
-			s.add_theme_stylebox_override("panel", _slot_sel_style)
+			_slots[i].add_theme_stylebox_override("panel", _slot_sel_style)
 		else:
-			s.add_theme_stylebox_override("panel", _slot_style)
+			_slots[i].add_theme_stylebox_override("panel", _slot_style)
 
 func _process(_delta: float) -> void:
 	if _inventory == null:

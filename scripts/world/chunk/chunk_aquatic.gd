@@ -38,9 +38,10 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 		var weed_chance: float = 0.04 if is_river else (0.10 if has_silt else 0.04)
 		if r1 < weed_chance:
 			plant_props.append({ "type": "weed", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
-	if not is_river and is_shore and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
+	if is_shore and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
 		if r1 < 0.08:
 			plant_props.append({ "type": "taro", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
+
 
 # ── Rong nước ngọt nhiệt đới (rong đuôi chó voxel) ──────────────────────────
 static func _add_tropical_weed(st: SurfaceTool, _wx: int, _wz: int, pos: Vector3,

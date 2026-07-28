@@ -13,6 +13,7 @@
 [ext_resource type="Script" uid="uid://brsekda2q2l6j" path="res://scripts/world/lighting/lotus_light_manager.gd" id="16"]
 [ext_resource type="Script" uid="uid://cbpkrb678md3h" path="res://scripts/world/lighting/road_lamp_manager.gd" id="17"]
 [ext_resource type="Script" path="res://scripts/world/weather/rain_manager.gd" id="18"]
+[ext_resource type="Script" uid="uid://b5ovd1swrpgop" path="res://scripts/characters/pig/pig_spawner.gd" id="19"]
 
 [node name="OpenWorldThucTe" type="Node3D" unique_id=708082117]
 
@@ -65,6 +66,14 @@ spawn_check_radius = 64.0
 despawn_distance = 100.0
 check_interval = 3.0
 spawn_attempts = 16
+
+[node name="PigSpawner" type="Node3D" parent="."]
+script = ExtResource("19")
+max_pigs = 15
+spawn_check_radius = 48.0
+despawn_distance = 100.0
+check_interval = 6.0
+spawn_attempts = 12
 
 [node name="LotusLightManager" type="Node" parent="." unique_id=1239342789]
 script = ExtResource("16")

@@ -3,22 +3,22 @@ class_name Library
 
 const CREATURES := [
 	{ "id": "player",     "name": "Player",      "cat": "party", "element": 6,
-	  "hp": 500, "atk": 80, "def": 20, "spd": 3.6, "mp": 200,
-	  "skills": "LMB: Vụt kiếm (0s)\nQ: Vụt sáng 80st (0.6s)\nR: Chém Xoáy 150st (1.0s)\nSPACE: Nhảy",
+	  "hp": 20, "atk": 1, "def": 0, "spd": 4.2, "stamina": 150,
+	  "skills": "LMB: Chém\nQ: Vụt sáng (0.6s)\nR: Chém Xoáy (1.0s)\nSPACE: Nhảy",
 	  "spawn": "Overworld" },
 
 	{ "id": "carp",       "name": "Carp",        "cat": "fish", "fi": 0,
-	  "hp": 60, "atk": 0, "def": 0, "spd": 1.4, "spawn": "Silt / Sand lakes" },
+	  "hp": 15, "atk": 0, "def": 0, "spd": 1.4, "spawn": "Silt / Sand lakes" },
 	{ "id": "perch",      "name": "Climbing Perch", "cat": "fish", "fi": 1,
-	  "hp": 40, "atk": 0, "def": 0, "spd": 2.0, "spawn": "Silt / Sand lakes" },
+	  "hp": 10, "atk": 0, "def": 0, "spd": 2.0, "spawn": "Silt / Sand lakes" },
 	{ "id": "tilapia",    "name": "Red Tilapia", "cat": "fish", "fi": 2,
-	  "hp": 50, "atk": 0, "def": 0, "spd": 1.8, "spawn": "Silt / Sand lakes" },
+	  "hp": 12, "atk": 0, "def": 0, "spd": 1.8, "spawn": "Silt / Sand lakes" },
 	{ "id": "snakehead",  "name": "Snakehead",   "cat": "fish", "fi": 3,
-	  "hp": 70, "atk": 0, "def": 0, "spd": 1.5, "spawn": "Silt / Sand lakes" },
+	  "hp": 20, "atk": 3, "def": 0, "spd": 1.5, "spawn": "Silt / Sand lakes" },
 	{ "id": "flowerhorn", "name": "Flowerhorn",  "cat": "fish", "fi": 4,
-	  "hp": 70, "atk": 25, "def": 5, "spd": 1.2, "spawn": "Silt / Sand lakes" },
+	  "hp": 15, "atk": 5, "def": 0, "spd": 1.2, "spawn": "Silt / Sand lakes" },
 	{ "id": "shrimp",     "name": "Freshwater Shrimp", "cat": "fish", "fi": 5,
-	  "hp": 15, "atk": 0, "def": 0, "spd": 0.8, "spawn": "Silt / Sand lakes (bottom)" },
+	  "hp": 5, "atk": 0, "def": 0, "spd": 0.8, "spawn": "Silt / Sand lakes (bottom)" },
 ]
 
 const BG_DEEP := Color(0.06, 0.04, 0.12)
@@ -382,7 +382,7 @@ func _update_preview() -> void:
 	if data["cat"] == "party":
 		var en: String = _get_element_name(data.get("element", 0))
 		_preview_element.text = en
-		_preview_stats.text = tr("LIB_STATS_FORMAT") % [data["hp"], data["atk"], data["def"], data["spd"], data["mp"]]
+		_preview_stats.text = tr("LIB_STATS_FORMAT") % [data["hp"], data["atk"], data["def"], data["spd"], data.get("stamina", 0)]
 		_preview_skills.text = data.get("skills", "")
 		_preview_spawn.text = "📍 " + data["spawn"]
 	else:

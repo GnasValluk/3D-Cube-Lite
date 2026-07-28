@@ -63,8 +63,11 @@ var _debug_speed_slider: HSlider
 var _debug_weather_btn: Button
 var _time_label: Label
 var _coords_label: Label
-var _biome_label: Label  # hiển thị tên biome + continent value góc trái
 var _temperature_label: Label  # hiển thị nhiệt độ góc phải
+var _zoom_slider: VSlider
+var _zoom_slider_timer: float = 0.0
+var _zoom_slider_label: Label
+var _last_tp_zoom: float = -1.0
 var _hud_throttle: float = 0.0
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
@@ -75,6 +78,16 @@ func _ready() -> void:
 	_setup_ui()
 	await get_tree().process_frame
 	_find_and_track()
+	var rig := get_parent().get_node_or_null("CameraRig") as Node3D
+	if rig and rig.has_signal("zoom_changed"):
+		rig.zoom_changed.connect(func(v: float):
+			var zmin: float = rig.zoom_min if "zoom_min" in rig else 4.0
+			var zmax: float = rig.zoom_max if "zoom_max" in rig else 55.0
+			_on_zoom_changed(v, zmin, zmax)
+		)
+	var tp_init := get_parent().get_node_or_null("TPCameraRig")
+	if tp_init:
+		_last_tp_zoom = tp_init.distance if "distance" in tp_init else 5.0
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_TRANSLATION_CHANGED:
@@ -123,21 +136,6 @@ func _setup_ui() -> void:
 	_switch_hint.add_theme_constant_override("shadow_offset_y", 1)
 	_switch_hint.text = tr("SWITCH_HINT")
 	add_child(_switch_hint)
-
-	var dim_label := Label.new()
-	dim_label.name = "DimensionLabel"
-	dim_label.position = Vector2(17, 56)
-	dim_label.add_theme_font_size_override("font_size", 16)
-	dim_label.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.65))
-	dim_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.5))
-	dim_label.add_theme_constant_override("shadow_offset_x", 1)
-	dim_label.add_theme_constant_override("shadow_offset_y", 1)
-	var owm: OpenWorldManager = get_node_or_null("../WorldManager") as OpenWorldManager
-	if owm:
-		dim_label.text = owm.dimension_name
-	else:
-		dim_label.text = "REAL WORLD"
-	add_child(dim_label)
 
 	_settings_ui = SettingsUI.new()
 	add_child(_settings_ui)
@@ -205,6 +203,7 @@ func _setup_ui() -> void:
 
 	_setup_oxygen_bar()
 	_setup_time_label()
+	_setup_zoom_slider()
 	_setup_debug_menu()
 	_setup_mobile_controls()
 
@@ -326,12 +325,8 @@ func _process(delta: float) -> void:
 			if pos_src and is_instance_valid(pos_src) and pos_src.is_inside_tree():
 				var p := pos_src.global_position
 				_coords_label.text = "X %.1f  Y %.1f  Z %.1f" % [p.x, p.y, p.z]
-				if _biome_label:
-					_biome_label.text = _get_biome_name_at(p.x, p.z)
 			else:
 				_coords_label.text = ""
-				if _biome_label:
-					_biome_label.text = ""
 
 	if _mini_map:
 		_mini_map.visible = _explore_sys != null and get_parent().has_node("WorldManager") and not (_explore_map and _explore_map.visible)
@@ -344,10 +339,24 @@ func _process(delta: float) -> void:
 	if _coords_label:
 		_coords_label.size = Vector2(308, 26)
 		_coords_label.position = Vector2(vp.x - _coords_label.size.x - 17, 64)
-		if _biome_label:
-			_biome_label.position = Vector2(17, 87)
 	if _temperature_label:
 		_temperature_label.position = Vector2(vp.x - _temperature_label.size.x - 17, 86)
+
+	var tp_rig := get_parent().get_node_or_null("TPCameraRig")
+	if tp_rig and is_instance_valid(tp_rig) and "distance" in tp_rig:
+		var tp_dist: float = tp_rig.distance
+		if tp_dist != _last_tp_zoom:
+			_last_tp_zoom = tp_dist
+			var tp_min: float = tp_rig.zoom_min if "zoom_min" in tp_rig else 2.0
+			var tp_max: float = tp_rig.zoom_max if "zoom_max" in tp_rig else 12.0
+			_on_zoom_changed(tp_dist, tp_min, tp_max)
+	if _zoom_slider.visible:
+		_zoom_slider.position = Vector2(vp.x - 48, (vp.y - _zoom_slider.size.y) * 0.5)
+		_zoom_slider_label.position = Vector2(vp.x - 48, (vp.y - _zoom_slider.size.y) * 0.5 - 22)
+		_zoom_slider_timer -= delta
+		if _zoom_slider_timer <= 0.0:
+			_zoom_slider.visible = false
+			_zoom_slider_label.visible = false
 
 	if _debug_open:
 		_debug_panel.position = Vector2(vp.x * 0.5 - 228, vp.y * 0.5 - 169)
@@ -713,16 +722,6 @@ func _setup_time_label() -> void:
 	_coords_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(_coords_label)
 
-	# Biome label — góc trái, dưới coords
-	_biome_label = Label.new()
-	_biome_label.add_theme_font_size_override("font_size", 18)
-	_biome_label.add_theme_color_override("font_color", Color(0.90, 0.85, 0.55, 0.85))
-	_biome_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
-	_biome_label.add_theme_constant_override("shadow_offset_x", 1)
-	_biome_label.add_theme_constant_override("shadow_offset_y", 1)
-	_biome_label.text = ""
-	add_child(_biome_label)
-
 	_temperature_label = Label.new()
 	_temperature_label.add_theme_font_size_override("font_size", 18)
 	_temperature_label.add_theme_color_override("font_color", Color(0.95, 0.60, 0.30, 0.80))
@@ -731,6 +730,55 @@ func _setup_time_label() -> void:
 	_temperature_label.add_theme_constant_override("shadow_offset_y", 1)
 	_temperature_label.text = ""
 	add_child(_temperature_label)
+
+func _setup_zoom_slider() -> void:
+	_zoom_slider = VSlider.new()
+	_zoom_slider.name = "ZoomSlider"
+	_zoom_slider.visible = false
+	_zoom_slider.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_zoom_slider.min_value = 4.0
+	_zoom_slider.max_value = 55.0
+	_zoom_slider.step = 1.0
+	var ss := StyleBoxFlat.new()
+	ss.bg_color = Color(0.10, 0.07, 0.18, 0.70)
+	ss.corner_radius_top_left = 6; ss.corner_radius_top_right = 6
+	ss.corner_radius_bottom_left = 6; ss.corner_radius_bottom_right = 6
+	ss.border_width_left = 1; ss.border_width_right = 1
+	ss.border_width_top = 1; ss.border_width_bottom = 1
+	ss.border_color = Color(0.40, 0.30, 0.60, 0.5)
+	_zoom_slider.add_theme_stylebox_override("slider", ss)
+	var grabber := StyleBoxFlat.new()
+	grabber.bg_color = Color(0.22, 0.62, 0.28, 0.85)
+	grabber.corner_radius_top_left = 4; grabber.corner_radius_top_right = 4
+	grabber.corner_radius_bottom_left = 4; grabber.corner_radius_bottom_right = 4
+	_zoom_slider.add_theme_stylebox_override("grabber", grabber)
+	_zoom_slider.add_theme_color_override("grabber_color", Color(0.22, 0.62, 0.28))
+	_zoom_slider.add_theme_constant_override("grabber_ratio", 0.15)
+	_zoom_slider.size = Vector2(28, 160)
+	add_child(_zoom_slider)
+
+	_zoom_slider_label = Label.new()
+	_zoom_slider_label.name = "ZoomSliderLabel"
+	_zoom_slider_label.visible = false
+	_zoom_slider_label.add_theme_font_size_override("font_size", 14)
+	_zoom_slider_label.add_theme_color_override("font_color", Color(0.82, 0.78, 0.95, 0.80))
+	_zoom_slider_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
+	_zoom_slider_label.add_theme_constant_override("shadow_offset_x", 1)
+	_zoom_slider_label.add_theme_constant_override("shadow_offset_y", 1)
+	_zoom_slider_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_zoom_slider_label.text = "4"
+	add_child(_zoom_slider_label)
+
+func _on_zoom_changed(value: float, v_min: float = 4.0, v_max: float = 55.0) -> void:
+	if not is_instance_valid(_zoom_slider):
+		return
+	_zoom_slider.visible = true
+	_zoom_slider_label.visible = true
+	_zoom_slider.min_value = v_min
+	_zoom_slider.max_value = v_max
+	_zoom_slider.value = clamp(value, v_min, v_max)
+	_zoom_slider_label.text = str(int(value))
+	_zoom_slider_timer = 2.0
 
 func _setup_debug_menu() -> void:
 	_debug_panel = Panel.new()

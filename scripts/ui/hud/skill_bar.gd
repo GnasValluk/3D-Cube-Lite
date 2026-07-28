@@ -102,13 +102,13 @@ func _setup_slots() -> void:
 		cd_label.visible = false
 		panel.add_child(cd_label)
 
-		var mana_dim := ColorRect.new()
-		mana_dim.size = slot_size
-		mana_dim.position = Vector2.ZERO
-		mana_dim.color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.30)
-		mana_dim.mouse_filter = MOUSE_FILTER_IGNORE
-		mana_dim.visible = false
-		panel.add_child(mana_dim)
+		var stamina_dim := ColorRect.new()
+		stamina_dim.size = slot_size
+		stamina_dim.position = Vector2.ZERO
+		stamina_dim.color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.30)
+		stamina_dim.mouse_filter = MOUSE_FILTER_IGNORE
+		stamina_dim.visible = false
+		panel.add_child(stamina_dim)
 
 		var sd: Dictionary = {}
 		sd["idx"] = i
@@ -117,10 +117,10 @@ func _setup_slots() -> void:
 		sd["hotkey"] = hotkey
 		sd["cd_overlay"] = cd_overlay
 		sd["cd_label"] = cd_label
-		sd["mana_dim"] = mana_dim
+		sd["stamina_dim"] = stamina_dim
 		sd["cd_var"] = ""
 		sd["max_cd_var"] = ""
-		sd["mana_cost_var"] = ""
+		sd["stamina_cost_var"] = ""
 		sd["bg"] = bg
 
 		var stack_lbl := Label.new()
@@ -146,13 +146,13 @@ func _process(_delta: float) -> void:
 		var overlay: ColorRect = sd["cd_overlay"]
 		var label: Label = sd["cd_label"]
 		var stack_lbl: Label = sd["stack_label"]
-		var mana_dim: ColorRect = sd["mana_dim"]
+		var stamina_dim: ColorRect = sd["stamina_dim"]
 		var cd_var: String = sd["cd_var"]
 		if cd_var == "":
 			overlay.visible = false
 			label.visible = false
 			stack_lbl.visible = false
-			mana_dim.visible = false
+			stamina_dim.visible = false
 			continue
 		var cd: float = _tracked.get(cd_var)
 		if cd > 0.0:
@@ -160,18 +160,18 @@ func _process(_delta: float) -> void:
 			label.visible = true
 			label.text = str(ceili(cd))
 			stack_lbl.visible = false
-			mana_dim.visible = false
+			stamina_dim.visible = false
 		else:
 			if overlay.visible:
 				overlay.visible = false
 				label.visible = false
-			var mana_cost_var: String = sd["mana_cost_var"]
-			var insufficient_mana: bool = false
-			if mana_cost_var != "" and _tracked.has_method("try_skill"):
-				var cost: int = _tracked.get(mana_cost_var)
-				if cost > 0 and _tracked.mana < cost:
-					insufficient_mana = true
-			mana_dim.visible = insufficient_mana
+			var stamina_cost_var: String = sd["stamina_cost_var"]
+			var insufficient_stamina: bool = false
+			if stamina_cost_var != "" and _tracked.has_method("try_skill"):
+				var cost: int = _tracked.get(stamina_cost_var)
+				if cost > 0 and _tracked.stamina < cost:
+					insufficient_stamina = true
+			stamina_dim.visible = insufficient_stamina
 			if "_q_stacks" in _tracked and sd["idx"] == 1 and cd_var == "_q_cd":
 				var stacks: int = _tracked.get("_q_stacks")
 				if stacks > 1:
@@ -185,10 +185,10 @@ func _process(_delta: float) -> void:
 func _slot_hide_cd(sd: Dictionary) -> void:
 	var overlay: ColorRect = sd["cd_overlay"]
 	var label: Label = sd["cd_label"]
-	var mana_dim: ColorRect = sd["mana_dim"]
+	var stamina_dim: ColorRect = sd["stamina_dim"]
 	overlay.visible = false
 	label.visible = false
-	mana_dim.visible = false
+	stamina_dim.visible = false
 
 func track(ch: CharacterBase) -> void:
 	_tracked = ch
@@ -198,15 +198,15 @@ func track(ch: CharacterBase) -> void:
 	_element_color = Color(0.38, 0.30, 0.55)
 
 	var skills: Array[Dictionary] = [
-		{ "idx": 0, "key": "LMB", "cd_var": "_lmb_cd", "max_cd_var": "lmb_cooldown", "mana_cost_var": "mana_cost_lmb" },
-		{ "idx": 1, "key": "Q",   "cd_var": "_q_cd",   "max_cd_var": "q_cooldown",   "mana_cost_var": "mana_cost_q" },
-		{ "idx": 2, "key": "R",   "cd_var": "_r_cd",   "max_cd_var": "r_cooldown",   "mana_cost_var": "mana_cost_r" },
+		{ "idx": 0, "key": "LMB", "cd_var": "_lmb_cd", "max_cd_var": "lmb_cooldown", "stamina_cost_var": "stamina_cost_lmb" },
+		{ "idx": 1, "key": "Q",   "cd_var": "_q_cd",   "max_cd_var": "q_cooldown",   "stamina_cost_var": "stamina_cost_q" },
+		{ "idx": 2, "key": "R",   "cd_var": "_r_cd",   "max_cd_var": "r_cooldown",   "stamina_cost_var": "stamina_cost_r" },
 	]
 
 	if ch.has_method("is_flying"):
-		skills.append({ "idx": 3, "key": "FLY", "cd_var": "_flight_cd", "max_cd_var": "flight_cooldown", "mana_cost_var": "" })
+		skills.append({ "idx": 3, "key": "FLY", "cd_var": "_flight_cd", "max_cd_var": "flight_cooldown", "stamina_cost_var": "" })
 	else:
-		skills.append({ "idx": 3, "key": "SPACE", "cd_var": "", "max_cd_var": "", "mana_cost_var": "" })
+		skills.append({ "idx": 3, "key": "SPACE", "cd_var": "", "max_cd_var": "", "stamina_cost_var": "" })
 
 	for i in range(4):
 		var slot: Dictionary = _slots[i]
@@ -225,4 +225,4 @@ func track(ch: CharacterBase) -> void:
 		slot["hotkey"].text = s.key
 		slot["cd_var"] = s.cd_var
 		slot["max_cd_var"] = s.max_cd_var
-		slot["mana_cost_var"] = s.mana_cost_var
+		slot["stamina_cost_var"] = s.stamina_cost_var

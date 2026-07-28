@@ -9,7 +9,7 @@ signal damage_taken(amount: int, attacker: Node3D)
 signal died(attacker: Node3D)
 signal hp_changed(current: int, max_hp: int)
 signal shield_changed(current: int)
-signal mana_changed(current: int, max_mana: int)
+signal stamina_changed(current: int, max_stamina: int)
 signal oxygen_changed(current: int, max_oxygen: int)
 signal level_up(new_level: int)
 signal submerged(underwater: bool)
@@ -49,31 +49,31 @@ const DAMAGE_TYPE_NAMES: Dictionary = {
 @export var dash_duration:      float = 0.18
 @export var dash_cooldown:      float = 0.80
 @export var attack_duration:    float = 0.45
-@export var melee_damage:       int   = 10
+@export var melee_damage:       int   = 0
 @export var melee_range:        float = 2.0
 @export var auto_aim_range:     float = 20.0
 @export var lmb_cooldown:       float = 0.0
 @export var q_cooldown:         float = 0.0
 @export var r_cooldown:         float = 0.0
 @export var cooldown_rate:      float = 1.0
-@export var sprint_mana_cost:   float = 0.5
+@export var sprint_stamina_cost:   float = 0.5
 @export var crouch_speed:       float = 2.5
 
-# ── Mana ──────────────────────────────────────────────────────────────────────
-@export var max_mana:            int   = 200
-@export var mana:                int   = 200
-@export var mp_regen:            float = 2.0
-@export var mp_refund:           int   = 5
-@export var mana_cost_lmb:       int   = 0
-@export var mana_cost_q:         int   = 0
-@export var mana_cost_r:         int   = 0
+# ── Stamina ───────────────────────────────────────────────────────────────────
+@export var max_stamina:            int   = 100
+@export var stamina:                int   = 100
+@export var stamina_regen:          float = 5.0
+@export var stamina_refund:         int   = 3
+@export var stamina_cost_lmb:       int   = 0
+@export var stamina_cost_q:         int   = 0
+@export var stamina_cost_r:         int   = 0
 @export var level:               int   = 1
 @export var exp:                 int   = 0
 @export var exp_to_next:         int   = 100
 @export var crit_rate:           float = 0.05
 @export var crit_dmg:            float = 0.50
-var _mana_regen_acc: float = 0.0
-var _sprint_mana_acc: float = 0.0
+var _stamina_regen_acc: float = 0.0
+var _sprint_stamina_acc: float = 0.0
 
 var is_alive: bool = true
 var character_name: String = ""
@@ -157,7 +157,7 @@ func _ready() -> void:
 	_grav_fall = (2.0 * jump_height) / (jump_time_fall * jump_time_fall)
 	_build_character()
 	hp = max_hp
-	mana = max_mana
+	stamina = max_stamina
 	oxygen = max_oxygen
 	await get_tree().process_frame
 	if _is_player:
@@ -185,12 +185,12 @@ func _process(delta: float) -> void:
 	_freeze_timer = max(_freeze_timer - delta, 0.0)
 	_han_bang_buff = max(_han_bang_buff - delta, 0.0)
 
-	# Mana regen
-	_mana_regen_acc += mp_regen * delta
-	if _mana_regen_acc >= 1.0:
-		var gain: int = int(_mana_regen_acc)
-		_mana_regen_acc -= gain
-		add_mana(gain)
+	# Stamina regen
+	_stamina_regen_acc += stamina_regen * delta
+	if _stamina_regen_acc >= 1.0:
+		var gain: int = int(_stamina_regen_acc)
+		_stamina_regen_acc -= gain
+		add_stamina(gain)
 
 	if not _active:
 		var cd_delta: float = delta * cooldown_rate
@@ -302,16 +302,16 @@ func add_shield(amount: int) -> void:
 	shield += amount
 	shield_changed.emit(shield)
 
-func add_mana(amount: int) -> void:
-	mana = mini(mana + amount, max_mana)
-	mana_changed.emit(mana, max_mana)
+func add_stamina(amount: int) -> void:
+	stamina = mini(stamina + amount, max_stamina)
+	stamina_changed.emit(stamina, max_stamina)
 
 func try_skill(cost: int) -> bool:
-	if mana < cost:
+	if stamina < cost:
 		return false
-	mana -= cost
-	mana = mini(mana + mp_refund, max_mana)
-	mana_changed.emit(mana, max_mana)
+	stamina -= cost
+	stamina = mini(stamina + stamina_refund, max_stamina)
+	stamina_changed.emit(stamina, max_stamina)
 	return true
 
 func heal(amount: int) -> void:
@@ -441,7 +441,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					_on_show_animation()
 			if k.keycode == KEY_R:
 				if _r_cd <= 0.0 and _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
-					if not try_skill(mana_cost_r):
+					if not try_skill(stamina_cost_r):
 						return
 					_aim_dir = _calc_aim_dir()
 					var fwd := global_transform.basis.z
@@ -460,7 +460,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.pressed:
 			if mb.button_index == MOUSE_BUTTON_LEFT:
 				if _lmb_cd <= 0.0 and _freeze_timer <= 0.0 and _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
-					if not try_skill(mana_cost_lmb):
+					if not try_skill(stamina_cost_lmb):
 						return
 					_aim_dir = _calc_aim_dir()
 					var fwd := global_transform.basis.z
@@ -611,17 +611,17 @@ func _physics_process(delta: float) -> void:
 	if _is_player:
 		crouching = Input.is_key_pressed(KEY_CTRL)
 		sprinting = Input.is_key_pressed(KEY_SHIFT) and not crouching
-		if sprinting and sprint_mana_cost > 0.0 and dir.length_squared() > 0.001:
-			_sprint_mana_acc += sprint_mana_cost * delta
-			if _sprint_mana_acc >= 1.0:
-				var drain: int = int(_sprint_mana_acc)
-				_sprint_mana_acc -= drain
-				mana = maxi(0, mana - drain)
-				if mana <= 0:
+		if sprinting and sprint_stamina_cost > 0.0 and dir.length_squared() > 0.001:
+			_sprint_stamina_acc += sprint_stamina_cost * delta
+			if _sprint_stamina_acc >= 1.0:
+				var drain: int = int(_sprint_stamina_acc)
+				_sprint_stamina_acc -= drain
+				stamina = maxi(0, stamina - drain)
+				if stamina <= 0:
 					sprinting = false
-				mana_changed.emit(mana, max_mana)
+				stamina_changed.emit(stamina, max_stamina)
 		else:
-			_sprint_mana_acc = 0.0
+			_sprint_stamina_acc = 0.0
 	else:
 		crouching = false
 		sprinting = false
@@ -650,7 +650,7 @@ func _physics_process(delta: float) -> void:
 	if _is_player:
 		want_dash = Input.is_key_pressed(KEY_Q) and _q_cd <= 0.0 and _freeze_timer <= 0.0 and not attacking and not devouring
 	if want_dash:
-		if not try_skill(mana_cost_q):
+		if not try_skill(stamina_cost_q):
 			return
 		var di := _read_input()
 		if di.length_squared() > 0.001:
@@ -703,6 +703,7 @@ func _do_melee_hit() -> void:
 			match pc.equipped_weapon.id:
 				"dai_kiem": range_scale = 1.5; angle_threshold = 0.25
 				"giao_dai": range_scale = 1.5
+				"iron_halberd": range_scale = 1.6; angle_threshold = 0.25
 	var mgr := _find_character_manager()
 	if mgr == null:
 		return
@@ -716,7 +717,12 @@ func _do_melee_hit() -> void:
 				var dot: float = fwd.dot(offset / dist)
 				if dot >= angle_threshold:
 					SFXManager.play_damage_hit()
-					ch.take_damage(calc_skill_damage(melee_damage), self)
+					var dmg: int = attack_power
+					if _is_player:
+						var pc := self as PlayerCharacter
+						if pc and pc.equipped_weapon:
+							dmg += pc.equipped_weapon.atk_bonus
+					ch.take_damage(dmg, self)
 	# Also hit fish in FishSpawner
 	var spawner := _find_fish_spawner()
 	if spawner:
@@ -729,7 +735,31 @@ func _do_melee_hit() -> void:
 					var dot: float = fwd.dot(offset / dist)
 					if dot >= angle_threshold:
 						SFXManager.play_damage_hit()
-						f.take_damage(calc_skill_damage(melee_damage), self)
+						var dmg: int = attack_power
+						if _is_player:
+							var pc := self as PlayerCharacter
+							if pc and pc.equipped_weapon:
+								dmg += pc.equipped_weapon.atk_bonus
+						f.take_damage(dmg, self)
+
+	# Also hit pigs in PigSpawner
+	var pig_nodes := get_tree().get_nodes_in_group("pig")
+	for pn in pig_nodes:
+		if not is_instance_valid(pn) or not pn.get("is_alive"):
+			continue
+		var offset: Vector3 = pn.global_position - global_position
+		offset.y = 0.0
+		var dist: float = offset.length()
+		if dist <= melee_range * range_scale:
+			var dot: float = fwd.dot(offset / dist)
+			if dot >= angle_threshold:
+				SFXManager.play_damage_hit()
+				var dmg: int = attack_power
+				if _is_player:
+					var pc := self as PlayerCharacter
+					if pc and pc.equipped_weapon:
+						dmg += pc.equipped_weapon.atk_bonus
+				pn.take_damage(dmg, self)
 
 	# Also hit destroyable props (đèn, cây, v.v.)
 	var weapon_id: String = ""

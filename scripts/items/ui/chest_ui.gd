@@ -27,13 +27,19 @@ var _chest = null
 var _player_ref: PlayerCharacter = null
 var _chest_faces: Array[ColorRect] = []
 var _chest_counts: Array[Label] = []
+var _chest_panels: Array[Panel] = []
 var _player_faces: Array[ColorRect] = []
 var _player_counts: Array[Label] = []
+var _player_panels: Array[Panel] = []
 var _hotbar_faces: Array[ColorRect] = []
 var _hotbar_counts: Array[Label] = []
+var _hotbar_panels: Array[Panel] = []
 
 var _content_h: float = 0.0
 var _slot_style: StyleBoxFlat
+var _slot_hover_style: StyleBoxFlat
+var _slot_drop_style: StyleBoxFlat
+var _slot_script: GDScript
 
 func _ready() -> void:
 	_content_h = _build_layout()
@@ -52,6 +58,29 @@ func _ready() -> void:
 	_slot_style.border_width_top = 2
 	_slot_style.border_width_bottom = 2
 	_slot_style.border_color = Color(0.85, 0.80, 0.95, 0.10)
+
+	_slot_hover_style = _slot_style.duplicate()
+	_slot_hover_style.bg_color = Color(0.22, 0.18, 0.35, 0.80)
+	_slot_hover_style.border_color = Color(0.55, 0.57, 0.62, 0.60)
+
+	_slot_drop_style = _slot_style.duplicate()
+	_slot_drop_style.bg_color = Color(0.18, 0.35, 0.22, 0.75)
+	_slot_drop_style.border_color = Color(0.22, 0.62, 0.28, 0.60)
+
+	_slot_script = GDScript.new()
+	_slot_script.source_code = """
+extends Panel
+var _chest_ui = null
+var _chest_type = ""  # "chest","player","hotbar"
+var _chest_idx = -1
+func _get_drag_data(at_position):
+	return _chest_ui._slot_get_drag_data(_chest_type, _chest_idx, at_position) if _chest_ui else null
+func _can_drop_data(position, data):
+	return _chest_ui._slot_can_drop_data(_chest_type, _chest_idx, position, data) if _chest_ui else false
+func _drop_data(position, data):
+	if _chest_ui: _chest_ui._slot_drop_data(_chest_type, _chest_idx, position, data)
+"""
+	_slot_script.reload()
 
 	_setup_background()
 	_setup_title()
@@ -98,12 +127,18 @@ func _setup_title() -> void:
 	title.size = Vector2(GRID_W, 30)
 	add_child(title)
 
-func _make_slot(px: float, py: float, faces: Array, counts: Array) -> Panel:
+func _make_slot(px: float, py: float, faces: Array, counts: Array, panels: Array, slot_type: String, slot_idx: int) -> Panel:
 	var panel := Panel.new()
 	panel.size = Vector2(SLOT_SIZE, SLOT_SIZE)
 	panel.position = Vector2(px, py)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.add_theme_stylebox_override("panel", _slot_style)
+	panel.set_script(_slot_script)
+	panel._chest_ui = self
+	panel._chest_type = slot_type
+	panel._chest_idx = slot_idx
+	panel.mouse_entered.connect(_on_slot_entered.bind(panels, slot_type, slot_idx))
+	panel.mouse_exited.connect(_on_slot_exited.bind(panels))
 	add_child(panel)
 
 	var face := ColorRect.new()
@@ -121,6 +156,8 @@ func _make_slot(px: float, py: float, faces: Array, counts: Array) -> Panel:
 	cnt.add_theme_color_override("font_color", TEXT_DIM)
 	panel.add_child(cnt)
 	counts.append(cnt)
+
+	panels.append(panel)
 
 	return panel
 
@@ -141,7 +178,7 @@ func _setup_chest_grid() -> void:
 			var px: float = sx + col * (SLOT_SIZE + GAP)
 			var pyf: float = sy + row * (SLOT_SIZE + GAP)
 			var i: int = row * COLS + col
-			var panel := _make_slot(px, pyf, _chest_faces, _chest_counts)
+			var panel := _make_slot(px, pyf, _chest_faces, _chest_counts, _chest_panels, "chest", i)
 			panel.gui_input.connect(_on_slot_gui_input.bind("chest", i))
 
 func _setup_player_grid() -> void:
@@ -161,52 +198,179 @@ func _setup_player_grid() -> void:
 			var i: int = 9 + row * COLS + col
 			var px: float = sx + col * (SLOT_SIZE + GAP)
 			var py2: float = py + row * (SLOT_SIZE + GAP)
-			var panel := _make_slot(px, py2, _player_faces, _player_counts)
+			var panel := _make_slot(px, py2, _player_faces, _player_counts, _player_panels, "player", i)
 			panel.gui_input.connect(_on_slot_gui_input.bind("player", i))
 
 	var hot_y: float = py + 3 * (SLOT_SIZE + GAP) + 6
 	for col in range(COLS):
 		var i: int = col
 		var px: float = sx + col * (SLOT_SIZE + GAP)
-		var panel := _make_slot(px, hot_y, _hotbar_faces, _hotbar_counts)
+		var panel := _make_slot(px, hot_y, _hotbar_faces, _hotbar_counts, _hotbar_panels, "hotbar", i)
 		panel.gui_input.connect(_on_slot_gui_input.bind("hotbar", i))
 
 func _on_slot_gui_input(event: InputEvent, _type: String, idx: int) -> void:
 	if not visible or _chest == null or _player_ref == null:
 		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if _type == "chest":
-			_transfer_from_chest(idx)
-		else:
-			_transfer_to_chest(idx, _type)
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_RIGHT:
+			_on_slot_right_click(_type, idx)
 
-func _transfer_from_chest(idx: int) -> void:
+func _on_slot_right_click(_type: String, idx: int) -> void:
+	var inv: Inventory = _get_inv(_type)
+	if inv == null:
+		return
+	var slot: ItemSlot = inv.slots[idx]
+	if slot.is_empty():
+		return
+	var count: int = slot.count
+	var half: int = count / 2
+	if half < 1:
+		return
+	if _type == "chest":
+		_transfer_from_chest(idx, half)
+	else:
+		_transfer_to_chest(idx, _type, half)
+
+func _get_inv(_type: String) -> Inventory:
+	match _type:
+		"chest": return _chest.inventory if _chest else null
+		"player", "hotbar": return _player_ref.inventory if _player_ref else null
+	return null
+
+func _transfer_from_chest(idx: int, count: int) -> void:
 	var ci = _chest.inventory
 	var pi = _player_ref.inventory
 	if ci == null or pi == null:
 		return
 	var slot: ItemSlot = ci.slots[idx]
-	if slot.is_empty():
+	if slot.is_empty() or count < 1:
 		return
-	var item: ItemDef = slot.item
-	var count: int = slot.count
-	var remaining: int = pi.add_item(item, count)
+	var remaining: int = pi.add_item(slot.item, count)
 	if remaining < count:
 		ci.remove_item(idx, count - remaining)
 
-func _transfer_to_chest(idx: int, _type: String) -> void:
+func _transfer_to_chest(idx: int, _type: String, count: int) -> void:
 	var ci = _chest.inventory
 	var pi = _player_ref.inventory
 	if ci == null or pi == null:
 		return
 	var slot: ItemSlot = pi.slots[idx]
-	if slot.is_empty():
+	if slot.is_empty() or count < 1:
 		return
-	var item: ItemDef = slot.item
-	var count: int = slot.count
-	var remaining: int = ci.add_item(item, count)
+	var remaining: int = ci.add_item(slot.item, count)
 	if remaining < count:
 		pi.remove_item(idx, count - remaining)
+
+# ── Hover glow ──────────────────────────────────────────────────────────────────
+func _on_slot_entered(panels: Array, _type: String, idx: int) -> void:
+	for p in panels:
+		p.add_theme_stylebox_override("panel", _slot_style)
+	if idx >= 0 and idx < panels.size():
+		panels[idx].add_theme_stylebox_override("panel", _slot_hover_style)
+
+func _on_slot_exited(panels: Array) -> void:
+	for p in panels:
+		p.add_theme_stylebox_override("panel", _slot_style)
+
+# ── Drag & Drop ────────────────────────────────────────────────────────────────
+func _slot_get_drag_data(_type: String, idx: int, _at_position: Vector2):
+	var inv: Inventory = _get_inv(_type)
+	if inv == null:
+		return null
+	var slot: ItemSlot = inv.slots[idx]
+	if slot.is_empty():
+		return null
+	var data := { "from_type": _type, "from_idx": idx, "from_inv": inv, "item_id": slot.item.id, "count": slot.count }
+	var preview := Panel.new()
+	var ss: float = SLOT_SIZE
+	preview.size = Vector2(ss, ss)
+	var ps := _slot_style.duplicate()
+	ps.bg_color = Color(0.14, 0.10, 0.22, 0.90)
+	ps.border_color = Color(0.22, 0.62, 0.28, 0.70)
+	preview.add_theme_stylebox_override("panel", ps)
+	var face := ColorRect.new()
+	face.position = Vector2(3, 3)
+	face.size = Vector2(ss - 6, ss - 6)
+	face.color = slot.item.icon_color
+	preview.add_child(face)
+	var cnt := Label.new()
+	cnt.position = Vector2(3, ss - 22)
+	cnt.size = Vector2(ss - 6, 18)
+	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	cnt.add_theme_font_size_override("font_size", int(S * 10))
+	cnt.add_theme_color_override("font_color", TEXT_BRIGHT)
+	cnt.text = str(slot.count) if slot.count > 1 else ""
+	preview.add_child(cnt)
+	set_drag_preview(preview)
+	return data
+
+func _slot_can_drop_data(_type: String, idx: int, _position: Vector2, data) -> bool:
+	if data == null or not (data is Dictionary):
+		return false
+	if not data.has("from_inv") or not data.has("from_idx"):
+		return false
+	var from_inv: Inventory = data["from_inv"]
+	var from_idx: int = data["from_idx"]
+	var src := from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
+	if src == null or src.is_empty():
+		return false
+	var dst_inv: Inventory = _get_inv(_type)
+	if dst_inv == null:
+		return false
+	var dst := dst_inv.slots[idx]
+	if dst.is_empty():
+		_highlight_drop(_type, idx, true)
+		return true
+	if dst.item.id == src.item.id and dst.item.stackable and dst.count < dst.item.max_stack:
+		_highlight_drop(_type, idx, true)
+		return true
+	return false
+
+func _slot_drop_data(_type: String, idx: int, _position: Vector2, data) -> void:
+	_clear_drop_highlights()
+	if data == null or not (data is Dictionary):
+		return
+	if not data.has("from_inv") or not data.has("from_idx"):
+		return
+	var from_inv: Inventory = data["from_inv"]
+	var from_idx: int = data["from_idx"]
+	var src := from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
+	if src == null or src.is_empty():
+		return
+	var dst_inv: Inventory = _get_inv(_type)
+	if dst_inv == null:
+		return
+	# Transfer via add/remove
+	var item: ItemDef = src.item
+	var count: int = src.count
+	if dst_inv == from_inv:
+		# Same inventory: prefer transfer, else swap
+		if dst_inv.can_transfer(from_idx, idx):
+			dst_inv.transfer(from_idx, idx)
+		else:
+			dst_inv.swap(from_idx, idx)
+	else:
+		# Cross-inventory
+		var remaining: int = dst_inv.add_item(item, count)
+		if remaining < count:
+			from_inv.remove_item(from_idx, count - remaining)
+
+func _highlight_drop(_type: String, idx: int, on: bool) -> void:
+	var panels: Array = []
+	match _type:
+		"chest": panels = _chest_panels
+		"player": panels = _player_panels
+		"hotbar": panels = _hotbar_panels
+	if idx >= 0 and idx < panels.size():
+		panels[idx].add_theme_stylebox_override("panel", _slot_drop_style if on else _slot_style)
+
+func _clear_drop_highlights() -> void:
+	for p in _chest_panels:
+		p.add_theme_stylebox_override("panel", _slot_style)
+	for p in _player_panels:
+		p.add_theme_stylebox_override("panel", _slot_style)
+	for p in _hotbar_panels:
+		p.add_theme_stylebox_override("panel", _slot_style)
 
 func open(chest, player: PlayerCharacter) -> void:
 	_chest = chest

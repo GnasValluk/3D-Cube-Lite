@@ -15,6 +15,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"chest": StructuresMesh.chest(parent)
 		"can_cau": ToolsMesh.fishing_rod_drop(parent)
 		"dai_kiem": ToolsMesh.greatsword_drop(parent)
+		"iron_halberd": ToolsMesh.iron_halberd_drop(parent)
 		"gang_tay_da_thu": ToolsMesh.gauntlet_drop(parent)
 		"no": ToolsMesh.no_drop(parent)
 		"phao_dua_hau": ToolsMesh.phao_dua_hau_drop(parent)
@@ -46,6 +47,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"raspberry": FruitMeshes.raspberry(parent)
 		"strawberry": FruitMeshes.strawberry(parent)
 		"tomato": FruitMeshes.tomato(parent)
+		"thit_heo_song": CreaturesMesh.meat(parent)
 		# ── Ores ──────────────────────────────────────────
 		"copper_ore": MaterialMeshes.ore(parent, Color(0.38, 0.29, 0.18), Color(0.70, 0.55, 0.15))
 		"bauxite_ore": MaterialMeshes.ore(parent, Color(0.55, 0.35, 0.25), Color(0.65, 0.55, 0.50))

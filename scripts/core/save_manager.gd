@@ -89,7 +89,7 @@ func _collect_player_data(cm: CharacterManager) -> Dictionary:
 	var pd = {
 		"name": ch.character_name,
 		"hp": ch.hp, "max_hp": ch.max_hp,
-		"mana": ch.mana, "max_mana": ch.max_mana,
+		"stamina": ch.stamina, "max_stamina": ch.max_stamina,
 		"oxygen": ch.oxygen, "max_oxygen": ch.max_oxygen,
 		"level": ch.level, "exp": ch.exp,
 		"shield": ch.shield,
@@ -183,8 +183,8 @@ func _apply_player_data(cm: CharacterManager, pd: Dictionary) -> void:
 	if ch == null: return
 	ch.hp = pd.get("hp", ch.max_hp)
 	ch.max_hp = pd.get("max_hp", ch.max_hp)
-	ch.mana = pd.get("mana", ch.max_mana)
-	ch.max_mana = pd.get("max_mana", ch.max_mana)
+	ch.stamina = pd.get("stamina", ch.max_stamina)
+	ch.max_stamina = pd.get("max_stamina", ch.max_stamina)
 	ch.oxygen = pd.get("oxygen", ch.max_oxygen)
 	ch.max_oxygen = pd.get("max_oxygen", ch.max_oxygen)
 	ch.level = pd.get("level", 1)

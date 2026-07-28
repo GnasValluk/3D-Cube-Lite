@@ -177,3 +177,33 @@ func from_dict(data: Array) -> void:
 		else:
 			slots[i].item = null
 			slots[i].count = 0
+
+func sort() -> void:
+	var filled: Array[ItemSlot] = []
+	for slot in slots:
+		if not slot.is_empty():
+			filled.append(slot)
+	for i in range(slots.size()):
+		slots[i].item = null
+		slots[i].count = 0
+	filled.sort_custom(func(a: ItemSlot, b: ItemSlot) -> bool:
+		if a.item.type != b.item.type:
+			return a.item.type < b.item.type
+		return a.item.name < b.item.name)
+	for i in range(mini(filled.size(), slots.size())):
+		slots[i].item = filled[i].item
+		slots[i].count = filled[i].count
+
+func split_stack(idx: int, count: int) -> int:
+	if idx < 0 or idx >= slots.size():
+		return -1
+	var slot: ItemSlot = slots[idx]
+	if slot.is_empty() or slot.count <= count:
+		return -1
+	var empty_idx: int = find_empty_slot()
+	if empty_idx < 0:
+		return -1
+	slots[empty_idx].item = slot.item
+	slots[empty_idx].count = count
+	slot.count -= count
+	return empty_idx

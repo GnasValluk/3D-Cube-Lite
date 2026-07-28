@@ -5,8 +5,10 @@ const SETTINGS_PATH: String = "user://settings.cfg"
 const SECTION: String = "settings"
 
 enum GraphicsPreset { STANDARD, ENHANCED, REALISTIC }
+enum FramerateLimit { FPS_60, FPS_120, UNLIMITED }
 
 static var graphics_preset: int = GraphicsPreset.STANDARD
+static var framerate_limit: int = FramerateLimit.FPS_60
 static var locale: String = "en"
 static var fullscreen: bool = false
 static var vsync: bool = true
@@ -73,6 +75,7 @@ func load_settings() -> void:
 	if config.load(SETTINGS_PATH) != OK:
 		return
 	graphics_preset = config.get_value(SECTION, "graphics_preset", GraphicsPreset.STANDARD)
+	framerate_limit = config.get_value(SECTION, "framerate_limit", FramerateLimit.FPS_60)
 	locale = config.get_value(SECTION, "locale", "en")
 	fullscreen = config.get_value(SECTION, "fullscreen", false)
 	vsync = config.get_value(SECTION, "vsync", true)
@@ -94,6 +97,10 @@ static func _apply_all() -> void:
 	TranslationServer.set_locale(locale)
 	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if fullscreen else DisplayServer.WINDOW_MODE_WINDOWED)
 	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
+	match framerate_limit:
+		FramerateLimit.FPS_60: Engine.max_fps = 60
+		FramerateLimit.FPS_120: Engine.max_fps = 120
+		FramerateLimit.UNLIMITED: Engine.max_fps = 0
 	var master_idx := AudioServer.get_bus_index("Master")
 	if master_idx >= 0:
 		AudioServer.set_bus_volume_db(master_idx, master_volume / 100.0 * 80.0 - 80.0)
@@ -116,6 +123,7 @@ static func _apply_all() -> void:
 static func save_settings() -> void:
 	var config := ConfigFile.new()
 	config.set_value(SECTION, "graphics_preset", graphics_preset)
+	config.set_value(SECTION, "framerate_limit", framerate_limit)
 	config.set_value(SECTION, "locale", locale)
 	config.set_value(SECTION, "fullscreen", fullscreen)
 	config.set_value(SECTION, "vsync", vsync)

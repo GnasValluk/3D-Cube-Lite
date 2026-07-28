@@ -12,6 +12,7 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"kiem":    _build_kiem(pivot)
 		"can_cau": _build_can_cau(pivot)
 		"dai_kiem": _build_dai_kiem(pivot)
+		"iron_halberd": _build_iron_halberd(pivot)
 		"gang_tay_da_thu": _build_gang_tay(pivot)
 		"no": _build_no(pivot)
 		"phao_dua_hau": _build_phao_dua_hau(pivot)
@@ -42,19 +43,40 @@ static func _cyl(p: Node3D, pos: Vector3, r: float, h: float, mat: StandardMater
 	p.add_child(mi)
 
 static func _build_cup(p: Node3D) -> void:
-	var wood := _mat(Color(0.55, 0.32, 0.10))
-	var iron := _mat(Color(0.62, 0.62, 0.68))
-	var iron_d := _mat(Color(0.40, 0.40, 0.46))
-	_cyl(p, Vector3(0, 0.18, 0), 0.04, 0.36, wood)
-	_box(p, Vector3(0, 0.38, 0), Vector3(0.07, 0.07, 0.28), iron)
-	_box(p, Vector3(0.04, 0.30, 0.10), Vector3(0.05, 0.16, 0.05), iron_d)
-	_box(p, Vector3(0.04, 0.30, -0.10), Vector3(0.05, 0.16, 0.05), iron_d)
-	_box(p, Vector3(0, 0.36, 0), Vector3(0.07, 0.07, 0.07), iron)
+	var wood := _mat(Color(0.52, 0.30, 0.10))
+	var wood_d := _mat(Color(0.38, 0.22, 0.07))
+	var iron := _mat(Color(0.60, 0.60, 0.66))
+	var iron_d := _mat(Color(0.38, 0.38, 0.44))
+	var iron_l := _mat(Color(0.72, 0.72, 0.78))
+	var wrap := _mat(Color(0.42, 0.28, 0.12))
+	# Handle — longer, with grip wrap at bottom
+	_cyl(p, Vector3(0, 0.16, 0), 0.035, 0.32, wood)
+	_cyl(p, Vector3(0, 0.06, 0), 0.040, 0.08, wood_d)
+	_box(p, Vector3(0, 0.04, 0), Vector3(0.005, 0.04, 0.005), wrap)
+	# Iron ferrule — ring connecting handle to head
+	_cyl(p, Vector3(0, 0.32, 0), 0.045, 0.04, iron_d)
+	_box(p, Vector3(0, 0.34, 0), Vector3(0.06, 0.03, 0.06), iron)
+	# Main head bar (crossbar) — centered on X
+	_box(p, Vector3(0.00, 0.38, 0.00), Vector3(0.07, 0.06, 0.28), iron)
+	_box(p, Vector3(0.00, 0.38, 0.00), Vector3(0.09, 0.04, 0.30), iron_d)
+	# Left prong — centered, extends in +Z
+	_box(p, Vector3(0.00, 0.34, 0.12), Vector3(0.05, 0.12, 0.06), iron)
+	_box(p, Vector3(0.00, 0.36, 0.16), Vector3(0.04, 0.10, 0.05), iron_d)
+	_box(p, Vector3(0.00, 0.32, 0.10), Vector3(0.06, 0.06, 0.04), iron_d)
+	# Right prong — centered, extends in -Z
+	_box(p, Vector3(0.00, 0.34, -0.12), Vector3(0.05, 0.12, 0.06), iron)
+	_box(p, Vector3(0.00, 0.36, -0.16), Vector3(0.04, 0.10, 0.05), iron_d)
+	_box(p, Vector3(0.00, 0.32, -0.10), Vector3(0.06, 0.06, 0.04), iron_d)
+	# Center tip (point) — centered
+	_box(p, Vector3(0.00, 0.38, 0.00), Vector3(0.05, 0.06, 0.06), iron_l)
+	# Prong tips — lighter metal
+	_box(p, Vector3(0.00, 0.38, 0.18), Vector3(0.03, 0.06, 0.03), iron_l)
+	_box(p, Vector3(0.00, 0.38, -0.18), Vector3(0.03, 0.06, 0.03), iron_l)
 
 static func _build_xeng(p: Node3D) -> void:
 	var wood := _mat(Color(0.55, 0.32, 0.10))
-	var iron := _mat(Color(0.68, 0.65, 0.55))
-	var iron_d := _mat(Color(0.45, 0.42, 0.35))
+	var iron := _mat(Color(0.60, 0.60, 0.66))
+	var iron_d := _mat(Color(0.40, 0.40, 0.46))
 	_cyl(p, Vector3(0, 0.18, 0), 0.04, 0.36, wood)
 	_box(p, Vector3(0, 0.44, 0), Vector3(0.025, 0.30, 0.24), iron)
 	_box(p, Vector3(0, 0.30, 0), Vector3(0.030, 0.035, 0.28), iron_d)
@@ -108,11 +130,16 @@ static func sword_drop(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, 0, 5, 0, 0.4, 1.5, 0.4, blade.lightened(0.15))
 
 static func cup_drop(p: Node3D) -> void:
-	var metal := Color(0.60, 0.55, 0.50)
-	ItemMeshShared.add_cube(p, 0, 0, 0, 2.5, 0.5, 2.5, metal.darkened(0.2))
-	ItemMeshShared.add_cube(p, 0, 1, 0, 2.5, 2.0, 2.5, metal)
-	ItemMeshShared.add_cube(p, 2, 0, 0, 1.0, 4.0, 1.0, metal)
-	ItemMeshShared.add_cube(p, 0, 0.5, 0, 2.0, 0.3, 2.0, Color(0.25, 0.25, 0.30))
+	var wood := Color(0.52, 0.30, 0.10)
+	var iron := Color(0.60, 0.60, 0.66)
+	var iron_d := Color(0.40, 0.40, 0.46)
+	ItemMeshShared.add_cube(p, 0, -1, 0, 1.0, 2.0, 1.0, wood)
+	ItemMeshShared.add_cube(p, 0, 1, 0, 2.0, 0.8, 2.5, iron)
+	ItemMeshShared.add_cube(p, 0, 2, 0, 2.0, 1.2, 2.0, iron_d)
+	ItemMeshShared.add_cube(p, 1, 1, 1, 1.2, 1.5, 0.8, iron)
+	ItemMeshShared.add_cube(p, 1, 1, -1, 1.2, 1.5, 0.8, iron)
+	ItemMeshShared.add_cube(p, 1, 2, 1.5, 1.0, 1.0, 0.6, iron.lightened(0.1))
+	ItemMeshShared.add_cube(p, 1, 2, -1.5, 1.0, 1.0, 0.6, iron.lightened(0.1))
 
 static func shovel_drop(p: Node3D) -> void:
 	var handle := Color(0.55, 0.40, 0.25)
@@ -202,6 +229,47 @@ static func _build_dai_kiem(p: Node3D) -> void:
 	# Đường chạm khắc trang trí hai bên fuller
 	_box(p, Vector3(0.034, 0.52, 0), Vector3(0.002, 0.44, 0.028), _mat(Color(0.50, 0.52, 0.60)))
 	_box(p, Vector3(-0.034, 0.52, 0), Vector3(0.002, 0.44, 0.028), _mat(Color(0.50, 0.52, 0.60)))
+
+# ── Kích Sắt (Iron Halberd) — cán dài, lưỡi búa + mũi nhọn ─────────────────
+static func _build_iron_halberd(p: Node3D) -> void:
+	var wood := _mat(Color(0.48, 0.28, 0.08))
+	var wood_d := _mat(Color(0.35, 0.20, 0.06))
+	var iron := _mat(Color(0.58, 0.58, 0.62))
+	var iron_d := _mat(Color(0.38, 0.38, 0.44))
+	var iron_l := _mat(Color(0.72, 0.72, 0.78))
+	var edge := _mat(Color(0.82, 0.84, 0.90))
+	# Cán dài (pole)
+	_cyl(p, Vector3(0, 0.00, 0), 0.035, 0.80, wood)
+	_cyl(p, Vector3(0, -0.06, 0), 0.040, 0.10, wood_d)
+	# Đai sắt giữa cán
+	_cyl(p, Vector3(0, 0.32, 0), 0.042, 0.04, iron_d)
+	# Ferrule — khớp nối đầu cán với lưỡi
+	_cyl(p, Vector3(0, 0.41, 0), 0.048, 0.06, iron)
+	_box(p, Vector3(0, 0.44, 0), Vector3(0.07, 0.03, 0.07), iron_d)
+	# Phần lưỡi búa (axe blade) — mở rộng sang +X
+	# Sống lưỡi
+	_box(p, Vector3(0.05, 0.46, 0.00), Vector3(0.18, 0.06, 0.05), iron)
+	_box(p, Vector3(0.15, 0.46, 0.00), Vector3(0.10, 0.06, 0.04), iron_d)
+	# Lưỡi cắt — cạnh sắc
+	_box(p, Vector3(0.22, 0.46, 0.00), Vector3(0.04, 0.06, 0.025), edge)
+	# Đế lưỡi (phần nối với cán)
+	_box(p, Vector3(0.00, 0.46, 0.00), Vector3(0.06, 0.08, 0.07), iron_d)
+	# Mũi nhọn trên đỉnh (spike) — thẳng lên trên
+	_box(p, Vector3(0.00, 0.56, 0.00), Vector3(0.04, 0.12, 0.04), iron)
+	_box(p, Vector3(0.00, 0.68, 0.00), Vector3(0.025, 0.10, 0.025), iron_l)
+	_box(p, Vector3(0.00, 0.78, 0.00), Vector3(0.012, 0.06, 0.012), edge)
+	# Móc sau (back hook) — ở -X phía sau lưỡi
+	_box(p, Vector3(-0.06, 0.46, 0.00), Vector3(0.04, 0.04, 0.04), iron)
+	_box(p, Vector3(-0.08, 0.48, 0.00), Vector3(0.02, 0.040, 0.02), iron_d)
+
+static func iron_halberd_drop(p: Node3D) -> void:
+	var wood := Color(0.48, 0.28, 0.08)
+	var iron := Color(0.58, 0.58, 0.62)
+	var edge := Color(0.82, 0.84, 0.90)
+	ItemMeshShared.add_cube(p, 0, -3, 0, 1.0, 5.0, 1.0, wood)
+	ItemMeshShared.add_cube(p, 0, 2, 0, 2.5, 1.5, 1.2, iron)
+	ItemMeshShared.add_cube(p, 0, 4, 0, 1.5, 2.0, 0.8, iron)
+	ItemMeshShared.add_cube(p, 1, 2, 0, 1.8, 1.0, 0.5, edge)
 
 # ── Găng Tay Da Thú (Fur Leather Gloves) — chi tiết ─────────────────────────
 static func _build_gang_tay(p: Node3D) -> void:

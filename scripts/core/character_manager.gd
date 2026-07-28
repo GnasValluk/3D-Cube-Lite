@@ -69,12 +69,12 @@ func _process(delta: float) -> void:
 			ch._freeze_timer = max(ch._freeze_timer - delta, 0.0)
 			ch._han_bang_buff = max(ch._han_bang_buff - delta, 0.0)
 			# Mana regen for off-tree characters
-			ch._mana_regen_acc += ch.mp_regen * delta
-			if ch._mana_regen_acc >= 1.0:
-				var gain: int = int(ch._mana_regen_acc)
-				ch._mana_regen_acc -= gain
-				ch.mana = mini(ch.mana + gain, ch.max_mana)
-				ch.mana_changed.emit(ch.mana, ch.max_mana)
+			ch._stamina_regen_acc += ch.stamina_regen * delta
+			if ch._stamina_regen_acc >= 1.0:
+				var gain: int = int(ch._stamina_regen_acc)
+				ch._stamina_regen_acc -= gain
+				ch.stamina = mini(ch.stamina + gain, ch.max_stamina)
+				ch.stamina_changed.emit(ch.stamina, ch.max_stamina)
 			ch._on_offline_tick(delta, cd_delta)
 
 # ── Input ─────────────────────────────────────────────────────────────────────

@@ -59,7 +59,8 @@ EQUIP_SUB,Sub,Phụ
 STAT_ATK_BONUS,ATK: +%d,ATK: +%d
 STAT_DEF_BONUS,DEF: +%d,DEF: +%d
 STAT_HEAL,"Heal: +%d HP","Hồi: +%d HP"
-DROP_HINT,"Right-click = Use","Chuột phải = Sử dụng"
+DROP_HINT,"Right-click = Split/Use  |  Drag to move","Chuột phải = Chia/Dùng  |  Kéo để di chuyển"
+SORT_BUTTON,Sort,Sắp xếp
 USE_ITEM,Use,Sử dụng
 DROP_ITEM,Drop,Vứt
 HEAL_VN,Heal: +{d} HP,"Hồi: +{d} HP"
@@ -77,6 +78,10 @@ SLOT_HEAD,Head,Đầu
 SLOT_BODY,Body,Thân
 SLOT_LEGS,Legs,Chân
 SLOT_FEET,Feet,Bàn chân
+ITEM_COCONUT_NAME,Coconut,Trái Dừa
+ITEM_COCONUT_DESC,"Fresh coconut — nutritious, refreshing","Trái dừa tươi — bổ dưỡng, giải khát"
+ITEM_PALM_WOOD_NAME,Palm Wood,Gỗ Dừa
+ITEM_PALM_WOOD_DESC,"Sturdy palm wood — crafting material","Gỗ dừa chắc — nguyên liệu chế tạo"
 ITEM_CHEST_NAME,Chest,Rương đồ
 ITEM_CHEST_DESC,Storage chest,Rương chứa đồ
 ITEM_TWILIGHT_GATE_NAME,Twilight Gate,Cổng Twilight
@@ -178,16 +183,16 @@ PARTY_QUICK_OFF,Quick Deploy: OFF,THIẾT LẬP NHANH: TẮT
 PARTY_QUICK_ON,Quick Deploy: ON,THIẾT LẬP NHANH: BẬT
 PARTY_CONFIRM_HINT,Press Confirm to apply,Ấn XÁC NHẬN để áp dụng
 PARTY_HP,HP: %d/%d,HP: %d/%d
-PARTY_MP,MP: %d/%d,MP: %d/%d
+PARTY_STAMINA,STAMINA: %d/%d,STAMINA: %d/%d
 PARTY_ATK,ATK: %d,ATK: %d
 PARTY_DEF,DEF: %d,DEF: %d
 PARTY_SPD,SPD: %.1f,SPD: %.1f
 PARTY_ELEMENT,Element: ,Hệ: 
 PARTY_CRIT_RATE,Crit Rate: %d%%,Tỉ lệ Crit: %d%%
 PARTY_CRIT_DMG,Crit Dmg: %d%%,Sát thương Crit: %d%%
-PARTY_MP_REGEN,MP Regen: %.1f/s,Hồi MP: %.1f/s
-PARTY_MP_REFUND,MP Refund: %d,Hoàn MP: %d
-PARTY_MP_COST,%d MP,%d MP
+PARTY_STAMINA_REGEN,Stamina Regen: %.1f/s,Hồi Stamina: %.1f/s
+PARTY_STAMINA_REFUND,Stamina Refund: %d,Hoàn Stamina: %d
+PARTY_STAMINA_COST,%d Stamina,%d Stamina
 PARTY_NEED_CHAR,Need at least 1 character,Cần ít nhất một nhân vật
 ELEM_ELECTRIC,Electric,Điện
 ELEM_FIRE,Fire,Hỏa
@@ -201,7 +206,7 @@ LIB_SECTION_FISH,— FISH —,— CÁ —
 LIB_HEADER_STATS,STATS,CHỈ SỐ
 LIB_HEADER_SKILLS,SKILLS,KỸ NĂNG
 LIB_HEADER_SPAWN,SPAWN,XUẤT HIỆN
-LIB_STATS_FORMAT,"HP: %d   ATK: %d   DEF: %d   SPD: %.1f   MP: %d","HP: %d   ATK: %d   DEF: %d   SPD: %.1f   MP: %d"
+LIB_STATS_FORMAT,"HP: %d   ATK: %d   DEF: %d   SPD: %.1f   STA: %d","HP: %d   ATK: %d   DEF: %d   SPD: %.1f   STA: %d"
 LIB_STATS_FORMAT2,"HP: %d   ATK: %d   DEF: %d   SPD: %.1f","HP: %d   ATK: %d   DEF: %d   SPD: %.1f"
 BUILD_INV_LABEL,Items in inventory:,Vật phẩm trong túi:
 BIOME_DESERT,Desert,Sa Mạc
@@ -216,3 +221,5 @@ SEASON_WINTER,Winter,Đông
 WEATHER_CLEAR,Clear,Trong
 WEATHER_RAIN,Rain,Mưa
 TEMP_FORMAT,%d°C,%d°C
+FRAMERATE,Framerate (FPS),FPS (Khung hình)
+FPS_UNLIMITED,Unlimited,Không giới hạn
