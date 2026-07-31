@@ -1,0 +1,209 @@
+class_name PlayerHalberd
+extends RefCounted
+
+static func start_throw_aim(player) -> void:
+	player._halberd_throwing = true
+	player._bow_aiming = false
+	if player._bow_indicator_root == null:
+		player._bow_indicator_root = Node3D.new()
+		player._bow_indicator_root.name = "BowAimIndicator"
+		player.get_tree().current_scene.add_child(player._bow_indicator_root)
+	else:
+		for ch in player._bow_indicator_root.get_children():
+			ch.queue_free()
+	var line_mat := StandardMaterial3D.new()
+	line_mat.albedo_color = Color(0.3, 0.8, 0.6, 0.35)
+	line_mat.emission_enabled = true
+	line_mat.emission_color = Color(0.3, 0.8, 0.6)
+	line_mat.emission_energy_multiplier = 0.5
+	line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	line_mat.no_depth_test = true
+	player._bow_indicator_line = MeshInstance3D.new()
+	player._bow_indicator_line.mesh = BoxMesh.new()
+	player._bow_indicator_line.material_override = line_mat
+	player._bow_indicator_root.add_child(player._bow_indicator_line)
+	var ring_mat := StandardMaterial3D.new()
+	ring_mat.albedo_color = Color(0.3, 0.8, 0.6, 0.50)
+	ring_mat.emission_enabled = true
+	ring_mat.emission_color = Color(0.3, 0.8, 0.6)
+	ring_mat.emission_energy_multiplier = 0.6
+	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	ring_mat.no_depth_test = true
+	player._bow_indicator_target = MeshInstance3D.new()
+	var ring := CylinderMesh.new()
+	ring.top_radius = 0.5
+	ring.bottom_radius = 0.5
+	ring.height = 0.05
+	ring.radial_segments = 16
+	player._bow_indicator_target.mesh = ring
+	player._bow_indicator_target.material_override = ring_mat
+	player._bow_indicator_target.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	player._bow_indicator_root.add_child(player._bow_indicator_target)
+	player._bow_indicator_root.visible = true
+
+static func update_aim(player, delta: float) -> void:
+	var cam: Camera3D = player.get_viewport().get_camera_3d()
+	if cam == null: return
+	var mouse_pos: Vector2 = player.get_viewport().get_mouse_position()
+	var from: Vector3 = cam.project_ray_origin(mouse_pos)
+	var dir: Vector3 = cam.project_ray_normal(mouse_pos)
+	var plane_y: float = player.global_position.y
+	player._halberd_aim_dir = player.global_transform.basis.z
+	if abs(dir.y) > 0.001:
+		var t: float = (plane_y - from.y) / dir.y
+		var ground_hit: Vector3 = from + dir * max(t, 0.0)
+		var to_target: Vector3 = ground_hit - player.global_position
+		to_target.y = 0.0
+		if to_target.length_squared() > 0.01:
+			player._halberd_aim_dir = to_target.normalized()
+	player.rotation.y = atan2(player._halberd_aim_dir.x, player._halberd_aim_dir.z)
+	var charge_pct: float = player._halberd_charge_time / (player.HALBERD_CHARGE_TIME + player._bow_max_charge)
+	charge_pct = clamp(charge_pct, 0.0, 1.0)
+	var range_len: float = lerp(player.HALBERD_MIN_RANGE, player.HALBERD_MAX_RANGE, charge_pct)
+	var end_pos: Vector3 = player._halberd_aim_dir * range_len
+	end_pos.y = plane_y
+	if player._bow_indicator_root == null or player._bow_indicator_line == null or player._bow_indicator_target == null: return
+	player._bow_indicator_root.global_position = player.global_position + Vector3(0, 0.3, 0)
+	player._bow_indicator_line.position = end_pos * 0.5
+	player._bow_indicator_line.mesh.size = Vector3(0.04, 0.04, range_len)
+	player._bow_indicator_line.look_at(player._bow_indicator_root.global_position + end_pos, Vector3.UP)
+	player._bow_indicator_target.global_position = player._bow_indicator_root.global_position + end_pos
+	var line_color := Color(0.3, 0.8, 0.6).lerp(Color(1.0, 0.4, 0.3), charge_pct)
+	line_color.a = 0.35
+	player._bow_indicator_line.material_override.albedo_color = line_color
+	var ring_color := Color(0.3, 0.8, 0.6).lerp(Color(1.0, 0.4, 0.3), charge_pct)
+	ring_color.a = 0.50
+	player._bow_indicator_target.material_override.albedo_color = ring_color
+
+static func fire_throw(player) -> void:
+	player._halberd_throwing = false
+	var saved_charge: float = player._halberd_charge_time
+	player._halberd_charge_time = -1.0
+	if player._bow_indicator_root:
+		player._bow_indicator_root.visible = false
+	if not player.try_skill(player.stamina_cost_lmb):
+		return
+	var dir: Vector3 = player._halberd_aim_dir
+	if dir.length_squared() < 0.01:
+		dir = -player.global_transform.basis.z
+	var halberd_slot_idx: int = -1
+	for i in range(player.inventory.slots.size()):
+		var slot: ItemSlot = player.inventory.slots[i]
+		if not slot.is_empty() and slot.item.id == "iron_halberd":
+			halberd_slot_idx = i
+			break
+	if halberd_slot_idx < 0:
+		return
+	player.inventory.remove_item(halberd_slot_idx, 1)
+	if player.equipped_weapon != null and player.equipped_weapon.id == "iron_halberd":
+		player.equipped_weapon = null
+		player._update_weapon_mesh()
+	var charge_pct: float = clamp(saved_charge / (player.HALBERD_CHARGE_TIME + player._bow_max_charge), 0.0, 1.0)
+	var range_len: float = lerp(player.HALBERD_MIN_RANGE, player.HALBERD_MAX_RANGE, charge_pct)
+	var plane_y: float = player.global_position.y
+	var landing_pos: Vector3 = player.global_position + dir * range_len
+	landing_pos.y = plane_y
+	var space: PhysicsDirectSpaceState3D = player.get_world_3d().direct_space_state
+	if space:
+		var q: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.new()
+		q.from = landing_pos + Vector3(0, 2.0, 0)
+		q.to = landing_pos + Vector3(0, -4.0, 0)
+		var hit: Dictionary = space.intersect_ray(q)
+		if not hit.is_empty():
+			landing_pos.y = hit.position.y
+	var world: Node = player.get_tree().current_scene
+	if world:
+		var def: ItemDef = ItemDatabase.items_db.get("iron_halberd")
+		if def:
+			var launch_pos: Vector3 = player.global_position + Vector3(0, 0.6, 0) + dir * 0.5
+			if player._mesh and player._mesh.weapon_pivot:
+				launch_pos = player._mesh.weapon_pivot.global_transform * Vector3(0, 0.35, 0)
+			var h_dist: float = Vector2(landing_pos.x - launch_pos.x, landing_pos.z - launch_pos.z).length()
+			var h_speed: float = lerp(14.0, 24.0, charge_pct)
+			var flight_time: float = maxf(h_dist / maxf(h_speed, 0.1), 0.1)
+			var vx: float = (landing_pos.x - launch_pos.x) / flight_time
+			var vz: float = (landing_pos.z - launch_pos.z) / flight_time
+			var vy: float = (landing_pos.y - launch_pos.y) / flight_time
+			var item: DroppedItem = DroppedItem.spawn(world, def, launch_pos, 1)
+			var ground_y: float = landing_pos.y
+			var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 10)
+			item.fly_straight(Vector3(vx, vy, vz), ground_y, base_dmg, player)
+	var msg: String = player.tr("THREW_MSG") if player.tr("THREW_MSG") != "THREW_MSG" else "Đã ném Kích Sắt"
+	player._scroll_inventory_message(msg)
+
+static func cancel_aim(player) -> void:
+	player._halberd_throwing = false
+	player._halberd_charge_time = -1.0
+	if player._bow_indicator_root:
+		player._bow_indicator_root.visible = false
+
+static func do_melee(player) -> void:
+	player._halberd_charge_time = -1.0
+	if player._freeze_timer <= 0.0 and player._attack2_timer <= 0.0 and player._state != player.State.DASH:
+		var max_step: int = 1
+		if player.combo_timer > 0.0 and player.combo_step < max_step:
+			player.combo_step += 1
+		elif player._attack_timer <= 0.0:
+			player.combo_step = 0
+		else:
+			return
+		player.combo_timer = player.COMBO_WINDOW
+		if not player.try_skill(player.stamina_cost_lmb):
+			return
+		player._aim_dir = player._calc_aim_dir()
+		var fwd: Vector3 = player.global_transform.basis.z
+		if player._aim_dir.dot(fwd) < 0.99:
+			player.rotation.y = atan2(player._aim_dir.x, player._aim_dir.z)
+		player._lmb_cd = 0.0
+		match player.combo_step:
+			0:
+				player.attack_duration = 0.85
+				player._melee_hit_progress = 0.35
+			1:
+				player.attack_duration = 0.70
+				player._melee_hit_progress = 0.30
+		player._attack_timer = player.attack_duration * (2.0 if player._underwater else 1.0)
+		player._state = player.State.ATTACK
+		player._melee_hit_once = false
+
+static func on_dash(player) -> void:
+	if player.equipped_weapon and player.equipped_weapon.id == "iron_halberd":
+		player._halberd_dashing = true
+		player._halberd_dash_hit = {}
+
+static func check_dash_hit(player) -> void:
+	var dir: Vector3 = player._dash_dir
+	if dir.length_squared() < 0.01:
+		return
+	var fwd: Vector3 = dir.normalized()
+	var right: Vector3 = Vector3.UP.cross(fwd).normalized()
+	var box_center: Vector3 = player.global_position + fwd * 1.2 + Vector3(0, 0.4, 0)
+	var half: Vector3 = Vector3(0.5, 0.4, 1.6)
+
+	var mgr: Node = player._find_character_manager()
+	if mgr:
+		for ch in mgr.get_children():
+			if ch is CharacterBase and ch != player and ch.is_alive and ch._active:
+				_try_dash_hit(player, ch, box_center, right, fwd, half)
+
+	var pig_nodes: Array[Node] = player.get_tree().get_nodes_in_group("pig")
+	for pn in pig_nodes:
+		if is_instance_valid(pn) and pn.get("is_alive"):
+			_try_dash_hit(player, pn as CharacterBase, box_center, right, fwd, half)
+
+	var spawner: Node = player._find_fish_spawner()
+	if spawner:
+		for f in spawner.get_children():
+			if f is FishCharacter and f.is_alive:
+				_try_dash_hit(player, f as CharacterBase, box_center, right, fwd, half)
+
+static func _try_dash_hit(player, ch: CharacterBase, box_center: Vector3, right: Vector3, fwd: Vector3, half: Vector3) -> void:
+	if player._halberd_dash_hit.has(ch.get_instance_id()):
+		return
+	var to_target: Vector3 = ch.global_position - box_center
+	var local: Vector3 = Vector3(to_target.dot(right), to_target.dot(Vector3.UP), to_target.dot(fwd))
+	if abs(local.x) < half.x and abs(local.y) < half.y and abs(local.z) < half.z:
+		player._halberd_dash_hit[ch.get_instance_id()] = true
+		var dmg: int = player.get_total_atk()
+		ch.take_damage(dmg, player)
+		SFXManager.play_damage_hit()

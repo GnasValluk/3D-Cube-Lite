@@ -17,7 +17,8 @@ const LIB_SLOT: float = 50.0
 const LIB_GAP: float = 5.0
 const LIB_COLS: int = 6
 const LIB_SEARCH_H: float = 38.0
-const _DATA := preload("res://scripts/world/chunk/chunk_data.gd")
+const _Library := preload("item_library_panel.gd")
+const _Detail := preload("item_detail_panel.gd")
 
 const EQUIP_H: float = 270.0
 const DETAIL_H: float = 140.0
@@ -52,7 +53,6 @@ var _selected_slot: int = -1
 var _tooltip: Label
 var _tooltip_bg: ColorRect
 var _hp_label: Label
-var _stamina_label: Label
 var _atk_label: Label
 var _def_label: Label
 var _count_label: Label
@@ -63,6 +63,8 @@ var _equip_centers: Array[Vector2] = []
 var _equip_line_pairs: Array[Array] = []
 var _equip_line_time: float = 0.0
 var _line_layer: Control
+var _opening: bool = false
+var _tween: Tween
 var _equip_name_keys: Array[String] = ["EQUIP_HEAD", "EQUIP_BODY", "EQUIP_LEGS", "EQUIP_HANDS", "EQUIP_BACK", "EQUIP_SUB"]
 var _equip_name_labels: Array[Label] = []
 var _title_label: Label
@@ -81,20 +83,9 @@ var _detail_use_btn: Button
 var _detail_drop_btn: Button
 
 # ── Item Library categories ────────────────────────────────────────────────────
-const CAT_ALL := -1
-const CAT_TERRAIN := 0
-const CAT_ORES := 1
-const CAT_INGOTS := 2
-const CAT_MATERIALS := 3
-const CAT_FOOD := 4
-const CAT_WEAPONS := 5
-const CAT_TOOLS := 6
-const CAT_ARMOR := 7
-
 # ── Item Library ───────────────────────────────────────────────────────────────
 var _item_db: Dictionary = {}           # id -> ItemDef (tất cả items)
-var _lib_filter: int = -1               # -1 = All, else ItemDef.Type
-var _lib_items: Array[ItemDef] = []     # danh sách hiển thị theo filter
+var _lib_items: Array[ItemDef] = []     # danh sách hiển thị theo search
 var _lib_panels: Array[Panel] = []      # panel slots thư viện
 var _lib_faces: Array[ColorRect] = []
 var _lib_icon_textures: Array[TextureRect] = []
@@ -104,8 +95,11 @@ var _lib_visible_rows: int = 0
 var _lib_container: Control             # container chứa slots
 var _lib_scroll_up: Button
 var _lib_scroll_down: Button
-var _lib_filter_buttons: Array[Button] = []
 var _lib_search_box: LineEdit
+var _lib_sort_buttons: Array[Button] = []
+
+enum SortMode { NAME_ASC, NAME_DESC, TYPE, ATK, DEF, HEAL }
+var _lib_sort_mode: int = SortMode.NAME_ASC
 
 # ── Styles ─────────────────────────────────────────────────────────────────────
 var _glass_style: StyleBoxFlat
@@ -184,17 +178,16 @@ func _ready() -> void:
 
 	ItemDatabase.ensure_db()
 	_item_db = ItemDatabase.items_db
-	_lib_filter = -1
-	_lib_apply_filter()
+	_Library.apply_filter(self)
 
-	_setup_library_panel()
+	_Library.setup_library_panel(self)
 	_setup_background()
 	_setup_title()
 	_setup_grid()
 	_setup_status_panel()
 	_setup_equipment_panel()
 	_setup_tooltip()
-	_setup_detail_panel()
+	_Detail.setup_detail_panel(self)
 	visible = false
 
 func _notification(what: int) -> void:
@@ -214,353 +207,7 @@ func _refresh_texts() -> void:
 	for i in range(_equip_name_labels.size()):
 		_equip_name_labels[i].text = tr(_equip_name_keys[i])
 
-# ── Item Library helpers ───────────────────────────────────────────────────────
-func _is_terrain_block(id: String) -> bool:
-	var bid: int = _DATA.ITEM_TO_BLOCK.get(id, -1)
-	return bid >= 0 and bid < _DATA.BlockID.COPPER_ORE
-
-func _is_ore_block(id: String) -> bool:
-	var bid: int = _DATA.ITEM_TO_BLOCK.get(id, -1)
-	return bid >= _DATA.BlockID.COPPER_ORE
-
-func _item_matches_category(item: ItemDef, cat: int) -> bool:
-	if cat == CAT_ALL: return true
-	var id := item.id
-	var t := item.type
-	match cat:
-		CAT_TERRAIN: return t == ItemDef.Type.BLOCK and _is_terrain_block(id)
-		CAT_ORES: return (t == ItemDef.Type.BLOCK and _is_ore_block(id)) or (t == ItemDef.Type.MATERIAL and id.ends_with("_ore"))
-		CAT_INGOTS: return id.ends_with("_ingot")
-		CAT_MATERIALS: return t == ItemDef.Type.MATERIAL and not id.ends_with("_ore")
-		CAT_FOOD: return t == ItemDef.Type.FOOD
-		CAT_WEAPONS: return t == ItemDef.Type.WEAPON
-		CAT_TOOLS: return t == ItemDef.Type.TOOL
-		CAT_ARMOR: return t == ItemDef.Type.ARMOR
-		_: return false
-
-# ── Item Library: lọc danh sách ────────────────────────────────────────────────
-func _lib_apply_filter() -> void:
-	_lib_items.clear()
-	var search: String = _lib_search_box.text.strip_edges().to_lower() if _lib_search_box else ""
-	for id in _item_db:
-		var item: ItemDef = _item_db[id]
-		if not _item_matches_category(item, _lib_filter):
-			continue
-		if not search.is_empty() and not item.id.to_lower().contains(search) and not item.name.to_lower().contains(search):
-			continue
-		_lib_items.append(item)
-	_lib_items.sort_custom(func(a: ItemDef, b: ItemDef) -> bool:
-		if a.type != b.type:
-			return a.type < b.type
-		return a.name < b.name)
-	_lib_scroll_offset = 0
-	_lib_refresh_display()
-
-func _lib_refresh_display() -> void:
-	if _lib_panels.is_empty():
-		return
-	var total_slots: int = _lib_panels.size()
-	var visible_count: int = total_slots
-	var start: int = _lib_scroll_offset * LIB_COLS
-
-	for i in range(visible_count):
-		var item_idx: int = start + i
-		var panel: Panel = _lib_panels[i]
-		var face: ColorRect = _lib_faces[i]
-		var lbl: Label = _lib_name_labels[i]
-		if item_idx < _lib_items.size():
-			var item: ItemDef = _lib_items[item_idx]
-			face.color = item.icon_color
-			var icon_tex := _lib_icon_textures[i]
-			var tex := ItemDatabase.load_icon_2d(item.id)
-			if tex:
-				icon_tex.texture = tex
-				icon_tex.visible = true
-			else:
-				icon_tex.texture = null
-				icon_tex.visible = false
-			lbl.text = item.name
-			panel.visible = true
-			panel.set_meta("item_idx", item_idx)
-		else:
-			face.color = Color(0.14, 0.10, 0.22, 0.3)
-			_lib_icon_textures[i].texture = null
-			_lib_icon_textures[i].visible = false
-			lbl.text = ""
-			panel.visible = true
-			panel.set_meta("item_idx", -1)
-
-	# Cập nhật scroll buttons
-	var max_row: int = ceili(float(_lib_items.size()) / float(LIB_COLS))
-	var can_up: bool = _lib_scroll_offset > 0
-	var can_down: bool = (_lib_scroll_offset + _lib_visible_rows) < max_row
-	if _lib_scroll_up:
-		_lib_scroll_up.modulate.a = 1.0 if can_up else 0.3
-		_lib_scroll_up.disabled = not can_up
-	if _lib_scroll_down:
-		_lib_scroll_down.modulate.a = 1.0 if can_down else 0.3
-		_lib_scroll_down.disabled = not can_down
-
-# ── Xây dựng Library Panel ────────────────────────────────────────────────────
-func _setup_library_panel() -> void:
-	# Panel nền thư viện
-	var lib_bg_style := _glass_style.duplicate() as StyleBoxFlat
-	lib_bg_style.bg_color = Color(0.10, 0.07, 0.18, 0.92)
-
-	var lib_bg := Panel.new()
-	lib_bg.position = Vector2(0, 0)
-	lib_bg.size = Vector2(LIB_W, CONTENT_H)
-	lib_bg.add_theme_stylebox_override("panel", lib_bg_style)
-	lib_bg.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(lib_bg)
-
-	# Tiêu đề
-	_lib_title_label = Label.new()
-	_lib_title_label.text = tr("ITEM_LIBRARY_TITLE")
-	_lib_title_label.position = Vector2(LIB_PAD, LIB_PAD - 2)
-	_lib_title_label.size = Vector2(LIB_W - LIB_PAD * 2, 22)
-	_lib_title_label.add_theme_font_size_override("font_size", 22)
-	_lib_title_label.add_theme_color_override("font_color", TEXT_MAIN)
-	_lib_title_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
-	_lib_title_label.add_theme_constant_override("shadow_offset_x", 1)
-	_lib_title_label.add_theme_constant_override("shadow_offset_y", 1)
-	add_child(_lib_title_label)
-
-	_lib_hint_label = Label.new()
-	_lib_hint_label.text = tr("LIB_CLICK_HINT")
-	_lib_hint_label.position = Vector2(LIB_PAD, LIB_PAD + 26)
-	_lib_hint_label.size = Vector2(LIB_W - LIB_PAD * 2, 18)
-	_lib_hint_label.add_theme_font_size_override("font_size", 16)
-	_lib_hint_label.add_theme_color_override("font_color", TEXT_MUTED)
-	add_child(_lib_hint_label)
-
-	# Filter buttons
-	_setup_lib_filters()
-
-	# Slots grid (title 30 + hint 18 + filters 2 rows 68 + gaps + search bar 38)
-	var slots_y: float = LIB_PAD + 30 + 2 + 18 + 2 + 68 + 6
-	var search_bar_h: float = LIB_SEARCH_H + 6
-	_lib_visible_rows = int((CONTENT_H - slots_y - LIB_PAD - 30 - search_bar_h) / (LIB_SLOT + LIB_GAP))
-	var total_lib_slots: int = _lib_visible_rows * LIB_COLS
-
-	for i in range(total_lib_slots):
-		var row: int = i / LIB_COLS
-		var col: int = i % LIB_COLS
-		var px: float = LIB_PAD + col * (LIB_SLOT + LIB_GAP)
-		var py: float = slots_y + row * (LIB_SLOT + LIB_GAP)
-
-		var panel := Panel.new()
-		panel.position = Vector2(px, py)
-		panel.size = Vector2(LIB_SLOT, LIB_SLOT)
-		panel.add_theme_stylebox_override("panel", _lib_slot_style)
-		panel.mouse_filter = Control.MOUSE_FILTER_STOP
-		panel.set_meta("item_idx", -1)
-		panel.gui_input.connect(_on_lib_slot_input.bind(i))
-		panel.mouse_entered.connect(_on_lib_slot_entered.bind(i))
-		panel.mouse_exited.connect(_on_lib_slot_exited)
-		add_child(panel)
-		_lib_panels.append(panel)
-
-		var face := ColorRect.new()
-		face.position = Vector2(2, 2)
-		face.size = Vector2(LIB_SLOT - 4, LIB_SLOT - 25)
-		face.color = Color(0.14, 0.10, 0.22, 0.3)
-		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(face)
-		_lib_faces.append(face)
-
-		var lib_icon := TextureRect.new()
-		lib_icon.position = Vector2(2, 2)
-		lib_icon.size = Vector2(LIB_SLOT - 4, LIB_SLOT - 18)
-		lib_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		lib_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		lib_icon.visible = false
-		panel.add_child(lib_icon)
-		_lib_icon_textures.append(lib_icon)
-
-		var lbl := Label.new()
-		lbl.position = Vector2(1, LIB_SLOT - 20)
-		lbl.size = Vector2(LIB_SLOT - 2, 18)
-		lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		lbl.add_theme_font_size_override("font_size", 13)
-		lbl.add_theme_color_override("font_color", Color(0.82, 0.78, 0.95, 0.80))
-		lbl.clip_contents = true
-		lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(lbl)
-		_lib_name_labels.append(lbl)
-
-	# Scroll buttons
-	var scroll_y: float = slots_y + _lib_visible_rows * (LIB_SLOT + LIB_GAP) + 4
-	_lib_scroll_up = _make_scroll_btn("▲", Vector2(LIB_PAD, scroll_y))
-	_lib_scroll_up.pressed.connect(_on_lib_scroll.bind(-1))
-	add_child(_lib_scroll_up)
-
-	_lib_scroll_down = _make_scroll_btn("▼", Vector2(LIB_PAD + 56, scroll_y))
-	_lib_scroll_down.pressed.connect(_on_lib_scroll.bind(1))
-	add_child(_lib_scroll_down)
-
-	var search_y: float = scroll_y + 38
-	_lib_search_box = LineEdit.new()
-	_lib_search_box.position = Vector2(LIB_PAD + 2, search_y)
-	_lib_search_box.size = Vector2(LIB_W - LIB_PAD * 2 - 4, LIB_SEARCH_H)
-	_lib_search_box.placeholder_text = "🔍 " + tr("LIB_SEARCH_HINT")
-	_lib_search_box.add_theme_font_size_override("font_size", 18)
-	_lib_search_box.add_theme_color_override("font_color", Color(0.82, 0.78, 0.95, 0.90))
-	_lib_search_box.add_theme_color_override("placeholder_color", Color(0.35, 0.32, 0.50, 0.70))
-	_lib_search_box.caret_blink = true
-	var search_bg := StyleBoxFlat.new()
-	search_bg.bg_color = Color(0.06, 0.04, 0.12, 0.90)
-	search_bg.corner_radius_top_left = 8; search_bg.corner_radius_top_right = 8
-	search_bg.corner_radius_bottom_left = 8; search_bg.corner_radius_bottom_right = 8
-	search_bg.border_width_left = 1; search_bg.border_width_right = 1
-	search_bg.border_width_top = 1; search_bg.border_width_bottom = 1
-	search_bg.border_color = Color(0.35, 0.28, 0.50, 0.25)
-	_lib_search_box.add_theme_stylebox_override("normal", search_bg)
-	var search_focus_bg := search_bg.duplicate() as StyleBoxFlat
-	search_focus_bg.border_color = Color(0.22, 0.62, 0.28, 0.50)
-	_lib_search_box.add_theme_stylebox_override("focus", search_focus_bg)
-	_lib_search_box.text_changed.connect(_on_lib_search_changed)
-	add_child(_lib_search_box)
-
-	_lib_refresh_display()
-
-func _setup_lib_filters() -> void:
-	var filter_y: float = LIB_PAD + 50
-	# [label, category, color]
-	var filters: Array = [
-		["Tất cả", CAT_ALL, Color(0.55, 0.55, 0.65)],
-		["Địa hình", CAT_TERRAIN, Color(0.54, 0.32, 0.12)],
-		["Quặng", CAT_ORES, Color(0.80, 0.75, 0.30)],
-		["Thỏi", CAT_INGOTS, Color(0.65, 0.65, 0.75)],
-		["N.Liệu", CAT_MATERIALS, Color(0.65, 0.55, 0.40)],
-		["T.ăn", CAT_FOOD, Color(0.30, 0.80, 0.30)],
-		["V.khí", CAT_WEAPONS, Color(0.75, 0.30, 0.30)],
-		["D.cụ", CAT_TOOLS, Color(0.40, 0.60, 0.85)],
-		["Giáp", CAT_ARMOR, Color(0.40, 0.60, 0.85)],
-	]
-
-	var usable_w: float = LIB_W - LIB_PAD * 2
-	var row1_count: int = 5
-	var row2_count: int = 4
-	var btn_w1: float = (usable_w - 4.0 * 4.0) / float(row1_count)
-	var btn_w2: float = (usable_w - 3.0 * 4.0) / float(row2_count)
-	var gap: float = 4.0
-
-	for fi in range(filters.size()):
-		var f: Array = filters[fi]
-		var btn := Button.new()
-		btn.text = f[0]
-		btn.add_theme_font_size_override("font_size", 14)
-
-		var is_row2: bool = fi >= row1_count
-		var row_idx: int = 1 if is_row2 else 0
-		var col_idx: int = fi - (row1_count if is_row2 else 0)
-		var bw: float = btn_w2 if is_row2 else btn_w1
-		btn.position = Vector2(LIB_PAD + col_idx * (bw + gap), filter_y + row_idx * 34)
-		btn.size = Vector2(bw, 28)
-
-		var cat: int = f[1]
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = BG_CARD
-		bg.corner_radius_top_left = 6; bg.corner_radius_top_right = 6
-		bg.corner_radius_bottom_left = 6; bg.corner_radius_bottom_right = 6
-		bg.border_width_left = 1; bg.border_width_right = 1
-		bg.border_width_top = 1; bg.border_width_bottom = 1
-		bg.border_color = (f[2] as Color).darkened(0.3)
-		btn.add_theme_stylebox_override("normal", bg)
-
-		var bg_hover := bg.duplicate() as StyleBoxFlat
-		bg_hover.bg_color = Color(0.35, 0.22, 0.50, 0.90)
-		bg_hover.border_color = f[2]
-		btn.add_theme_stylebox_override("hover", bg_hover)
-		btn.add_theme_stylebox_override("pressed", bg_hover)
-		btn.add_theme_color_override("font_color", f[2])
-
-		btn.mouse_filter = Control.MOUSE_FILTER_STOP
-		btn.pressed.connect(_on_lib_filter.bind(cat))
-		add_child(btn)
-		_lib_filter_buttons.append(btn)
-
-func _make_scroll_btn(txt: String, pos: Vector2) -> Button:
-	var btn := Button.new()
-	btn.text = txt
-	btn.position = pos
-	btn.size = Vector2(50, 28)
-	btn.add_theme_font_size_override("font_size", 20)
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.14, 0.10, 0.22, 0.75)
-	bg.corner_radius_top_left = 6; bg.corner_radius_top_right = 6
-	bg.corner_radius_bottom_left = 6; bg.corner_radius_bottom_right = 6
-	bg.border_width_left = 1; bg.border_width_right = 1
-	bg.border_width_top = 1; bg.border_width_bottom = 1
-	bg.border_color = Color(0.40, 0.32, 0.55, 0.25)
-	btn.add_theme_stylebox_override("normal", bg)
-	var bg_h := bg.duplicate() as StyleBoxFlat
-	bg_h.bg_color = Color(0.30, 0.20, 0.40, 0.85)
-	bg_h.border_color = Color(0.22, 0.62, 0.28, 0.50)
-	btn.add_theme_stylebox_override("hover", bg_h)
-	btn.add_theme_color_override("font_color", Color(0.82, 0.78, 0.95, 0.80))
-	btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	return btn
-
-# ── Library events ─────────────────────────────────────────────────────────────
-func _on_lib_filter(type: int) -> void:
-	_lib_filter = type
-	_lib_apply_filter()
-
-func _on_lib_scroll(dir: int) -> void:
-	var max_row: int = ceili(float(_lib_items.size()) / float(LIB_COLS))
-	_lib_scroll_offset = clampi(_lib_scroll_offset + dir, 0, max(0, max_row - _lib_visible_rows))
-	_lib_refresh_display()
-
-func _on_lib_search_changed(text: String) -> void:
-	_lib_apply_filter()
-
-func _on_lib_slot_input(event: InputEvent, slot_i: int) -> void:
-	if not visible or _inventory == null or _player_ref == null:
-		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var panel: Panel = _lib_panels[slot_i]
-		var item_idx: int = panel.get_meta("item_idx", -1)
-		if item_idx < 0 or item_idx >= _lib_items.size():
-			return
-		var item: ItemDef = _lib_items[item_idx]
-		var remaining: int = _inventory.add_item(item, 1)
-		if remaining == 0:
-			# Hiệu ứng flash xanh nhẹ
-			panel.add_theme_stylebox_override("panel", _lib_slot_hover_style)
-			var tween := create_tween()
-			tween.tween_interval(0.15)
-			tween.tween_callback(func(): panel.add_theme_stylebox_override("panel", _lib_slot_style))
-		accept_event()
-
-func _on_lib_slot_entered(slot_i: int) -> void:
-	var panel: Panel = _lib_panels[slot_i]
-	var item_idx: int = panel.get_meta("item_idx", -1)
-	if item_idx < 0 or item_idx >= _lib_items.size():
-		_tooltip.visible = false; _tooltip_bg.visible = false
-		return
-	panel.add_theme_stylebox_override("panel", _lib_slot_hover_style)
-	var item: ItemDef = _lib_items[item_idx]
-	var tt: String = item.name
-	if item.desc.length() > 0: tt += "\n" + item.desc
-	if item.atk_bonus > 0: tt += "\n" + tr("STAT_ATK_BONUS") % item.atk_bonus
-	if item.def_bonus > 0: tt += "\n" + tr("STAT_DEF_BONUS") % item.def_bonus
-	if item.heal_amount > 0: tt += "\n" + tr("STAT_HEAL") % item.heal_amount
-	tt += "\n[" + item.get_type_name() + "]"
-	if item.type == ItemDef.Type.ARMOR: tt += " [" + item.get_armor_slot_name() + "]"
-	tt += "\n" + tr("TOOLTIP_CLICK_ADD")
-	_tooltip.text = tt
-	_tooltip_bg.size = _tooltip.size + Vector2(8, 8)
-	_tooltip_bg.visible = true
-	_tooltip.visible = true
-
-func _on_lib_slot_exited() -> void:
-	# Reset hover style cho tất cả
-	for i in range(_lib_panels.size()):
-		_lib_panels[i].add_theme_stylebox_override("panel", _lib_slot_style)
-	_tooltip.visible = false
-	_tooltip_bg.visible = false
+# ── Item Library: all logic extracted to item_library_panel.gd ─────────────────
 
 # ── Inventory background & title (offset sang phải LIB_W + LIB_MARGIN) ────────
 func _setup_background() -> void:
@@ -612,6 +259,7 @@ func _setup_grid() -> void:
 			var panel := Panel.new()
 			panel.size = Vector2(SLOT_SIZE, SLOT_SIZE)
 			panel.position = Vector2(px, py)
+			panel.clip_contents = true
 			panel.add_theme_stylebox_override("panel", _slot_style)
 			panel.mouse_filter = Control.MOUSE_FILTER_STOP
 			panel.set_script(slot_scr)
@@ -633,6 +281,7 @@ func _setup_grid() -> void:
 			var slot_icon := TextureRect.new()
 			slot_icon.position = Vector2(2, 2)
 			slot_icon.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
+			slot_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 			slot_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 			slot_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			slot_icon.visible = false
@@ -658,7 +307,7 @@ func _setup_status_panel() -> void:
 
 	var stat := Panel.new()
 	stat.position = Vector2(sx, sy)
-	stat.size = Vector2(STAT_W, 220)
+	stat.size = Vector2(STAT_W, 178)
 	var st_style := _glass_style.duplicate() as StyleBoxFlat
 	st_style.bg_color = Color(0.10, 0.07, 0.18, 0.65)
 	st_style.corner_radius_top_left = 12; st_style.corner_radius_top_right = 12
@@ -673,54 +322,35 @@ func _setup_status_panel() -> void:
 	_stat_title_label.add_theme_color_override("font_color", Color(0.82, 0.78, 0.95, 0.80))
 	add_child(_stat_title_label)
 
-	_hp_label = Label.new(); _hp_label.position = Vector2(sx + 12, sy + 44)
-	_hp_label.add_theme_font_size_override("font_size", 20)
-	_hp_label.add_theme_color_override("font_color", TEAL); add_child(_hp_label)
+	_hp_label = Label.new()
+	_hp_label.position = Vector2(sx + 16, sy + 46)
+	_hp_label.add_theme_font_size_override("font_size", 22)
+	_hp_label.add_theme_color_override("font_color", TEAL)
+	add_child(_hp_label)
 
-	_stamina_label = Label.new(); _stamina_label.position = Vector2(sx + 12, sy + 70)
-	_stamina_label.add_theme_font_size_override("font_size", 20)
-	_stamina_label.add_theme_color_override("font_color", PURPLE); add_child(_stamina_label)
+	_atk_label = Label.new()
+	_atk_label.position = Vector2(sx + 16, sy + 76)
+	_atk_label.add_theme_font_size_override("font_size", 22)
+	_atk_label.add_theme_color_override("font_color", PINK)
+	add_child(_atk_label)
 
-	_atk_label = Label.new(); _atk_label.position = Vector2(sx + 12, sy + 96)
-	_atk_label.add_theme_font_size_override("font_size", 20)
-	_atk_label.add_theme_color_override("font_color", PINK); add_child(_atk_label)
-
-	_def_label = Label.new(); _def_label.position = Vector2(sx + 12, sy + 122)
-	_def_label.add_theme_font_size_override("font_size", 20)
-	_def_label.add_theme_color_override("font_color", ORANGE); add_child(_def_label)
+	_def_label = Label.new()
+	_def_label.position = Vector2(sx + 16, sy + 106)
+	_def_label.add_theme_font_size_override("font_size", 22)
+	_def_label.add_theme_color_override("font_color", ORANGE)
+	add_child(_def_label)
 
 	_drop_hint_label = Label.new()
 	_drop_hint_label.text = tr("DROP_HINT")
-	_drop_hint_label.position = Vector2(sx + 12, sy + 156)
-	_drop_hint_label.add_theme_font_size_override("font_size", 16)
+	_drop_hint_label.position = Vector2(sx + 16, sy + 144)
+	_drop_hint_label.add_theme_font_size_override("font_size", 15)
 	_drop_hint_label.add_theme_color_override("font_color", TEXT_MUTED)
 	add_child(_drop_hint_label)
-
-	var sort_btn := Button.new()
-	sort_btn.text = "⇅ " + tr("SORT_BUTTON")
-	sort_btn.position = Vector2(sx + 12, sy + 180)
-	sort_btn.size = Vector2(STAT_W - 24, 28)
-	sort_btn.add_theme_font_size_override("font_size", 16)
-	var sb_style := StyleBoxFlat.new()
-	sb_style.bg_color = Color(0.14, 0.10, 0.22, 0.75)
-	sb_style.corner_radius_top_left = 6; sb_style.corner_radius_top_right = 6
-	sb_style.corner_radius_bottom_left = 6; sb_style.corner_radius_bottom_right = 6
-	sb_style.border_width_left = 1; sb_style.border_width_right = 1
-	sb_style.border_width_top = 1; sb_style.border_width_bottom = 1
-	sb_style.border_color = Color(0.40, 0.32, 0.55, 0.25)
-	sort_btn.add_theme_stylebox_override("normal", sb_style)
-	var sb_hover := sb_style.duplicate() as StyleBoxFlat
-	sb_hover.bg_color = Color(0.30, 0.20, 0.40, 0.85)
-	sb_hover.border_color = Color(0.22, 0.62, 0.28, 0.50)
-	sort_btn.add_theme_stylebox_override("hover", sb_hover)
-	sort_btn.add_theme_color_override("font_color", TEAL)
-	sort_btn.pressed.connect(_on_sort_pressed)
-	add_child(sort_btn)
 
 func _setup_equipment_panel() -> void:
 	var ox: float = LIB_W + LIB_MARGIN
 	var sx: float = ox + PAD + GRID_W + 12
-	var sy: float = PAD + 40 + 180 + 6
+	var sy: float = PAD + 40 + 178 + 10
 
 	var eq := Panel.new()
 	eq.position = Vector2(sx, sy)
@@ -876,141 +506,7 @@ func _setup_tooltip() -> void:
 	_tooltip.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_tooltip)
 
-# ── Detail panel ────────────────────────────────────────────────────────────────
-func _setup_detail_panel() -> void:
-	var ox: float = LIB_W + LIB_MARGIN
-	var grid_y: float = PAD + 40
-	var dy: float = grid_y + 4 * (SLOT_SIZE + GAP) + 10
-	var dw: float = GRID_W
-	var dx: float = ox + PAD
-
-	_detail_bg = ColorRect.new()
-	_detail_bg.position = Vector2(dx, dy)
-	_detail_bg.size = Vector2(dw, DETAIL_H)
-	_detail_bg.color = Color(0.10, 0.07, 0.18, 0.70)
-	_detail_bg.visible = false
-	_detail_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_detail_bg)
-
-	_detail_item_name = Label.new()
-	_detail_item_name.position = Vector2(dx + 8, dy + 6)
-	_detail_item_name.size = Vector2(dw - 16, 28)
-	_detail_item_name.add_theme_font_size_override("font_size", 26)
-	_detail_item_name.add_theme_color_override("font_color", TEXT_BRIGHT)
-	_detail_item_name.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.6))
-	_detail_item_name.add_theme_constant_override("shadow_offset_x", 1)
-	_detail_item_name.add_theme_constant_override("shadow_offset_y", 1)
-	_detail_item_name.visible = false
-	add_child(_detail_item_name)
-
-	_detail_desc = Label.new()
-	_detail_desc.position = Vector2(dx + 8, dy + 38)
-	_detail_desc.size = Vector2(dw - 16, 46)
-	_detail_desc.add_theme_font_size_override("font_size", 18)
-	_detail_desc.add_theme_color_override("font_color", Color(0.82, 0.78, 0.95, 0.85))
-	_detail_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_detail_desc.visible = false
-	add_child(_detail_desc)
-
-	_detail_stats = Label.new()
-	_detail_stats.position = Vector2(dx + 8, dy + 80)
-	_detail_stats.size = Vector2(dw - 16, 20)
-	_detail_stats.add_theme_font_size_override("font_size", 18)
-	_detail_stats.add_theme_color_override("font_color", Color(0.55, 0.50, 0.72, 0.80))
-	_detail_stats.visible = false
-	add_child(_detail_stats)
-
-	var btn_style := StyleBoxFlat.new()
-	btn_style.bg_color = Color(0.14, 0.10, 0.22, 0.85)
-	btn_style.corner_radius_top_left = 6; btn_style.corner_radius_top_right = 6
-	btn_style.corner_radius_bottom_left = 6; btn_style.corner_radius_bottom_right = 6
-	btn_style.border_width_left = 1; btn_style.border_width_right = 1
-	btn_style.border_width_top = 1; btn_style.border_width_bottom = 1
-	btn_style.border_color = Color(0.55, 0.57, 0.62, 0.45)
-
-	var btn_hover := btn_style.duplicate() as StyleBoxFlat
-	btn_hover.bg_color = Color(0.35, 0.22, 0.50, 0.95)
-	btn_hover.border_color = Color(0.55, 0.57, 0.62, 0.75)
-
-	var btn_y: float = dy + DETAIL_H - 40
-
-	_detail_use_btn = Button.new()
-	_detail_use_btn.text = tr("USE_ITEM")
-	_detail_use_btn.position = Vector2(dx + dw - 200, btn_y)
-	_detail_use_btn.size = Vector2(90, 30)
-	_detail_use_btn.add_theme_font_size_override("font_size", 18)
-	_detail_use_btn.add_theme_color_override("font_color", TEAL)
-	_detail_use_btn.add_theme_stylebox_override("normal", btn_style)
-	_detail_use_btn.add_theme_stylebox_override("hover", btn_hover)
-	_detail_use_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_detail_use_btn.pressed.connect(_on_detail_use)
-	_detail_use_btn.visible = false
-	add_child(_detail_use_btn)
-
-	_detail_drop_btn = Button.new()
-	_detail_drop_btn.text = tr("DROP_ITEM")
-	_detail_drop_btn.position = Vector2(dx + dw - 105, btn_y)
-	_detail_drop_btn.size = Vector2(95, 30)
-	_detail_drop_btn.add_theme_font_size_override("font_size", 18)
-	_detail_drop_btn.add_theme_color_override("font_color", Color(0.88, 0.35, 0.32, 0.90))
-	_detail_drop_btn.add_theme_stylebox_override("normal", btn_style)
-	_detail_drop_btn.add_theme_stylebox_override("hover", btn_hover)
-	_detail_drop_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	_detail_drop_btn.pressed.connect(_on_detail_drop)
-	_detail_drop_btn.visible = false
-	add_child(_detail_drop_btn)
-
-func _update_detail_panel() -> void:
-	var has_selection: bool = false
-	if _inventory != null and _selected_slot >= 0 and _selected_slot < _inventory.slots.size():
-		var slot: ItemSlot = _inventory.slots[_selected_slot]
-		if not slot.is_empty():
-			has_selection = true
-			var item: ItemDef = slot.item
-			_detail_item_name.text = item.name
-			_detail_desc.text = item.desc if item.desc.length() > 0 else "(" + item.get_type_name() + ")"
-			var stats_text: String = ""
-			if item.atk_bonus > 0:  stats_text += tr("STAT_ATK_BONUS") % item.atk_bonus + "  "
-			if item.def_bonus > 0:  stats_text += tr("STAT_DEF_BONUS") % item.def_bonus + "  "
-			if item.heal_amount > 0: stats_text += tr("STAT_HEAL") % item.heal_amount
-			_detail_stats.text = stats_text
-			var can_use: bool = item.type in [ItemDef.Type.FOOD, ItemDef.Type.WEAPON, ItemDef.Type.TOOL, ItemDef.Type.ARMOR]
-			_detail_use_btn.visible = can_use
-			_detail_item_name.visible = true
-			_detail_desc.visible = true
-			_detail_stats.visible = true
-			_detail_drop_btn.visible = true
-			_detail_bg.visible = true
-
-	if not has_selection:
-		_detail_bg.visible = false
-		_detail_item_name.visible = false
-		_detail_desc.visible = false
-		_detail_stats.visible = false
-		_detail_use_btn.visible = false
-		_detail_drop_btn.visible = false
-
-func _on_detail_use() -> void:
-	if _player_ref == null or _inventory == null: return
-	var idx: int = _selected_slot
-	if idx < 0 or idx >= _inventory.slots.size(): return
-	var slot: ItemSlot = _inventory.slots[idx]
-	if slot.is_empty(): return
-	_player_ref.use_item_from_inventory(idx)
-	# After use, the slot may be empty (e.g. food consumed)
-	if slot.is_empty():
-		_selected_slot = -1
-		_reset_slot_styles()
-
-func _on_detail_drop() -> void:
-	if _player_ref == null or _inventory == null: return
-	var idx: int = _selected_slot
-	if idx < 0 or idx >= _inventory.slots.size(): return
-	var slot: ItemSlot = _inventory.slots[idx]
-	if slot.is_empty(): return
-	_player_ref.drop_item(idx)
-	_selected_slot = -1
-	_reset_slot_styles()
+# ── Detail panel: all logic extracted to item_detail_panel.gd ─────────────────
 
 # ── Inventory slot events ──────────────────────────────────────────────────────
 func _on_slot_gui_input(event: InputEvent, idx: int) -> void:
@@ -1064,12 +560,6 @@ func _on_slot_mouse_entered(idx: int) -> void:
 	_tooltip.text = tt
 	_tooltip_bg.size = _tooltip.size + Vector2(8, 8)
 	_tooltip_bg.visible = true; _tooltip.visible = true
-
-func _on_sort_pressed() -> void:
-	if _inventory == null:
-		return
-	_inventory.sort()
-	_selected_slot = -1
 
 func _on_slot_mouse_exited() -> void:
 	_tooltip.visible = false; _tooltip_bg.visible = false
@@ -1169,6 +659,45 @@ func set_inventory(inv: Inventory) -> void:
 func set_player(p: PlayerCharacter) -> void:
 	_player_ref = p
 
+func open() -> void:
+	if _opening:
+		return
+	_opening = true
+	_play_appear()
+
+func close() -> void:
+	if not _opening:
+		return
+	_opening = false
+	_play_disappear()
+
+func _play_appear() -> void:
+	visible = true
+	scale = Vector2(0.9, 0.9)
+	modulate.a = 0.0
+	if _tween and _tween.is_valid(): _tween.kill()
+	_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	_tween.tween_property(self, "scale", Vector2.ONE, 0.20)
+	_tween.parallel().tween_property(self, "modulate:a", 1.0, 0.20)
+
+func _play_disappear() -> void:
+	if _tween and _tween.is_valid(): _tween.kill()
+	_tween = create_tween().set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	_tween.tween_property(self, "scale", Vector2(0.9, 0.9), 0.12)
+	_tween.parallel().tween_property(self, "modulate:a", 0.0, 0.12)
+	_tween.tween_callback(func():
+		visible = false
+		scale = Vector2.ONE
+		modulate.a = 1.0
+	)
+
+func _input(event: InputEvent) -> void:
+	if not visible:
+		return
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and _lib_search_box and _lib_search_box.has_focus():
+			_lib_search_box.release_focus()
+
 func _process(delta: float) -> void:
 	if _inventory == null: return
 	for i in range(_inventory.slots.size()):
@@ -1178,24 +707,24 @@ func _process(delta: float) -> void:
 			_slot_faces[i].color = col; _slot_count_labels[i].text = ""
 			_slot_icons[i].texture = null; _slot_icons[i].visible = false
 		else:
-			_slot_faces[i].color = slot.item.icon_color
 			var tex := ItemDatabase.load_icon_2d(slot.item.id)
 			if tex:
+				_slot_faces[i].color = Color(0.20, 0.15, 0.30, 0.4)
 				_slot_icons[i].texture = tex
 				_slot_icons[i].visible = true
 			else:
+				_slot_faces[i].color = slot.item.icon_color
 				_slot_icons[i].texture = null
 				_slot_icons[i].visible = false
 			_slot_count_labels[i].text = str(slot.count) if slot.count > 1 else ""
 
 	if _player_ref:
-		_hp_label.text  = "HP: %d / %d"   % [_player_ref.hp, _player_ref.max_hp]
-		_stamina_label.text  = "STAMINA: %d / %d" % [_player_ref.stamina, _player_ref.max_stamina]
-		_atk_label.text = "ATK: %d"        % _player_ref.get_total_atk()
-		_def_label.text = "DEF: %d"        % _player_ref.get_total_def()
+		_hp_label.text  = "\u2665  %d / %d"   % [_player_ref.hp, _player_ref.max_hp]
+		_atk_label.text = "\u2694  %d"        % _player_ref.get_total_atk()
+		_def_label.text = "\u2741  %d"        % _player_ref.get_total_def()
 		_update_equipment_display(_player_ref)
 
-	_update_detail_panel()
+	_Detail.update_detail_panel(self)
 
 	var filled: int = _inventory.count_filled_slots()
 	_count_label.text = "Used: %d / %d" % [filled, _inventory.slots.size()]

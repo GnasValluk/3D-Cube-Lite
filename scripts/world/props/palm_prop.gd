@@ -4,17 +4,32 @@ extends DestroyableProp
 enum PalmSize { SMALL, MEDIUM, TALL }
 
 const VOXEL: float = 0.0625
+const _DARKEN: float = 0.72
+
+const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
+const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 
 var _variant: String = "river"
 var _size: int = PalmSize.MEDIUM
 
+var _sway_phase: float
+var _sway_freq: float
+var _sway_amp: float
+
 func setup(variant: String = "river") -> void:
 	_variant = variant
-	_size = [PalmSize.SMALL, PalmSize.MEDIUM, PalmSize.TALL].pick_random()
+	var r := randf()
+	if r < 0.10: _size = PalmSize.SMALL
+	elif r < 0.35: _size = PalmSize.MEDIUM
+	else: _size = PalmSize.TALL
 
 func _ready() -> void:
 	super._ready()
 	_build_tree()
+	_setup_collision()
+	_sway_phase = randf() * TAU
+	_sway_freq = 0.5 + randf() * 0.4
+	_sway_amp = deg_to_rad(0.8 + randf() * 0.6)
 
 func _get_h() -> float:
 	if _variant == "river":
@@ -28,6 +43,34 @@ func _get_h() -> float:
 			PalmSize.MEDIUM: return 2.2 + randf() * 0.5
 			PalmSize.TALL:   return 3.0 + randf() * 0.8
 	return 2.5
+
+func _on_destroy() -> void:
+	super._on_destroy()
+	if randf() < 0.5: return
+	var world := _find_world_manager()
+	if world == null: return
+	_ItemDatabase.ensure_db()
+	var def = _ItemDatabase.items_db.get("coconut")
+	if def:
+		_DroppedItem.spawn(world, def, global_position, randi() % 2 + 1, _spawn_drop_velocity(), global_position.y)
+
+func _process(delta: float) -> void:
+	var t := Time.get_ticks_usec() * 0.000001
+	rotation.x = sin(t * _sway_freq + _sway_phase) * _sway_amp
+	rotation.z = cos(t * _sway_freq * 0.7 + _sway_phase + 1.0) * _sway_amp * 0.6
+
+func _setup_collision() -> void:
+	var h := _get_h()
+	var br := _get_base_r()
+	var body := StaticBody3D.new()
+	var col := CollisionShape3D.new()
+	var shape := CylinderShape3D.new()
+	shape.radius = br + 0.15
+	shape.height = h + 0.3
+	col.shape = shape
+	col.position.y = h * 0.5
+	body.add_child(col)
+	add_child(body)
 
 func _get_base_r() -> float:
 	if _variant == "river":
@@ -77,7 +120,7 @@ func _add_voxel(pos: Vector3, col: Color) -> void:
 	_ordered.append(p)
 
 func _fill(px: float, py: float, pz: float, col: Color) -> void:
-	_add_voxel(Vector3(px, py, pz), col)
+	_add_voxel(Vector3(px, py, pz), col * _DARKEN)
 
 # ── MAIN BUILD ──────────────────────────────────────────────────────────────
 
@@ -91,34 +134,54 @@ func _build_tree() -> void:
 
 	_trunk_voxels(h, base_r, top_r)
 	_frond_voxels(h, top_r)
+	var main_count := _ordered.size()
 	_coconut_voxels(h, top_r)
+	var nut_count := _ordered.size() - main_count
 
 	if _ordered.is_empty():
 		return
 
 	var cube := BoxMesh.new()
 	cube.size = Vector3(VOXEL, VOXEL, VOXEL)
+	var cube_mat := StandardMaterial3D.new()
+	cube_mat.vertex_color_use_as_albedo = true
+	cube_mat.metallic = 0.0
+	cube_mat.roughness = 0.85
+	cube.material = cube_mat
 
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
-	mat.metallic = 0.0
-	mat.roughness = 0.85
-	cube.material = mat
+	if main_count > 0:
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.use_colors = true
+		mm.mesh = cube
+		mm.instance_count = main_count
+		for i in range(main_count):
+			mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[i]))
+			mm.set_instance_color(i, _grid[_key(_ordered[i])])
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		mmi.name = "PalmVisual"
+		add_child(mmi)
 
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = true
-	mm.mesh = cube
-	mm.instance_count = _ordered.size()
-
-	for i in range(_ordered.size()):
-		mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[i]))
-		mm.set_instance_color(i, _grid[_key(_ordered[i])])
-
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = mm
-	mmi.name = "PalmVisual"
-	add_child(mmi)
+	if nut_count > 0:
+		var nut_mat := StandardMaterial3D.new()
+		nut_mat.vertex_color_use_as_albedo = true
+		nut_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		nut_mat.metallic = 0.0
+		nut_mat.roughness = 0.85
+		var nut_mm := MultiMesh.new()
+		nut_mm.transform_format = MultiMesh.TRANSFORM_3D
+		nut_mm.use_colors = true
+		nut_mm.mesh = cube
+		nut_mm.instance_count = nut_count
+		for i in range(nut_count):
+			var idx := main_count + i
+			nut_mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[idx]))
+			nut_mm.set_instance_color(i, _grid[_key(_ordered[idx])])
+		var nut_mmi := MultiMeshInstance3D.new()
+		nut_mmi.multimesh = nut_mm
+		nut_mmi.name = "CoconutVisual"
+		add_child(nut_mmi)
 
 # ── TRUNK ───────────────────────────────────────────────────────────────────
 
@@ -228,16 +291,16 @@ func _frond_voxels(h: float, _top_r: float) -> void:
 			if is_young:
 				elevation = deg_to_rad(45.0 + randf() * 20.0)
 				frond_len = 1.2 + randf() * 0.5
-				col_stem = Color(0.12, 0.72, 0.10)
-				col_leaf = Color(0.06, 0.55, 0.04)
-				col_tip = Color(0.18, 0.65, 0.10)
+				col_stem = Color(0.15, 0.82, 0.12)
+				col_leaf = Color(0.08, 0.70, 0.06)
+				col_tip = Color(0.22, 0.85, 0.14)
 				droop = 0.08
 			elif fi < young_n + int((count - young_n) * 0.65):
 				elevation = deg_to_rad(-15.0 + randf() * 20.0)
 				frond_len = 1.8 + randf() * 0.5
-				col_stem = Color(0.05, 0.48, 0.03)
-				col_leaf = Color(0.02, 0.38, 0.02)
-				col_tip = Color(0.10, 0.50, 0.06)
+				col_stem = Color(0.08, 0.65, 0.05)
+				col_leaf = Color(0.05, 0.58, 0.04)
+				col_tip = Color(0.14, 0.72, 0.08)
 				droop = 0.18
 			else:
 				elevation = deg_to_rad(15.0 + randf() * 20.0)
@@ -250,16 +313,16 @@ func _frond_voxels(h: float, _top_r: float) -> void:
 			if is_young:
 				elevation = deg_to_rad(60.0 + randf() * 20.0)
 				frond_len = 0.6 + randf() * 0.2
-				col_stem = Color(0.35, 0.75, 0.15)
-				col_leaf = Color(0.28, 0.62, 0.12)
-				col_tip = Color(0.45, 0.72, 0.18)
+				col_stem = Color(0.38, 0.82, 0.18)
+				col_leaf = Color(0.30, 0.72, 0.15)
+				col_tip = Color(0.45, 0.85, 0.22)
 				droop = 0.03
 			elif fi < young_n + int((count - young_n) * 0.5):
 				elevation = deg_to_rad(-5.0 + randf() * 25.0)
 				frond_len = 1.0 + randf() * 0.3
-				col_stem = Color(0.20, 0.52, 0.10)
-				col_leaf = Color(0.15, 0.42, 0.08)
-				col_tip = Color(0.30, 0.55, 0.14)
+				col_stem = Color(0.22, 0.68, 0.12)
+				col_leaf = Color(0.16, 0.58, 0.10)
+				col_tip = Color(0.30, 0.74, 0.16)
 				droop = 0.10
 			else:
 				elevation = deg_to_rad(30.0 + randf() * 20.0)
@@ -368,20 +431,20 @@ func _coconut_voxels(h: float, top_r: float) -> void:
 # ── HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) ───────────
 
 func _hit_flash() -> void:
-	var mmi := find_child("PalmVisual", false, false) as MultiMeshInstance3D
-	if mmi == null:
-		return
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color.WHITE
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var orig := mmi.material_override
-	mmi.material_override = mat
-	var tween := create_tween()
-	tween.tween_interval(0.08)
-	tween.tween_callback(func():
-		if is_instance_valid(mmi):
-			mmi.material_override = orig
-	)
+	for name in ["PalmVisual", "CoconutVisual"]:
+		var mmi := find_child(name, false, false) as MultiMeshInstance3D
+		if mmi == null: continue
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color.WHITE
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var orig := mmi.material_override
+		mmi.material_override = mat
+		var tween := create_tween()
+		tween.tween_interval(0.08)
+		tween.tween_callback(func():
+			if is_instance_valid(mmi):
+				mmi.material_override = orig
+		)
 
 func _get_mesh_instances() -> Array[MeshInstance3D]:
 	return []

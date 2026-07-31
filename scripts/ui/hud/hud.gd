@@ -27,9 +27,16 @@ var _skill_bar: SkillBar
 var _hotbar: Hotbar
 var _inventory_ui: InventoryUI
 var _chest_ui
+var _crafting_ui
+var _recipe_library: Control
+var _furnace_ui
 var _inventory_open: bool = false
 var _chest_open: bool = false
 var _current_chest: Chest = null
+var _crafting_open: bool = false
+var _current_crafting: CraftingTable = null
+var _furnace_open: bool = false
+@onready var _current_furnace = null
 var _switch_hint: Label
 var _settings_ui
 var _library
@@ -53,8 +60,6 @@ var _load_elapsed: float = 0.0
 var _load_scene: String = "res://scenes/open_world.tscn"
 var _portal_timer: float = 0.0
 var _world_clock: Label
-var _oxygen_bar_bg: ColorRect
-var _oxygen_bar_fill: ColorRect
 var _debug_open: bool = false
 var _debug_panel: Panel
 var _debug_ts_label: Label
@@ -72,7 +77,11 @@ var _hud_throttle: float = 0.0
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _ChestUI = preload("res://scripts/items/ui/chest_ui.gd")
+const _CraftingUI = preload("res://scripts/items/ui/crafting_ui.gd")
+const _RecipeLibrary = preload("res://scripts/items/ui/recipe_library_panel.gd")
+const _FurnaceUI = preload("res://scripts/items/ui/furnace_ui.gd")
 const _Library = preload("res://scripts/ui/library/creature_library.gd")
+const _Debug = preload("debug_menu.gd")
 
 func _ready() -> void:
 	_setup_ui()
@@ -126,6 +135,15 @@ func _setup_ui() -> void:
 
 	_chest_ui = _ChestUI.new()
 	add_child(_chest_ui)
+
+	_crafting_ui = _CraftingUI.new()
+	add_child(_crafting_ui)
+
+	_recipe_library = _RecipeLibrary.new()
+	add_child(_recipe_library)
+
+	_furnace_ui = _FurnaceUI.new()
+	add_child(_furnace_ui)
 
 	_switch_hint = Label.new()
 	_switch_hint.position = Vector2(84, 22)
@@ -201,7 +219,6 @@ func _setup_ui() -> void:
 
 	_setup_loading_overlay()
 
-	_setup_oxygen_bar()
 	_setup_time_label()
 	_setup_zoom_slider()
 	_setup_debug_menu()
@@ -362,12 +379,6 @@ func _process(delta: float) -> void:
 		_debug_panel.position = Vector2(vp.x * 0.5 - 228, vp.y * 0.5 - 169)
 		_update_debug_menu()
 
-	if _oxygen_bar_bg.visible:
-		var bx: float = (vp.x - 224.0) * 0.5
-		var by: float = vp.y - 112.0
-		_oxygen_bar_bg.position = Vector2(bx, by)
-		_oxygen_bar_fill.position = Vector2(bx, by)
-
 	if _load_state == LOAD_IDLE:
 		var platform := _find_portal_gate()
 		if platform and platform.is_player_on():
@@ -424,6 +435,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			if _chest_open:
 				if k.keycode == k_interact or k.keycode == KEY_ESCAPE or k.keycode == k_inventory:
 					close_chest()
+				return
+
+			if _furnace_open:
+				if k.keycode == k_interact or k.keycode == KEY_ESCAPE or k.keycode == k_inventory:
+					close_furnace()
+				return
+
+			if _crafting_open:
+				if k.keycode == k_interact or k.keycode == KEY_ESCAPE or k.keycode == k_inventory:
+					close_crafting()
 				return
 
 			if _inventory_open:
@@ -485,12 +506,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _toggle_inventory() -> void:
 	_inventory_open = not _inventory_open
-	_inventory_ui.visible = _inventory_open
+	if _inventory_open:
+		_inventory_ui.open()
+	else:
+		_inventory_ui.close()
+	if not _inventory_open:
+		_release_focus(_inventory_ui)
 	var player := _find_player_character()
 	if player:
 		player._inventory_open = _inventory_open
 		if not _inventory_open:
 			player._held_item = {}
+
+func _release_focus(node: Node) -> void:
+	if node is Control and node.has_focus():
+		node.release_focus()
+	for child in node.get_children():
+		_release_focus(child)
 
 func open_chest(chest) -> void:
 	if _chest_open:
@@ -512,6 +544,54 @@ func close_chest() -> void:
 		_current_chest.close_ui()
 	_current_chest = null
 
+func open_crafting(table) -> void:
+	if _crafting_open:
+		return
+	if _inventory_open:
+		_toggle_inventory()
+	if _chest_open:
+		close_chest()
+	_crafting_open = true
+	_current_crafting = table
+	_recipe_library.open()
+	var player := _find_player_character()
+	if player:
+		_crafting_ui.open(player)
+
+func open_furnace(furnace) -> void:
+	if _furnace_open:
+		return
+	if _inventory_open:
+		_toggle_inventory()
+	if _chest_open:
+		close_chest()
+	if _crafting_open:
+		close_crafting()
+	_furnace_open = true
+	_current_furnace = furnace
+	var player := _find_player_character()
+	if player:
+		_furnace_ui.open(furnace, player)
+
+func close_furnace() -> void:
+	if not _furnace_open:
+		return
+	_furnace_open = false
+	_furnace_ui.close()
+	if _current_furnace and is_instance_valid(_current_furnace):
+		_current_furnace.close_ui()
+	_current_furnace = null
+
+func close_crafting() -> void:
+	if not _crafting_open:
+		return
+	_crafting_open = false
+	_recipe_library.close()
+	_crafting_ui.close()
+	if _current_crafting and is_instance_valid(_current_crafting):
+		_current_crafting.close_ui()
+	_current_crafting = null
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -531,7 +611,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_placement_sys.confirm_placement()
 					_build_hint.text = ""
 				elif mb.button_index == MOUSE_BUTTON_RIGHT:
-					_placement_sys.cancel_placement()
+					_placement_sys.rotate_placement()
 					_build_hint.text = ""
 
 func _find_and_track() -> void:
@@ -603,19 +683,10 @@ func _find_player_character() -> PlayerCharacter:
 	return null
 
 func _track_character(ch: CharacterBase) -> void:
-	if _tracked:
-		if _tracked.hp_changed.is_connected(_on_hp_changed):
-			_tracked.hp_changed.disconnect(_on_hp_changed)
-		if _tracked.oxygen_changed.is_connected(_on_oxygen_changed):
-			_tracked.oxygen_changed.disconnect(_on_oxygen_changed)
 	_tracked = ch
 	if ch == null:
 		_dummy_label.text = ""
 		return
-	ch.hp_changed.connect(_on_hp_changed)
-	ch.oxygen_changed.connect(_on_oxygen_changed)
-	_on_hp_changed(ch.hp, ch.max_hp)
-	_on_oxygen_changed(int(ch.oxygen), int(ch.max_oxygen))
 
 	var is_player: bool = ch is PlayerCharacter
 	_skill_bar.visible = not is_player
@@ -623,7 +694,7 @@ func _track_character(ch: CharacterBase) -> void:
 	_hotbar.set_inventory(null)
 	if _inventory_open:
 		_inventory_open = false
-		_inventory_ui.visible = false
+		_inventory_ui.close()
 		var player := _find_player_character()
 		if player:
 			player._inventory_open = false
@@ -642,9 +713,6 @@ func _track_character(ch: CharacterBase) -> void:
 			_inventory_ui.set_player(player_ch)
 	else:
 		_skill_bar.track(ch)
-
-func _on_hp_changed(_current: int, _max_hp_val: int) -> void:
-	pass
 
 func _find_portal_gate() -> PortalGate:
 	var parent := get_parent()
@@ -688,7 +756,7 @@ func _on_hotbar_slot_changed(idx: int) -> void:
 func _is_building_item(def: ItemDef) -> bool:
 	if def.type == ItemDef.Type.BLOCK:
 		return true
-	if def.id in ["twilight_gate", "chest"]:
+	if def.id in ["twilight_gate", "chest", "crafting_table", "water_bucket"]:
 		return true
 	return false
 
@@ -931,36 +999,30 @@ func _setup_debug_menu() -> void:
 	add_child(_debug_panel)
 
 func _toggle_debug() -> void:
-	_debug_open = not _debug_open
-	_debug_panel.visible = _debug_open
+	_debug_open = _Debug.toggle_debug(_debug_open, _debug_panel)
 	if _debug_open:
 		_update_debug_menu()
 
 func _on_debug_hour_changed(value: float) -> void:
-	if TimeSystem:
-		TimeSystem.set_hour(value)
+	_Debug.on_hour_changed(value)
 
 func _on_debug_speed_changed(value: float) -> void:
-	if TimeSystem:
-		TimeSystem.set_time_scale(value)
+	_Debug.on_speed_changed(value)
 
 func _on_debug_weather_toggle() -> void:
+	_Debug.on_weather_toggle(_debug_weather_btn)
 	if not TimeSystem:
 		return
-	if TimeSystem.get_weather() == TimeSystem.Weather.CLEAR:
-		TimeSystem.force_weather(TimeSystem.Weather.RAIN)
-		_debug_weather_btn.text = "Rain"
-		var player := _find_player_character()
-		if player:
-			var rm := get_tree().current_scene.find_child("RainManager", true, false) as RainManager
-			if rm:
-				rm.add_zone(Vector2(player.global_position.x, player.global_position.z), 80.0, TimeSystem.CYCLE_DURATION)
+	var player := _find_player_character()
+	if not player:
+		return
+	var rm := get_tree().current_scene.find_child("RainManager", true, false) as RainManager
+	if not rm:
+		return
+	if TimeSystem.get_weather() == TimeSystem.Weather.RAIN:
+		rm.add_zone(Vector2(player.global_position.x, player.global_position.z), 80.0, TimeSystem.CYCLE_DURATION)
 	else:
-		TimeSystem.force_weather(TimeSystem.Weather.CLEAR)
-		_debug_weather_btn.text = "Clear"
-		var rm := get_tree().current_scene.find_child("RainManager", true, false) as RainManager
-		if rm:
-			rm.clear_zones()
+		rm.clear_zones()
 
 func _on_teleport_biome(biome_type: String) -> void:
 	var player := _find_player_character()
@@ -1077,52 +1139,9 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 	return "🌿 " + tr("BIOME_PLAINS")
 
 func _update_debug_menu() -> void:
-	if not _debug_open or not TimeSystem:
+	if not _debug_open:
 		return
-	var h: float = TimeSystem.get_hour_int()
-	var m: int = TimeSystem.get_minute()
-	var day: int = TimeSystem.get_day()
-	var month: String = TimeSystem.get_month_name()
-	var year: int = TimeSystem.get_year() + 1
-	var season: String = TimeSystem.get_season_name()
-	var weather: String = TimeSystem.get_weather_name()
-	_debug_ts_label.text = "%02d:%02d  %s %d, Year %d  |  %s  |  %s" % [h, m, month, day, year, season, weather]
-	_debug_hour_slider.value = h
-	_debug_speed_slider.value = TimeSystem.get_time_scale()
-	if TimeSystem.get_weather() == TimeSystem.Weather.RAIN:
-		_debug_weather_btn.text = "Rain"
-	else:
-		_debug_weather_btn.text = "Clear"
-
-func _setup_oxygen_bar() -> void:
-	_oxygen_bar_bg = ColorRect.new()
-	_oxygen_bar_bg.color = Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.70)
-	_oxygen_bar_bg.size = Vector2(224, 20)
-	_oxygen_bar_bg.visible = false
-	add_child(_oxygen_bar_bg)
-
-	_oxygen_bar_fill = ColorRect.new()
-	_oxygen_bar_fill.color = Color(PURPLE.r, PURPLE.g, PURPLE.b, 0.80)
-	_oxygen_bar_fill.size = Vector2(224, 20)
-	_oxygen_bar_fill.visible = false
-	add_child(_oxygen_bar_fill)
-
-func _on_oxygen_changed(current: int, max_oxy: int) -> void:
-	if max_oxy <= 0:
-		return
-	var ratio: float = clamp(float(current) / float(max_oxy), 0.0, 1.0)
-	_oxygen_bar_fill.size.x = 224.0 * ratio
-	_oxygen_bar_fill.color = Color(
-		0.2 + (1.0 - ratio) * 0.5,
-		0.55 - (1.0 - ratio) * 0.35,
-		0.80 - (1.0 - ratio) * 0.6,
-		0.90)
-	if current < max_oxy:
-		_oxygen_bar_bg.visible = true
-		_oxygen_bar_fill.visible = true
-	else:
-		_oxygen_bar_bg.visible = false
-		_oxygen_bar_fill.visible = false
+	_Debug.update_debug_menu(_debug_ts_label, _debug_hour_slider, _debug_speed_slider, _debug_weather_btn)
 
 func _on_portal_click() -> void:
 	_load_state = LOAD_LOADING

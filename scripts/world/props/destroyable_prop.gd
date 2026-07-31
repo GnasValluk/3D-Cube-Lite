@@ -37,9 +37,9 @@ func _weapon_allowed(weapon_id: String) -> bool:
 	if weapon_requirement == WeaponReq.NONE:
 		return true
 	match weapon_requirement:
-		WeaponReq.AXE:     return weapon_id == "riu" or weapon_id == "dai_kiem"
-		WeaponReq.SWORD:   return weapon_id == "kiem" or weapon_id == "dai_kiem"
-		WeaponReq.PICKAXE: return weapon_id == "cup"
+		WeaponReq.AXE:     return weapon_id == "axe" or weapon_id == "iron_greatsword"
+		WeaponReq.SWORD:   return weapon_id == "iron_sword" or weapon_id == "iron_greatsword"
+		WeaponReq.PICKAXE: return weapon_id == "pickaxe"
 	return false
 
 func _hit_flash() -> void:

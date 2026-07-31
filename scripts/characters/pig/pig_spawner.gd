@@ -45,12 +45,12 @@ class PigHerd:
 		cleanup()
 		return pigs.size() >= target_size
 
-@export var max_herds: int = 4
+@export var max_herds: int = 3
 @export var herd_spacing: float = 40.0
 @export var herd_radius_min: float = 8.0
 @export var herd_radius_max: float = 12.0
 @export var herd_target_min: int = 1
-@export var herd_target_max: int = 3
+@export var herd_target_max: int = 2
 @export var herd_spawn_radius: float = 50.0
 @export var despawn_distance: float = 80.0
 @export var check_interval: float = 8.0

@@ -9,7 +9,6 @@ const BAR_GAP: float = 0.02
 var _pivot: Node3D
 var _fill: MeshInstance3D
 var _shield: MeshInstance3D
-var _stamina: MeshInstance3D
 var _target: CharacterBase
 
 func setup(target: CharacterBase) -> void:
@@ -18,11 +17,9 @@ func setup(target: CharacterBase) -> void:
 	_build()
 	target.hp_changed.connect(_update)
 	target.shield_changed.connect(_update_shield)
-	target.stamina_changed.connect(_update_stamina)
 	target.died.connect(_hide)
 	_update(target.hp, target.max_hp)
 	_update_shield(target.shield)
-	_update_stamina(target.stamina, target.max_stamina)
 
 func _build() -> void:
 	_pivot = Node3D.new()
@@ -45,17 +42,6 @@ func _build() -> void:
 	_shield = MeshInstance3D.new()
 	_shield.mesh = qshield
 	_shield.material_override = mat_shield
-	var mat_stamina := StandardMaterial3D.new()
-	mat_stamina.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat_stamina.albedo_color = Color(0.20, 0.50, 1.0, 0.60)
-	var qstamina := QuadMesh.new()
-	qstamina.size = Vector2(BAR_WIDTH, BAR_HEIGHT)
-	_stamina = MeshInstance3D.new()
-	_stamina.mesh = qstamina
-	_stamina.material_override = mat_stamina
-	_stamina.position = Vector3(-BAR_WIDTH * 0.5, -(BAR_HEIGHT + BAR_GAP), 0.0)
-	_pivot.add_child(_stamina)
-
 	_shield.position = Vector3(-BAR_WIDTH * 0.5, -(BAR_HEIGHT + BAR_GAP) * 2, 0.0)
 	_pivot.add_child(_shield)
 
@@ -112,20 +98,6 @@ func _update_shield(current: int) -> void:
 		return
 	qm.size = Vector2(BAR_WIDTH * shield_ratio, BAR_HEIGHT)
 	_shield.position = Vector3(-(1.0 - shield_ratio) * BAR_WIDTH * 0.5, -(BAR_HEIGHT + BAR_GAP) * 2, 0.0)
-
-func _update_stamina(current: int, max_stamina_val: int) -> void:
-	if not is_instance_valid(_target):
-		return
-	if current <= 0:
-		_stamina.visible = false
-		return
-	_stamina.visible = true
-	var ratio: float = clamp(float(current) / float(max_stamina_val), 0.0, 1.0)
-	var qm: QuadMesh = _stamina.mesh as QuadMesh
-	if qm == null:
-		return
-	qm.size = Vector2(BAR_WIDTH * ratio, BAR_HEIGHT)
-	_stamina.position = Vector3(-(1.0 - ratio) * BAR_WIDTH * 0.5, -(BAR_HEIGHT + BAR_GAP), 0.0)
 
 func _hide(_attacker: Node3D = null) -> void:
 	visible = false

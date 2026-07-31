@@ -30,6 +30,14 @@ enum BlockID {
 	GOLD_ORE     = 22,
 	TITAN_ORE    = 23,
 	PLATINUM_ORE = 24,
+	WATER_SOURCE = 25,
+	WATER_LEVEL_7 = 26,
+	WATER_LEVEL_6 = 27,
+	WATER_LEVEL_5 = 28,
+	WATER_LEVEL_4 = 29,
+	WATER_LEVEL_3 = 30,
+	WATER_LEVEL_2 = 31,
+	WATER_LEVEL_1 = 32,
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -82,6 +90,7 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"gold_ore":           BlockID.GOLD_ORE,
 	"titan_ore":          BlockID.TITAN_ORE,
 	"platinum_ore":       BlockID.PLATINUM_ORE,
+	"water_bucket":       BlockID.WATER_SOURCE,
 }
 
 const VOXEL: float = 1.0
@@ -124,7 +133,7 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.92, 0.78, 0.32),           # 3 SAND (hồ nội địa)
 	Color(0.42, 0.22, 0.08),           # 4 DIRT
 	Color(0.16, 0.15, 0.13),           # 5 SILT
-	Color(0.08, 0.36, 0.68, 0.70),     # 6 WATER (hồ)
+	Color(0.08, 0.36, 0.68, 0.70),     # 6 WATER (backward compat)
 	Color(0.42, 0.42, 0.46),           # 7 STONE
 	Color(0.28, 0.16, 0.06),           # 8 DARK_DIRT
 	Color(0.80, 0.66, 0.28),           # 9 SAND_DEEP
@@ -143,6 +152,14 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.37, 0.33, 0.29),           # 22 GOLD_ORE
 	Color(0.35, 0.30, 0.40),           # 23 TITAN_ORE
 	Color(0.30, 0.30, 0.35),           # 24 PLATINUM_ORE
+	Color(0.08, 0.36, 0.68, 0.75),     # 25 WATER_SOURCE
+	Color(0.08, 0.36, 0.68, 0.70),     # 26 WATER_LEVEL_7
+	Color(0.10, 0.40, 0.70, 0.65),     # 27 WATER_LEVEL_6
+	Color(0.12, 0.44, 0.72, 0.60),     # 28 WATER_LEVEL_5
+	Color(0.14, 0.48, 0.74, 0.55),     # 29 WATER_LEVEL_4
+	Color(0.16, 0.52, 0.76, 0.50),     # 30 WATER_LEVEL_3
+	Color(0.18, 0.56, 0.78, 0.45),     # 31 WATER_LEVEL_2
+	Color(0.20, 0.60, 0.80, 0.40),     # 32 WATER_LEVEL_1
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -152,7 +169,7 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.05, 0.15, 0.10),           # 3 SAND
 	Color(0.04, 0.10, 0.07),           # 4 DIRT
 	Color(0.06, 0.14, 0.08),           # 5 SILT
-	Color(0.10, 0.55, 0.45, 0.70),     # 6 WATER
+	Color(0.10, 0.55, 0.45, 0.70),     # 6 WATER (backward compat)
 	Color(0.04, 0.08, 0.06),           # 7 STONE
 	Color(0.03, 0.10, 0.06),           # 8 DARK_DIRT
 	Color(0.05, 0.13, 0.08),           # 9 SAND_DEEP
@@ -171,6 +188,14 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.37, 0.33, 0.29),           # 22 GOLD_ORE
 	Color(0.35, 0.30, 0.40),           # 23 TITAN_ORE
 	Color(0.30, 0.30, 0.35),           # 24 PLATINUM_ORE
+	Color(0.10, 0.55, 0.45, 0.75),     # 25 WATER_SOURCE
+	Color(0.10, 0.55, 0.45, 0.70),     # 26 WATER_LEVEL_7
+	Color(0.12, 0.57, 0.47, 0.65),     # 27 WATER_LEVEL_6
+	Color(0.14, 0.59, 0.49, 0.60),     # 28 WATER_LEVEL_5
+	Color(0.16, 0.61, 0.51, 0.55),     # 29 WATER_LEVEL_4
+	Color(0.18, 0.63, 0.53, 0.50),     # 30 WATER_LEVEL_3
+	Color(0.20, 0.65, 0.55, 0.45),     # 31 WATER_LEVEL_2
+	Color(0.22, 0.67, 0.57, 0.40),     # 32 WATER_LEVEL_1
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -181,9 +206,31 @@ const TRAIL_SINK: float = 0.0
 static func block_side_color(top_col: Color) -> Color:
 	return Color(top_col.r * 0.50, top_col.g * 0.50, top_col.b * 0.50, top_col.a)
 
+## Water helpers
+static func is_water(bid: int) -> bool:
+	return bid == BlockID.WATER \
+		or (bid >= BlockID.WATER_SOURCE and bid <= BlockID.WATER_LEVEL_1)
+
+static func water_level(bid: int) -> int:
+	if bid == BlockID.WATER_SOURCE or bid == BlockID.WATER:
+		return 8
+	if bid >= BlockID.WATER_LEVEL_7 and bid <= BlockID.WATER_LEVEL_1:
+		return 8 - (bid - BlockID.WATER_LEVEL_7)
+	return 0
+
+static func is_source_water(bid: int) -> bool:
+	return bid == BlockID.WATER_SOURCE or bid == BlockID.WATER
+
+static func water_block_for_level(level: int) -> int:
+	if level >= 8:
+		return BlockID.WATER_SOURCE
+	if level >= 1:
+		return BlockID.WATER_LEVEL_7 - (level - 7)
+	return BlockID.AIR
+
 ## Block nào là solid (player không đi xuyên qua)
 static func is_solid(block_id: int) -> bool:
-	return block_id != BlockID.AIR and block_id != BlockID.WATER
+	return block_id != BlockID.AIR and not is_water(block_id)
 
 ## Block nào là indestructible (không thể phá vỡ)
 static func is_indestructible(block_id: int) -> bool:
@@ -191,7 +238,7 @@ static func is_indestructible(block_id: int) -> bool:
 
 ## Block nào là transparent (render both sides / skip face culling)
 static func is_transparent(block_id: int) -> bool:
-	return block_id == BlockID.AIR or block_id == BlockID.WATER
+	return block_id == BlockID.AIR or is_water(block_id)
 
 ## ── Legacy tile colors (giữ lại để tương thích các code cũ) ─────────────────
 const TILE_COLORS_TW: Array[Dictionary] = [

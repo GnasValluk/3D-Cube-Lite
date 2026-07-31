@@ -3,6 +3,7 @@ extends RefCounted
 const _Data = preload("chunk_data.gd")
 
 static var _road_curves: Array[PackedVector2Array] = []
+static var _road_curve_bboxes: Array[Rect2] = []
 static var _road_spatial: Dictionary = {}
 static var _road_ready: bool = false
 static var _int_cache: Dictionary = {}
@@ -78,14 +79,29 @@ static func _index_curves() -> void:
 			var cx1: int = floori(max(a.x, b.x) / cell_sz)
 			var cz0: int = floori(min(a.y, b.y) / cell_sz)
 			var cz1: int = floori(max(a.y, b.y) / cell_sz)
+			# Lưu theo SEGMENT (ci*10000+i) — truy vấn điểm chỉ chạm vài segment
+			var skey: int = ci * 10000 + i
 			for cx in range(cx0 - 1, cx1 + 2):
 				for cz in range(cz0 - 1, cz1 + 2):
 					var ck: Vector2i = Vector2i(cx, cz)
 					if not _road_spatial.has(ck):
 						_road_spatial[ck] = PackedInt32Array()
 					var arr: PackedInt32Array = _road_spatial[ck]
-					if arr.size() == 0 or arr[arr.size() - 1] != ci:
-						arr.append(ci)
+					if arr.size() == 0 or arr[arr.size() - 1] != skey:
+						arr.append(skey)
+
+## Cache bounding box của từng curve — compute_positions gọi mỗi chunk
+static func curve_bbox(ci: int) -> Rect2:
+	if _road_curve_bboxes.size() > ci and _road_curve_bboxes[ci].size != Vector2.ZERO:
+		return _road_curve_bboxes[ci]
+	var wp: PackedVector2Array = _road_curves[ci]
+	var rect := Rect2(wp[0], Vector2.ZERO)
+	for pt in wp:
+		rect = rect.expand(pt)
+	if _road_curve_bboxes.size() <= ci:
+		_road_curve_bboxes.resize(ci + 1)
+	_road_curve_bboxes[ci] = rect
+	return rect
 
 static func _ensure_roads() -> void:
 	if _road_ready:
@@ -157,14 +173,17 @@ static func is_on_road(wx: float, wz: float) -> bool:
 	_ensure_roads()
 	var cell_sz: float = _Data.ROAD_GRID * 0.5
 	var ck: Vector2i = Vector2i(int(wx / cell_sz), int(wz / cell_sz))
-	var indices: PackedInt32Array = _road_spatial.get(ck, PackedInt32Array())
-	if indices.is_empty():
+	var segs: PackedInt32Array = _road_spatial.get(ck, PackedInt32Array())
+	if segs.is_empty():
 		return false
 	var pos: Vector2 = Vector2(wx, wz)
 	var md2: float = _Data.ROAD_HALF_W * _Data.ROAD_HALF_W
-	for ci in indices:
+	for skey in segs:
+		var ci: int = skey / 10000
+		var i: int = skey % 10000
 		var wp: PackedVector2Array = _road_curves[ci]
-		for i in range(wp.size() - 1):
-			if _point_to_seg_d2(pos, wp[i], wp[i + 1]) <= md2:
-				return true
+		if i >= wp.size() - 1:
+			continue
+		if _point_to_seg_d2(pos, wp[i], wp[i + 1]) <= md2:
+			return true
 	return false

@@ -56,7 +56,7 @@ func _idle(delta: float, t: float) -> void:
 	mesh.backpack.position.z = lerp(mesh.backpack.position.z, -0.02, delta * 5.0)
 	# Tay đung đưa nhẹ
 	var arm_bob: float = 1.0
-	if player and player.equipped_weapon and player.equipped_weapon.id == "phao_dua_hau":
+	if player and player.equipped_weapon and player.equipped_weapon.id == "watermelon_cannon":
 		arm_bob = 0.3
 	mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, (-0.06 + b * 0.03) * arm_bob, delta * 5.0)
 	mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, (-0.06 + b * 0.03) * arm_bob, delta * 5.0)
@@ -80,7 +80,7 @@ func _walk(delta: float, t: float, mult: float) -> void:
 	mesh.backpack.rotation.x = sin(cyc * 0.5) * 0.04
 	# Tay đánh nhịp
 	var arm_swing: float = 0.28 + mult * 0.08
-	if player and player.equipped_weapon and player.equipped_weapon.id == "phao_dua_hau":
+	if player and player.equipped_weapon and player.equipped_weapon.id == "watermelon_cannon":
 		arm_swing *= 0.35
 	mesh.arm_l.rotation.x = sin(cyc + PI) * arm_swing
 	mesh.arm_r.rotation.x = sin(cyc) * arm_swing
@@ -188,8 +188,8 @@ func _attack(delta: float, _t: float) -> void:
 		_slash_spawned = false
 	_last_remaining = remaining
 
-	var is_heavy: bool = player and player.equipped_weapon != null and (player.equipped_weapon.id == "riu" or player.equipped_weapon.id == "cup")
-	var is_gs: bool = player and player.equipped_weapon != null and player.equipped_weapon.id == "dai_kiem"
+	var is_heavy: bool = player and player.equipped_weapon != null and (player.equipped_weapon.id == "axe" or player.equipped_weapon.id == "pickaxe")
+	var is_gs: bool = player and player.equipped_weapon != null and player.equipped_weapon.id == "iron_greatsword"
 	var is_halberd: bool = player and player.equipped_weapon != null and player.equipped_weapon.id == "iron_halberd"
 
 	if is_heavy:
@@ -496,17 +496,17 @@ func _spawn_slash(step: int) -> void:
 	if not player or not player.equipped_weapon:
 		return
 	var wp := mesh.weapon_pivot
-	var is_heavy: bool = player.equipped_weapon.id == "riu" or player.equipped_weapon.id == "cup"
-	var is_gs: bool = player.equipped_weapon.id == "dai_kiem"
+	var is_heavy: bool = player.equipped_weapon.id == "axe" or player.equipped_weapon.id == "pickaxe"
+	var is_gs: bool = player.equipped_weapon.id == "iron_greatsword"
 	var is_halberd: bool = player.equipped_weapon.id == "iron_halberd"
 
 	if is_heavy:
-			var is_axe: bool = player.equipped_weapon.id == "riu"
+			var is_axe: bool = player.equipped_weapon.id == "axe"
 			var vfx := SlashVFX.new(75.0 if is_axe else 60.0, 0.40 if is_axe else 0.30, 0.10, Color.WHITE)
 			wp.add_child(vfx)
 			vfx.position = Vector3(0, 0.40, 0)
 			vfx.rotation_degrees = Vector3(0, 90, 0)
-	elif player.equipped_weapon.id == "kiem":
+	elif player.equipped_weapon.id == "iron_sword":
 		var vfx := SlashVFX.new(70.0, 0.5, 0.12, Color.WHITE)
 		wp.add_child(vfx)
 		vfx.position = Vector3(0, 0.40, 0)
@@ -532,7 +532,7 @@ func _spawn_slash(step: int) -> void:
 		match step:
 			0: vfx.rotation_degrees = Vector3(0, 90, 0)
 			1: vfx.rotation_degrees = Vector3(90, 0, 30)
-	elif player.equipped_weapon.id == "gang_tay_da_thu":
+	elif player.equipped_weapon.id == "leather_gloves":
 		var vfx := PunchVFX.new(1.0, Color(0.85, 0.72, 0.40))
 		wp.add_child(vfx)
 		vfx.position = Vector3(0, 0.25, 0.08)

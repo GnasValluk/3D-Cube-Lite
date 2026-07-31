@@ -1,39 +1,159 @@
 class_name MaterialMeshes
 
-static func ingot(p: Node3D, metal: Color, dark: Color) -> void:
-	ItemMeshShared.add_cube(p, 0, 0, 0, 4.5, 2.4, 3.0, metal)
-	ItemMeshShared.add_cube(p, 0, 0.9, 0, 3.9, 0.6, 2.4, metal.lightened(0.12))
-	ItemMeshShared.add_cube(p, 0, -0.9, 0, 3.9, 0.6, 2.4, dark)
-
-static func ingot_high(p: Node3D, metal: Color, dark: Color) -> void:
-	var mid := metal.lightened(0.15)
-	ItemMeshShared.add_cube(p, 0, 0, 0, 5.1, 2.7, 3.6, metal)
-	ItemMeshShared.add_cube(p, 0, 1.05, 0, 4.5, 0.6, 3.0, mid)
-	ItemMeshShared.add_cube(p, 0, -1.05, 0, 4.5, 0.6, 3.0, dark)
-
-static func ingot_purified(p: Node3D, metal: Color, dark: Color) -> void:
-	var mid := metal.lightened(0.18)
-	ItemMeshShared.add_cube(p, 0, 0, 0, 5.7, 3.0, 4.2, metal)
-	ItemMeshShared.add_cube(p, 0, 1.2, 0, 4.8, 0.6, 3.3, mid)
-	ItemMeshShared.add_cube(p, 0, -1.2, 0, 4.8, 0.6, 3.3, dark)
-
+# ── ORE BLOCK ────────────────────────────────────────────────────────────────
+# Rough stone base with mineral veins and sparkle crystals
 static func ore(p: Node3D, stone: Color, mineral: Color) -> void:
-	ItemMeshShared.add_cube(p, 0, 0, 0, 3.0, 2.5, 3.0, stone)
-	ItemMeshShared.add_cube(p, 1.2, 0.4, 0.8, 1.0, 1.2, 1.0, stone.darkened(0.06))
-	ItemMeshShared.add_cube(p, -1.0, -0.3, -0.8, 1.2, 1.0, 1.2, stone.lightened(0.05))
-	ItemMeshShared.add_cube(p, 0.5, 0.6, -1.2, 1.0, 0.8, 0.8, stone.darkened(0.04))
-	ItemMeshShared.add_cube(p, -0.5, -0.5, 1.2, 1.0, 0.8, 0.8, stone.lightened(0.03))
-	ItemMeshShared.add_cube(p, 0, 0.3, 0, 0.2, 1.8, 0.2, stone.darkened(0.20))
-	ItemMeshShared.add_cube(p, 0.8, -0.5, -0.5, 0.2, 1.0, 0.2, stone.darkened(0.18))
-	ItemMeshShared.add_cube(p, -0.8, 0.5, 0, 1.2, 0.8, 1.6, mineral)
-	ItemMeshShared.add_cube(p, 0.8, 0, 0, 1.4, 1.0, 1.2, mineral)
-	ItemMeshShared.add_cube(p, 0, -0.2, 1.2, 1.0, 1.2, 1.0, mineral)
-	ItemMeshShared.add_cube(p, 0.3, 0.7, -1.2, 1.0, 0.6, 1.0, mineral)
-	ItemMeshShared.add_cube(p, -1.4, 0.8, 0.6, 0.5, 0.5, 0.5, mineral.lightened(0.20))
-	ItemMeshShared.add_cube(p, 1.2, -0.6, -0.8, 0.6, 0.5, 0.6, mineral.lightened(0.15))
-	ItemMeshShared.add_cube(p, -0.3, 0.9, -1.0, 0.5, 0.4, 0.5, mineral.lightened(0.25))
-	ItemMeshShared.add_cube(p, -1.0, 1.0, -0.5, 0.3, 0.3, 0.3, Color(1, 1, 1, 0.5))
-	ItemMeshShared.add_cube(p, 1.0, 0.3, 1.2, 0.3, 0.3, 0.3, Color(1, 1, 1, 0.5))
+	var sx := 4.0; var sy := 3.4; var sz := 4.0
+
+	ItemMeshShared.add_cube_shaded(p, 0, 0, 0, sx, sy, sz, stone, 0.0, 0.9)
+	ItemMeshShared.add_cube_shaded(p, 0.5, 0.7, 0.4, sx * 0.55, sy * 0.4, sz * 0.5, stone.darkened(0.08), 0.0, 0.95)
+	ItemMeshShared.add_cube_shaded(p, -0.6, -0.5, -0.3, sx * 0.5, sy * 0.35, sz * 0.55, stone.lightened(0.05), 0.0, 0.85)
+	ItemMeshShared.add_cube_shaded(p, -0.4, 1.0, -0.7, sx * 0.35, sy * 0.3, sz * 0.35, stone.darkened(0.12), 0.0, 0.9)
+	ItemMeshShared.add_cube_shaded(p, 0.7, -0.8, 0.6, sx * 0.3, sy * 0.25, sz * 0.4, stone.lightened(0.03), 0.0, 0.9)
+
+	ItemMeshShared.add_cube_shaded(p, 0.4, 0.1, 0.8, 1.4, 1.6, 0.6, mineral, 0.3, 0.6)
+	ItemMeshShared.add_cube_shaded(p, -0.8, 0.4, -0.5, 0.5, 1.8, 1.2, mineral, 0.3, 0.6)
+	ItemMeshShared.add_cube_shaded(p, 1.2, -0.3, -0.8, 0.6, 1.0, 1.4, mineral, 0.25, 0.65)
+	ItemMeshShared.add_cube_shaded(p, -0.3, 1.1, -1.0, 1.4, 0.5, 0.5, mineral, 0.3, 0.55)
+	ItemMeshShared.add_cube_shaded(p, -1.2, -0.7, 1.2, 0.5, 0.7, 1.6, mineral, 0.3, 0.6)
+	ItemMeshShared.add_cube_shaded(p, 1.0, 0.7, 0, 0.4, 1.4, 0.4, mineral.darkened(0.15), 0.35, 0.5)
+	ItemMeshShared.add_cube_shaded(p, -0.7, -0.4, -1.4, 0.6, 0.4, 0.6, mineral.darkened(0.1), 0.3, 0.55)
+	ItemMeshShared.add_cube_shaded(p, 1.4, 1.1, -0.4, 0.5, 0.4, 0.5, mineral.lightened(0.15), 0.25, 0.5)
+	ItemMeshShared.add_cube_shaded(p, -1.1, -1.0, 0.3, 0.6, 0.5, 0.6, mineral.lightened(0.1), 0.3, 0.5)
+
+	ItemMeshShared.add_cube_shaded(p, 1.0, -0.1, -1.6, 0.3, 0.3, 0.3, Color(1, 1, 1), 0.0, 0.3)
+	ItemMeshShared.add_cube_shaded(p, -1.5, 0.8, 0.6, 0.25, 0.25, 0.25, Color(1, 1, 1), 0.0, 0.25)
+	ItemMeshShared.add_cube_shaded(p, 0.3, -0.6, 1.5, 0.25, 0.25, 0.25, Color(1, 1, 1), 0.0, 0.3)
+	ItemMeshShared.add_cube_shaded(p, -0.6, 1.4, -1.2, 0.25, 0.25, 0.25, Color(1, 1, 1), 0.0, 0.25)
+
+
+# ── INGOT (Standard) ─────────────────────────────────────────────────────────
+# Trapezoid bar, cast metal, slightly rough surface
+static func ingot(p: Node3D, metal: Color, dark: Color) -> void:
+	var w := 5.2; var h := 2.6; var d := 3.4
+
+	ItemMeshShared.add_cube_shaded(p, 0, 0.5, 0, w, h * 0.35, d, metal, 0.8, 0.4)
+	ItemMeshShared.add_cube_shaded(p, 0, 0, 0, w * 0.85, h * 0.35, d * 0.85, metal.darkened(0.06), 0.8, 0.4)
+	ItemMeshShared.add_cube_shaded(p, 0, -0.5, 0, w * 0.7, h * 0.35, d * 0.7, dark, 0.8, 0.45)
+
+	var bevel := 0.3
+	ItemMeshShared.add_cube_shaded(p, -w * 0.5, 0.2, 0, bevel, h * 0.35, d * 0.85, metal.lightened(0.06), 0.8, 0.35)
+	ItemMeshShared.add_cube_shaded(p, w * 0.5, 0.2, 0, bevel, h * 0.35, d * 0.85, metal.lightened(0.06), 0.8, 0.35)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.2, -d * 0.5, w * 0.85, h * 0.35, bevel, metal.lightened(0.06), 0.8, 0.35)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.2, d * 0.5, w * 0.85, h * 0.35, bevel, metal.lightened(0.06), 0.8, 0.35)
+
+	ItemMeshShared.add_cube_shaded(p, -0.6, 0.7, 0, 0.2, h * 0.2, 1.5, dark, 0.8, 0.5)
+	ItemMeshShared.add_cube_shaded(p, 0.6, 0.7, -0.4, 0.2, h * 0.2, 0.8, dark, 0.8, 0.5)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.7, 1.0, 1.0, h * 0.15, 0.15, dark, 0.8, 0.55)
+
+	ItemMeshShared.add_cube_shaded(p, -1.8, 0.25, 1.2, 0.6, 0.2, 0.2, metal.lightened(0.08), 0.85, 0.3)
+	ItemMeshShared.add_cube_shaded(p, 1.8, -0.2, -1.4, 0.5, 0.18, 0.18, metal.lightened(0.06), 0.85, 0.3)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.55, -1.2, 0.4, 0.15, 0.15, metal.lightened(0.1), 0.85, 0.25)
+
+
+# ── HIGH INGOT ───────────────────────────────────────────────────────────────
+# V-groove on top, logo mark, polished metallic finish
+static func ingot_high(p: Node3D, metal: Color, dark: Color) -> void:
+	var w := 5.8; var h := 3.0; var d := 3.8
+	var mid := metal.lightened(0.12)
+
+	ItemMeshShared.add_cube_shaded(p, 0, 0.5, 0, w, h * 0.35, d, metal, 0.95, 0.2)
+	ItemMeshShared.add_cube_shaded(p, 0, 0, 0, w * 0.88, h * 0.35, d * 0.88, mid, 0.95, 0.2)
+	ItemMeshShared.add_cube_shaded(p, 0, -0.5, 0, w * 0.76, h * 0.35, d * 0.76, dark, 0.95, 0.25)
+
+	var bevel := 0.25
+	ItemMeshShared.add_cube_shaded(p, -w * 0.5, 0.15, 0, bevel, h * 0.4, d * 0.88, metal.lightened(0.08), 0.95, 0.15)
+	ItemMeshShared.add_cube_shaded(p, w * 0.5, 0.15, 0, bevel, h * 0.4, d * 0.88, metal.lightened(0.08), 0.95, 0.15)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.15, -d * 0.5, w * 0.88, h * 0.4, bevel, metal.lightened(0.08), 0.95, 0.15)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.15, d * 0.5, w * 0.88, h * 0.4, bevel, metal.lightened(0.08), 0.95, 0.15)
+
+	var gx := 0.4
+	ItemMeshShared.add_cube_shaded(p, 0, 0.85, 0, gx, 0.2, d - 0.8, dark, 0.95, 0.15)
+	ItemMeshShared.add_cube_shaded(p, -0.18, 0.85, 0, 0.15, 0.2, d - 0.8, metal.darkened(0.1), 0.95, 0.15)
+	ItemMeshShared.add_cube_shaded(p, 0.18, 0.85, 0, 0.15, 0.2, d - 0.8, metal.darkened(0.1), 0.95, 0.15)
+
+	ItemMeshShared.add_cube_shaded(p, -2.0, 0.6, 1.4, 0.8, 0.18, 0.18, metal.lightened(0.15), 0.95, 0.1)
+	ItemMeshShared.add_cube_shaded(p, -2.0, 0.6, 1.15, 0.8, 0.18, 0.18, metal.lightened(0.15), 0.95, 0.1)
+	ItemMeshShared.add_cube_shaded(p, -2.0, 0.6, 0.9, 0.8, 0.18, 0.18, metal.lightened(0.15), 0.95, 0.1)
+	ItemMeshShared.add_cube_shaded(p, -2.2, 0.32, 1.15, 0.18, 0.4, 0.7, metal.lightened(0.1), 0.95, 0.15)
+
+	ItemMeshShared.add_cube_shaded(p, 1.0, 0.35, 1.8, 0.2, 0.2, 0.2, metal.lightened(0.2), 0.95, 0.08)
+	ItemMeshShared.add_cube_shaded(p, 1.8, 0.15, -1.6, 0.22, 0.22, 0.22, metal.lightened(0.18), 0.95, 0.08)
+	ItemMeshShared.add_cube_shaded(p, -1.4, -0.15, -1.8, 0.2, 0.2, 0.2, metal.lightened(0.15), 0.95, 0.08)
+
+	ItemMeshShared.add_cube_shaded(p, 2.0, 0.55, 0, 0.6, 0.15, 0.6, metal.darkened(0.08), 0.95, 0.2)
+	ItemMeshShared.add_cube_shaded(p, 2.0, 0.4, 0, 0.6, 0.12, 0.6, metal.darkened(0.05), 0.95, 0.2)
+
+
+# ── PURIFIED INGOT ───────────────────────────────────────────────────────────
+# Mirror finish, glowing center strip, border trim, floating energy
+static func ingot_purified(p: Node3D, metal: Color, dark: Color) -> void:
+	var w := 6.4; var h := 3.2; var d := 4.6
+	var glow := Color(0.3, 0.6, 1.0)
+	var glow_dim := Color(0.15, 0.35, 0.7)
+
+	ItemMeshShared.add_cube_shaded(p, 0, 0.5, 0, w, h * 0.35, d, metal, 0.98, 0.05)
+	ItemMeshShared.add_cube_shaded(p, 0, 0, 0, w * 0.9, h * 0.35, d * 0.9, metal.lightened(0.06), 0.98, 0.05)
+	ItemMeshShared.add_cube_shaded(p, 0, -0.5, 0, w * 0.8, h * 0.35, d * 0.8, dark, 0.98, 0.08)
+
+	var bevel := 0.2
+	ItemMeshShared.add_cube_shaded(p, -w * 0.5, 0.1, 0, bevel, h * 0.42, d * 0.9, metal.lightened(0.1), 0.98, 0.03)
+	ItemMeshShared.add_cube_shaded(p, w * 0.5, 0.1, 0, bevel, h * 0.42, d * 0.9, metal.lightened(0.1), 0.98, 0.03)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.1, -d * 0.5, w * 0.9, h * 0.42, bevel, metal.lightened(0.1), 0.98, 0.03)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.1, d * 0.5, w * 0.9, h * 0.42, bevel, metal.lightened(0.1), 0.98, 0.03)
+
+	var trim := metal.lightened(0.18)
+	ItemMeshShared.add_cube_shaded(p, -w * 0.46, 0.55, 0, 0.15, h * 0.15, d - 0.5, trim, 0.98, 0.02)
+	ItemMeshShared.add_cube_shaded(p, w * 0.46, 0.55, 0, 0.15, h * 0.15, d - 0.5, trim, 0.98, 0.02)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.55, -d * 0.46, w - 0.5, h * 0.15, 0.15, trim, 0.98, 0.02)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.55, d * 0.46, w - 0.5, h * 0.15, 0.15, trim, 0.98, 0.02)
+
+	ItemMeshShared.add_cube_shaded(p, -w * 0.46, -0.25, 0, 0.15, h * 0.15, d - 0.5, trim.darkened(0.06), 0.98, 0.03)
+	ItemMeshShared.add_cube_shaded(p, w * 0.46, -0.25, 0, 0.15, h * 0.15, d - 0.5, trim.darkened(0.06), 0.98, 0.03)
+
+	var cx := 0.4
+	ItemMeshShared.add_cube_shaded(p, 0, 0.8, 0, cx, 0.18, d - 1.2, glow_dim, 0.0, 0.6, glow_dim * 2.0)
+	ItemMeshShared.add_cube_shaded(p, 0, 0.65, 0, cx * 0.6, 0.12, d - 1.4, glow, 0.0, 0.3, glow * 2.5)
+
+	ItemMeshShared.add_cube_shaded(p, 0, 1.0, 0.7, cx * 0.45, 0.08, 0.5, glow.lightened(0.3), 0.0, 0.2, glow * 3.0)
+	ItemMeshShared.add_cube_shaded(p, 0, 1.0, -0.7, cx * 0.45, 0.08, 0.5, glow.lightened(0.3), 0.0, 0.2, glow * 3.0)
+	ItemMeshShared.add_cube_shaded(p, 0.6, 1.0, 0, 0.5, 0.08, cx * 0.45, glow.lightened(0.3), 0.0, 0.2, glow * 3.0)
+	ItemMeshShared.add_cube_shaded(p, -0.6, 1.0, 0, 0.5, 0.08, cx * 0.45, glow.lightened(0.3), 0.0, 0.2, glow * 3.0)
+
+	ItemMeshShared.add_cube_shaded(p, 1.8, 0.35, 2.2, 0.25, 0.25, 0.25, metal.lightened(0.25), 0.98, 0.02)
+	ItemMeshShared.add_cube_shaded(p, -2.2, -0.15, -2.0, 0.25, 0.25, 0.25, metal.lightened(0.22), 0.98, 0.02)
+	ItemMeshShared.add_cube_shaded(p, 0.5, 0.6, -2.2, 0.22, 0.22, 0.22, metal.lightened(0.2), 0.98, 0.02)
+	ItemMeshShared.add_cube_shaded(p, -1.0, 0.25, 2.2, 0.22, 0.22, 0.22, metal.lightened(0.2), 0.98, 0.02)
+
+	ItemMeshShared.add_cube_shaded(p, 0, 1.15, 0, 0.8, 0.1, 0.8, Color(1, 1, 1, 0.3), 0.0, 0.05, glow * 0.8)
+	ItemMeshShared.add_cube_shaded(p, -1.4, 0.8, -1.4, 0.12, 0.12, 0.12, glow.lightened(0.5), 0.0, 0.1, glow * 3.0)
+	ItemMeshShared.add_cube_shaded(p, 1.4, 0.8, 1.4, 0.12, 0.12, 0.12, glow.lightened(0.5), 0.0, 0.1, glow * 3.0)
+	ItemMeshShared.add_cube_shaded(p, -1.4, -0.5, 1.4, 0.12, 0.12, 0.12, glow.lightened(0.4), 0.0, 0.1, glow * 2.5)
+	ItemMeshShared.add_cube_shaded(p, 1.4, -0.5, -1.4, 0.12, 0.12, 0.12, glow.lightened(0.4), 0.0, 0.1, glow * 2.5)
+
+
+# ── LEGACY HELPERS ───────────────────────────────────────────────────────────
+# palm_wood, log, plank, coins, gem, pile, hide, lump, bone, egg, pearl,
+# feather, paper, stick, essence — unchanged from original
+
+static func palm_wood(p: Node3D) -> void:
+	var bark := Color(0.45, 0.28, 0.14)
+	var inner := Color(0.62, 0.48, 0.28)
+	var dark := Color(0.35, 0.20, 0.10)
+	var fiber := Color(0.50, 0.38, 0.20)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 3.5, 1.0, 3.5, bark)
+	ItemMeshShared.add_cube(p, 0, 0.25, 0, 3.8, 0.3, 3.8, dark)
+	ItemMeshShared.add_cube(p, 0, -0.25, 0, 3.8, 0.3, 3.8, dark)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 2.6, 0.6, 2.6, inner)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 1.4, 0.5, 1.4, inner.lightened(0.08))
+	ItemMeshShared.add_cube(p, -1.4, 0, 0, 0.3, 0.4, 2.4, fiber)
+	ItemMeshShared.add_cube(p, 1.4, 0, 0, 0.3, 0.4, 2.4, fiber)
+	ItemMeshShared.add_cube(p, 0, 0, -1.4, 2.4, 0.4, 0.3, fiber)
+	ItemMeshShared.add_cube(p, 0, 0, 1.4, 2.4, 0.4, 0.3, fiber)
+	ItemMeshShared.add_cube(p, -0.8, 0.15, -0.8, 0.4, 0.2, 0.4, inner.darkened(0.06))
+	ItemMeshShared.add_cube(p, 0.8, 0.15, 0.8, 0.4, 0.2, 0.4, inner.darkened(0.06))
+	ItemMeshShared.add_cube(p, 0.8, -0.15, -0.8, 0.4, 0.2, 0.4, dark)
+	ItemMeshShared.add_cube(p, -0.8, -0.15, 0.8, 0.4, 0.2, 0.4, dark)
 
 static func log(p: Node3D, bark: Color, inner: Color) -> void:
 	ItemMeshShared.add_cube(p, 0, 0, 0, 2.5, 3.0, 2.5, bark)

@@ -1,6 +1,7 @@
 extends Node
 
 const SAVE_PATH: String = "user://saves.json"
+const _WorldChunk := preload("res://scripts/world/chunk/world_chunk.gd")
 
 var seed_value: int = 42
 var target_scene: String = "res://scenes/open_world_real.tscn"
@@ -20,6 +21,7 @@ func start_new_journey(name: String, seed_val: int) -> void:
 	if SaveManager:
 		SaveManager.reset_load_state()
 	save_journey()
+	_WorldChunk.prewarm_async()
 
 func save_journey() -> void:
 	var saves: Dictionary = _load_saves()
@@ -44,6 +46,7 @@ func load_journey(idx: int) -> bool:
 	is_loading = SaveManager and SaveManager.save_exists(world_name)
 	if SaveManager:
 		SaveManager.reset_load_state()
+	_WorldChunk.prewarm_async()
 	return true
 
 func get_saves() -> Array:

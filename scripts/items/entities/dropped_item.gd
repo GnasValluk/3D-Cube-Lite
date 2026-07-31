@@ -39,18 +39,18 @@ func _setup_mesh():
 	root.position.y = 0.15
 
 	var item_id := item_def.id
-	if item_id in ["cup", "xeng", "riu", "kiem", "can_cau", "dai_kiem", "gang_tay_da_thu", "no", "mui_ten", "phao_dua_hau", "dan_hat_nhan_dua_hau", "phao_coi_bi_do", "iron_halberd"]:
+	if item_id in ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd"]:
 		var scale_node := Node3D.new()
 		scale_node.scale = Vector3(1.8, 1.8, 1.8)
 		root.add_child(scale_node)
 		ToolsMesh.build_held(scale_node, item_id)
-	elif item_id in ["ca_chep", "ca_ro", "ca_dieu_hong", "ca_loc", "ca_la_han", "tom"]:
+	elif item_id in ["carp", "climbing_perch", "red_tilapia", "snakehead", "flowerhorn", "shrimp"]:
 		_build_fish_model(root, item_id)
-	elif item_id == "mon_ngot":
+	elif item_id == "taro":
 		PlantProp.build_drop_mesh(root, "taro")
-	elif item_id == "rong_nhiet_doi":
+	elif item_id == "tropical_seaweed":
 		PlantProp.build_drop_mesh(root, "weed")
-	elif item_id in ["chest", "twilight_gate"]:
+	elif item_id in ["chest", "twilight_gate", "crafting_table", "furnace"]:
 		ItemMesh.build(root, item_id)
 	else:
 		var scale_pivot := Node3D.new()
@@ -71,12 +71,12 @@ func _setup_mesh():
 func _build_fish_model(parent: Node3D, item_id: String) -> void:
 	var variant: int = 0
 	match item_id:
-		"ca_chep": variant = 0
-		"ca_ro": variant = 1
-		"ca_dieu_hong": variant = 2
-		"ca_loc": variant = 3
-		"ca_la_han": variant = 4
-		"tom": variant = 5
+		"carp": variant = 0
+		"climbing_perch": variant = 1
+		"red_tilapia": variant = 2
+		"snakehead": variant = 3
+		"flowerhorn": variant = 4
+		"shrimp": variant = 5
 
 	var colors: Array = FishCharacter.VARIANT_COLORS[variant]
 

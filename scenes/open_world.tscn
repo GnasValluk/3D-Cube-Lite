@@ -14,9 +14,6 @@
 
 [node name="OpenWorld" type="Node3D" unique_id=1251481109]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=47012939]
-transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 19.18763, 0)
-
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1595477122]
 script = ExtResource("3")
 
@@ -35,6 +32,7 @@ script = ExtResource("2")
 
 [node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Player" unique_id=1739135953]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+light_energy = 0.0
 
 [node name="PlacementSystem" type="Node" parent="." unique_id=1867924783]
 script = ExtResource("15")

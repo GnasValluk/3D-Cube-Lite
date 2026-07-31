@@ -17,9 +17,6 @@
 
 [node name="OpenWorldThucTe" type="Node3D" unique_id=708082117]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1814531682]
-transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 28.772238, 0)
-
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1736804692]
 script = ExtResource("2")
 
@@ -36,6 +33,7 @@ script = ExtResource("13")
 
 [node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Player" unique_id=777547506]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+light_energy = 0.0
 
 [node name="PlacementSystem" type="Node" parent="." unique_id=1798667591]
 script = ExtResource("14")

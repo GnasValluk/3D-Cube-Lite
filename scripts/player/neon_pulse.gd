@@ -5,8 +5,8 @@
 extends Node
 
 @export var pulse_speed: float = 1.6
-@export var energy_min:  float = 1.2
-@export var energy_max:  float = 2.2
+@export var energy_min:  float = 0.15
+@export var energy_max:  float = 0.40
 
 var _time:   float = 0.0
 var _meshes: Array[MeshInstance3D] = []

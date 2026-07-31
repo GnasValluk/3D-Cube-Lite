@@ -4,9 +4,9 @@ enum Category { BLOCKS, ITEMS, CHARACTERS, ENVIRONMENT }
 const CATEGORY_NAMES := ["Blocks", "Items", "Characters", "Environment"]
 
 const BLOCK_IDS := [1, 2, 3, 4, 5, 7, 8, 9, 10, 11]
-const ITEM_IDS := ["cup", "xeng", "riu", "kiem", "can_cau", "chest", "twilight_gate"]
+const ITEM_IDS := ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod", "chest", "crafting_table", "furnace", "twilight_gate"]
 const CHAR_NAMES := ["Player", "Dummy",
-	"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh", "Ca La Han", "Tom"]
+	"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh", "Ca La Han", "shrimp"]
 const ENV_NAMES := ["Rong Nhiet Doi", "Sen Thach Anh"]
 
 const CHAR_ANIMS := {
@@ -20,7 +20,7 @@ const CHAR_ANIMS := {
 	"Ca Vang": ["SWIM", "IDLE"],
 	"Ca Linh": ["SWIM", "IDLE"],
 	"Ca La Han": ["SWIM", "IDLE"],
-	"Tom": ["SWIM", "IDLE"],
+	"shrimp": ["SWIM", "IDLE"],
 }
 
 const ITEM_ANIMS := {
@@ -33,6 +33,7 @@ const _PlayerMesh = preload("res://scripts/characters/player/player_mesh.gd")
 const _FishMesh = preload("res://scripts/characters/fish/fish_mesh.gd")
 const _FishAnim = preload("res://scripts/characters/fish/fish_animator.gd")
 const _Aquatic = preload("res://scripts/world/chunk/chunk_aquatic.gd")
+const _Debug = preload("res://scripts/ui/hud/debug_menu.gd")
 
 const FISH_COLORS := [
 	[Color(0.95, 0.70, 0.10), Color(0.98, 0.95, 0.80), Color(0.85, 0.55, 0.05)],
@@ -231,7 +232,7 @@ func _on_anim_selected(idx: int) -> void:
 			if ITEM_IDS[_index] == "chest":
 				_chest_open = idx == 1
 				if _chest_lid:
-					var target: float = -90.0 if _chest_open else 0.0
+					var target: float = 90.0 if _chest_open else 0.0
 					_chest_lid.rotation.x = deg_to_rad(target)
 		Category.ENVIRONMENT:
 			pass
@@ -392,52 +393,189 @@ func _show_block() -> void:
 func _show_item() -> void:
 	var iid: String = ITEM_IDS[_index]
 	match iid:
-		"cup", "xeng", "riu", "kiem", "can_cau":
+		"pickaxe", "shovel", "axe", "iron_sword", "fishing_rod":
 			_WM.build_held(_container, iid)
 		"chest":
 			_build_chest()
+		"crafting_table":
+			_build_crafting_table()
+		"furnace":
+			_build_furnace()
 		"twilight_gate":
 			_build_twilight_gate()
 
 func _build_chest() -> void:
 	var root := Node3D.new()
 	_container.add_child(root)
-	var body_mat := StandardMaterial3D.new()
-	body_mat.albedo_color = Color(0.45, 0.28, 0.15)
-	body_mat.metallic = 0.1; body_mat.roughness = 0.8
-	var lid_mat := StandardMaterial3D.new()
-	lid_mat.albedo_color = Color(0.50, 0.32, 0.18)
-	lid_mat.metallic = 0.1; lid_mat.roughness = 0.7
-	var band_mat := StandardMaterial3D.new()
-	band_mat.albedo_color = Color(0.35, 0.22, 0.12)
-	var lock_mat := StandardMaterial3D.new()
-	lock_mat.albedo_color = Color(0.60, 0.50, 0.30)
 
-	var body_mi := MeshInstance3D.new()
-	var body_box := BoxMesh.new(); body_box.size = Vector3(0.7, 0.35, 0.6)
-	body_mi.mesh = body_box; body_mi.material_override = body_mat
-	body_mi.position = Vector3(0, 0.175, 0)
-	root.add_child(body_mi)
+	var m := func(color: Color, metallic: float = 0.0, rough: float = 0.8) -> StandardMaterial3D:
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = color
+		mat.metallic = metallic
+		mat.roughness = rough
+		return mat
 
+	var wood_body := m.call(Color(0.42, 0.26, 0.14), 0.1, 0.85)
+	var wood_lid := m.call(Color(0.47, 0.30, 0.17), 0.1, 0.80)
+	var metal := m.call(Color(0.25, 0.22, 0.20), 0.5, 0.5)
+	var lock_gold := m.call(Color(0.75, 0.60, 0.20), 0.7, 0.3)
+
+	# Body
+	var bw := 1.76; var bh := 0.36; var bd := 0.78
+	var body := MeshInstance3D.new()
+	var body_box := BoxMesh.new(); body_box.size = Vector3(bw, bh, bd)
+	body.mesh = body_box; body.material_override = wood_body
+	body.position = Vector3(0, bh * 0.5, 0)
+	root.add_child(body)
+
+	# Metal bands
+	var body_front_z := bd * 0.5 + 0.005
+	var body_side_x := bw * 0.5 + 0.005
+	for band_y in [0.06, bh - 0.06]:
+		var band := MeshInstance3D.new()
+		var band_box := BoxMesh.new(); band_box.size = Vector3(bw + 0.04, 0.04, 0.06)
+		band.mesh = band_box; band.material_override = metal
+		band.position = Vector3(0, band_y, body_front_z)
+		root.add_child(band)
+		for side_x in [-body_side_x, body_side_x]:
+			var side := MeshInstance3D.new()
+			var side_box := BoxMesh.new(); side_box.size = Vector3(0.06, 0.04, bd - 0.04)
+			side.mesh = side_box; side.material_override = metal
+			side.position = Vector3(side_x, band_y, 0)
+			root.add_child(side)
+
+	# Lock
+	var lock := MeshInstance3D.new()
+	var lock_box := BoxMesh.new(); lock_box.size = Vector3(0.16, 0.14, 0.08)
+	lock.mesh = lock_box; lock.material_override = lock_gold
+	lock.position = Vector3(0, bh * 0.5, body_front_z + 0.04)
+	root.add_child(lock)
+
+	# Lid
+	var lw := bw + 0.08; var ld := bd + 0.06
 	var lid_root := Node3D.new()
-	lid_root.position = Vector3(0, 0.38, 0)
+	lid_root.position = Vector3(0, bh, body_front_z)
 	root.add_child(lid_root)
 	var lid_mi := MeshInstance3D.new()
-	var lid_box := BoxMesh.new(); lid_box.size = Vector3(0.72, 0.06, 0.62)
-	lid_mi.mesh = lid_box; lid_mi.material_override = lid_mat
+	var lid_box := BoxMesh.new(); lid_box.size = Vector3(lw, 0.06, ld)
+	lid_mi.mesh = lid_box; lid_mi.material_override = wood_lid
+	lid_mi.position = Vector3(0, 0.03, -body_front_z - 0.01)
 	lid_root.add_child(lid_mi)
 	_chest_lid = lid_root
 
-	var band := MeshInstance3D.new()
-	var band_box := BoxMesh.new(); band_box.size = Vector3(0.74, 0.04, 0.08)
-	band.mesh = band_box; band.material_override = band_mat
-	band.position = Vector3(0, 0.20, 0.305)
-	root.add_child(band)
-	var lock := MeshInstance3D.new()
-	var lock_box := BoxMesh.new(); lock_box.size = Vector3(0.10, 0.08, 0.06)
-	lock.mesh = lock_box; lock.material_override = lock_mat
-	lock.position = Vector3(0, 0.22, 0.305)
-	root.add_child(lock)
+func _build_crafting_table() -> void:
+	var root := Node3D.new()
+	_container.add_child(root)
+
+	var m := func(color: Color, metallic: float = 0.0, rough: float = 0.8) -> StandardMaterial3D:
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = color
+		mat.metallic = metallic
+		mat.roughness = rough
+		return mat
+
+	var wood := m.call(Color(0.42, 0.26, 0.14), 0.05, 0.85)
+	var wood_dark := m.call(Color(0.35, 0.20, 0.10), 0.05, 0.90)
+	var metal := m.call(Color(0.22, 0.22, 0.25), 0.4, 0.6)
+	var fire_glow := m.call(Color(0.70, 0.20, 0.05), 0.0, 0.8)
+	var anvil_mat := m.call(Color(0.28, 0.28, 0.32), 0.5, 0.5)
+
+	var ty := 0.65
+	# Table top
+	var top := MeshInstance3D.new()
+	var top_box := BoxMesh.new(); top_box.size = Vector3(1.80, 0.05, 0.85)
+	top.mesh = top_box; top.material_override = wood
+	top.position = Vector3(0, ty - 0.025, 0)
+	root.add_child(top)
+
+	# Legs
+	for x in [-0.84, 0.84]:
+		for z in [-0.38, 0.38]:
+			var leg := MeshInstance3D.new()
+			var leg_box := BoxMesh.new(); leg_box.size = Vector3(0.04, ty - 0.05, 0.04)
+			leg.mesh = leg_box; leg.material_override = wood_dark
+			leg.position = Vector3(x, (ty - 0.05) * 0.5, z)
+			root.add_child(leg)
+
+	# Forge
+	var forge := MeshInstance3D.new()
+	var forge_box := BoxMesh.new(); forge_box.size = Vector3(0.26, 0.12, 0.22)
+	forge.mesh = forge_box; forge.material_override = metal
+	forge.position = Vector3(0.52, ty + 0.06, -0.12)
+	root.add_child(forge)
+
+	var glow := MeshInstance3D.new()
+	var glow_box := BoxMesh.new(); glow_box.size = Vector3(0.16, 0.04, 0.14)
+	glow.mesh = glow_box; glow.material_override = fire_glow
+	glow.position = Vector3(0.52, ty + 0.14, -0.12)
+	root.add_child(glow)
+
+	# Anvil
+	var anvil := MeshInstance3D.new()
+	var anvil_box := BoxMesh.new(); anvil_box.size = Vector3(0.12, 0.06, 0.09)
+	anvil.mesh = anvil_box; anvil.material_override = anvil_mat
+	anvil.position = Vector3(0.75, ty + 0.08, -0.12)
+	root.add_child(anvil)
+
+func _build_furnace() -> void:
+	var root := Node3D.new()
+	_container.add_child(root)
+
+	var m := func(color: Color, metallic: float = 0.0, rough: float = 0.8) -> StandardMaterial3D:
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = color
+		mat.metallic = metallic
+		mat.roughness = rough
+		return mat
+
+	var stone := m.call(Color(0.30, 0.28, 0.26), 0.1, 0.9)
+	var stone_dark := m.call(Color(0.20, 0.18, 0.17), 0.1, 0.95)
+	var brick := m.call(Color(0.40, 0.22, 0.15), 0.0, 0.85)
+	var metal := m.call(Color(0.22, 0.22, 0.25), 0.4, 0.6)
+	var anvil_mat := m.call(Color(0.28, 0.28, 0.32), 0.5, 0.5)
+	var fire_glow := m.call(Color(0.80, 0.30, 0.05), 0.0, 0.8)
+	var fire_hot := m.call(Color(0.95, 0.60, 0.10), 0.0, 0.7)
+
+	# Body
+	var body := MeshInstance3D.new()
+	var body_box := BoxMesh.new(); body_box.size = Vector3(1.60, 0.65, 0.80)
+	body.mesh = body_box; body.material_override = stone
+	body.position = Vector3(0, 0.325, 0)
+	root.add_child(body)
+
+	# Brick trim top
+	var top_trim := MeshInstance3D.new()
+	var top_box := BoxMesh.new(); top_box.size = Vector3(1.64, 0.06, 0.84)
+	top_trim.mesh = top_box; top_trim.material_override = brick
+	top_trim.position = Vector3(0, 0.65, 0)
+	root.add_child(top_trim)
+
+	# Fire opening
+	var fire := MeshInstance3D.new()
+	var fire_box := BoxMesh.new(); fire_box.size = Vector3(0.38, 0.18, 0.04)
+	fire.mesh = fire_box; fire.material_override = fire_glow
+	fire.position = Vector3(0, 0.26, 0.43)
+	root.add_child(fire)
+
+	var fire2 := MeshInstance3D.new()
+	var fire2_box := BoxMesh.new(); fire2_box.size = Vector3(0.26, 0.10, 0.04)
+	fire2.mesh = fire2_box; fire2.material_override = fire_hot
+	fire2.position = Vector3(0, 0.30, 0.43)
+	root.add_child(fire2)
+
+	# Chimney
+	var chim := MeshInstance3D.new()
+	var chim_box := BoxMesh.new(); chim_box.size = Vector3(0.24, 0.18, 0.24)
+	chim.mesh = chim_box; chim.material_override = stone_dark
+	chim.position = Vector3(0, 0.74, -0.30)
+	root.add_child(chim)
+
+	# Anvil
+	var anvil := MeshInstance3D.new()
+	var anvil_box := BoxMesh.new(); anvil_box.size = Vector3(0.14, 0.08, 0.10)
+	anvil.mesh = anvil_box; anvil.material_override = anvil_mat
+	anvil.position = Vector3(0.88, 0.12, 0.10)
+	root.add_child(anvil)
 
 func _build_twilight_gate() -> void:
 	var pg := PortalGate.new()
@@ -468,7 +606,7 @@ func _show_character() -> void:
 				mi.position = Vector3(0, 1.0, 0)
 				mi.rotation = Vector3(deg_to_rad(90), 0, deg_to_rad(i * 90))
 				root.add_child(mi)
-		"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh", "Ca La Han", "Tom":
+		"Ca Chep", "Ca Ro", "Ca Tram", "Ca Mong", "Ca Vang", "Ca Linh", "Ca La Han", "shrimp":
 			_build_fish_variant(root)
 
 func _build_fish_variant(root: Node3D) -> void:
@@ -668,41 +806,18 @@ func _setup_debug_menu() -> void:
 	$CanvasLayer.add_child(_debug_panel)
 
 func _toggle_debug() -> void:
-	_debug_open = not _debug_open
-	_debug_panel.visible = _debug_open
+	_debug_open = _Debug.toggle_debug(_debug_open, _debug_panel)
 
 func _update_debug_menu() -> void:
-	if not _debug_open or not TimeSystem:
+	if not _debug_open:
 		return
-	var h: int = TimeSystem.get_hour_int()
-	var m: int = TimeSystem.get_minute()
-	var day: int = TimeSystem.get_day()
-	var month: String = TimeSystem.get_month_name()
-	var year: int = TimeSystem.get_year() + 1
-	var season: String = TimeSystem.get_season_name()
-	var weather: String = TimeSystem.get_weather_name()
-	_debug_ts_label.text = "%02d:%02d  %s %d, Year %d  |  %s  |  %s" % [h, m, month, day, year, season, weather]
-	_debug_hour_slider.value = h
-	_debug_speed_slider.value = TimeSystem.get_time_scale()
-	if TimeSystem.get_weather() == TimeSystem.Weather.RAIN:
-		_debug_weather_btn.text = "Rain"
-	else:
-		_debug_weather_btn.text = "Clear"
+	_Debug.update_debug_menu(_debug_ts_label, _debug_hour_slider, _debug_speed_slider, _debug_weather_btn)
 
 func _on_debug_hour_changed(value: float) -> void:
-	if TimeSystem:
-		TimeSystem.set_hour(value)
+	_Debug.on_hour_changed(value)
 
 func _on_debug_speed_changed(value: float) -> void:
-	if TimeSystem:
-		TimeSystem.set_time_scale(value)
+	_Debug.on_speed_changed(value)
 
 func _on_debug_weather_toggle() -> void:
-	if not TimeSystem:
-		return
-	if TimeSystem.get_weather() == TimeSystem.Weather.CLEAR:
-		TimeSystem.force_weather(TimeSystem.Weather.RAIN)
-		_debug_weather_btn.text = "Rain"
-	else:
-		TimeSystem.force_weather(TimeSystem.Weather.CLEAR)
-		_debug_weather_btn.text = "Clear"
+	_Debug.on_weather_toggle(_debug_weather_btn)

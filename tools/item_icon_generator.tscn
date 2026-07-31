@@ -1,0 +1,6 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://tools/item_icon_generator.gd" id="1"]
+
+[node name="ItemIconGenerator" type="Node"]
+script = ExtResource("1")

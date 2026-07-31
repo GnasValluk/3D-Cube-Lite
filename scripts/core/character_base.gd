@@ -5,6 +5,9 @@
 extends CharacterBody3D
 class_name CharacterBase
 
+const _Damage = preload("res://scripts/core/damage_system.gd")
+const _Swim  = preload("res://scripts/core/swim_system.gd")
+
 signal damage_taken(amount: int, attacker: Node3D)
 signal died(attacker: Node3D)
 signal hp_changed(current: int, max_hp: int)
@@ -209,7 +212,7 @@ func _process(delta: float) -> void:
 			_drown_timer += delta
 			if _drown_timer >= DROWN_DAMAGE_INTERVAL:
 				_drown_timer = 0.0
-				take_damage(5)
+				_Damage.take_damage(self, 5)
 		oxygen_changed.emit(int(oxygen), int(max_oxygen))
 	else:
 		if oxygen < max_oxygen:
@@ -257,6 +260,32 @@ func _spawn_freeze_vfx() -> void:
 	_rig.add_child(vfx)
 	vfx.setup(_freeze_timer)
 
+func _spawn_splash(entering: bool) -> void:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.7, 0.85, 1.0, 0.7)
+	mat.emission_enabled = true
+	mat.emission = Color(0.7, 0.85, 1.0) * 1.5
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.06
+	sphere.height = 0.12
+	var count := 8 if entering else 4
+	var parent := get_parent()
+	if parent == null: return
+	for k in range(count):
+		var sp := MeshInstance3D.new()
+		sp.mesh = sphere
+		sp.material_override = mat
+		parent.add_child(sp)
+		sp.global_position = global_position + Vector3(0, 0.25, 0)
+		var dir := Vector3(randf_range(-1, 1), randf_range(0.2, 1.0), randf_range(-1, 1)).normalized()
+		var dist := 0.5 + randf() * 1.0
+		var tw := create_tween()
+		tw.tween_property(sp, "global_position", sp.global_position + dir * dist, 0.4).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(sp, "scale", Vector3.ZERO, 0.4)
+		tw.tween_callback(sp.queue_free)
+
 # ── Level / Exp ───────────────────────────────────────────────────────────────
 func add_exp(amount: int) -> void:
 	exp += amount
@@ -275,32 +304,10 @@ func calc_hp_skill_damage(percent: float) -> int:
 
 # ── HP / Damage ───────────────────────────────────────────────────────────────
 func take_damage(amount: int, attacker: Node3D = null, damage_type: int = 0) -> void:
-	if not is_alive or _invul_timer > 0.0:
-		return
-	var dmg := maxi(1, amount - defense)
-	if shield > 0:
-		var absorbed := mini(shield, dmg)
-		shield -= absorbed
-		dmg -= absorbed
-		shield_changed.emit(shield)
-	if dmg > 0:
-		hp = maxi(0, hp - dmg)
-		_invul_timer = 0.05
-		_hit_timer = 0.18
-		_hit_flash()
-		_spawn_damage_number(dmg, attacker, damage_type)
-		SFXManager.play_hurt()
-		_state = State.HIT
-		_attack_timer = 0.0
-		_attack2_timer = 0.0
-		hp_changed.emit(hp, max_hp)
-		damage_taken.emit(dmg, attacker)
-	if hp <= 0:
-		_die(attacker)
+	_Damage.take_damage(self, amount, attacker, damage_type)
 
 func add_shield(amount: int) -> void:
-	shield += amount
-	shield_changed.emit(shield)
+	_Damage.add_shield(self, amount)
 
 func add_stamina(amount: int) -> void:
 	stamina = mini(stamina + amount, max_stamina)
@@ -315,55 +322,16 @@ func try_skill(cost: int) -> bool:
 	return true
 
 func heal(amount: int) -> void:
-	if not is_alive:
-		return
-	hp = mini(max_hp, hp + amount)
-	hp_changed.emit(hp, max_hp)
+	_Damage.heal(self, amount)
 
 func apply_dot(damage_per_tick: int, tick_interval: float, duration: float, attacker: Node3D = null) -> void:
-	if not is_alive:
-		return
-	var dot := Node.new()
-	var timer := Timer.new()
-	timer.wait_time = tick_interval
-	timer.autostart = true
-	timer.timeout.connect(func():
-		if is_alive:
-			take_damage(damage_per_tick, attacker)
-	)
-	dot.add_child(timer)
-	add_child(dot)
-	get_tree().create_timer(duration).timeout.connect(func():
-		if is_instance_valid(dot):
-			dot.queue_free()
-	)
+	_Damage.apply_dot(self, damage_per_tick, tick_interval, duration, attacker)
 
 func _die(_attacker: Node3D = null) -> void:
-	is_alive = false
-	_flash_restore()
-	SFXManager.play_death()
-	_death_timer = 1.8
-	_state = State.DEAD
-	_attack_timer = 0.0
-	_attack2_timer = 0.0
-	_hit_timer = 0.0
-	velocity = Vector3.ZERO
-	died.emit(_attacker)
+	_Damage._die(self, _attacker)
 
 func revive() -> void:
-	hp     = max_hp
-	is_alive = true
-	_active  = true
-	_state   = State.IDLE
-	_flash_restore()
-	_death_timer = 0.0
-	_hit_timer = 0.0
-	set_physics_process(true)
-	set_process_unhandled_input(true)
-	set_process_unhandled_key_input(true)
-	if _rig:
-		_rig.visible = true
-	hp_changed.emit(hp, max_hp)
+	_Damage.revive(self)
 
 # ── Hit flash ─────────────────────────────────────────────────────────────────
 var _white_mat: StandardMaterial3D = null
@@ -396,8 +364,8 @@ func _flash_restore() -> void:
 	if _flash_pairs.is_empty():
 		return
 	for pair in _flash_pairs:
-		var mi := pair["mi"] as MeshInstance3D
-		if is_instance_valid(mi):
+		var mi = pair["mi"]
+		if is_instance_valid(mi) and mi is MeshInstance3D:
 			mi.material_override = pair["orig"]
 	_flash_pairs.clear()
 
@@ -532,15 +500,17 @@ func _physics_process(delta: float) -> void:
 		if _water_mgr == null or not _water_mgr.is_inside_tree():
 			_water_mgr = _find_water_manager()
 		if _water_mgr != null:
-			_underwater = _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y)
+			_underwater = _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y) \
+				or _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y + 0.5)
 		else:
 			_underwater = false
 		if _underwater != was_underwater:
 			submerged.emit(_underwater)
+			_spawn_splash(!_underwater)
 
 	# Underwater / swimming
 	if _underwater:
-		_swim_physics(delta)
+		_Swim.swim_physics(self, delta)
 		if _attack_timer > 0.0 and not _melee_hit_once and (1.0 - _attack_timer / attack_duration) >= _melee_hit_progress:
 			_do_melee_hit()
 		return
@@ -588,7 +558,7 @@ func _physics_process(delta: float) -> void:
 			velocity = Vector3.ZERO
 			on_floor = false
 		else:
-			_die()
+			_Damage._die(self)
 
 	if on_floor and not _was_floor:
 		_sy_tgt = 0.76
@@ -701,7 +671,7 @@ func _do_melee_hit() -> void:
 		var pc := self as PlayerCharacter
 		if pc and pc.equipped_weapon:
 			match pc.equipped_weapon.id:
-				"dai_kiem": range_scale = 1.5; angle_threshold = 0.25
+				"iron_greatsword": range_scale = 1.5; angle_threshold = 0.25
 				"giao_dai": range_scale = 1.5
 				"iron_halberd": range_scale = 1.6; angle_threshold = 0.25
 	var mgr := _find_character_manager()
@@ -845,41 +815,7 @@ func _find_mobile_controls() -> Node:
 	return null
 
 func _swim_physics(delta: float) -> void:
-	var dir := _read_input()
-	var spd: float = move_speed * 0.55
-	var accel: float = acceleration * 0.6
-	var frict: float = friction * 0.5
-
-	var wants_jump: bool = _jbuf > 0.0 and _swim_jump_cd <= 0.0
-	_jbuf = 0.0
-	_swim_jump_cd = max(_swim_jump_cd - delta, 0.0)
-
-	if wants_jump:
-		velocity.y = _jump_v * 0.7
-		_swim_jump_cd = 0.6
-	elif _is_player and Input.is_key_pressed(KEY_SPACE):
-		if global_position.y < -0.7:
-			velocity.y = 4.0
-		else:
-			velocity.y = 7.0
-	else:
-		velocity.y -= 3.0 * delta
-
-	if dir.length_squared() > 0.001:
-		dir = dir.normalized()
-		velocity.x = move_toward(velocity.x, dir.x * spd, accel * delta)
-		velocity.z = move_toward(velocity.z, dir.z * spd, accel * delta)
-		rotation.y = lerp_angle(rotation.y, atan2(dir.x, dir.z), delta * 10.0)
-		if _attack_timer <= 0.0:
-			_state = State.WALK
-	else:
-		velocity.x = move_toward(velocity.x, 0.0, frict * delta)
-		velocity.z = move_toward(velocity.z, 0.0, frict * delta)
-		if _attack_timer <= 0.0:
-			_state = State.IDLE
-
-	move_and_slide()
-	_animate(delta)
+	_Swim.swim_physics(self, delta)
 
 func _calc_aim_dir() -> Vector3:
 	var target := _find_nearest_target()

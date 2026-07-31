@@ -4,6 +4,7 @@ extends Control
 const DAY_NAMES: Array[String] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 const PHONE_W: float = 1500
 const PHONE_H: float = 860
+const _Settings = preload("res://scripts/core/settings_storage.gd")
 
 var _phone: Panel
 var _hud: HUD
@@ -23,6 +24,7 @@ var _refresh_timer: float = 0.0
 var _current_forecast: Array[Dictionary] = []
 
 var _is_dark_theme: bool = true
+var _tween: Tween
 
 func _ready() -> void:
 	_hud = get_parent() as HUD
@@ -504,114 +506,43 @@ func _make_tab_btn(text: String, active: bool) -> Panel:
 	p.add_child(l)
 	return p
 
-# ── Settings helpers ──
+# ── Settings helpers (delegates to shared module) ──
 
-func _get_master_volume() -> float:
-	return SettingsData.master_volume if SettingsData else 50.0
+func _get_master_volume() -> float: return _Settings.get_master_volume()
+func _set_master_volume(v: float) -> void: _Settings.set_master_volume(v); SettingsManager._apply_all()
+func _get_music_volume() -> float: return _Settings.get_music_volume()
+func _set_music_volume(v: float) -> void: _Settings.set_music_volume(v); SettingsManager._apply_all()
+func _get_sfx_volume() -> float: return _Settings.get_sfx_volume()
+func _set_sfx_volume(v: float) -> void: _Settings.set_sfx_volume(v); SettingsManager._apply_all()
 
-func _set_master_volume(v: float) -> void:
-	if SettingsData:
-		SettingsData.master_volume = v
-		SettingsManager._apply_all()
-
-func _get_music_volume() -> float:
-	return SettingsData.music_volume if SettingsData else 50.0
-
-func _set_music_volume(v: float) -> void:
-	if SettingsData:
-		SettingsData.music_volume = v
-		SettingsManager._apply_all()
-
-func _get_sfx_volume() -> float:
-	return SettingsData.sfx_volume if SettingsData else 50.0
-
-func _set_sfx_volume(v: float) -> void:
-	if SettingsData:
-		SettingsData.sfx_volume = v
-		SettingsManager._apply_all()
-
-func _get_graphics_preset() -> int:
-	return SettingsData.graphics_preset if SettingsData else 0
-
+func _get_graphics_preset() -> int: return SettingsData.graphics_preset if SettingsData else 0
 func _set_graphics_preset(p: int) -> void:
 	if SettingsData:
 		SettingsData.graphics_preset = p
 		SettingsManager._apply_all()
 
-func _get_locale() -> String:
-	return SettingsData.locale if SettingsData else "en"
-
+func _get_locale() -> String: return SettingsData.locale if SettingsData else "en"
 func _set_locale(loc: String) -> void:
 	if SettingsData:
 		SettingsData.locale = loc
 		SettingsManager._apply_all()
 
-func _is_fullscreen() -> bool:
-	return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+func _is_fullscreen() -> bool: return _Settings.is_fullscreen()
+func _set_fullscreen(v: bool) -> void: _Settings.set_fullscreen(v)
+func _is_vsync() -> bool: return _Settings.is_vsync()
+func _set_vsync(v: bool) -> void: _Settings.set_vsync(v)
+func _get_mouse_sensitivity() -> float: return _Settings.get_mouse_sensitivity()
+func _set_mouse_sensitivity(v: float) -> void: _Settings.set_mouse_sensitivity(v)
+func _is_invert_y() -> bool: return _Settings.is_invert_y()
+func _set_invert_y(v: bool) -> void: _Settings.set_invert_y(v)
+func _is_touch_enabled() -> bool: return _Settings.is_touch_enabled()
+func _set_touch_enabled(v: bool) -> void: _Settings.set_touch_enabled(v)
+func _get_joystick_sensitivity() -> float: return _Settings.get_joystick_sensitivity()
+func _set_joystick_sensitivity(v: float) -> void: _Settings.set_joystick_sensitivity(v)
+func _get_button_scale() -> float: return _Settings.get_button_scale()
+func _set_button_scale(v: float) -> void: _Settings.set_button_scale(v)
 
-func _set_fullscreen(v: bool) -> void:
-	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if v else DisplayServer.WINDOW_MODE_WINDOWED)
-	if SettingsData:
-		SettingsData.fullscreen = v
-		SettingsManager.save_settings()
-
-func _is_vsync() -> bool:
-	return DisplayServer.window_get_vsync_mode() == DisplayServer.VSYNC_ENABLED
-
-func _set_vsync(v: bool) -> void:
-	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if v else DisplayServer.VSYNC_DISABLED)
-	if SettingsData:
-		SettingsData.vsync = v
-		SettingsManager.save_settings()
-
-func _get_mouse_sensitivity() -> float:
-	return ProjectSettings.get_setting("input/pointing/mouse_sensitivity_modifier", 1.0)
-
-func _set_mouse_sensitivity(v: float) -> void:
-	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_modifier", v)
-	if SettingsData:
-		SettingsData.mouse_sensitivity = v
-		SettingsManager.save_settings()
-
-func _is_invert_y() -> bool:
-	return ProjectSettings.get_setting("controls/invert_y", false)
-
-func _set_invert_y(v: bool) -> void:
-	ProjectSettings.set_setting("controls/invert_y", v)
-	if SettingsData:
-		SettingsData.invert_y = v
-		SettingsManager.save_settings()
-
-func _is_touch_enabled() -> bool:
-	return ProjectSettings.get_setting("mobile/touch_controls_enabled", true)
-
-func _set_touch_enabled(v: bool) -> void:
-	ProjectSettings.set_setting("mobile/touch_controls_enabled", v)
-	if SettingsData:
-		SettingsData.touch_enabled = v
-		SettingsManager.save_settings()
-
-func _get_joystick_sensitivity() -> float:
-	return ProjectSettings.get_setting("mobile/joystick_sensitivity", 1.0)
-
-func _set_joystick_sensitivity(v: float) -> void:
-	ProjectSettings.set_setting("mobile/joystick_sensitivity", v)
-	if SettingsData:
-		SettingsData.joystick_sensitivity = v
-		SettingsManager.save_settings()
-
-func _get_button_scale() -> float:
-	return ProjectSettings.get_setting("mobile/button_scale", 1.0)
-
-func _set_button_scale(v: float) -> void:
-	ProjectSettings.set_setting("mobile/button_scale", v)
-	if SettingsData:
-		SettingsData.button_scale = v
-		SettingsManager.save_settings()
-
-func _get_device_mode() -> int:
-	return SettingsData.device_mode if SettingsData else 0
-
+func _get_device_mode() -> int: return SettingsData.device_mode if SettingsData else 0
 func _set_device_mode(v: int) -> void:
 	if SettingsData:
 		SettingsData.device_mode = v
@@ -619,8 +550,7 @@ func _set_device_mode(v: int) -> void:
 	if DeviceManager:
 		DeviceManager.set_device(v as DeviceManager.Device)
 
-func _get_keybinding(action: String, default_key: int) -> int:
-	return SettingsData.key_bindings.get(action, default_key) if SettingsData else default_key
+func _get_keybinding(action: String, default_key: int) -> int: return _Settings.get_keybinding(action, default_key)
 
 func _keycode_name(code: int) -> String:
 	if code >= KEY_A and code <= KEY_Z: return char(code)
@@ -671,18 +601,15 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _rebinding_lbl and is_instance_valid(_rebinding_lbl):
 					_rebinding_lbl.text = "..."
 				return
-			ProjectSettings.set_setting(_rebinding_action, k.keycode)
-			if SettingsData:
-				SettingsData.key_bindings[_rebinding_action] = k.keycode
-				SettingsManager.save_settings()
+			_Settings.set_keybinding(_rebinding_action, k.keycode)
 			_rebinding_lbl.text = _keycode_name(k.keycode)
 			_rebinding_action = ""
 			_rebinding_lbl = null
 
 func _cancel_rebind() -> void:
 	if _rebinding_lbl and is_instance_valid(_rebinding_lbl):
-		var def: int = SettingsData.key_bindings.get(_rebinding_action, KEY_F) if SettingsData else KEY_F
-		_rebinding_lbl.text = _keycode_name(ProjectSettings.get_setting(_rebinding_action, def))
+		var def: int = _Settings.get_keybinding(_rebinding_action, KEY_F)
+		_rebinding_lbl.text = _keycode_name(def)
 		_rebinding_lbl = null
 		_rebinding_action = ""
 
@@ -1105,12 +1032,32 @@ func open() -> void:
 	if not TimeSystem:
 		return
 	_update_weather_ui()
-	visible = true
+	_play_appear()
 
 func close() -> void:
 	if _current_screen == _map_holder:
 		_close_map_in_phone()
-	visible = false
+	_play_disappear()
+
+func _play_appear() -> void:
+	visible = true
+	scale = Vector2(0.9, 0.9)
+	modulate.a = 0.0
+	if _tween and _tween.is_valid(): _tween.kill()
+	_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	_tween.tween_property(self, "scale", Vector2.ONE, 0.20)
+	_tween.parallel().tween_property(self, "modulate:a", 1.0, 0.20)
+
+func _play_disappear() -> void:
+	if _tween and _tween.is_valid(): _tween.kill()
+	_tween = create_tween().set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	_tween.tween_property(self, "scale", Vector2(0.9, 0.9), 0.12)
+	_tween.parallel().tween_property(self, "modulate:a", 0.0, 0.12)
+	_tween.tween_callback(func():
+		visible = false
+		scale = Vector2.ONE
+		modulate.a = 1.0
+	)
 
 func _process(delta: float) -> void:
 	if not visible or not TimeSystem:

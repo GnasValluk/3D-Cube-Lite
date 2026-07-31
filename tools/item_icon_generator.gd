@@ -1,0 +1,97 @@
+@tool
+extends Node
+
+const OUT := "res://assets/icon_items/"
+
+func _ready() -> void:
+	if Engine.is_editor_hint():
+		return
+	_run()
+
+func _run() -> void:
+	ItemDatabase.ensure_db()
+	var ids: Array[String] = []
+	for k in ItemDatabase.items_db.keys():
+		ids.append(k)
+	ids.sort()
+	for item_id in ids:
+		await _snap_item(item_id)
+	print("=== All item icons generated ===")
+	queue_free()
+
+func _snap_item(item_id: String) -> void:
+	var vp := SubViewport.new()
+	vp.size = Vector2i(256, 256)
+	vp.transparent_bg = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	add_child(vp)
+
+	var cam := Camera3D.new()
+	vp.add_child(cam)
+	cam.current = true
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.size = 1.0
+	cam.near = 0.01
+	cam.far = 100.0
+
+	for p in [Vector3(3, 6, 4), Vector3(-3, 4, -2)]:
+		var lt := DirectionalLight3D.new()
+		vp.add_child(lt)
+		lt.look_at_from_position(p, Vector3.ZERO)
+		lt.light_energy = 1.5 if p.z > 0 else 0.6
+
+	var root := Node3D.new()
+	vp.add_child(root)
+
+	var held_items := ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod",
+		"iron_greatsword", "iron_halberd", "leather_gloves", "crossbow",
+		"watermelon_cannon", "arrow", "watermelon_nuke_ammo", "pumpkin_mortar"]
+
+	if item_id in held_items:
+		ToolsMesh.build_held(root, item_id)
+	else:
+		ItemMesh.build(root, item_id)
+
+	var aabb := _compute_aabb(root)
+	if aabb != AABB():
+		var center := aabb.get_center()
+		root.position = -center
+
+		var max_size := maxf(aabb.size.x, maxf(aabb.size.y, aabb.size.z))
+		cam.size = maxf(max_size, 0.01) * 1.5
+
+	var dir := Vector3(2.0, 1.5, 2.0).normalized()
+	cam.look_at_from_position(dir * 5.0, Vector3.ZERO)
+
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	await RenderingServer.frame_post_draw
+
+	var img: Image = vp.get_texture().get_image()
+	if img:
+		var d := DirAccess.open("res://")
+		if d:
+			d.make_dir_recursive("assets/icon_items")
+		var out := OUT.path_join(item_id + ".png")
+		var r := img.save_png(out)
+		if r == OK:
+			print("Saved: ", out)
+		else:
+			push_error("Save failed: ", out, " err=", r)
+	vp.queue_free()
+	await get_tree().process_frame
+
+static func _compute_aabb(root: Node3D) -> AABB:
+	var aabb: AABB
+	var first := true
+	for child in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := child as MeshInstance3D
+		if not mi or not mi.mesh:
+			continue
+		var mesh_aabb := mi.mesh.get_aabb()
+		var global_aabb := mi.global_transform * mesh_aabb
+		if first:
+			aabb = global_aabb
+			first = false
+		else:
+			aabb = aabb.merge(global_aabb)
+	return aabb

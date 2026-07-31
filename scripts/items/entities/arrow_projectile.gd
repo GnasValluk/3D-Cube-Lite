@@ -130,7 +130,7 @@ func _spawn_trail() -> void:
 	tw.tween_callback(mi.queue_free).set_delay(0.4)
 
 func _drop_arrow() -> void:
-	var def := ItemDatabase.items_db.get("mui_ten") as ItemDef
+	var def := ItemDatabase.items_db.get("arrow") as ItemDef
 	if def == null:
 		return
 	var world := get_tree().current_scene

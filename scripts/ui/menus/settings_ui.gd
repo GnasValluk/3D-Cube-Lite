@@ -1,6 +1,7 @@
 extends Control
 class_name SettingsUI
 
+const _Settings = preload("res://scripts/core/settings_storage.gd")
 const BG_DEEP := Color(0.06, 0.04, 0.12)
 const BG_PANEL := Color(0.10, 0.07, 0.18)
 const BG_CARD := Color(0.14, 0.10, 0.22)
@@ -25,6 +26,7 @@ var _tab_btns: Array[Button] = []
 var _close_btn: Button
 var _title_lbl: Label
 var _scroll: ScrollContainer
+var _tween: Tween
 
 func _ready() -> void:
 	visible = false
@@ -439,89 +441,23 @@ func _add_slider(initial: float, cb: Callable) -> void:
 	slider.value_changed.connect(func(v): val_lbl.text = "%d%%" % v)
 	hbox.add_child(val_lbl)
 
-# ── Settings storage ─────────────────────────────────────────────────────────
+# ── Settings storage (delegates to shared module) ──────────────────────────
 
-func _is_fullscreen() -> bool:
-	return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-
-func _set_fullscreen(v: bool) -> void:
-	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN if v else DisplayServer.WINDOW_MODE_WINDOWED)
-	SettingsManager.fullscreen = v
-	SettingsData.save_settings()
-
-func _is_vsync() -> bool:
-	return DisplayServer.window_get_vsync_mode() == DisplayServer.VSYNC_ENABLED
-
-func _set_vsync(v: bool) -> void:
-	DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_ENABLED if v else DisplayServer.VSYNC_DISABLED)
-	SettingsManager.vsync = v
-	SettingsData.save_settings()
-
-func _set_framerate(mode: int) -> void:
-	SettingsManager.framerate_limit = mode
-	match mode:
-		0: Engine.max_fps = 60
-		1: Engine.max_fps = 120
-		2: Engine.max_fps = 0
-	SettingsData.save_settings()
-
-func _get_master_volume() -> float:
-	var idx: int = AudioServer.get_bus_index("Master")
-	if idx < 0: return 50.0
-	var db: float = AudioServer.get_bus_volume_db(idx)
-	return (db + 80.0) / 80.0 * 100.0
-
-func _set_master_volume(v: float) -> void:
-	var idx: int = AudioServer.get_bus_index("Master")
-	if idx < 0: return
-	var db: float = v / 100.0 * 80.0 - 80.0
-	AudioServer.set_bus_volume_db(idx, db)
-	SettingsManager.master_volume = v
-	SettingsData.save_settings()
-
-func _get_music_volume() -> float:
-	var idx: int = AudioServer.get_bus_index("Music")
-	if idx < 0: return 50.0
-	var db: float = AudioServer.get_bus_volume_db(idx)
-	return (db + 80.0) / 80.0 * 100.0
-
-func _set_music_volume(v: float) -> void:
-	var idx: int = AudioServer.get_bus_index("Music")
-	if idx < 0: return
-	var db: float = v / 100.0 * 80.0 - 80.0
-	AudioServer.set_bus_volume_db(idx, db)
-	SettingsManager.music_volume = v
-	SettingsData.save_settings()
-
-func _get_sfx_volume() -> float:
-	var idx: int = AudioServer.get_bus_index("SFX")
-	if idx < 0: return 50.0
-	var db: float = AudioServer.get_bus_volume_db(idx)
-	return (db + 80.0) / 80.0 * 100.0
-
-func _set_sfx_volume(v: float) -> void:
-	var idx: int = AudioServer.get_bus_index("SFX")
-	if idx < 0: return
-	var db: float = v / 100.0 * 80.0 - 80.0
-	AudioServer.set_bus_volume_db(idx, db)
-	SettingsManager.sfx_volume = v
-	SettingsData.save_settings()
-
-func _get_mouse_sensitivity() -> float:
-	return ProjectSettings.get_setting("input/pointing/mouse_sensitivity_modifier", 1.0)
-
-func _set_mouse_sensitivity(v: float) -> void:
-	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_modifier", v)
-	SettingsManager.mouse_sensitivity = v
-	SettingsData.save_settings()
-
-func _is_invert_y() -> bool:
-	return ProjectSettings.get_setting("controls/invert_y", false)
-
-func _set_invert_y(v: bool) -> void:
-	ProjectSettings.set_setting("controls/invert_y", v)
-	SettingsManager.invert_y = v
-	SettingsData.save_settings()
+func _is_fullscreen() -> bool: return _Settings.is_fullscreen()
+func _set_fullscreen(v: bool) -> void: _Settings.set_fullscreen(v)
+func _is_vsync() -> bool: return _Settings.is_vsync()
+func _set_vsync(v: bool) -> void: _Settings.set_vsync(v)
+func _set_framerate(mode: int) -> void: _Settings.set_framerate(mode)
+func _get_master_volume() -> float: return _Settings.get_master_volume()
+func _set_master_volume(v: float) -> void: _Settings.set_master_volume(v)
+func _get_music_volume() -> float: return _Settings.get_music_volume()
+func _set_music_volume(v: float) -> void: _Settings.set_music_volume(v)
+func _get_sfx_volume() -> float: return _Settings.get_sfx_volume()
+func _set_sfx_volume(v: float) -> void: _Settings.set_sfx_volume(v)
+func _get_mouse_sensitivity() -> float: return _Settings.get_mouse_sensitivity()
+func _set_mouse_sensitivity(v: float) -> void: _Settings.set_mouse_sensitivity(v)
+func _is_invert_y() -> bool: return _Settings.is_invert_y()
+func _set_invert_y(v: bool) -> void: _Settings.set_invert_y(v)
 
 # ── Language ─────────────────────────────────────────────────────────────────
 
@@ -541,12 +477,7 @@ func _refresh_lang_btns() -> void:
 							bg.border_color = Color(0.2, 0.8, 0.2, 0.9) if is_active else Color(0.30, 0.20, 0.55, 0.6)
 							bg.bg_color = Color(0.08, 0.30, 0.08, 0.6) if is_active else Color(BG_PANEL.r, BG_PANEL.g, BG_PANEL.b, 0.6)
 
-func _on_set_language(locale: String) -> void:
-	TranslationServer.set_locale(locale)
-	SettingsManager.locale = locale
-	SettingsData.save_settings()
-	_current_tab = Tab.GENERAL
-	_rebuild_texts()
+func _on_set_language(locale: String) -> void: _Settings.set_locale(locale)
 
 func _rebuild_texts() -> void:
 	_title_lbl.text = tr("SETTINGS_TITLE")
@@ -560,13 +491,13 @@ func _on_close() -> void:
 	hide_settings()
 
 func show_settings() -> void:
-	visible = true
-	mouse_filter = Control.MOUSE_FILTER_STOP
 	_show_tab(_current_tab)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	_play_appear()
 
 func hide_settings() -> void:
-	visible = false
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_play_disappear()
 
 func _build_mobile_tab() -> void:
 	_section_label(tr("TOUCH_CONTROLS"))
@@ -578,34 +509,16 @@ func _build_mobile_tab() -> void:
 
 # ── Mobile settings ──────────────────────────────────────────────────────────
 
-func _is_touch_enabled() -> bool:
-	return ProjectSettings.get_setting("mobile/touch_controls_enabled", true)
-
-func _set_touch_enabled(v: bool) -> void:
-	ProjectSettings.set_setting("mobile/touch_controls_enabled", v)
-	SettingsManager.touch_enabled = v
-	SettingsData.save_settings()
-
-func _get_joystick_sensitivity() -> float:
-	return ProjectSettings.get_setting("mobile/joystick_sensitivity", 1.0)
-
-func _set_joystick_sensitivity(v: float) -> void:
-	ProjectSettings.set_setting("mobile/joystick_sensitivity", v)
-	SettingsManager.joystick_sensitivity = v
-	SettingsData.save_settings()
-
-func _get_button_scale() -> float:
-	return ProjectSettings.get_setting("mobile/button_scale", 1.0)
-
-func _set_button_scale(v: float) -> void:
-	ProjectSettings.set_setting("mobile/button_scale", v)
-	SettingsManager.button_scale = v
-	SettingsData.save_settings()
+func _is_touch_enabled() -> bool: return _Settings.is_touch_enabled()
+func _set_touch_enabled(v: bool) -> void: _Settings.set_touch_enabled(v)
+func _get_joystick_sensitivity() -> float: return _Settings.get_joystick_sensitivity()
+func _set_joystick_sensitivity(v: float) -> void: _Settings.set_joystick_sensitivity(v)
+func _get_button_scale() -> float: return _Settings.get_button_scale()
+func _set_button_scale(v: float) -> void: _Settings.set_button_scale(v)
 
 # ── Key bindings ─────────────────────────────────────────────────────────────
 
-func _get_keybinding(key: String, default_key: int) -> int:
-	return SettingsManager.key_bindings.get(key, default_key)
+func _get_keybinding(key: String, default_key: int) -> int: return _Settings.get_keybinding(key, default_key)
 
 func _keycode_name(code: int) -> String:
 	if code >= KEY_A and code <= KEY_Z: return char(code)
@@ -625,6 +538,26 @@ func _keycode_name(code: int) -> String:
 		KEY_UP: return "U_Arrow"
 		KEY_DOWN: return "D_Arrow"
 	return "Key%d" % code
+
+func _play_appear() -> void:
+	visible = true
+	scale = Vector2(0.9, 0.9)
+	modulate.a = 0.0
+	if _tween and _tween.is_valid(): _tween.kill()
+	_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	_tween.tween_property(self, "scale", Vector2.ONE, 0.20)
+	_tween.parallel().tween_property(self, "modulate:a", 1.0, 0.20)
+
+func _play_disappear() -> void:
+	if _tween and _tween.is_valid(): _tween.kill()
+	_tween = create_tween().set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	_tween.tween_property(self, "scale", Vector2(0.9, 0.9), 0.12)
+	_tween.parallel().tween_property(self, "modulate:a", 0.0, 0.12)
+	_tween.tween_callback(func():
+		visible = false
+		scale = Vector2.ONE
+		modulate.a = 1.0
+	)
 
 func _start_rebind(setting: String, default_key: int, btn: Button) -> void:
 	_rebinding_action = setting

@@ -185,7 +185,7 @@ func _swim(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, frict * delta)
 		velocity.z = move_toward(velocity.z, 0.0, frict * delta)
 
-	move_and_slide(Vector3.UP)
+	move_and_slide()
 	if _pig_anim:
 		_pig_anim.animate(delta)
 
@@ -198,7 +198,7 @@ func _physics_process(delta: float) -> void:
 			if _pig_anim:
 				_pig_anim.clear_look()
 				_pig_anim.animate(delta)
-			move_and_slide(Vector3.UP)
+			move_and_slide()
 			if _death_timer <= 0.0:
 				queue_free()
 		return
@@ -208,7 +208,8 @@ func _physics_process(delta: float) -> void:
 	if _water_mgr == null or not _water_mgr.is_inside_tree():
 		_water_mgr = _find_water_manager()
 	if _water_mgr != null:
-		_underwater = _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y)
+		_underwater = _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y) \
+				or _water_mgr.is_in_water(global_position.x, global_position.z, global_position.y + 0.5)
 	else:
 		_underwater = false
 	if _underwater != was_underwater:
@@ -346,7 +347,7 @@ func _move(delta: float) -> void:
 	if _turn_smooth.length_squared() < 0.01:
 		_turn_smooth = dir
 	else:
-		_turn_smooth = _turn_smooth.slerp(dir, delta * 4.0).normalized()
+		_turn_smooth = _turn_smooth.normalized().slerp(dir, delta * 4.0).normalized()
 	var final_dir := _turn_smooth
 	var spd: float = sprint_speed if _ai_state == AIState.FLEE else _speed_target
 	velocity.x = final_dir.x * spd
@@ -366,7 +367,7 @@ func _move(delta: float) -> void:
 	else:
 		velocity.y -= _grav_fall * delta
 
-	move_and_slide(Vector3.UP)
+	move_and_slide()
 	if final_dir.length_squared() > 0.01:
 		var target_angle := atan2(final_dir.x, final_dir.z)
 		rotation.y = lerp_angle(rotation.y, target_angle, delta * 5.0)
@@ -390,7 +391,7 @@ func _roll_loot() -> void:
 	if world == null:
 		return
 	ItemDatabase.ensure_db()
-	var defn: ItemDef = ItemDatabase.items_db.get("thit_heo_song")
+	var defn: ItemDef = ItemDatabase.items_db.get("raw_pork")
 	if defn and randf() < 0.9:
 		var vel := Vector3(randf_range(-1.0, 1.0), randf_range(2.0, 3.5), randf_range(-1.0, 1.0))
 		_DroppedItem.spawn(world, defn, global_position, 1, vel, global_position.y)

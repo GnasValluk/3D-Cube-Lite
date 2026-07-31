@@ -9,69 +9,46 @@ static func ensure_db() -> void:
 
 static func create_item_db() -> Dictionary:
 	var db: Dictionary = {}
-	_add(db, "chest",         "Rương đồ",     ItemDef.Type.BLOCK,  Color(0.50, 0.32, 0.10), "C",  "Rương chứa đồ",          false, 1)
+	_add(db, "chest",         "Rương Gỗ",     ItemDef.Type.BLOCK,  Color(0.50, 0.32, 0.10), "C",  "Rương gỗ chắc chắn",     false, 1)
+	_add(db, "crafting_table", "Bàn Chế Tạo", ItemDef.Type.BLOCK,  Color(0.45, 0.28, 0.15), "W",  "Bàn chế tạo đa năng",     false, 1)
+	_add(db, "furnace",       "Lò Nung",     ItemDef.Type.BLOCK,  Color(0.30, 0.28, 0.26), "F",  "Lò nung quặng — nấu chảy quặng thành thỏi", false, 1)
 	_add(db, "twilight_gate", "Cổng Twilight", ItemDef.Type.TOOL,   Color(0.10, 0.50, 0.45), "T",  "Đặt cổng Twilight ra thế giới", false, 1)
 
 	# ── Công cụ ────────────────────────────────────────────────────────────────
-	_add(db, "cup",   "Cúp Sắt",   ItemDef.Type.TOOL,   Color(0.60, 0.55, 0.50), "⛏", "Đào đất, khai thác tài nguyên",   false, 1, 0, 3,  0)
-	_add(db, "xeng",  "Xẻng Sắt",  ItemDef.Type.TOOL,   Color(0.70, 0.65, 0.55), "🔨", "Xúc đất, di chuyển vật liệu",     false, 1, 0, 2,  0)
-	_add(db, "riu",   "Rìu Sắt",   ItemDef.Type.TOOL,   Color(0.50, 0.45, 0.40), "🪓", "Chặt cây, phá gỗ",                false, 1, 0, 8, 0)
+	_add(db, "pickaxe",   "Cúp Sắt",   ItemDef.Type.TOOL,   Color(0.60, 0.55, 0.50), "⛏", "Đào đất, khai thác tài nguyên",   false, 1, 0, 3,  0)
+	_add(db, "shovel",  "Xẻng Sắt",  ItemDef.Type.TOOL,   Color(0.70, 0.65, 0.55), "🔨", "Xúc đất, di chuyển vật liệu",     false, 1, 0, 2,  0)
+	_add(db, "axe",   "Rìu Sắt",   ItemDef.Type.TOOL,   Color(0.50, 0.45, 0.40), "🪓", "Chặt cây, phá gỗ",                false, 1, 0, 8, 0)
 
 	# ── Vũ khí ─────────────────────────────────────────────────────────────────
-	_add(db, "kiem",    "Kiếm Sắt",       ItemDef.Type.WEAPON, Color(0.75, 0.80, 0.90), "⚔", "Tấn công nhanh, sát thương cao",  false, 1, 0, 6, 0)
-	_add(db, "dai_kiem","Đại Kiếm Sắt",   ItemDef.Type.WEAPON, Color(0.40, 0.45, 0.60), "🗡", "Chém mạnh một nhát, sát thương cực cao", false, 1, 0, 12, 0)
-	_add(db, "gang_tay_da_thu","Găng Tay Da Thú", ItemDef.Type.WEAPON, Color(0.55, 0.32, 0.14), "🥊", "Đấm nhanh liên hoàn, sát thương thấp", false, 1, 0, 5, 0)
+	_add(db, "iron_sword",    "Kiếm Sắt",       ItemDef.Type.WEAPON, Color(0.75, 0.80, 0.90), "⚔", "Tấn công nhanh, sát thương cao",  false, 1, 0, 6, 0)
+	_add(db, "iron_greatsword","Đại Kiếm Sắt",   ItemDef.Type.WEAPON, Color(0.40, 0.45, 0.60), "🗡", "Chém mạnh một nhát, sát thương cực cao", false, 1, 0, 12, 0)
+	_add(db, "leather_gloves","Găng Tay Da Thú", ItemDef.Type.WEAPON, Color(0.55, 0.32, 0.14), "🥊", "Đấm nhanh liên hoàn, sát thương thấp", false, 1, 0, 5, 0)
 	_add(db, "iron_halberd","Kích Sắt",   ItemDef.Type.WEAPON, Color(0.55, 0.55, 0.62), "🔱", "Kích dài sắt — tầm đánh xa, sát thương mạnh", false, 1, 0, 10, 0)
-	_add(db, "no",          "Nỏ",          ItemDef.Type.WEAPON, Color(0.55, 0.35, 0.18), "🏹", "Nỏ — bắn tên từ xa, giữ chuột để nạp và tăng sát thương", false, 1, 0, 8, 0)
-	_add(db, "phao_dua_hau","Pháo Dưa Hấu Hạt Nhân", ItemDef.Type.WEAPON, Color(0.20, 0.55, 0.15), "🍉", "Bắn đạn hạt nhân dưa hấu phát nổ gây sát thương vùng. Cần đạn hạt nhân dưa hấu!", false, 1, 0, 20, 0)
+	_add(db, "crossbow",          "Nỏ",          ItemDef.Type.WEAPON, Color(0.55, 0.35, 0.18), "🏹", "Nỏ — bắn tên từ xa, giữ chuột để nạp và tăng sát thương", false, 1, 0, 8, 0)
+	_add(db, "watermelon_cannon","Pháo Dưa Hấu Hạt Nhân", ItemDef.Type.WEAPON, Color(0.20, 0.55, 0.15), "🍉", "Bắn đạn hạt nhân dưa hấu phát nổ gây sát thương vùng. Cần đạn hạt nhân dưa hấu!", false, 1, 0, 20, 0)
 
 	# ── Câu cá ────────────────────────────────────────────────────────────────
-	_add(db, "can_cau", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0)
+	_add(db, "fishing_rod", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0)
+	_add(db, "water_bucket", "Xô Nước", ItemDef.Type.TOOL, Color(0.15, 0.40, 0.70), "🌊", "Xô đựng nước — đặt khối nước tại vị trí chỉ định", false, 16)
 
 	# ── Cá (thức ăn) ──────────────────────────────────────────────────────────
-	_add(db, "ca_chep", "Carp", ItemDef.Type.FOOD, Color(0.95, 0.70, 0.10), "🐟", "Freshwater carp — rich, firm flesh", true, 16, 30)
-	_add(db, "ca_ro",   "Climbing Perch", ItemDef.Type.FOOD, Color(0.30, 0.30, 0.30), "🐟", "Climbing perch — sweet white meat", true, 16, 20)
-	_add(db, "ca_dieu_hong", "Red Tilapia", ItemDef.Type.FOOD, Color(0.88, 0.55, 0.45), "🐟", "Red tilapia — firm, mild flavour", true, 16, 35)
-	_add(db, "ca_loc", "Snakehead", ItemDef.Type.FOOD, Color(0.30, 0.25, 0.15), "🐟", "Snakehead — dense, savoury fillet", true, 16, 45)
-	_add(db, "ca_la_han", "Flowerhorn", ItemDef.Type.FOOD, Color(0.92, 0.25, 0.15), "🐟", "Flowerhorn — rich, flavourful meat", true, 16, 55)
-	_add(db, "tom", "Freshwater Shrimp", ItemDef.Type.FOOD, Color(0.85, 0.35, 0.20), "🦐", "Freshwater shrimp — sweet, delicate meat", true, 16, 8)
+	_add(db, "carp", "Carp", ItemDef.Type.FOOD, Color(0.95, 0.70, 0.10), "🐟", "Freshwater carp — rich, firm flesh", true, 16, 30)
+	_add(db, "climbing_perch",   "Climbing Perch", ItemDef.Type.FOOD, Color(0.30, 0.30, 0.30), "🐟", "Climbing perch — sweet white meat", true, 16, 20)
+	_add(db, "red_tilapia", "Red Tilapia", ItemDef.Type.FOOD, Color(0.88, 0.55, 0.45), "🐟", "Red tilapia — firm, mild flavour", true, 16, 35)
+	_add(db, "snakehead", "Snakehead", ItemDef.Type.FOOD, Color(0.30, 0.25, 0.15), "🐟", "Snakehead — dense, savoury fillet", true, 16, 45)
+	_add(db, "flowerhorn", "Flowerhorn", ItemDef.Type.FOOD, Color(0.92, 0.25, 0.15), "🐟", "Flowerhorn — rich, flavourful meat", true, 16, 55)
+	_add(db, "shrimp", "Freshwater Shrimp", ItemDef.Type.FOOD, Color(0.85, 0.35, 0.20), "🦐", "Freshwater shrimp — sweet, delicate meat", true, 16, 8)
 
-	# ── Hoa quả & rau củ ──────────────────────────────────────────────────────
-	_add(db, "apple_green", "Green Apple", ItemDef.Type.FOOD, Color(0.28,0.65,0.20), "🍎", "Green apple — crisp and sour", true, 16, 12)
-	_add(db, "banana_peeled", "Banana", ItemDef.Type.FOOD, Color(0.94,0.71,0.24), "🍌", "Banana — soft and sweet", true, 16, 10)
-	_add(db, "blueberry", "Blueberry", ItemDef.Type.FOOD, Color(0.19,0.37,0.63), "🫐", "Blueberry — tiny antioxidant burst", true, 16, 5)
-	_add(db, "cabbage", "Cabbage", ItemDef.Type.FOOD, Color(0.13,0.50,0.19), "🥬", "Cabbage — crunchy leaf vegetable", true, 16, 8)
-	_add(db, "carrot", "Carrot", ItemDef.Type.FOOD, Color(0.60,0.22,0.25), "🥕", "Carrot — sweet root vegetable", true, 16, 6)
-	_add(db, "cauliflower", "Cauliflower", ItemDef.Type.FOOD, Color(0.62,0.72,0.83), "🥦", "Cauliflower — mild and versatile", true, 16, 10)
-	_add(db, "cherry", "Cherry", ItemDef.Type.FOOD, Color(0.68,0.16,0.29), "🍒", "Cherry — small and juicy", true, 16, 6)
-	_add(db, "chili_red", "Chili Pepper", ItemDef.Type.FOOD, Color(0.68,0.16,0.29), "🌶", "Chili pepper — fiery and intense", true, 16, 4)
-	_add(db, "corn", "Corn", ItemDef.Type.FOOD, Color(0.83,0.52,0.21), "🌽", "Corn — sweet golden kernels", true, 16, 12)
-	_add(db, "cucumber", "Cucumber", ItemDef.Type.FOOD, Color(0.55,0.78,0.27), "🥒", "Cucumber — cool and refreshing", true, 16, 8)
-	_add(db, "eggplant", "Eggplant", ItemDef.Type.FOOD, Color(0.67,0.33,0.66), "🍆", "Eggplant — hearty purple vegetable", true, 16, 8)
-	_add(db, "grapes_black", "Black Grapes", ItemDef.Type.FOOD, Color(0.67,0.33,0.66), "🍇", "Black grapes — rich and sweet", true, 16, 8)
-	_add(db, "leek", "Leek", ItemDef.Type.FOOD, Color(0.28,0.65,0.20), "🧅", "Leek — mild onion flavour", true, 16, 6)
-	_add(db, "lemon", "Lemon", ItemDef.Type.FOOD, Color(0.94,1.00,1.00), "🍋", "Lemon — bright and tangy", true, 16, 4)
-	_add(db, "onion", "Onion", ItemDef.Type.FOOD, Color(0.83,0.52,0.21), "🧅", "Onion — layered and pungent", true, 16, 6)
-	_add(db, "orange", "Orange", ItemDef.Type.FOOD, Color(0.91,0.41,0.21), "🍊", "Orange — citrus and sweet", true, 16, 10)
-	_add(db, "paprika_red", "Red Paprika", ItemDef.Type.FOOD, Color(0.90,0.36,0.36), "🫑", "Red paprika — sweet bell pepper", true, 16, 6)
-	_add(db, "pear", "Pear", ItemDef.Type.FOOD, Color(0.72,0.42,0.23), "🍐", "Pear — soft and buttery", true, 16, 10)
-	_add(db, "pineapple", "Pineapple", ItemDef.Type.FOOD, Color(0.83,0.52,0.21), "🍍", "Pineapple — tropical and tangy", true, 16, 15)
-	_add(db, "plum", "Plum", ItemDef.Type.FOOD, Color(0.52,0.30,0.60), "🍑", "Plum — sweet stone fruit", true, 16, 6)
-	_add(db, "potato", "Potato", ItemDef.Type.FOOD, Color(0.60,0.34,0.24), "🥔", "Potato — starchy and filling", true, 16, 8)
 	_add(db, "pumpkin", "Pumpkin", ItemDef.Type.FOOD, Color(0.91,0.41,0.21), "🎃", "Pumpkin — hearty winter squash", true, 16, 14)
-	_add(db, "raspberry", "Raspberry", ItemDef.Type.FOOD, Color(0.90,0.36,0.36), "🍓", "Raspberry — tart summer berry", true, 16, 4)
-	_add(db, "strawberry", "Strawberry", ItemDef.Type.FOOD, Color(0.90,0.36,0.36), "🍓", "Strawberry — sweet and aromatic", true, 16, 6)
-	_add(db, "tomato", "Tomato", ItemDef.Type.FOOD, Color(0.80,0.21,0.26), "🍅", "Tomato — juicy red fruit", true, 16, 8)
-	_add(db, "watermelon", "Watermelon", ItemDef.Type.FOOD, Color(0.55,0.78,0.27), "🍉", "Watermelon — refreshing and sweet", true, 16, 16)
 
 	# ── Thịt ──────────────────────────────────────────────────────────────────
-	_add(db, "thit_heo_song", "Thịt Heo Sống", ItemDef.Type.FOOD, Color(0.85, 0.50, 0.45), "🥩", "Thịt heo tươi — nấu chín trước khi ăn", true, 16, 12)
+	_add(db, "raw_pork", "Thịt Heo Sống", ItemDef.Type.FOOD, Color(0.85, 0.50, 0.45), "🥩", "Thịt heo tươi — nấu chín trước khi ăn", true, 16, 12)
 
 	# ── Vật phẩm từ prop ─────────────────────────────────────────────────────
-	_add(db, "mon_ngot", "Môn ngọt (Taro)", ItemDef.Type.FOOD, Color(0.25, 0.50, 0.15), "🌿", "Củ môn ngọt — có thể nấu ăn", true, 16, 12)
+	_add(db, "taro", "Môn ngọt (Taro)", ItemDef.Type.FOOD, Color(0.25, 0.50, 0.15), "🌿", "Củ môn ngọt — có thể nấu ăn", true, 16, 12)
 	_add(db, "coconut", "Trái Dừa", ItemDef.Type.FOOD, Color(0.50, 0.35, 0.20), "🥥", "Trái dừa tươi — bổ dưỡng, giải khát", true, 16, 16)
 	_add(db, "palm_wood", "Gỗ Dừa", ItemDef.Type.MATERIAL, Color(0.78, 0.70, 0.48), "🪵", "Gỗ dừa chắc — nguyên liệu chế tạo", true, 64)
-	_add(db, "rong_nhiet_doi", "Rong nhiệt đới", ItemDef.Type.MATERIAL, Color(0.08, 0.55, 0.10), "🌊", "Rong nhiệt đới — nguyên liệu chế tạo", true, 32)
+	_add(db, "tropical_seaweed", "Rong nhiệt đới", ItemDef.Type.MATERIAL, Color(0.08, 0.55, 0.10), "🌊", "Rong nhiệt đới — nguyên liệu chế tạo", true, 32)
 
 	# ── Quặng & Kim loại ──────────────────────────────────────────────────────
 	# Copper (Đồng)
@@ -125,9 +102,9 @@ static func create_item_db() -> Dictionary:
 	_add(db, "dark_metal_high_ingot",   "Dark Metal High Ingot",   ItemDef.Type.MATERIAL, Color(0.25, 0.25, 0.28), "RM", "Thỏi kim loại tối tinh luyện — ma thuật", true, 64)
 	_add(db, "dark_metal_purified_ingot","Dark Metal Purified Ingot",ItemDef.Type.MATERIAL, Color(0.30, 0.20, 0.45), "RM", "Thỏi kim loại tối tinh khiết — hào quang tím", true, 64)
 
-	_add(db, "mui_ten", "Mũi Tên", ItemDef.Type.MATERIAL, Color(0.60, 0.50, 0.35), "🪶", "Đạn cho nỏ — tiêu hao khi bắn", true, 64)
-	_add(db, "dan_hat_nhan_dua_hau", "Đạn Hạt Nhân Dưa Hấu", ItemDef.Type.MATERIAL, Color(0.18, 0.50, 0.12), "☢", "Đạn cho pháo dưa hấu hạt nhân — tiêu hao khi bắn", true, 32)
-	_add(db, "phao_coi_bi_do", "Pháo Cối Bí Đỏ", ItemDef.Type.WEAPON, Color(0.80, 0.50, 0.15), "🎃", "Pháo cối bí đỏ — bắn đạn bí đỏ theo đường parabal, gây sát thương vùng + để lại bãi lầy làm chậm. Cần bí đỏ!", false, 1, 0, 11, 0)
+	_add(db, "arrow", "Mũi Tên", ItemDef.Type.MATERIAL, Color(0.60, 0.50, 0.35), "🪶", "Đạn cho nỏ — tiêu hao khi bắn", true, 64)
+	_add(db, "watermelon_nuke_ammo", "Đạn Hạt Nhân Dưa Hấu", ItemDef.Type.MATERIAL, Color(0.18, 0.50, 0.12), "☢", "Đạn cho pháo dưa hấu hạt nhân — tiêu hao khi bắn", true, 32)
+	_add(db, "pumpkin_mortar", "Pháo Cối Bí Đỏ", ItemDef.Type.WEAPON, Color(0.80, 0.50, 0.15), "🎃", "Pháo cối bí đỏ — bắn đạn bí đỏ theo đường parabal, gây sát thương vùng + để lại bãi lầy làm chậm. Cần bí đỏ!", false, 1, 0, 11, 0)
 
 	# ── Khối (đào từ thế giới) ─────────────────────────────────────────────────
 	_add(db, "block_grass",       "Cỏ",        ItemDef.Type.BLOCK, Color(0.22, 0.58, 0.14), "🧱", "Khối cỏ",           true, 64)
@@ -153,40 +130,15 @@ static func _add(db: Dictionary, id: String, name: String, type: int, color: Col
 				heal: int = 0, atk: int = 0, def_val: int = 0, armor_slot: int = -1) -> void:
 	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot)
 
-static func get_icon_2d_path(item_id: String) -> String:
-	match item_id:
-		"apple_green": return "res://assets/icon_items/frutti/Apple_Green.png"
-		"banana_peeled": return "res://assets/icon_items/frutti/Banana_Peeled.png"
-		"blueberry": return "res://assets/icon_items/frutti/Blueberry.png"
-		"cabbage": return "res://assets/icon_items/frutti/Cabbage.png"
-		"carrot": return "res://assets/icon_items/frutti/Carrot.png"
-		"cauliflower": return "res://assets/icon_items/frutti/Cauliflower.png"
-		"cherry": return "res://assets/icon_items/frutti/Cherry.png"
-		"chili_red": return "res://assets/icon_items/frutti/Chili_Red.png"
-		"corn": return "res://assets/icon_items/frutti/Corn.png"
-		"cucumber": return "res://assets/icon_items/frutti/Cucumber.png"
-		"eggplant": return "res://assets/icon_items/frutti/Eggplant.png"
-		"grapes_black": return "res://assets/icon_items/frutti/Grapes_Black.png"
-		"leek": return "res://assets/icon_items/frutti/Leek.png"
-		"lemon": return "res://assets/icon_items/frutti/Lemon.png"
-		"onion": return "res://assets/icon_items/frutti/Onion.png"
-		"orange": return "res://assets/icon_items/frutti/Orange.png"
-		"paprika_red": return "res://assets/icon_items/frutti/Paprika_Red.png"
-		"pear": return "res://assets/icon_items/frutti/Pear.png"
-		"pineapple": return "res://assets/icon_items/frutti/Pineapple.png"
-		"plum": return "res://assets/icon_items/frutti/Plum.png"
-		"potato": return "res://assets/icon_items/frutti/Potato.png"
-		"pumpkin": return "res://assets/icon_items/frutti/Pumpkin.png"
-		"raspberry": return "res://assets/icon_items/frutti/Raspberry.png"
-		"strawberry": return "res://assets/icon_items/frutti/Strawberry.png"
-		"tomato": return "res://assets/icon_items/frutti/Tomato.png"
-		"watermelon": return "res://assets/icon_items/frutti/Watermelon.png"
-		"phao_coi_bi_do": return "res://assets/icon_items/frutti/Pumpkin.png"
-
-	return ""
-
 static func load_icon_2d(item_id: String) -> Texture2D:
-	var path := get_icon_2d_path(item_id)
-	if path.is_empty():
-		return null
-	return load(path) as Texture2D
+	var path := "res://assets/icon_items/%s.png" % item_id
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
+
+# Helper: returns {tex, has_icon}. When has_icon==true, use neutral face bg.
+static func try_load_icon(item_id: String) -> Dictionary:
+	var tex := load_icon_2d(item_id)
+	return { "tex": tex, "has_icon": tex != null }
+
+const _NEUTRAL_FACE := Color(0.20, 0.15, 0.30, 0.4)

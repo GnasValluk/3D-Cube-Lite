@@ -5,11 +5,11 @@ var _box: MeshInstance3D
 
 func _init() -> void:
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(1.0, 0.6, 0.1, 0.4)
+	mat.albedo_color = Color(1.0, 1.0, 1.0, 0.30)
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.no_depth_test = true
+
 	var mesh := BoxMesh.new()
 	mesh.size = Vector3(1.04, 0.54, 1.04)
 	_box = MeshInstance3D.new()

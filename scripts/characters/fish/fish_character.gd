@@ -231,7 +231,7 @@ func _physics_process(delta: float) -> void:
 		if _swim_dir.length_squared() < 0.001:
 			_swim_dir = t_dir
 		else:
-			_swim_dir = _swim_dir.normalized().slerp(t_dir, delta * _turn_rate).normalized()
+			_swim_dir = _swim_dir.normalized().lerp(t_dir, delta * _turn_rate).normalized()
 	else:
 		_swim_dir = _swim_dir.lerp(t_dir, delta * _turn_rate).normalized()
 
@@ -533,12 +533,12 @@ func take_damage(dmg: int, attacker: Node3D = null, damage_type: int = 0) -> voi
 
 # Mỗi biến thể: [ { item_id, rate_0_1 }, ... ]
 const LOOT_TABLE: Dictionary = {
-	FishVariant.CARP:       [ { id = "ca_chep",       rate = 0.50 } ],
-	FishVariant.PERCH:      [ { id = "ca_ro",         rate = 0.50 } ],
-	FishVariant.TILAPIA:    [ { id = "ca_dieu_hong",  rate = 0.50 } ],
-	FishVariant.SNAKEHEAD:  [ { id = "ca_loc",        rate = 0.60 } ],
-	FishVariant.FLOWERHORN: [ { id = "ca_la_han",     rate = 0.70 } ],
-	FishVariant.SHRIMP:     [ { id = "tom",           rate = 0.40 } ],
+	FishVariant.CARP:       [ { id = "carp",       rate = 0.50 } ],
+	FishVariant.PERCH:      [ { id = "climbing_perch",         rate = 0.50 } ],
+	FishVariant.TILAPIA:    [ { id = "red_tilapia",  rate = 0.50 } ],
+	FishVariant.SNAKEHEAD:  [ { id = "snakehead",        rate = 0.60 } ],
+	FishVariant.FLOWERHORN: [ { id = "flowerhorn",     rate = 0.70 } ],
+	FishVariant.SHRIMP:     [ { id = "shrimp",           rate = 0.40 } ],
 }
 
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")

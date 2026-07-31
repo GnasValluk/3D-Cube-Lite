@@ -2,6 +2,7 @@ extends Node
 class_name PlacementSystem
 
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
+const _FurnaceScript = preload("res://scripts/items/entities/furnace.gd")
 const VOXEL: float = 0.50
 
 var _placing: bool = false
@@ -9,6 +10,7 @@ var _item_id: String = ""
 var _ghost: Node3D = null
 var _ghost_valid: bool = false
 var _ghost_pos: Vector3 = Vector3.ZERO
+var _placement_rotation: float = 0.0
 var _player_inv: Inventory = null
 var _player: Node3D = null
 
@@ -49,8 +51,16 @@ func start_placement(item_id: String) -> void:
 		return
 	_item_id = item_id
 	_placing = true
+	_placement_rotation = 0.0
 	get_tree().root.set_meta("building_placement_active", true)
 	_make_ghost()
+
+func rotate_placement(clockwise: bool = true) -> void:
+	if not _placing or _pending_placement:
+		return
+	_placement_rotation += deg_to_rad(90.0 if clockwise else -90.0)
+	if _ghost:
+		_ghost.rotation.y = _placement_rotation
 
 func _clear_ghost_children() -> void:
 	if _ghost == null:
@@ -70,8 +80,13 @@ func _make_ghost() -> void:
 		_build_ghost_portal()
 	elif _item_id == "chest":
 		_build_ghost_chest()
+	elif _item_id == "crafting_table":
+		_build_ghost_crafting_table()
+	elif _item_id == "furnace":
+		_build_ghost_furnace()
 	elif _Data.ITEM_TO_BLOCK.has(_item_id):
 		_build_ghost_block()
+	_ghost.rotation.y = _placement_rotation
 
 func _build_ghost_block() -> void:
 	var block_mat := _ghost_mat(Color(0.80, 0.80, 0.80, 0.30), Color(0.40, 0.40, 0.40), 0.0)
@@ -123,20 +138,51 @@ func _build_ghost_chest() -> void:
 	var body_mat := _ghost_mat(Color(0.35, 0.22, 0.12, 0.35), Color(0.15, 0.08, 0.05), 0.2)
 	var body := MeshInstance3D.new()
 	var body_box := BoxMesh.new()
-	body_box.size = Vector3(0.7, 0.35, 0.6)
+	body_box.size = Vector3(1.76, 0.36, 0.78)
 	body.mesh = body_box
 	body.material_override = body_mat
-	body.position = Vector3(0, 0.175, 0)
+	body.position = Vector3(0, 0.18, 0)
 	_ghost.add_child(body)
 
 	var lid_mat := _ghost_mat(Color(0.40, 0.28, 0.16, 0.35), Color(0.20, 0.12, 0.06), 0.2)
 	var lid := MeshInstance3D.new()
 	var lid_box := BoxMesh.new()
-	lid_box.size = Vector3(0.72, 0.06, 0.62)
+	lid_box.size = Vector3(1.84, 0.06, 0.84)
 	lid.mesh = lid_box
 	lid.material_override = lid_mat
-	lid.position = Vector3(0, 0.38, 0)
+	lid.position = Vector3(0, 0.40, 0)
 	_ghost.add_child(lid)
+
+func _build_ghost_furnace() -> void:
+	var body_mat := _ghost_mat(Color(0.25, 0.22, 0.20, 0.35), Color(0.12, 0.10, 0.08), 0.2)
+	var body := MeshInstance3D.new()
+	var body_box := BoxMesh.new()
+	body_box.size = Vector3(1.60, 0.65, 0.80)
+	body.mesh = body_box
+	body.material_override = body_mat
+	body.position = Vector3(0, 0.325, 0)
+	_ghost.add_child(body)
+
+func _build_ghost_crafting_table() -> void:
+	var body_mat := _ghost_mat(Color(0.35, 0.22, 0.12, 0.35), Color(0.15, 0.08, 0.05), 0.2)
+	var body := MeshInstance3D.new()
+	var body_box := BoxMesh.new()
+	body_box.size = Vector3(1.80, 0.05, 0.85)
+	body.mesh = body_box
+	body.material_override = body_mat
+	body.position = Vector3(0, 0.625, 0)
+	_ghost.add_child(body)
+
+	var leg_mat := _ghost_mat(Color(0.30, 0.18, 0.10, 0.35), Color(0.12, 0.06, 0.03), 0.2)
+	for x in [-0.84, 0.84]:
+		for z in [-0.38, 0.38]:
+			var leg := MeshInstance3D.new()
+			var leg_box := BoxMesh.new()
+			leg_box.size = Vector3(0.04, 0.60, 0.04)
+			leg.mesh = leg_box
+			leg.material_override = leg_mat
+			leg.position = Vector3(x, 0.30, z)
+			_ghost.add_child(leg)
 
 func _ghost_mat(albedo: Color, emissive: Color, emit_power: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -253,6 +299,10 @@ func _make_throw_mesh(item_id: String) -> Node3D:
 		ItemMesh.build(root, item_id)
 	elif item_id == "chest":
 		ItemMesh.build(root, item_id)
+	elif item_id == "crafting_table":
+		ItemMesh.build(root, item_id)
+	elif item_id == "furnace":
+		ItemMesh.build(root, item_id)
 	elif _Data.ITEM_TO_BLOCK.has(item_id):
 		var pivot := Node3D.new()
 		pivot.scale = Vector3(4.0, 4.0, 4.0)
@@ -337,6 +387,21 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 		chest_obj.name = "Chest"
 		parent.add_child(chest_obj)
 		chest_obj.global_position = pos
+		chest_obj.rotation.y = _placement_rotation
+		SFXManager.play_block_place()
+	elif item_id == "crafting_table":
+		var table_obj := CraftingTable.new()
+		table_obj.name = "CraftingTable"
+		parent.add_child(table_obj)
+		table_obj.global_position = pos
+		table_obj.rotation.y = _placement_rotation
+		SFXManager.play_block_place()
+	elif item_id == "furnace":
+		var furnace_obj = _FurnaceScript.new()
+		furnace_obj.name = "Furnace"
+		parent.add_child(furnace_obj)
+		furnace_obj.global_position = pos
+		furnace_obj.rotation.y = _placement_rotation
 		SFXManager.play_block_place()
 	elif _Data.ITEM_TO_BLOCK.has(item_id):
 		var block_id: int = _Data.ITEM_TO_BLOCK.get(item_id, 0)

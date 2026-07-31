@@ -5,7 +5,8 @@ const _Data = preload("chunk_data.gd")
 static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 		vx: int, vz: int, pos: Vector3, _h_v: float, has_silt: bool,
 		biome: int, lotus_lights: Array[Vector3] = [],
-		plant_props: Array[Dictionary] = [], is_river: bool = false) -> void:
+		plant_props: Array[Dictionary] = [], is_river: bool = false,
+		is_desert: bool = false) -> void:
 	var wx: int = cx * size + vx
 	var wz: int = cz * size + vz
 
@@ -29,8 +30,8 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 	var is_deep: bool = water_gap >= _Data.VOXEL * 0.5
 	var is_shore: bool = not is_deep and water_gap > -_Data.VOXEL * 0.5
 
-	# No lotus in rivers
-	if not is_river and is_deep and has_silt:
+	# Lotus — all lake biomes, not rivers
+	if not is_river and is_deep:
 		_add_lotus_plant(st, wx, wz, pos, r1, r2, r3, r4, h1, lotus_lights)
 
 	# Track plant positions for destroyable props
@@ -38,8 +39,8 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 		var weed_chance: float = 0.04 if is_river else (0.10 if has_silt else 0.04)
 		if r1 < weed_chance:
 			plant_props.append({ "type": "weed", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
-	if is_shore and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
-		if r1 < 0.08:
+	if is_shore and not is_desert and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
+		if r1 < 0.03:
 			plant_props.append({ "type": "taro", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
 
 
@@ -179,7 +180,7 @@ static func _add_lotus_plant(st: SurfaceTool, wx: int, wz: int, pos: Vector3,
 	var h5: int = wx * 912347189 + wz * 678451237 + 119988771
 	h5 = (h5 ^ (h5 >> 13)) * 1174126183; h5 = h5 ^ (h5 >> 16)
 	var r5 := float(h5 & 0x7FFFFFFF) / 2147483648.0
-	if r5 >= 0.10: return
+	if r5 >= 0.05: return
 	var h6: int = wx * 556677889 + wz * 334455667 + 223344556
 	h6 = (h6 ^ (h6 >> 13)) * 1074126187; h6 = h6 ^ (h6 >> 16)
 	var r6 := float(h6 & 0x7FFFFFFF) / 2147483648.0
@@ -290,14 +291,14 @@ static func _draw_hex_leaf(st: SurfaceTool, center: Vector3, r: float,
 		var em := (e0 + e1) * 0.5
 		var e_dir := (e1 - e0).normalized()
 		var e_perp := Vector3(-e_dir.z, 0, e_dir.x).normalized()
-		var col_edge := col_base * (0.80 + float(ei % 2) * 0.08)
+		var col_edge := col_base * (0.50 + float(ei % 2) * 0.06)
 		_add_quad(st, em, e_perp * 0.025, e_dir * e0.distance_to(e1) * 0.5, Vector3(0, 1, 0), col_edge)
 
 	# Thuỳ đáy — 2 quads ở phía gốc cuống (mặt sau)
 	var ba := angle + PI
 	var bw: float = r * 0.28
 	var bh: float = r * 0.16
-	var col_lobe := col_base * 0.80
+	var col_lobe := col_base * 0.55
 	var lb := Vector3(cx + cos(ba - 0.3) * r * 0.45, cy - d_cup * 0.5, cz + sin(ba - 0.3) * r * 0.45)
 	var rb := Vector3(cx + cos(ba + 0.3) * r * 0.45, cy - d_cup * 0.5, cz + sin(ba + 0.3) * r * 0.45)
 	_add_quad(st, lb, Vector3(bw, 0, 0).rotated(Vector3(0,1,0), angle), Vector3(0, 0, bh).rotated(Vector3(0,1,0), angle), Vector3(0, 1, 0), col_lobe)

@@ -84,11 +84,15 @@ func _process(_delta: float) -> void:
 		if promoted >= 1:
 			break
 		var chunk: WorldChunk = _loading[ck] as WorldChunk
-		if chunk._built:
+		if chunk._built or not chunk._pending_data.is_empty():
+			if not chunk._pending_data.is_empty():
+				chunk.apply_chunk(chunk._pending_data)
+				chunk._pending_data = {}
 			_loading.erase(ck)
 			_chunks[ck] = chunk
 			if SaveManager:
 				SaveManager.apply_block_modifications_for_chunk(chunk, ck.x, ck.y)
+			chunk.refresh_boundary_water()
 			promoted += 1
 			_check_initial_ready()
 
@@ -146,6 +150,7 @@ func _start_loading(key: Vector2i, sync: bool) -> void:
 		_chunks[key] = chunk
 		if SaveManager:
 			SaveManager.apply_block_modifications_for_chunk(chunk, key.x, key.y)
+		chunk.refresh_boundary_water()
 
 func _check_initial_ready() -> void:
 	if _loading_ready or _total_initial == 0: return

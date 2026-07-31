@@ -80,14 +80,17 @@ static func _index_curves() -> void:
 			var cx1: int = floori(max(a.x, b.x) / cell_sz)
 			var cz0: int = floori(min(a.y, b.y) / cell_sz)
 			var cz1: int = floori(max(a.y, b.y) / cell_sz)
+			# Lưu theo SEGMENT (ci*10000+i) thay vì curve — truy vấn chỉ chạm
+			# vài segment trong cell thay vì toàn bộ curve dài
+			var skey: int = ci * 10000 + i
 			for cx in range(cx0 - 1, cx1 + 2):
 				for cz in range(cz0 - 1, cz1 + 2):
 					var ck: Vector2i = Vector2i(cx, cz)
 					if not _river_spatial.has(ck):
 						_river_spatial[ck] = PackedInt32Array()
 					var arr: PackedInt32Array = _river_spatial[ck]
-					if arr.size() == 0 or arr[arr.size() - 1] != ci:
-						arr.append(ci)
+					if arr.size() == 0 or arr[arr.size() - 1] != skey:
+						arr.append(skey)
 
 static func _ensure_rivers() -> void:
 	if _river_ready:
@@ -163,17 +166,20 @@ static func river_distance_factor(wx: float, wz: float) -> float:
 	_ensure_rivers()
 	var cell_sz: float = _Data.RIVER_GRID * 0.5
 	var ck: Vector2i = Vector2i(int(wx / cell_sz), int(wz / cell_sz))
-	var indices: PackedInt32Array = _river_spatial.get(ck, PackedInt32Array())
-	if indices.is_empty():
+	var segs: PackedInt32Array = _river_spatial.get(ck, PackedInt32Array())
+	if segs.is_empty():
 		return -1.0
 	var pos: Vector2 = Vector2(wx, wz)
 	var min_dist2: float = INF
-	for ci in indices:
+	for skey in segs:
+		var ci: int = skey / 10000
+		var i: int = skey % 10000
 		var wp: PackedVector2Array = _river_curves[ci]
-		for i in range(wp.size() - 1):
-			var d2: float = _point_to_seg_d2(pos, wp[i], wp[i + 1])
-			if d2 < min_dist2:
-				min_dist2 = d2
+		if i >= wp.size() - 1:
+			continue
+		var d2: float = _point_to_seg_d2(pos, wp[i], wp[i + 1])
+		if d2 < min_dist2:
+			min_dist2 = d2
 	var bank_w2: float = _bank_width * _bank_width
 	if min_dist2 > bank_w2:
 		return -1.0

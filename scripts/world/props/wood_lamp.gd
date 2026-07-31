@@ -44,6 +44,10 @@ var road_dir: Vector2 = Vector2(1.0, 0.0)
 
 var _light: OmniLight3D = null
 var _crystal_mi: MeshInstance3D = null
+var _sway_phase: float
+var _sway_freq: float
+var _sway_amp: float
+var _base_rotation: Vector3
 
 func _init() -> void:
 	super._init(200, DestroyableProp.WeaponReq.AXE, "")
@@ -58,6 +62,10 @@ func _ready() -> void:
 	_build_mesh(arm_dir)
 	_setup_light(arm_dir)
 	_setup_collision()
+	_base_rotation = rotation
+	_sway_phase = randf() * TAU
+	_sway_freq = 0.4 + randf() * 0.3
+	_sway_amp = deg_to_rad(0.6 + randf() * 0.4)
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _build_mesh(arm_dir: Vector3) -> void:
@@ -206,6 +214,14 @@ func _notification(what: int) -> void:
 			RoadLampManager.unregister_light(_light)
 		if _crystal_mi != null:
 			RoadLampManager.unregister_crystal(_crystal_mi)
+
+func _process(delta: float) -> void:
+	var t := Time.get_ticks_usec() * 0.000001
+	rotation = _base_rotation + Vector3(
+		sin(t * _sway_freq + _sway_phase) * _sway_amp,
+		0,
+		cos(t * _sway_freq * 0.7 + _sway_phase + 1.2) * _sway_amp * 0.6
+	)
 
 func _on_destroy() -> void:
 	super._on_destroy()

@@ -125,6 +125,7 @@ func _drop_data(position, data):
 		var icon_tex := TextureRect.new()
 		icon_tex.position = Vector2(3, 3)
 		icon_tex.size = Vector2(ss - 4, ss - 4)
+		icon_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		icon_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		icon_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon_tex.visible = false
@@ -362,14 +363,24 @@ func _process(_delta: float) -> void:
 			_slot_icons[i].texture = null
 			_slot_icons[i].visible = false
 		else:
-			_slot_faces[i].color = slot.item.icon_color
 			var tex := ItemDatabase.load_icon_2d(slot.item.id)
 			if tex:
+				_slot_faces[i].color = Color(0.20, 0.15, 0.30, 0.4)
 				_slot_icons[i].texture = tex
 				_slot_icons[i].visible = true
 				_slot_labels[i].text = ""
 			else:
+				_slot_faces[i].color = slot.item.icon_color
 				_slot_icons[i].texture = null
 				_slot_icons[i].visible = false
 				_slot_labels[i].text = slot.item.icon_char
 			_slot_count_labels[i].text = str(slot.count) if slot.count > 1 else ""
+
+	var player := _player_ref
+	if player == null:
+		return
+	var cur := player.equipped_weapon
+	var sel_slot := _inventory.slots[_selected]
+	var target := sel_slot.item if not sel_slot.is_empty() else null
+	if cur != target:
+		_auto_equip_selected()

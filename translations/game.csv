@@ -82,12 +82,24 @@ ITEM_COCONUT_NAME,Coconut,Trái Dừa
 ITEM_COCONUT_DESC,"Fresh coconut — nutritious, refreshing","Trái dừa tươi — bổ dưỡng, giải khát"
 ITEM_PALM_WOOD_NAME,Palm Wood,Gỗ Dừa
 ITEM_PALM_WOOD_DESC,"Sturdy palm wood — crafting material","Gỗ dừa chắc — nguyên liệu chế tạo"
-ITEM_CHEST_NAME,Chest,Rương đồ
-ITEM_CHEST_DESC,Storage chest,Rương chứa đồ
+ITEM_CHEST_NAME,Wooden Chest,Rương Gỗ
+ITEM_CHEST_DESC,"A sturdy wooden chest","Rương gỗ chắc chắn"
 ITEM_TWILIGHT_GATE_NAME,Twilight Gate,Cổng Twilight
 ITEM_TWILIGHT_GATE_DESC,"Place Twilight Gate into the world","Đặt cổng Twilight ra thế giới"
-CHEST_LABEL,Chest,Rương
-CHEST_INTERACT,F: Open chest,F: Mở rương
+CHEST_LABEL,Wooden Chest,Rương Gỗ
+CHEST_INTERACT,F: Open,F: Mở
+ITEM_CRAFTING_TABLE_NAME,Crafting Table,Bàn Chế Tạo
+ITEM_CRAFTING_TABLE_DESC,"Multi-purpose workbench","Bàn chế tạo đa năng"
+CRAFTING_LABEL,Crafting Table,Bàn Chế Tạo
+RECIPE_LIBRARY,Recipe Library,Sách Công Thức
+NO_RECIPES,No recipes available,Chưa có công thức
+CRAFTING_GRID,Crafting Grid,Lưới Chế Tạo
+LIB_CAT_ALL,All,Tất cả
+LIB_CAT_WEAPONS,Weapons,Vũ khí
+LIB_CAT_TOOLS,Tools,Công cụ
+LIB_CAT_FOOD,Food,Thức ăn
+LIB_CAT_POTIONS,Potions,Thuốc
+LIB_CAT_MATERIALS,Materials,Nguyên liệu
 PORTAL_TWILIGHT_NAME,Twilight World Gate,Cổng Thế Giới Chạng Vạng
 PORTAL_TWILIGHT_DESC,"Open gate to the Twilight World","Mở cổng đến thế giới Chạng Vạng"
 PORTAL_REAL_NAME,Real World Gate,Cổng Thế Giới Thực Tại
@@ -223,3 +235,6 @@ WEATHER_RAIN,Rain,Mưa
 TEMP_FORMAT,%d°C,%d°C
 FRAMERATE,Framerate (FPS),FPS (Khung hình)
 FPS_UNLIMITED,Unlimited,Không giới hạn
+FURNACE_LABEL,Furnace,Lò Nung
+FURNACE_INPUT,Raw Material,Nguyên Liệu
+FURNACE_OUTPUT,Product,Sản Phẩm

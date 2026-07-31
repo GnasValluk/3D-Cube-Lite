@@ -19,12 +19,17 @@ const TEXT_MUTED := Color(0.35, 0.32, 0.50)
 
 const PANEL_W: float = 300.0
 const ITEM_H: float = 72.0
+const TAB_H: float = 36.0
 
 var _player_inv: Inventory = null
-
 var _btns: Array[Button] = []
-var _building_names: Array[String] = []
 var _building_ids: Array[String] = []
+var _building_names: Array[String] = []
+var _categories: Array[Dictionary] = []
+var _cur_cat: int = 0
+var _tab_btns: Array[Button] = []
+var _list_container: Control = null
+var _tween: Tween
 
 signal building_selected(item_id: String)
 signal closed()
@@ -32,34 +37,43 @@ signal closed()
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	_building_ids = ["twilight_gate", "chest"]
+	_setup_categories()
 	ItemDatabase.ensure_db()
-	_building_names = []
-	for item_id in _building_ids:
-		var def: ItemDef = ItemDatabase.items_db.get(item_id) as ItemDef
-		_building_names.append(def.name if def else item_id)
-	# Add blocks from ItemDatabase
+
+func _setup_categories() -> void:
+	_categories = [
+		{"label": "Công Trình", "ids": ["twilight_gate", "chest", "crafting_table", "furnace"]},
+		{"label": "Khối", "ids": []},
+		{"label": "Quặng", "ids": []},
+	]
 	for item_id in ItemDatabase.items_db:
 		var def: ItemDef = ItemDatabase.items_db[item_id] as ItemDef
-		if def and def.type == ItemDef.Type.BLOCK:
-			_building_ids.append(item_id)
-			_building_names.append(def.name)
+		if not def or def.type != ItemDef.Type.BLOCK:
+			continue
+		if item_id in ["chest", "crafting_table", "furnace"]:
+			continue
+		if item_id.ends_with("_ore"):
+			_categories[2].ids.append(item_id)
+		else:
+			_categories[1].ids.append(item_id)
 
 func open(initial_inv: Inventory) -> void:
 	_player_inv = initial_inv
 	_clear()
 	_build_ui()
-	visible = true
+	_play_appear()
 
 func close() -> void:
-	visible = false
 	_clear()
+	_play_disappear()
 	closed.emit()
 
 func _clear() -> void:
 	for ch in get_children():
 		ch.queue_free()
 	_btns.clear()
+	_tab_btns.clear()
+	_list_container = null
 
 func _build_ui() -> void:
 	var vp_size: Vector2 = get_viewport().get_visible_rect().size
@@ -107,17 +121,65 @@ func _build_ui() -> void:
 	title.size = Vector2(PANEL_W, 44)
 	panel.add_child(title)
 
-	var inv_info := Label.new()
-	inv_info.text = tr("BUILD_INV_LABEL")
-	inv_info.position = Vector2(14, 66)
-	inv_info.add_theme_font_size_override("font_size", int(S * 11))
-	inv_info.add_theme_color_override("font_color", TEXT_DIM)
-	panel.add_child(inv_info)
+	# ── Tabs ──
+	var tab_y: float = 60.0
+	var tab_w: float = PANEL_W / _categories.size()
+	for ci in range(_categories.size()):
+		var cat: Dictionary = _categories[ci]
+		var tab := Button.new()
+		tab.text = cat.label
+		tab.position = Vector2(tab_w * ci, tab_y)
+		tab.size = Vector2(tab_w, TAB_H)
+		tab.add_theme_font_size_override("font_size", int(S * 12))
+		var tab_style := StyleBoxFlat.new()
+		tab_style.bg_color = BG_CARD if ci == _cur_cat else BG_PANEL
+		tab_style.corner_radius_top_left = 8; tab_style.corner_radius_top_right = 8
+		tab_style.border_width_bottom = 2
+		tab_style.border_color = PURPLE if ci == _cur_cat else Color(0.25, 0.20, 0.35, 0.3)
+		tab.add_theme_stylebox_override("normal", tab_style)
+		tab.add_theme_stylebox_override("hover", tab_style)
+		var tc := ci
+		tab.pressed.connect(func(): _switch_tab(tc))
+		_tab_btns.append(tab)
+		panel.add_child(tab)
 
-	var y: float = 96.0
-	for i in range(_building_ids.size()):
-		var bid: String = _building_ids[i]
-		var bname: String = _building_names[i]
+	# ── Scrollable list ──
+	var list_y: float = tab_y + TAB_H + 4
+	var list_h: float = vp_size.y - list_y - 10
+	_list_container = Control.new()
+	_list_container.position = Vector2(0, list_y)
+	_list_container.size = Vector2(PANEL_W, list_h)
+	panel.add_child(_list_container)
+
+	_populate_list()
+
+func _switch_tab(ci: int) -> void:
+	_cur_cat = ci
+	for i in range(_tab_btns.size()):
+		var tab := _tab_btns[i]
+		var ts := StyleBoxFlat.new()
+		ts.bg_color = BG_CARD if i == ci else BG_PANEL
+		ts.corner_radius_top_left = 8; ts.corner_radius_top_right = 8
+		ts.border_width_bottom = 2
+		ts.border_color = PURPLE if i == ci else Color(0.25, 0.20, 0.35, 0.3)
+		tab.add_theme_stylebox_override("normal", ts)
+		tab.add_theme_stylebox_override("hover", ts)
+	_populate_list()
+
+func _populate_list() -> void:
+	_clear_list()
+	if _cur_cat < 0 or _cur_cat >= _categories.size():
+		return
+	var ids: Array = _categories[_cur_cat].ids
+	var names: Array = []
+	for item_id in ids:
+		var def: ItemDef = ItemDatabase.items_db.get(item_id) as ItemDef
+		names.append(def.name if def else item_id)
+
+	var y: float = 4.0
+	for i in range(ids.size()):
+		var bid: String = ids[i]
+		var bname: String = names[i]
 		var count: int = _get_item_count(bid)
 		var has_item: bool = count > 0
 
@@ -137,7 +199,7 @@ func _build_ui() -> void:
 			btn_bg.border_color = Color(0.40, 0.32, 0.60, 0.5)
 			btn.add_theme_color_override("font_color", TEXT_MAIN)
 			var idx := i
-			btn.pressed.connect(func(): _on_item_click(idx))
+			btn.pressed.connect(func(): _on_item_click(ids[idx]))
 		var icon := TextureRect.new()
 		icon.position = Vector2(10, 10)
 		icon.size = Vector2(54, 54)
@@ -162,7 +224,7 @@ func _build_ui() -> void:
 		btn_bg.border_width_top = 2; btn_bg.border_width_bottom = 2
 		btn.add_theme_stylebox_override("normal", btn_bg)
 		btn.add_theme_stylebox_override("disabled", btn_bg)
-		panel.add_child(btn)
+		_list_container.add_child(btn)
 
 		var count_label := Label.new()
 		count_label.text = "x" + str(count)
@@ -176,12 +238,37 @@ func _build_ui() -> void:
 		_btns.append(btn)
 		y += ITEM_H + 10
 
+func _clear_list() -> void:
+	if _list_container == null:
+		return
+	for ch in _list_container.get_children():
+		ch.queue_free()
+	_btns.clear()
+
 func _get_item_count(item_id: String) -> int:
 	if _player_inv == null:
 		return 0
 	return _player_inv.get_item_count(item_id)
 
-func _on_item_click(idx: int) -> void:
-	if idx < 0 or idx >= _building_ids.size():
-		return
-	building_selected.emit(_building_ids[idx])
+func _play_appear() -> void:
+	visible = true
+	scale = Vector2.ZERO
+	modulate.a = 0.0
+	if _tween and _tween.is_valid(): _tween.kill()
+	_tween = create_tween().set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	_tween.tween_property(self, "scale", Vector2.ONE, 0.25)
+	_tween.parallel().tween_property(self, "modulate:a", 1.0, 0.15)
+
+func _play_disappear() -> void:
+	if _tween and _tween.is_valid(): _tween.kill()
+	_tween = create_tween().set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BACK)
+	_tween.tween_property(self, "scale", Vector2.ZERO, 0.15)
+	_tween.parallel().tween_property(self, "modulate:a", 0.0, 0.10)
+	_tween.tween_callback(func():
+		visible = false
+		scale = Vector2.ONE
+		modulate.a = 1.0
+	)
+
+func _on_item_click(item_id: String) -> void:
+	building_selected.emit(item_id)

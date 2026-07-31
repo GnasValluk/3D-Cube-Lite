@@ -42,7 +42,7 @@ func setup(player: Node3D, target_pos: Vector3, rod_pivot: Node3D = null) -> voi
 	_make_line()
 
 func _random_catch() -> String:
-	var pool := ["ca_chep", "ca_ro", "ca_dieu_hong", "ca_loc", "ca_la_han", "tom"]
+	var pool := ["carp", "climbing_perch", "red_tilapia", "snakehead", "flowerhorn", "shrimp"]
 	return pool[randi() % pool.size()]
 
 func _make_line_mat() -> void:
