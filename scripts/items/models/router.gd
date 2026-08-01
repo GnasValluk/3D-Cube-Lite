@@ -12,6 +12,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"pickaxe": ToolsMesh.cup_drop(parent)
 		"shovel": ToolsMesh.shovel_drop(parent)
 		"axe": ToolsMesh.axe_drop(parent)
+		"hoe": ToolsMesh.hoe_drop(parent)
 		"chest": StructuresMesh.chest(parent)
 		"crafting_table": StructuresMesh.crafting_table(parent)
 		"furnace": StructuresMesh.furnace(parent)
@@ -23,6 +24,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"watermelon_cannon": ToolsMesh.phao_dua_hau_drop(parent)
 		"arrow": ToolsMesh.arrow_drop(parent)
 		"twilight_gate": StructuresMesh.gate(parent)
+		"fishing_boat": StructuresMesh.fishing_boat(parent)
 		"palm_wood": MaterialMeshes.palm_wood(parent)
 		"pumpkin": FruitMeshes.pumpkin(parent)
 		"coconut": CoconutMesh.whole(parent, "green")
@@ -32,6 +34,9 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"water_bucket": _build_water_bucket_icon(parent)
 		"taro": _build_taro_icon(parent)
 		"tropical_seaweed": _build_seaweed_icon(parent)
+		"coconut_seed": _build_seed_icon(parent, 0)
+		"taro_seed": _build_seed_icon(parent, 1)
+		"seaweed_seed": _build_seed_icon(parent, 2)
 		# ── Ores (dùng BlockMeshes.block_cube để texture khớp world) ──
 		"copper_ore": BlockMeshes.block_cube(parent, "copper_ore")
 		"bauxite_ore": BlockMeshes.block_cube(parent, "bauxite_ore")
@@ -259,3 +264,32 @@ static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3, 
 	st.add_vertex(center - u - v)
 	st.add_vertex(center + u + v)
 	st.add_vertex(center - u + v)
+
+## ── Mầm cây: hạt + chồi non ─────────────────────────────────────────────────
+## variant 0 = dừa (xanh sáng), 1 = môn (xanh đậm), 2 = rong (xanh ngọc)
+static func _build_seed_icon(p: Node3D, variant: int) -> void:
+	var seed_c := Color(0.38, 0.26, 0.14)
+	var stem_c: Color
+	var leaf_c: Color
+	var leaf2_c: Color
+	match variant:
+		1:
+			stem_c = Color(0.32, 0.55, 0.14)
+			leaf_c = Color(0.10, 0.34, 0.08)
+			leaf2_c = Color(0.14, 0.44, 0.10)
+		2:
+			stem_c = Color(0.10, 0.60, 0.35)
+			leaf_c = Color(0.06, 0.48, 0.26)
+			leaf2_c = Color(0.10, 0.62, 0.34)
+		_:
+			stem_c = Color(0.42, 0.68, 0.18)
+			leaf_c = Color(0.24, 0.58, 0.12)
+			leaf2_c = Color(0.34, 0.68, 0.16)
+	# Hạt
+	ItemMeshShared.add_cube(p, 0, -0.45, 0, 0.9, 0.7, 0.9, seed_c)
+	ItemMeshShared.add_cube(p, 0, -0.6, 0, 0.7, 0.3, 0.7, seed_c.darkened(0.15))
+	# Chồi non
+	ItemMeshShared.add_cube(p, 0, -0.05, 0, 0.22, 0.8, 0.22, stem_c)
+	ItemMeshShared.add_cube(p, 0.22, 0.35, 0, 0.5, 0.14, 0.26, leaf_c)
+	ItemMeshShared.add_cube(p, -0.22, 0.35, 0, 0.5, 0.14, 0.26, leaf2_c)
+	ItemMeshShared.add_cube(p, 0, 0.68, 0, 0.12, 0.18, 0.12, stem_c.lightened(0.1))

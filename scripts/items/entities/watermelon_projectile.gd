@@ -190,7 +190,7 @@ func _check_hit() -> void:
 			continue
 		var offset: Vector3 = global_position - ch.global_position
 		offset.y = 0.0
-		if offset.length() < 1.0:
+		if offset.length() < 1.0 + ch.hit_radius:
 			_explode()
 			return
 

@@ -586,7 +586,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
 			get_viewport().set_input_as_handled()
-			if k.keycode == KEY_ESCAPE:
+			if k.is_action_pressed("ui_cancel"):
 				_cancel_rebind()
 				return
 			var conflict: String = ""

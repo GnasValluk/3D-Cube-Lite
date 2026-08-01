@@ -15,6 +15,10 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 	const CHUNK_H := _BlockData.CHUNK_H   # 21
 	const B := _Data.BlockID
 
+	# Inline set_block — 21K method calls/chunk ≈ 100ms; ghi trực tiếp vào buffer
+	var data: PackedByteArray = bd._data
+	var layer_stride: int = cols
+	var layer_size: int = CHUNK_H * cols
 	for x in range(cols):
 		for z in range(cols):
 			var biome: int = biome_grid[x][z]
@@ -62,66 +66,171 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 				top_block = B.TRAIL
 
 			var top_slab: int = floori((h - SLAB) / SLAB) - Y_MIN
-
 			var water_top_slab: int = floori((_Data.WATER_Y - SLAB) / SLAB) - Y_MIN
 
+			var i: int = x * layer_size + z
 			for ly in range(CHUNK_H):
+				var blk: int = B.AIR
 				if ly == 0:
-					if top_slab == 0:
-						bd.set_block(x, ly, z, top_block)
-					else:
-						bd.set_block(x, ly, z, B.BEDROCK)
+					blk = top_block if top_slab == 0 else B.BEDROCK
 				elif ly <= top_slab - 2:
-					bd.set_block(x, ly, z, B.STONE)
+					blk = B.STONE
 				elif ly == top_slab - 1 and top_slab > 1:
 					if top_block == B.DARK_GRASS or top_block == B.DIRT:
-						bd.set_block(x, ly, z, B.DARK_DIRT)
+						blk = B.DARK_DIRT
 					else:
-						bd.set_block(x, ly, z, B.SAND_DEEP)
+						blk = B.SAND_DEEP
 				elif ly == top_slab and top_slab > 0:
-					bd.set_block(x, ly, z, top_block)
+					blk = top_block
 				else:
 					if ly <= water_top_slab:
-						bd.set_block(x, ly, z, B.WATER_SOURCE)
+						blk = B.WATER_SOURCE
 					else:
-						bd.set_block(x, ly, z, B.AIR)
+						blk = B.AIR
+				data[i] = blk
+				i += layer_stride
 
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		var dirs: Array[Vector2i] = [
-			Vector2i(0,0), Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1),
-			Vector2i(1,1), Vector2i(-1,1), Vector2i(1,-1), Vector2i(-1,-1)
-		]
-		for x in range(cols):
-			for z in range(cols):
-				var biome: int = biome_grid[x][z]
-				if biome != _Data.TileType.SAND and biome != _Data.TileType.MUDDY_SAND: continue
-				var h: float = height_grid[x][z]
-				if h >= _Data.WATER_Y - _BlockData.SLAB_HEIGHT: continue
-				var wx2: int = cx * size + x
-				var wz2: int = cz * size + z
-				var hh: int = wx2 * 374761393 + wz2 * 668265263
-				hh = (hh ^ (hh >> 13)) * 1274126177
-				hh = hh ^ (hh >> 16)
-				var r := float(hh & 0x7FFFFFFF) / 2147483648.0
-				if r >= 0.003: continue
-				var s: int = hh
-				s = s * 16807 + 1
-				var cluster_size: int = 3 + (s & 3)
-				if (s & 4) != 0: cluster_size += 1
-				var placed: int = 0
-				for di in dirs.size():
-					if placed >= cluster_size: break
-					var nx: int = x + dirs[di].x
-					var nz: int = z + dirs[di].y
-					if nx < 0 or nx >= cols or nz < 0 or nz >= cols: continue
-					var nb: int = biome_grid[nx][nz]
-					if nb != _Data.TileType.SAND and nb != _Data.TileType.MUDDY_SAND: continue
-					var nh: float = height_grid[nx][nz]
-					if nh >= _Data.WATER_Y - _BlockData.SLAB_HEIGHT: continue
-					var top_slab: int = floori((nh - _BlockData.SLAB_HEIGHT) / _BlockData.SLAB_HEIGHT) - _BlockData.Y_MIN
-					if top_slab < 0: continue
-					bd.set_block(nx, top_slab, nz, B.SEDIMENT)
-					placed += 1
+## ── Đồi quặng trên bề mặt — chỉ spawn ở khu vực xa spawn ────────────────────
+## Deterministic theo chunk (cùng cx,cz → cùng đồi). Tổng block 4~12: đá trộn
+## quặng. Ngoài vùng xa spawn có 4 loại quặng: than, sắt, đồng, nhôm.
+## Đồng bằng (DARK_GRASS): chủ yếu quặng than + sắt hiếm, tỷ lệ spawn thấp hơn.
+const ORE_HILL_MIN_DIST: float = 100.0   # cách spawn (0,0) tối thiểu (block)
+const ORE_HILL_CHANCE: int = 28          # xác suất 1 chunk có đồi (%)
+const ORE_HILL_PLAINS_CHANCE: int = 14   # đồng bằng: thấp hơn (chỉ than + sắt hiếm)
+const ORE_HILL_PLAINS_IRON_PCT: int = 12 # đồng bằng: xác suất quặng là sắt (%)
+
+const _ORE_HILL_ORES: Array[int] = [
+	_Data.BlockID.COAL_ORE,
+	_Data.BlockID.IRON_ORE,
+	_Data.BlockID.COPPER_ORE,
+	_Data.BlockID.BAUXITE_ORE,
+]
+## Ngưỡng trọng số tích lũy cho _ORE_HILL_ORES: than 34%, sắt 25%, đồng 25%, nhôm 16%
+const _ORE_HILL_WEIGHTS: Array[int] = [34, 59, 84, 100]
+
+static func _oh_hash(seed_v: int, salt: int) -> int:
+	var h: int = seed_v * 374761393 + salt * 668265263
+	h = (h ^ (h >> 13)) * 1274126177
+	h = h ^ (h >> 16)
+	return h & 0x7FFFFFFF
+
+static func spawn_ore_hills(bd: _BlockData, biome_grid: Array, height_grid: Array,
+		road_grid: PackedByteArray, cols: int, cx: int, cz: int, size: int) -> Dictionary:
+	const SLAB := _BlockData.SLAB_HEIGHT
+	const Y_MIN := _BlockData.Y_MIN
+	const B := _Data.BlockID
+
+	var cw_x: float = float(cx) * size + size * 0.5
+	var cw_z: float = float(cz) * size + size * 0.5
+	if sqrt(cw_x * cw_x + cw_z * cw_z) < ORE_HILL_MIN_DIST:
+		return { "cx": -1, "cz": -1 }
+
+	var seed_v: int = cx * 73856093 ^ cz * 19349663
+
+	var hx: int = _oh_hash(seed_v, 2) % cols
+	var hz: int = _oh_hash(seed_v, 3) % cols
+	if hx < 2 or hx >= cols - 2 or hz < 2 or hz >= cols - 2:
+		return { "cx": -1, "cz": -1 }  # giữ đồi nằm trọn trong chunk, không lấn biên
+	if biome_grid[hx][hz] == _Data.TileType.OCEAN_DEEP:
+		return { "cx": -1, "cz": -1 }
+	if height_grid[hx][hz] <= _Data.WATER_Y:
+		return { "cx": -1, "cz": -1 }
+
+	# Đồng bằng (DARK_GRASS): tỷ lệ thấp hơn, chủ yếu than + sắt hiếm
+	var is_plains: bool = biome_grid[hx][hz] == _Data.TileType.DARK_GRASS \
+		or biome_grid[hx][hz] == _Data.TileType.GRASS
+	var chance: int = ORE_HILL_PLAINS_CHANCE if is_plains else ORE_HILL_CHANCE
+	if _oh_hash(seed_v, 1) % 100 >= chance:
+		return { "cx": -1, "cz": -1 }
+
+	# ── Hình dạng: 3x3 (bỏ 0-2 góc) hoặc 5 chữ thập; tâm cao thêm 1-2 lớp ──
+	var is_big: bool = _oh_hash(seed_v, 4) % 2 == 0
+	var stack: int = 1 + _oh_hash(seed_v, 5) % 2
+	var ore_count: int = 1 + _oh_hash(seed_v, 6) % 3
+
+	var ore_type: int = B.COAL_ORE
+	if is_plains:
+		# Đồng bằng: than là chính, sắt hiếm (12%)
+		var pr: int = _oh_hash(seed_v, 12) % 100
+		if pr < ORE_HILL_PLAINS_IRON_PCT:
+			ore_type = B.IRON_ORE
+	else:
+		ore_type = _ORE_HILL_ORES[0]
+		var roll: int = _oh_hash(seed_v, 7) % 100
+		for i in range(_ORE_HILL_WEIGHTS.size()):
+			if roll < _ORE_HILL_WEIGHTS[i]:
+				ore_type = _ORE_HILL_ORES[i]
+				break
+
+	var cells: Array[Vector2i] = []
+	for dx in [-1, 0, 1]:
+		for dz in [-1, 0, 1]:
+			if dx == 0 and dz == 0:
+				cells.append(Vector2i(hx, hz))
+				continue
+			if not is_big and abs(dx) + abs(dz) > 1:
+				continue
+			if dx != 0 and dz != 0 and _oh_hash(seed_v, 10 + dx * 3 + dz) % 100 < 40:
+				continue
+			cells.append(Vector2i(hx + dx, hz + dz))
+	var kept: Array[Vector2i] = []
+	for cell in cells:
+		if cell.x < 0 or cell.x >= cols or cell.y < 0 or cell.y >= cols:
+			continue
+		if biome_grid[cell.x][cell.y] == _Data.TileType.OCEAN_DEEP:
+			continue
+		if height_grid[cell.x][cell.y] <= _Data.WATER_Y:
+			continue
+		if road_grid.size() > 0 and road_grid[cell.x * cols + cell.y] != 0:
+			continue
+		kept.append(cell)
+	cells = kept
+	if cells.size() < 4:
+		return { "cx": -1, "cz": -1 }
+
+	# ── Đặt block: lớp đáy trên mặt đất + tâm cao thêm ──
+	var placed: Array[Vector3i] = []
+	for cell in cells:
+		var h: float = height_grid[cell.x][cell.y]
+		var ly: int = floori((h - SLAB) / SLAB) - Y_MIN + 1
+		placed.append(Vector3i(cell.x, ly, cell.y))
+		if cell.x == hx and cell.y == hz:
+			for extra in range(1, stack + 1):
+				placed.append(Vector3i(cell.x, ly + extra, cell.y))
+
+	# Đáy trên cùng mỗi cột → ưu tiên để quặng lộ ra mặt đồi
+	var col_max := {}
+	for p in placed:
+		var key: int = p.x * 1024 + p.z
+		if not col_max.has(key) or col_max[key] < p.y:
+			col_max[key] = p.y
+	var order: Array[int] = []
+	for idx in range(placed.size()):
+		if col_max[placed[idx].x * 1024 + placed[idx].z] == placed[idx].y:
+			order.append(idx)
+	for idx in range(placed.size()):
+		if col_max[placed[idx].x * 1024 + placed[idx].z] != placed[idx].y:
+			order.append(idx)
+
+	var step: int = _oh_hash(seed_v, 9) % 2 + 1
+	var start: int = _oh_hash(seed_v, 8) % maxi(order.size(), 1)
+	var is_ore := {}
+	for k in range(mini(ore_count, order.size())):
+		is_ore[order[(start + k * step) % order.size()]] = true
+
+	for idx in range(placed.size()):
+		var p := placed[idx]
+		var blk: int = B.STONE if not is_ore.has(idx) else ore_type
+		bd.set_block(p.x, p.y, p.z, blk)
+		var nh: float = float((p.y + Y_MIN) * SLAB + SLAB)
+		if height_grid[p.x][p.z] < nh:
+			height_grid[p.x][p.z] = nh
+		# Đồi quặng không mọc cỏ
+		var bg: int = biome_grid[p.x][p.z]
+		if bg == _Data.TileType.GRASS or bg == _Data.TileType.DARK_GRASS:
+			biome_grid[p.x][p.z] = _Data.TileType.DIRT
+
+	return { "cx": hx, "cz": hz, "plains": is_plains }
 
 ## ── _build_terrain_mesh: COLUMN-TOP OPTIMIZED ────────────────────────────────
 static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
@@ -245,15 +354,7 @@ static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 					Vector3(0, 0, hw), Vector3(0, side_h * 0.5, 0),
 					Vector3(1, 0, 0), side_col)
 
-## ── _build_sediment_mesh ──
-static func build_sediment_mesh(bd: _BlockData, cols: int) -> ArrayMesh:
-	return WorldChunk._build_textured_block_mesh(bd, cols, _Data.BlockID.SEDIMENT)
-
-## ── _get_sediment_material ──
-static func get_sediment_material() -> Material:
-	return WorldChunk._get_textured_block_material(_Data.BlockID.SEDIMENT)
-
-## ── _add_quad_uv: quad với UV (dùng cho sediment texture) ──────────────────
+## ── _add_quad_uv: quad với UV (dùng cho ore texture) ────────────────────────
 static func _add_quad_uv(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,
 		n: Vector3) -> void:
 	st.set_normal(n)

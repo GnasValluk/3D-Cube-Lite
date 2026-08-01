@@ -92,11 +92,12 @@ func _ready() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
-		if k.keycode == KEY_SPACE and k.pressed and not k.echo:
-			_jbuf = JUMP_BUFFER
-		# F1: chuyển đổi giữa iso camera và third-person camera
-		if k.keycode == KEY_F1 and k.pressed and not k.echo:
-			_toggle_camera()
+		if k.pressed and not k.echo:
+			if k.is_action_pressed("jump"):
+				_jbuf = JUMP_BUFFER
+			# F1: chuyển đổi giữa iso camera và third-person camera
+			if k.is_action_pressed("camera_toggle"):
+				_toggle_camera()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
@@ -257,8 +258,8 @@ func _physics_process(delta: float) -> void:
 
 	# ── Movement input ────────────────────────────────────────────────────────
 	var is_attacking: bool = _attack_timer > 0.0
-	var is_crouching: bool = Input.is_key_pressed(KEY_CTRL)
-	var is_sprinting: bool = Input.is_key_pressed(KEY_SHIFT) and not is_crouching
+	var is_crouching: bool = Input.is_action_pressed("crouch")
+	var is_sprinting: bool = Input.is_action_pressed("sprint") and not is_crouching
 	var target_spd: float
 	if is_crouching:    target_spd = crouch_speed
 	elif is_sprinting:  target_spd = sprint_speed
@@ -275,7 +276,7 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, friction * delta)
 
 	# ── Dash trigger (Q) ──────────────────────────────────────────────────────
-	if Input.is_key_pressed(KEY_Q) and _dash_cd <= 0.0 and not is_attacking:
+	if Input.is_action_pressed("dash") and _dash_cd <= 0.0 and not is_attacking:
 		var dash_input := _read_input()
 		_dash_dir = (dash_input.normalized() if dash_input.length_squared() > 0.001
 					 else -global_transform.basis.z)
@@ -303,10 +304,10 @@ func _physics_process(delta: float) -> void:
 
 func _read_input() -> Vector3:
 	var rx: float = 0.0; var rz: float = 0.0
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    rz -= 1.0
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  rz += 1.0
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  rx -= 1.0
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): rx += 1.0
+	if Input.is_action_pressed("move_forward"): rz -= 1.0
+	if Input.is_action_pressed("move_back"):    rz += 1.0
+	if Input.is_action_pressed("move_left"):    rx -= 1.0
+	if Input.is_action_pressed("move_right"):   rx += 1.0
 	if rx == 0.0 and rz == 0.0: return Vector3.ZERO
 	if _camera == null: return Vector3.ZERO
 	var cb := _camera.global_transform.basis

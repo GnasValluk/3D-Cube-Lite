@@ -1,5 +1,5 @@
 class_name PalmProp
-extends DestroyableProp
+extends GrowingProp
 
 enum PalmSize { SMALL, MEDIUM, TALL }
 
@@ -11,6 +11,7 @@ const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 
 var _variant: String = "river"
 var _size: int = PalmSize.MEDIUM
+var _base_h: float = 2.5
 
 var _sway_phase: float
 var _sway_freq: float
@@ -22,16 +23,9 @@ func setup(variant: String = "river") -> void:
 	if r < 0.10: _size = PalmSize.SMALL
 	elif r < 0.35: _size = PalmSize.MEDIUM
 	else: _size = PalmSize.TALL
+	_base_h = _roll_base_h()
 
-func _ready() -> void:
-	super._ready()
-	_build_tree()
-	_setup_collision()
-	_sway_phase = randf() * TAU
-	_sway_freq = 0.5 + randf() * 0.4
-	_sway_amp = deg_to_rad(0.8 + randf() * 0.6)
-
-func _get_h() -> float:
+func _roll_base_h() -> float:
 	if _variant == "river":
 		match _size:
 			PalmSize.SMALL:  return 2.5 + randf() * 0.5
@@ -44,20 +38,48 @@ func _get_h() -> float:
 			PalmSize.TALL:   return 3.0 + randf() * 0.8
 	return 2.5
 
+func _birth_span_days() -> float:
+	return 45.0
+
+func _stage_thresholds() -> Array[float]:
+	return [8.0, 25.0]
+
+func _ready() -> void:
+	super._ready()
+	_build_tree()
+	_setup_collision()
+	_sway_phase = randf() * TAU
+	_sway_freq = 0.5 + randf() * 0.4
+	_sway_amp = deg_to_rad(0.8 + randf() * 0.6)
+
+func _get_h() -> float:
+	if _stage == GrowingProp.Stage.SPROUT:
+		return 0.5
+	var stage_scale: float = 0.55 if _stage == GrowingProp.Stage.YOUNG else 1.0
+	return _base_h * stage_scale
+
 func _on_destroy() -> void:
 	super._on_destroy()
-	if randf() < 0.5: return
+	if _stage != GrowingProp.Stage.MATURE: return
 	var world := _find_world_manager()
 	if world == null: return
 	_ItemDatabase.ensure_db()
+	var seed_def = _ItemDatabase.items_db.get("coconut_seed")
+	if seed_def:
+		_DroppedItem.spawn(world, seed_def, global_position, 1, _spawn_drop_velocity(), global_position.y)
+	if randf() < 0.5: return
 	var def = _ItemDatabase.items_db.get("coconut")
 	if def:
 		_DroppedItem.spawn(world, def, global_position, randi() % 2 + 1, _spawn_drop_velocity(), global_position.y)
 
 func _process(delta: float) -> void:
+	super._process(delta)
 	var t := Time.get_ticks_usec() * 0.000001
-	rotation.x = sin(t * _sway_freq + _sway_phase) * _sway_amp
-	rotation.z = cos(t * _sway_freq * 0.7 + _sway_phase + 1.0) * _sway_amp * 0.6
+	var amp := _sway_amp
+	if _stage == GrowingProp.Stage.SPROUT:
+		amp *= 0.4
+	rotation.x = sin(t * _sway_freq + _sway_phase) * amp
+	rotation.z = cos(t * _sway_freq * 0.7 + _sway_phase + 1.0) * amp * 0.6
 
 func _setup_collision() -> void:
 	var h := _get_h()
@@ -73,32 +95,42 @@ func _setup_collision() -> void:
 	add_child(body)
 
 func _get_base_r() -> float:
+	var r: float
 	if _variant == "river":
 		match _size:
-			PalmSize.SMALL:  return 0.30
-			PalmSize.MEDIUM: return 0.36
-			PalmSize.TALL:   return 0.44
-		return 0.36
+			PalmSize.SMALL:  r = 0.30
+			PalmSize.MEDIUM: r = 0.36
+			PalmSize.TALL:   r = 0.44
+			_: r = 0.36
 	else:
 		match _size:
-			PalmSize.SMALL:  return 0.18
-			PalmSize.MEDIUM: return 0.22
-			PalmSize.TALL:   return 0.26
-		return 0.22
+			PalmSize.SMALL:  r = 0.18
+			PalmSize.MEDIUM: r = 0.22
+			PalmSize.TALL:   r = 0.26
+			_: r = 0.22
+	if _stage == GrowingProp.Stage.SPROUT:
+		r *= 0.40
+	elif _stage == GrowingProp.Stage.YOUNG:
+		r *= 0.65
+	return r
 
 func _get_top_r() -> float:
+	var r: float
 	if _variant == "river":
 		match _size:
-			PalmSize.SMALL:  return 0.14
-			PalmSize.MEDIUM: return 0.16
-			PalmSize.TALL:   return 0.20
-		return 0.16
+			PalmSize.SMALL:  r = 0.14
+			PalmSize.MEDIUM: r = 0.16
+			PalmSize.TALL:   r = 0.20
+			_: r = 0.16
 	else:
 		match _size:
-			PalmSize.SMALL:  return 0.08
-			PalmSize.MEDIUM: return 0.10
-			PalmSize.TALL:   return 0.12
-		return 0.10
+			PalmSize.SMALL:  r = 0.08
+			PalmSize.MEDIUM: r = 0.10
+			PalmSize.TALL:   r = 0.12
+			_: r = 0.10
+	if _stage == GrowingProp.Stage.YOUNG:
+		r *= 0.65
+	return r
 
 # ── GRID helpers ────────────────────────────────────────────────────────────
 
@@ -128,6 +160,11 @@ func _build_tree() -> void:
 	_grid.clear()
 	_ordered.clear()
 
+	if _stage == GrowingProp.Stage.SPROUT:
+		_build_sprout()
+		_commit_visual(_ordered.size(), 0)
+		return
+
 	var h: float = _get_h()
 	var base_r: float = _get_base_r()
 	var top_r: float = _get_top_r()
@@ -135,9 +172,13 @@ func _build_tree() -> void:
 	_trunk_voxels(h, base_r, top_r)
 	_frond_voxels(h, top_r)
 	var main_count := _ordered.size()
-	_coconut_voxels(h, top_r)
+	if _stage == GrowingProp.Stage.MATURE:
+		_coconut_voxels(h, top_r)
 	var nut_count := _ordered.size() - main_count
 
+	_commit_visual(main_count, nut_count)
+
+func _commit_visual(main_count: int, nut_count: int) -> void:
 	if _ordered.is_empty():
 		return
 
@@ -182,6 +223,56 @@ func _build_tree() -> void:
 		nut_mmi.multimesh = nut_mm
 		nut_mmi.name = "CoconutVisual"
 		add_child(nut_mmi)
+
+func _apply_stage(_from: int, _to: int) -> void:
+	_rebuild()
+
+func _rebuild() -> void:
+	for i in range(get_child_count() - 1, -1, -1):
+		var ch := get_child(i)
+		if ch is MultiMeshInstance3D or ch is StaticBody3D:
+			remove_child(ch)
+			ch.queue_free()
+	_build_tree()
+	_setup_collision()
+	_pop_growth()
+
+## Cây dừa mầm: chồi non nhỏ với các lá dạng lưỡi kiếm dựng đứng, chưa có thân.
+func _build_sprout() -> void:
+	var is_river: bool = _variant == "river"
+	var count: int = 6 + randi() % 2
+	var crown := Vector3(0.0, 0.22, 0.0)
+	var seed_a: float = randf() * TAU
+	var col_stem := Color(0.35, 0.72, 0.15) if is_river else Color(0.42, 0.78, 0.18)
+	var col_leaf := Color(0.30, 0.78, 0.16) if is_river else Color(0.38, 0.82, 0.20)
+	var col_tip := Color(0.50, 0.88, 0.26) if is_river else Color(0.58, 0.90, 0.30)
+	for fi in range(count):
+		var angle_y: float = seed_a + float(fi) / float(count) * TAU
+		var elevation: float = deg_to_rad(55.0 + randf() * 25.0)
+		var frond_len: float = 0.38 + randf() * 0.30
+		var droop: float = 0.06 + randf() * 0.06
+		var dir := Vector3(sin(angle_y) * cos(elevation), sin(elevation), cos(angle_y) * cos(elevation))
+		var right := dir.cross(Vector3.UP).normalized()
+		if right.length() < 0.001:
+			right = Vector3.RIGHT
+		var up_dir := right.cross(dir).normalized()
+		var steps: int = maxi(2, ceili(frond_len / VOXEL))
+		for si in range(steps + 1):
+			var lt: float = float(si) / float(steps)
+			var pos := crown + dir * lt * frond_len
+			pos.y -= lt * lt * frond_len * droop
+			var col := col_stem
+			if lt < 0.5:
+				col = col_stem.lerp(col_leaf, lt / 0.5)
+			else:
+				col = col_leaf.lerp(col_tip, (lt - 0.5) / 0.5)
+			col = _jitter(col)
+			_fill(pos.x, pos.y, pos.z, col)
+			if si > 0 and si < steps - 1:
+				var up_pos := pos + up_dir * VOXEL * 1.6
+				var lo_pos := pos + right * VOXEL * 1.2 - up_dir * VOXEL * 0.4
+				_fill(up_pos.x, up_pos.y, up_pos.z, col_leaf)
+				_fill(lo_pos.x, lo_pos.y, lo_pos.z, col_leaf.darkened(0.12))
 
 # ── TRUNK ───────────────────────────────────────────────────────────────────
 
@@ -265,16 +356,23 @@ func _crown_pos(h: float) -> Vector3:
 
 func _frond_voxels(h: float, _top_r: float) -> void:
 	var is_river: bool = _variant == "river"
+	var is_young_tree: bool = _stage == GrowingProp.Stage.YOUNG
 	var count: int = (8 + randi() % 4) if not is_river else (14 + randi() % 4)
+	if is_young_tree:
+		count = (6 + randi() % 3) if not is_river else (9 + randi() % 3)
 	var crown := _crown_pos(h)
 	var seed_a: float = randf() * TAU
 
 	var young_n: int = maxi(1, count / 4)
+	if is_young_tree:
+		young_n = count
 
 	for fi in range(count):
-		var is_young: bool = fi < young_n
+		var is_young: bool = is_young_tree or fi < young_n
 		var angle_y: float
-		if is_young:
+		if is_young_tree:
+			angle_y = seed_a + float(fi) / float(count) * TAU
+		elif is_young:
 			angle_y = seed_a + float(fi) / float(young_n) * TAU * 0.5
 		else:
 			angle_y = seed_a + float(fi - young_n) / float(count - young_n) * TAU

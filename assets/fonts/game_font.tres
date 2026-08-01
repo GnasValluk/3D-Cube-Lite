@@ -1,0 +1,14 @@
+[gd_resource type="FontVariation" load_steps=8 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/ark-pixel-16px-proportional-latin.ttf" id="1_latin"]
+[ext_resource type="FontFile" path="res://assets/fonts/ark-pixel-16px-proportional-zh_cn.ttf" id="2_zhcn"]
+[ext_resource type="FontFile" path="res://assets/fonts/ark-pixel-16px-proportional-zh_hk.ttf" id="3_zhhk"]
+[ext_resource type="FontFile" path="res://assets/fonts/ark-pixel-16px-proportional-zh_tw.ttf" id="4_zhtw"]
+[ext_resource type="FontFile" path="res://assets/fonts/ark-pixel-16px-proportional-ja.ttf" id="5_ja"]
+[ext_resource type="FontFile" path="res://assets/fonts/ark-pixel-16px-proportional-ko.ttf" id="6_ko"]
+[ext_resource type="FontFile" path="res://assets/fonts/unifont-17.0.05.otf" id="7_unifont"]
+
+[resource]
+base_font = ExtResource("1_latin")
+fallbacks = [ExtResource("2_zhcn"), ExtResource("3_zhhk"), ExtResource("4_zhtw"), ExtResource("5_ja"), ExtResource("6_ko"), ExtResource("7_unifont")]
+variation_embolden = 0.6

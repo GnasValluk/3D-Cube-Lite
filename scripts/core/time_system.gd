@@ -150,6 +150,9 @@ func force_weather(weather: int) -> void:
 		_weather_intensity_target = 0.0
 	weather_changed.emit(weather)
 
+func get_cycle_time() -> float:
+	return _cycle_time
+
 func get_cycle_progress() -> float:
 	return _cycle_time / CYCLE_DURATION
 

@@ -22,7 +22,7 @@ static func compute_positions(cx: int, cz: int, size: int,
 	var pad:      float = LAMP_SPACING
 
 	var rng := RandomNumberGenerator.new()
-	rng.seed = WorldSeed.seed_value + cx * 100003 + cz * 200003 + 54321
+	rng.seed = SeedSnapshot.ensure() + cx * 100003 + cz * 200003 + 54321
 
 	var placed: Array[Vector2] = []
 	var result: Array = []

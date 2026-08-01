@@ -15,10 +15,12 @@ var heal_amount: int
 var atk_bonus: int
 var def_bonus: int
 var armor_slot: int = ArmorSlot.BODY
+var max_durability: int = 0  # 0 = không có độ bền (vĩnh cửu); >0 = hao mòn khi dùng
 
 func _init(p_id: String, p_name: String, p_type: int, p_color: Color, p_char: String,
 		   p_desc: String = "", p_stackable: bool = true, p_max: int = 64,
-		   p_heal: int = 0, p_atk: int = 0, p_def: int = 0, p_armor_slot: int = -1):
+		   p_heal: int = 0, p_atk: int = 0, p_def: int = 0, p_armor_slot: int = -1,
+		   p_durability: int = 0):
 	id = p_id
 	name = p_name
 	type = p_type
@@ -32,6 +34,7 @@ func _init(p_id: String, p_name: String, p_type: int, p_color: Color, p_char: St
 	def_bonus = p_def
 	if p_armor_slot >= 0:
 		armor_slot = p_armor_slot
+	max_durability = p_durability
 
 func get_type_name() -> String:
 	match type:

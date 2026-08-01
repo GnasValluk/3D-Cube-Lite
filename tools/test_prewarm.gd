@@ -109,6 +109,7 @@ func _process(_delta: float) -> void:
 				print("TOTAL | PASS | 0 failures")
 			else:
 				print("TOTAL | FAIL | %d failures" % _fails)
+			await WorldChunk.wait_for_tasks_async(get_tree())
 			get_tree().quit(0 if _fails == 0 else 1)
 
 func _check(name: String, ok: bool) -> void:

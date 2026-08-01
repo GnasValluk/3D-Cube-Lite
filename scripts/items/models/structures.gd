@@ -202,3 +202,32 @@ static func gate(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, 0, 3, 0, 1.0, 1.0, 0.5, frame)
 	ItemMeshShared.add_cube(p, 0, 4, 0, 3.0, 1.0, 0.5, frame)
 	ItemMeshShared.add_cube(p, 0, 1, 0, 2.0, 1.0, 0.5, glow)
+
+
+# ── FISHING BOAT (mini model: cầm tay / rơi / ném) ──────────────────────────
+static func fishing_boat(p: Node3D) -> void:
+	var wood       := Color(0.46, 0.30, 0.15)
+	var wood_dark  := Color(0.34, 0.21, 0.10)
+	var wood_light := Color(0.58, 0.42, 0.24)
+	var trim       := Color(0.20, 0.55, 0.45)
+	var paddle     := Color(0.62, 0.48, 0.28)
+
+	var L: float = 6.7   # ≈ 0.2 m khi cầm tay (units × V=0.03)
+	var W: float = 2.8
+	var H: float = 1.1
+
+	# Thân chính
+	ItemMeshShared.add_cube(p, 0, 0, 0, L, H, W, wood_dark)
+	# Mũi nâng cao
+	ItemMeshShared.add_cube(p, 0, H * 0.5 + 0.35, -L * 0.5 + 0.6, L * 0.55, H * 0.5, W * 0.8, wood)
+	# Boong giữa
+	ItemMeshShared.add_cube(p, 0, H * 0.5 + 0.05, 0.6, L * 0.75, H * 0.3, W * 0.65, wood_light)
+	# Ghế lái đuôi
+	ItemMeshShared.add_cube(p, 0, H * 0.5 + 0.5, L * 0.5 - 0.3, L * 0.6, H * 0.45, W * 0.7, wood_light)
+	# Bánh lái
+	ItemMeshShared.add_cube(p, 0, -0.15, L * 0.5 + 0.3, 0.3, H * 0.5, W * 0.4, wood_dark)
+	# Viền mũi
+	ItemMeshShared.add_cube(p, 0, H * 0.45, -L * 0.5 - 0.05, L * 0.15, H * 0.15, W * 0.5, trim)
+	# Hai mái chèo
+	ItemMeshShared.add_cube(p, W * 0.5 + 0.35, H * 0.25, -0.5, 0.12, 0.12, L * 0.7, paddle)
+	ItemMeshShared.add_cube(p, -W * 0.5 - 0.35, H * 0.25, -0.5, 0.12, 0.12, L * 0.7, paddle)

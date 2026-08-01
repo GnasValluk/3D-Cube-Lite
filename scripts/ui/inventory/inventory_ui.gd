@@ -695,7 +695,7 @@ func _input(event: InputEvent) -> void:
 	if not visible:
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_ESCAPE and _lib_search_box and _lib_search_box.has_focus():
+		if event.is_action_pressed("ui_cancel") and _lib_search_box and _lib_search_box.has_focus():
 			_lib_search_box.release_focus()
 
 func _process(delta: float) -> void:

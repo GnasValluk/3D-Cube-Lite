@@ -53,8 +53,10 @@ const DAMAGE_TYPE_NAMES: Dictionary = {
 @export var dash_cooldown:      float = 0.80
 @export var attack_duration:    float = 0.45
 @export var melee_damage:       int   = 0
-@export var melee_range:        float = 2.0
+@export var melee_range:        float = 2.2
 @export var auto_aim_range:     float = 20.0
+## Bán kính hitbox của nhân vật — cộng thêm vào tầm đánh/đạn để khớp kích thước thật
+@export var hit_radius:         float = 0.3
 @export var lmb_cooldown:       float = 0.0
 @export var q_cooldown:         float = 0.0
 @export var r_cooldown:         float = 0.0
@@ -400,14 +402,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
-			if k.keycode == KEY_SPACE and _freeze_timer <= 0.0:
+			if k.is_action_pressed("jump") and _freeze_timer <= 0.0:
 				_jbuf = JUMP_BUFFER
-			if k.keycode == KEY_F1:
+			if k.is_action_pressed("camera_toggle"):
 				_toggle_camera()
-			if k.keycode == KEY_CTRL:
+			if k.is_action_pressed("crouch"):
 				if _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
 					_on_show_animation()
-			if k.keycode == KEY_R:
+			if k.is_action_pressed("skill"):
 				if _r_cd <= 0.0 and _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _attack_timer <= 0.0 and _state != State.DASH:
 					if not try_skill(stamina_cost_r):
 						return
@@ -508,6 +510,13 @@ func _physics_process(delta: float) -> void:
 			submerged.emit(_underwater)
 			_spawn_splash(!_underwater)
 
+	# Đang lái thuyền: bỏ qua điều khiển di chuyển — vị trí do thuyền đồng bộ
+	if _is_player and has_meta("driving_boat"):
+		if _attack_timer > 0.0 and not _melee_hit_once and (1.0 - _attack_timer / attack_duration) >= _melee_hit_progress:
+			_do_melee_hit()
+		_animate(delta)
+		return
+
 	# Underwater / swimming
 	if _underwater:
 		_Swim.swim_physics(self, delta)
@@ -558,7 +567,7 @@ func _physics_process(delta: float) -> void:
 			velocity = Vector3.ZERO
 			on_floor = false
 		else:
-			_Damage._die(self)
+			_die()
 
 	if on_floor and not _was_floor:
 		_sy_tgt = 0.76
@@ -579,8 +588,8 @@ func _physics_process(delta: float) -> void:
 	var crouching: bool
 	var sprinting: bool
 	if _is_player:
-		crouching = Input.is_key_pressed(KEY_CTRL)
-		sprinting = Input.is_key_pressed(KEY_SHIFT) and not crouching
+		crouching = Input.is_action_pressed("crouch")
+		sprinting = Input.is_action_pressed("sprint") and not crouching
 		if sprinting and sprint_stamina_cost > 0.0 and dir.length_squared() > 0.001:
 			_sprint_stamina_acc += sprint_stamina_cost * delta
 			if _sprint_stamina_acc >= 1.0:
@@ -618,7 +627,7 @@ func _physics_process(delta: float) -> void:
 	# Dash trigger
 	var want_dash: bool = false
 	if _is_player:
-		want_dash = Input.is_key_pressed(KEY_Q) and _q_cd <= 0.0 and _freeze_timer <= 0.0 and not attacking and not devouring
+		want_dash = Input.is_action_pressed("dash") and _q_cd <= 0.0 and _freeze_timer <= 0.0 and not attacking and not devouring
 	if want_dash:
 		if not try_skill(stamina_cost_q):
 			return
@@ -666,14 +675,20 @@ func _physics_process(delta: float) -> void:
 func _do_melee_hit() -> void:
 	_melee_hit_once = true
 	var range_scale: float = 1.0
-	var angle_threshold: float = 0.4
+	var angle_threshold: float = 0.35
 	if _is_player:
 		var pc := self as PlayerCharacter
 		if pc and pc.equipped_weapon:
 			match pc.equipped_weapon.id:
-				"iron_greatsword": range_scale = 1.5; angle_threshold = 0.25
-				"giao_dai": range_scale = 1.5
-				"iron_halberd": range_scale = 1.6; angle_threshold = 0.25
+				"iron_greatsword": range_scale = 1.75; angle_threshold = 0.15
+				"giao_dai": range_scale = 1.7
+				"iron_halberd": range_scale = 1.9; angle_threshold = 0.15
+				"axe": range_scale = 1.3
+				"iron_sword": range_scale = 1.2
+				"pickaxe", "shovel", "hoe": range_scale = 1.1
+				"leather_gloves": range_scale = 0.9
+	var max_dist: float = melee_range * range_scale
+	var landed := false
 	var mgr := _find_character_manager()
 	if mgr == null:
 		return
@@ -683,7 +698,7 @@ func _do_melee_hit() -> void:
 			var offset: Vector3 = ch.global_position - global_position
 			offset.y = 0.0
 			var dist: float = offset.length()
-			if dist <= melee_range * range_scale:
+			if dist <= max_dist + ch.hit_radius:
 				var dot: float = fwd.dot(offset / dist)
 				if dot >= angle_threshold:
 					SFXManager.play_damage_hit()
@@ -693,6 +708,7 @@ func _do_melee_hit() -> void:
 						if pc and pc.equipped_weapon:
 							dmg += pc.equipped_weapon.atk_bonus
 					ch.take_damage(dmg, self)
+					landed = true
 	# Also hit fish in FishSpawner
 	var spawner := _find_fish_spawner()
 	if spawner:
@@ -701,7 +717,7 @@ func _do_melee_hit() -> void:
 				var offset: Vector3 = f.global_position - global_position
 				offset.y = 0.0
 				var dist: float = offset.length()
-				if dist <= melee_range * range_scale:
+				if dist <= max_dist + f.hit_radius:
 					var dot: float = fwd.dot(offset / dist)
 					if dot >= angle_threshold:
 						SFXManager.play_damage_hit()
@@ -711,6 +727,7 @@ func _do_melee_hit() -> void:
 							if pc and pc.equipped_weapon:
 								dmg += pc.equipped_weapon.atk_bonus
 						f.take_damage(dmg, self)
+						landed = true
 
 	# Also hit pigs in PigSpawner
 	var pig_nodes := get_tree().get_nodes_in_group("pig")
@@ -720,16 +737,17 @@ func _do_melee_hit() -> void:
 		var offset: Vector3 = pn.global_position - global_position
 		offset.y = 0.0
 		var dist: float = offset.length()
-		if dist <= melee_range * range_scale:
+		if dist <= max_dist + pn.hit_radius:
 			var dot: float = fwd.dot(offset / dist)
 			if dot >= angle_threshold:
-				SFXManager.play_damage_hit()
-				var dmg: int = attack_power
-				if _is_player:
-					var pc := self as PlayerCharacter
-					if pc and pc.equipped_weapon:
-						dmg += pc.equipped_weapon.atk_bonus
-				pn.take_damage(dmg, self)
+					SFXManager.play_damage_hit()
+					var dmg: int = attack_power
+					if _is_player:
+						var pc := self as PlayerCharacter
+						if pc and pc.equipped_weapon:
+							dmg += pc.equipped_weapon.atk_bonus
+					pn.take_damage(dmg, self)
+					landed = true
 
 	# Also hit destroyable props (đèn, cây, v.v.)
 	var weapon_id: String = ""
@@ -750,7 +768,7 @@ func _do_melee_hit() -> void:
 		var offset: Vector3 = prop.global_position - global_position
 		offset.y = 0.0
 		var dist: float = offset.length()
-		if dist <= melee_range * range_scale:
+		if dist <= max_dist:
 			var dot: float = fwd.dot(offset / dist)
 			if dot >= angle_threshold:
 				var dmg: int = 1
@@ -758,7 +776,14 @@ func _do_melee_hit() -> void:
 					var pc := self as PlayerCharacter
 					if pc and pc.equipped_weapon != null:
 						dmg = pc.equipped_weapon.atk_bonus
-				prop.try_destroy(weapon_id, dmg)
+				if prop.try_destroy(weapon_id, dmg):
+					landed = true
+
+	# Độ bền vũ khí: mỗi đòn trúng đích giảm 1 (như Minecraft)
+	if landed and _is_player:
+		var pc := self as PlayerCharacter
+		if pc:
+			pc._damage_equipped_tool(1)
 
 func _find_character_manager() -> Node:
 	var p := get_parent()
@@ -781,10 +806,10 @@ func _read_input() -> Vector3:
 		var rz: float = 0.0
 
 		# Keyboard input (PC)
-		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    rz -= 1.0
-		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  rz += 1.0
-		if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  rx -= 1.0
-		if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): rx += 1.0
+		if Input.is_action_pressed("move_forward"): rz -= 1.0
+		if Input.is_action_pressed("move_back"):    rz += 1.0
+		if Input.is_action_pressed("move_left"):    rx -= 1.0
+		if Input.is_action_pressed("move_right"):   rx += 1.0
 
 		# Virtual joystick input (Mobile) — ưu tiên nếu có tín hiệu
 		if DeviceManager and DeviceManager.is_mobile():

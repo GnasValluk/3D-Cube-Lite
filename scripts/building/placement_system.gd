@@ -3,6 +3,7 @@ class_name PlacementSystem
 
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const _FurnaceScript = preload("res://scripts/items/entities/furnace.gd")
+const _FishingBoat = preload("res://scripts/items/entities/fishing_boat.gd")
 const VOXEL: float = 0.50
 
 var _placing: bool = false
@@ -78,15 +79,94 @@ func _make_ghost() -> void:
 
 	if _item_id == "twilight_gate":
 		_build_ghost_portal()
+	elif _item_id == "fishing_boat":
+		_build_ghost_boat()
 	elif _item_id == "chest":
 		_build_ghost_chest()
 	elif _item_id == "crafting_table":
 		_build_ghost_crafting_table()
 	elif _item_id == "furnace":
 		_build_ghost_furnace()
+	elif _is_seed_item(_item_id):
+		_build_ghost_seed()
 	elif _Data.ITEM_TO_BLOCK.has(_item_id):
 		_build_ghost_block()
 	_ghost.rotation.y = _placement_rotation
+
+## ── Mầm cây ─────────────────────────────────────────────────────────────────
+const SEED_ITEMS: Array[String] = ["coconut_seed", "taro_seed", "seaweed_seed"]
+
+static func _is_seed_item(item_id: String) -> bool:
+	return item_id in SEED_ITEMS
+
+func _build_ghost_seed() -> void:
+	var seed_mat := _ghost_mat(Color(0.30, 0.55, 0.20, 0.35), Color(0.15, 0.45, 0.20), 0.3)
+	var base_mat := _ghost_mat(Color(0.40, 0.28, 0.14, 0.30), Color(0.10, 0.10, 0.10), 0.0)
+	var mi := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(VOXEL * 0.7, VOXEL * 0.35, VOXEL * 0.7)
+	mi.mesh = box
+	mi.material_override = base_mat
+	_ghost.add_child(mi)
+	var sprout := MeshInstance3D.new()
+	var sbox := BoxMesh.new()
+	sbox.size = Vector3(VOXEL * 0.45, VOXEL * 0.9, VOXEL * 0.45)
+	sprout.mesh = sbox
+	sprout.material_override = seed_mat
+	sprout.position = Vector3(0, VOXEL * 0.6, 0)
+	_ghost.add_child(sprout)
+
+## Nền trồng hợp lệ: dừa/môn chỉ trên đất tơi xốp; rong trên cát/bùn dưới nước.
+func _can_plant_seed(item_id: String, pos: Vector3) -> bool:
+	var owm := _find_world_manager()
+	if owm == null or not owm.has_method("get_block"):
+		return false
+	var below: int = owm.get_block(pos.x, pos.y - VOXEL, pos.z)
+	if item_id == "seaweed_seed":
+		if not _is_seaweed_bed(below):
+			return false
+		return _Data.is_water(owm.get_block(pos.x, pos.y, pos.z))
+	return below == _Data.BlockID.TILLED_SOIL
+
+static func _is_seaweed_bed(bid: int) -> bool:
+	return bid == _Data.BlockID.SAND or bid == _Data.BlockID.SAND_DEEP \
+		or bid == _Data.BlockID.OCEAN_SAND or bid == _Data.BlockID.MUDDY_SAND \
+		or bid == _Data.BlockID.OCEAN_GRAVEL or bid == _Data.BlockID.OCEAN_MUD \
+		or bid == _Data.BlockID.SILT
+
+func _measure_water_gap(owm: Node, pos: Vector3) -> float:
+	var gap := 0.0
+	var y := pos.y
+	while y < pos.y + 3.0:
+		if not _Data.is_water(owm.get_block(pos.x, y, pos.z)):
+			break
+		gap += VOXEL
+		y += VOXEL
+	return gap
+
+## Trồng mầm: dừa → cây dừa, môn → cây môn, rong → cây rong nhiệt đới.
+func _plant_seed(item_id: String, pos: Vector3) -> void:
+	var world_mgr := _find_world_manager()
+	if world_mgr == null or not _can_plant_seed(item_id, pos):
+		var item_def := ItemDatabase.items_db.get(item_id) as ItemDef
+		if item_def and _player_inv:
+			_player_inv.add_item(item_def, 1)
+		SFXManager.play_block_break()
+		return
+	var prop: Node3D
+	if item_id == "coconut_seed":
+		prop = PalmProp.new(150, DestroyableProp.WeaponReq.AXE, "palm_wood")
+		prop.setup("river")
+	elif item_id == "taro_seed":
+		prop = PlantProp.new(50, DestroyableProp.WeaponReq.SWORD, "taro")
+		prop.setup("taro", randi(), randi(), true, 0.0)
+	else:
+		prop = PlantProp.new(50, DestroyableProp.WeaponReq.SWORD, "tropical_seaweed")
+		prop.setup("weed", randi(), randi(), true, _measure_water_gap(world_mgr, pos))
+	prop.name = "PlantedCrop"
+	prop.position = pos
+	world_mgr.add_child(prop)
+	SFXManager.play_block_place()
 
 func _build_ghost_block() -> void:
 	var block_mat := _ghost_mat(Color(0.80, 0.80, 0.80, 0.30), Color(0.40, 0.40, 0.40), 0.0)
@@ -133,6 +213,25 @@ func _build_ghost_portal() -> void:
 				mi.material_override = frame_mat
 				mi.position = p
 				_ghost.add_child(mi)
+
+## Ghost thuyền: phác thảo theo kích thước thật (dài 3.4, rộng 1.4).
+func _build_ghost_boat() -> void:
+	var hull_mat := _ghost_mat(Color(0.50, 0.32, 0.14, 0.30), Color(0.15, 0.08, 0.04), 0.2)
+	var deck_mat := _ghost_mat(Color(0.62, 0.45, 0.22, 0.30), Color(0.20, 0.12, 0.06), 0.2)
+	var mi := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(1.4, 0.55, 3.4)
+	mi.mesh = box
+	mi.material_override = hull_mat
+	mi.position = Vector3(0, -0.14, 0)
+	_ghost.add_child(mi)
+	var deck := MeshInstance3D.new()
+	var dbox := BoxMesh.new()
+	dbox.size = Vector3(1.2, 0.1, 2.6)
+	deck.mesh = dbox
+	deck.material_override = deck_mat
+	deck.position = Vector3(0, 0.14, 0.3)
+	_ghost.add_child(deck)
 
 func _build_ghost_chest() -> void:
 	var body_mat := _ghost_mat(Color(0.35, 0.22, 0.12, 0.35), Color(0.15, 0.08, 0.05), 0.2)
@@ -225,12 +324,28 @@ func update_placement() -> void:
 		params.from = result.position + dir * 0.1
 		skips -= 1
 	if result.is_empty():
-		_ghost.visible = false
-		_ghost_valid = false
+		if _item_id == "fishing_boat":
+			# Ngắm ra mặt nước: chiếu ray xuống mặt nước mặc định (y = 0.5)
+			_ghost_pos = _ray_to_water_plane(from, dir)
+			_ghost_pos.y = 0.5
+			_ghost.global_position = _ghost_pos
+			_ghost_valid = _can_place_boat_pos(_ghost_pos)
+			_ghost.visible = _ghost_valid
+		else:
+			_ghost.visible = false
+			_ghost_valid = false
 		return
 	var hit_pos: Vector3 = result.position
 	var normal: Vector3 = result.normal
 	var snapped: Vector3 = _snap_to_surface(hit_pos, normal)
+	if _item_id == "fishing_boat":
+		# Thuyền luôn đặt trên mặt nước mặc định (nổi lên nếu ao cao hơn)
+		snapped.y = 0.5
+		_ghost_pos = snapped
+		_ghost.global_position = _ghost_pos
+		_ghost_valid = _can_place_boat_pos(_ghost_pos)
+		_ghost.visible = _ghost_valid
+		return
 	var y_offset: float = 0.0
 	if _item_id == "twilight_gate":
 		y_offset = VOXEL
@@ -240,6 +355,29 @@ func update_placement() -> void:
 	_ghost.global_position = _ghost_pos
 	_ghost.visible = true
 	_ghost_valid = true
+	if _is_seed_item(_item_id):
+		_ghost_valid = _can_plant_seed(_item_id, _ghost_pos)
+
+## Giao điểm ray với mặt nước mặc định (y = 0.5) khi không trúng vật nào.
+func _ray_to_water_plane(from: Vector3, dir: Vector3) -> Vector3:
+	if absf(dir.y) < 0.0001:
+		return from
+	var t := (0.5 - from.y) / dir.y
+	if t < 0.0:
+		t = 0.0
+	return from + dir * t
+
+## Đặt thuyền hợp lệ khi có nước ở gần (khối nước mực 0.25 trong ô 3×3).
+func _can_place_boat_pos(pos: Vector3) -> bool:
+	var world_mgr := _find_world_manager()
+	if world_mgr == null or not world_mgr.has_method("get_block"):
+		return true
+	for dx in [-1, 0, 1]:
+		for dz in [-1, 0, 1]:
+			var blk: int = world_mgr.get_block(pos.x + dx, 0.25, pos.z + dz)
+			if _Data.is_water(blk):
+				return true
+	return false
 
 func _snap_to_surface(hit_pos: Vector3, normal: Vector3) -> Vector3:
 	var sx: float = round(hit_pos.x / VOXEL) * VOXEL
@@ -296,6 +434,8 @@ func _start_throw() -> void:
 func _make_throw_mesh(item_id: String) -> Node3D:
 	var root := Node3D.new()
 	if item_id == "twilight_gate":
+		ItemMesh.build(root, item_id)
+	elif item_id == "fishing_boat":
 		ItemMesh.build(root, item_id)
 	elif item_id == "chest":
 		ItemMesh.build(root, item_id)
@@ -382,6 +522,21 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 		parent.add_child(portal)
 		portal.global_position = pos
 		SFXManager.play_block_place()
+	elif item_id == "fishing_boat":
+		if not _can_place_boat_pos(pos):
+			var item_def := ItemDatabase.items_db.get(item_id) as ItemDef
+			if item_def and _player_inv:
+				_player_inv.add_item(item_def, 1)
+			_placing = false
+			_item_id = ""
+			get_tree().root.set_meta("building_placement_active", false)
+			return
+		var boat_obj = _FishingBoat.new()
+		boat_obj.name = "FishingBoat"
+		parent.add_child(boat_obj)
+		boat_obj.global_position = pos
+		boat_obj.rotation.y = _placement_rotation
+		SFXManager.play_block_place()
 	elif item_id == "chest":
 		var chest_obj := Chest.new()
 		chest_obj.name = "Chest"
@@ -403,6 +558,8 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 		furnace_obj.global_position = pos
 		furnace_obj.rotation.y = _placement_rotation
 		SFXManager.play_block_place()
+	elif _is_seed_item(item_id):
+		_plant_seed(item_id, pos)
 	elif _Data.ITEM_TO_BLOCK.has(item_id):
 		var block_id: int = _Data.ITEM_TO_BLOCK.get(item_id, 0)
 		if block_id != 0:

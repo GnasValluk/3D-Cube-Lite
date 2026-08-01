@@ -84,14 +84,19 @@ func _ready() -> void:
 				"terrain mesh hint==nohint dim=%d chunk=%s verts=%d" % [dim, c, v1])
 
 			# ── 3. Water mesh bounded == full scan ─────────────────────────
+			# Chunk có thể không có nước (mesh 0 surface) → skip check, không crash.
 			var h_vox := _D.VOXEL * 0.5
 			var half := SIZE * 0.5
 			var w_bounded := _W._build_water_mesh(bd, COLS, dim, h_vox, half, {}, -1)
 			var w_full := _W._build_water_mesh(bd, COLS, dim, h_vox, half, {}, _BD.CHUNK_H - 1)
-			var vb: int = w_bounded.surface_get_arrays(0)[Mesh.ARRAY_VERTEX].size() if w_bounded else 0
-			var vf: int = w_full.surface_get_arrays(0)[Mesh.ARRAY_VERTEX].size() if w_full else 0
-			_check(vb == vf,
-				"water bounded==full dim=%d chunk=%s verts=%d" % [dim, c, vb])
+			if w_bounded == null or w_bounded.get_surface_count() == 0:
+				_check(w_full == null or w_full.get_surface_count() == 0,
+					"water absent consistently dim=%d chunk=%s" % [dim, c])
+			else:
+				var vb: int = w_bounded.surface_get_arrays(0)[Mesh.ARRAY_VERTEX].size()
+				var vf: int = w_full.surface_get_arrays(0)[Mesh.ARRAY_VERTEX].size() if w_full else 0
+				_check(vb == vf,
+					"water bounded==full dim=%d chunk=%s verts=%d" % [dim, c, vb])
 
 	# ── 4. _update_top_ly_cache ────────────────────────────────────────────
 	var chunk := _W.new()
@@ -193,4 +198,5 @@ func _ready() -> void:
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	print("TEST_TIME_MS=%d" % (Time.get_ticks_msec() - t0))
+	await WorldChunk.wait_for_tasks_async(get_tree())
 	get_tree().quit(0 if _failures == 0 else 1)

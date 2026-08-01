@@ -2,6 +2,10 @@ class_name PlayerHalberd
 extends RefCounted
 
 static func start_throw_aim(player) -> void:
+	if player._ranged_on_cd("iron_halberd"):
+		player._halberd_charge_time = -1.0
+		player._scroll_inventory_message("(kích đang hồi chiêu)")
+		return
 	player._halberd_throwing = true
 	player._bow_aiming = false
 	if player._bow_indicator_root == null:
@@ -83,21 +87,12 @@ static func fire_throw(player) -> void:
 		player._bow_indicator_root.visible = false
 	if not player.try_skill(player.stamina_cost_lmb):
 		return
+	if player._ranged_on_cd("iron_halberd"):
+		player._scroll_inventory_message("(kích đang hồi chiêu)")
+		return
 	var dir: Vector3 = player._halberd_aim_dir
 	if dir.length_squared() < 0.01:
 		dir = -player.global_transform.basis.z
-	var halberd_slot_idx: int = -1
-	for i in range(player.inventory.slots.size()):
-		var slot: ItemSlot = player.inventory.slots[i]
-		if not slot.is_empty() and slot.item.id == "iron_halberd":
-			halberd_slot_idx = i
-			break
-	if halberd_slot_idx < 0:
-		return
-	player.inventory.remove_item(halberd_slot_idx, 1)
-	if player.equipped_weapon != null and player.equipped_weapon.id == "iron_halberd":
-		player.equipped_weapon = null
-		player._update_weapon_mesh()
 	var charge_pct: float = clamp(saved_charge / (player.HALBERD_CHARGE_TIME + player._bow_max_charge), 0.0, 1.0)
 	var range_len: float = lerp(player.HALBERD_MIN_RANGE, player.HALBERD_MAX_RANGE, charge_pct)
 	var plane_y: float = player.global_position.y
@@ -111,25 +106,57 @@ static func fire_throw(player) -> void:
 		var hit: Dictionary = space.intersect_ray(q)
 		if not hit.is_empty():
 			landing_pos.y = hit.position.y
-	var world: Node = player.get_tree().current_scene
-	if world:
-		var def: ItemDef = ItemDatabase.items_db.get("iron_halberd")
-		if def:
-			var launch_pos: Vector3 = player.global_position + Vector3(0, 0.6, 0) + dir * 0.5
-			if player._mesh and player._mesh.weapon_pivot:
-				launch_pos = player._mesh.weapon_pivot.global_transform * Vector3(0, 0.35, 0)
-			var h_dist: float = Vector2(landing_pos.x - launch_pos.x, landing_pos.z - launch_pos.z).length()
-			var h_speed: float = lerp(14.0, 24.0, charge_pct)
-			var flight_time: float = maxf(h_dist / maxf(h_speed, 0.1), 0.1)
-			var vx: float = (landing_pos.x - launch_pos.x) / flight_time
-			var vz: float = (landing_pos.z - launch_pos.z) / flight_time
-			var vy: float = (landing_pos.y - launch_pos.y) / flight_time
-			var item: DroppedItem = DroppedItem.spawn(world, def, launch_pos, 1)
-			var ground_y: float = landing_pos.y
-			var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 10)
-			item.fly_straight(Vector3(vx, vy, vz), ground_y, base_dmg, player)
+	# Kích KHÔNG rời khỏi inventory — không spawn drop, thêm cooldown 4s
+	player._set_ranged_cd("iron_halberd")
+	var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 10)
+	var dmg: int = int(base_dmg * lerp(1.0, 1.6, charge_pct))
+	_apply_throw_damage(player, dir, landing_pos, dmg)
 	var msg: String = player.tr("THREW_MSG") if player.tr("THREW_MSG") != "THREW_MSG" else "Đã ném Kích Sắt"
 	player._scroll_inventory_message(msg)
+
+## Đòn ném: sát thương mọi mục tiêu nằm trong hành lang player → điểm đáp
+static func _apply_throw_damage(player, dir: Vector3, landing_pos: Vector3, dmg: int) -> void:
+	var start: Vector3 = player.global_position + Vector3(0, 0.4, 0)
+	var end: Vector3 = landing_pos + Vector3(0, 0.4, 0)
+	var hit_any := false
+	var mgr: Node = player._find_character_manager()
+	if mgr:
+		for ch in mgr.get_children():
+			if ch is CharacterBase and ch != player and ch.is_alive and ch._active:
+				if _segment_dist(start, end, ch.global_position) <= 0.9 + ch.hit_radius:
+					ch.take_damage(dmg, player)
+					_knockback(ch, dir)
+					hit_any = true
+	var pig_nodes: Array[Node] = player.get_tree().get_nodes_in_group("pig")
+	for pn in pig_nodes:
+		if is_instance_valid(pn) and pn.get("is_alive"):
+			if _segment_dist(start, end, pn.global_position) <= 0.9 + pn.hit_radius:
+				pn.take_damage(dmg, player)
+				_knockback(pn, dir)
+				hit_any = true
+	var spawner: Node = player._find_fish_spawner()
+	if spawner:
+		for f in spawner.get_children():
+			if f is FishCharacter and f.is_alive:
+				if _segment_dist(start, end, f.global_position) <= 0.9 + f.hit_radius:
+					f.take_damage(dmg, player)
+					_knockback(f, dir)
+					hit_any = true
+	if hit_any:
+		SFXManager.play_damage_hit()
+
+static func _segment_dist(a: Vector3, b: Vector3, p: Vector3) -> float:
+	var ab := b - a
+	var len2 := ab.length_squared()
+	if len2 < 0.0001:
+		return a.distance_to(p)
+	var t := clampf((p - a).dot(ab) / len2, 0.0, 1.0)
+	return a.distance_to(a + ab * t)
+
+static func _knockback(ch: CharacterBase, dir: Vector3) -> void:
+	var kb := dir * 3.0
+	kb.y = 1.5
+	ch.velocity += kb
 
 static func cancel_aim(player) -> void:
 	player._halberd_throwing = false
@@ -177,8 +204,8 @@ static func check_dash_hit(player) -> void:
 		return
 	var fwd: Vector3 = dir.normalized()
 	var right: Vector3 = Vector3.UP.cross(fwd).normalized()
-	var box_center: Vector3 = player.global_position + fwd * 1.2 + Vector3(0, 0.4, 0)
-	var half: Vector3 = Vector3(0.5, 0.4, 1.6)
+	var box_center: Vector3 = player.global_position + fwd * 1.4 + Vector3(0, 0.5, 0)
+	var half: Vector3 = Vector3(0.65, 0.55, 2.0)
 
 	var mgr: Node = player._find_character_manager()
 	if mgr:

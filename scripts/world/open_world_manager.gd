@@ -209,6 +209,12 @@ func place_block(wx: float, wy: float, wz: float, block_id: int) -> bool:
 	if chunk == null: return false
 	return chunk.place_block_at(wx, wy, wz, block_id)
 
+## Cuốc đất tại vị trí world. Trả về block cũ đã cuốc (0 = không cuốc được).
+func till_block(wx: float, wy: float, wz: float) -> int:
+	var chunk := get_chunk_at(wx, wz)
+	if chunk == null: return 0
+	return chunk.till_block_at(wx, wy, wz)
+
 ## Lấy block ID tại vị trí world.
 func get_block(wx: float, wy: float, wz: float) -> int:
 	var chunk := get_chunk_at(wx, wz)

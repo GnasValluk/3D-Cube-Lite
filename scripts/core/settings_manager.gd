@@ -34,11 +34,9 @@ static var _preset_changed_callbacks: Array[Callable] = []
 func _ready() -> void:
 	_load_translations()
 	load_settings()
-	_apply_all()
-
 	# Luôn set inventory key = E (bất kể setting cũ có bị đổi)
 	key_bindings["controls/inventory"] = KEY_E
-	ProjectSettings.set_setting("controls/inventory", KEY_E)
+	_apply_all()
 
 static func _load_translations() -> void:
 	var path: String = "res://translations/game.csv"
@@ -117,8 +115,17 @@ static func _apply_all() -> void:
 	ProjectSettings.set_setting("mobile/button_scale", button_scale)
 	if DeviceManager:
 		DeviceManager.set_device(device_mode as DeviceManager.Device)
+	_apply_key_bindings()
+
+## Đồng bộ key_bindings đã lưu (nếu có rebind) vào InputMap trước khi vào game
+static func _apply_key_bindings() -> void:
 	for action in key_bindings:
-		ProjectSettings.set_setting(action, key_bindings[action])
+		var code: int = key_bindings[action] as int
+		if InputMap.has_action(action):
+			InputMap.action_erase_events(action)
+			var ev := InputEventKey.new()
+			ev.keycode = code
+			InputMap.action_add_event(action, ev)
 
 static func save_settings() -> void:
 	var config := ConfigFile.new()
@@ -145,8 +152,17 @@ static func set_graphics_preset(preset: int) -> void:
 		SettingsData.save_settings()
 	_notify_preset_changed()
 
+## Preset thực tế đang áp dụng: trên mobile luôn ép STANDARD để đảm bảo hiệu năng
+static func effective_graphics_preset() -> int:
+	if DeviceManager != null and DeviceManager.is_mobile():
+		return GraphicsPreset.STANDARD
+	return graphics_preset
+
 static func apply_viewport_settings(viewport: Viewport) -> void:
-	match graphics_preset:
+	var is_mob: bool = DeviceManager != null and DeviceManager.is_mobile()
+	viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	viewport.scaling_3d_scale = 0.75 if is_mob else 1.0
+	match effective_graphics_preset():
 		GraphicsPreset.STANDARD:
 			viewport.msaa_3d = Viewport.MSAA_DISABLED
 			viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED

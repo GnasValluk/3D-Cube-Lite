@@ -13,7 +13,7 @@ static func _intersection(gx: int, gz: int) -> Vector2:
 	if _int_cache.has(key):
 		return _int_cache[key]
 	# Hash function nhanh thay vì RandomNumberGenerator.new()
-	var h: int = WorldSeed.seed_value + 7777 + gx * 73856093 + gz * 19349663
+	var h: int = SeedSnapshot.ensure() + 7777 + gx * 73856093 + gz * 19349663
 	h = (h ^ (h >> 13)) * 1274126177; h = h ^ (h >> 16)
 	var rx: float = float(h & 0x7FFFFFFF) / 2147483648.0
 	h = h * 16807 + 1
@@ -108,7 +108,7 @@ static func _ensure_roads() -> void:
 		return
 	_road_ready = true
 
-	var seed_base: int = WorldSeed.seed_value + 7777
+	var seed_base: int = SeedSnapshot.ensure() + 7777
 	var inters: Dictionary = {}
 	for gx in range(-_Data.ROAD_GRID_R, _Data.ROAD_GRID_R + 1):
 		for gz in range(-_Data.ROAD_GRID_R, _Data.ROAD_GRID_R + 1):

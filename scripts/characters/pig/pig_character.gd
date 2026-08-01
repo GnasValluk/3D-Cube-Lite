@@ -60,11 +60,12 @@ func _build_character() -> void:
 	scale = Vector3(sc, sc, sc)
 	var col := CollisionShape3D.new()
 	var cap := CapsuleShape3D.new()
-	cap.radius = 0.25
-	cap.height = 0.50
+	cap.radius = 0.34
+	cap.height = 0.72
 	col.shape = cap
-	col.position = Vector3(0, 0.25, 0)
+	col.position = Vector3(0, 0.36, 0)
 	add_child(col)
+	hit_radius = 0.34 * sc
 	_pig_mesh = PigMesh.new()
 	_pig_mesh.is_sand = (pig_variant == Variant.SAND)
 	_pig_mesh.build(self)

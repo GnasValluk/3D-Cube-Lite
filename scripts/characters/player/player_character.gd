@@ -38,6 +38,17 @@ var _block_highlight: Node3D = null
 var _target_block: Vector3 = Vector3.ZERO
 var _has_target: bool = false
 
+## Đào nhấn-giữ: tiến trình + thanh trên đầu block.
+var _mining: bool = false
+var _mine_progress: float = 0.0
+var _mine_block: Vector3 = Vector3.ZERO
+var _mine_block_id: int = 0
+var _mine_bar: Node3D = null
+
+## Độ bền công cụ: vị trí slot đang cầm (hotbar) hoặc độ bền rời (equip từ inventory UI).
+var _equipped_slot_idx: int = -1
+var _equipped_durability: int = -1
+
 var _bow_aiming: bool = false
 var _bow_charge: float = 0.0
 var _bow_charge_rate: float = 0.35
@@ -54,6 +65,14 @@ var _bow_string_node: Node3D = null
 const HALBERD_CHARGE_TIME: float = 0.7
 const HALBERD_MIN_RANGE: float = 6.0
 const HALBERD_MAX_RANGE: float = 16.67
+## Cooldown bắn của vũ khí tầm xa + ném kích (giây) — chống spam, cân bằng
+const RANGED_COOLDOWNS := {
+	"crossbow": 0.8,
+	"pumpkin_mortar": 2.5,
+	"watermelon_cannon": 5.0,
+	"iron_halberd": 4.0,
+}
+var _ranged_cd: Dictionary = {}
 var _halberd_charge_time: float = -1.0
 var _halberd_throwing: bool = false
 var _halberd_aim_dir: Vector3 = Vector3.FORWARD
@@ -94,11 +113,12 @@ func _build_character() -> void:
 
 	var col := CollisionShape3D.new()
 	var cs := CapsuleShape3D.new()
-	cs.radius = 0.28
-	cs.height = 0.90
+	cs.radius = 0.32
+	cs.height = 1.10
 	col.shape = cs
-	col.position = Vector3(0, 0.45, 0)
+	col.position = Vector3(0, 0.55, 0)
 	add_child(col)
+	hit_radius = 0.32
 
 	_mesh = PlayerMesh.new()
 	_mesh.build(self)
@@ -145,6 +165,14 @@ func interact_with_nearby() -> void:
 	if world == null:
 		return
 	for child in world.get_children():
+		if child is FishingBoat:
+			var boat := child as FishingBoat
+			if boat.is_player_nearby(self):
+				boat.try_board(self)
+				return
+			if boat.is_driver(self):
+				boat.try_exit()
+				return
 		if child is Chest and child.is_player_nearby():
 			child.open_ui()
 			return
@@ -163,6 +191,23 @@ func pickup_item(item_def: ItemDef, count: int) -> int:
 		SFXManager.play_orb()
 		_scroll_inventory_message(tr("PICKUP_MSG").format({"s": item_def.name, "n": count - remaining}))
 	return remaining
+
+# ── Cooldown vũ khí tầm xa ───────────────────────────────────────────────────
+func _ranged_on_cd(weapon_id: String) -> bool:
+	return _ranged_cd.get(weapon_id, 0.0) > 0.0
+
+func _set_ranged_cd(weapon_id: String) -> void:
+	_ranged_cd[weapon_id] = RANGED_COOLDOWNS.get(weapon_id, 1.0)
+
+func _tick_ranged_cd(delta: float) -> void:
+	if _ranged_cd.is_empty():
+		return
+	for k in _ranged_cd.keys():
+		var v: float = _ranged_cd[k] - delta
+		if v <= 0.0:
+			_ranged_cd.erase(k)
+		else:
+			_ranged_cd[k] = v
 
 func _scroll_inventory_message(msg: String) -> void:
 	var label := Label.new()
@@ -222,10 +267,22 @@ func use_item_from_inventory(idx: int) -> void:
 				_scroll_inventory_message(tr("ATE_FOOD").format({"s": item.name, "d": healed}))
 		ItemDef.Type.WEAPON:
 			var old: ItemDef = equipped_weapon
+			var src_dur: int = inventory.slots[idx].durability if idx >= 0 and idx < inventory.slots.size() else -1
+			_stop_mining()
 			equipped_weapon = item
 			inventory.remove_item(idx, 1)
 			if old != null:
+				var old_dur: int = -1
+				var old_slot := inventory.find_slot_of_item(old)
+				if old_slot >= 0:
+					old_dur = inventory.slots[old_slot].durability
 				inventory.add_item(old, 1)
+				if old_dur >= 0:
+					var os := inventory.find_slot_of_item(old)
+					if os >= 0:
+						inventory.slots[os].durability = old_dur
+			_equipped_slot_idx = -1
+			_equipped_durability = src_dur
 			_update_weapon_mesh()
 			_scroll_inventory_message(tr("EQUIP_MSG").format({"s": item.name}))
 		ItemDef.Type.ARMOR:
@@ -243,11 +300,23 @@ func use_item_from_inventory(idx: int) -> void:
 				inventory.add_item(old, 1)
 			_scroll_inventory_message(tr("WEAR_MSG").format({"s": item.name}))
 		ItemDef.Type.TOOL:
-			var old: ItemDef = equipped_weapon
+			var old_t: ItemDef = equipped_weapon
+			var src_dur_t: int = inventory.slots[idx].durability if idx >= 0 and idx < inventory.slots.size() else -1
+			_stop_mining()
 			equipped_weapon = item
 			inventory.remove_item(idx, 1)
-			if old != null:
-				inventory.add_item(old, 1)
+			if old_t != null:
+				var old_dur_t: int = -1
+				var old_slot_t := inventory.find_slot_of_item(old_t)
+				if old_slot_t >= 0:
+					old_dur_t = inventory.slots[old_slot_t].durability
+				inventory.add_item(old_t, 1)
+				if old_dur_t >= 0:
+					var os_t := inventory.find_slot_of_item(old_t)
+					if os_t >= 0:
+						inventory.slots[os_t].durability = old_dur_t
+			_equipped_slot_idx = -1
+			_equipped_durability = src_dur_t
 			_update_weapon_mesh()
 			_scroll_inventory_message(tr("EQUIP_MSG").format({"s": item.name}))
 
@@ -295,7 +364,7 @@ func _update_weapon_mesh() -> void:
 		if _bow_aiming:
 			_Bow.cancel_aim(self)
 		return
-	if item_id in ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd"]:
+	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd"]:
 		ToolsMesh.build_held(pivot, item_id)
 		if item_id == "crossbow":
 			_bow_string_node = null
@@ -306,9 +375,12 @@ func _update_weapon_mesh() -> void:
 		ItemMesh.build(held_scale, item_id)
 
 ## Cầm weapon trực tiếp từ hotbar (không remove khỏi inventory)
-func equip_weapon_direct(item: ItemDef) -> void:
+func equip_weapon_direct(item: ItemDef, slot_idx: int = -1) -> void:
 	print("[Player] equip_weapon_direct: ", item.id if item != null else "null")
+	_stop_mining()
 	equipped_weapon = item
+	_equipped_slot_idx = slot_idx
+	_equipped_durability = -1
 	_update_weapon_mesh()
 
 func get_total_atk() -> int:
@@ -333,21 +405,23 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
 			if _bow_aiming:
-				if k.keycode in [KEY_E, KEY_B, KEY_I, KEY_ESCAPE, KEY_SPACE]:
+				if k.is_action_pressed("controls/inventory") or k.is_action_pressed("controls/build") \
+						or k.is_action_pressed("ui_cancel") or k.is_action_pressed("jump"):
 					var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
 					if is_mortar:
 						_Mortar.cancel_aim(self)
 					else:
 						_Bow.cancel_aim(self)
 					return
-			if (_halberd_charge_time >= 0.0 or _halberd_throwing) and k.keycode in [KEY_E, KEY_B, KEY_I, KEY_ESCAPE]:
+			if (_halberd_charge_time >= 0.0 or _halberd_throwing) and (k.is_action_pressed("controls/inventory") \
+					or k.is_action_pressed("controls/build") or k.is_action_pressed("ui_cancel")):
 				_Halberd.cancel_aim(self)
 				return
-			if k.keycode == KEY_SPACE and _freeze_timer <= 0.0:
+			if k.is_action_pressed("jump") and _freeze_timer <= 0.0:
 				_jbuf = JUMP_BUFFER
-			if k.keycode == KEY_F1:
+			if k.is_action_pressed("camera_toggle"):
 				_toggle_camera()
-			if k.keycode == KEY_F5:
+			if k.is_action_pressed("save_game"):
 				if SaveManager:
 					SaveManager.save_game()
 					_scroll_inventory_message(tr("GAME_SAVED"))
@@ -362,6 +436,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
+		if not mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			_stop_mining()
 		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _bow_aiming:
 			if equipped_weapon and equipped_weapon.id == "crossbow":
 				_Bow.fire(self)
@@ -388,36 +464,34 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _halberd_charge_time >= 0.0 or _halberd_throwing:
 				_Halberd.cancel_aim(self)
 				return
-			# Mining — cúp/xẻng on RIGHT click
+			# Mining — cúp/xẻng on RIGHT click (giữ chuột để đào)
 			if equipped_weapon != null:
 				var wep_id: String = equipped_weapon.id
-				if wep_id == "pickaxe" or wep_id == "shovel":
-					var target: Vector3
+				if wep_id == "hoe":
+					var tgt: Vector3
 					if _has_target:
-						target = _target_block
+						tgt = _target_block
 					else:
-						target = _raycast_target_block()
-					if target != Vector3.ZERO:
-						var owm: Node = _open_world_manager()
-						if owm:
-							var blk_id: int = owm.get_block(target.x, target.y, target.z)
-							if blk_id != _Data.BlockID.AIR and blk_id != _Data.BlockID.WATER:
-								var can_dig: bool = false
-								if wep_id == "pickaxe":
-									can_dig = not _is_soft_block(target.x, target.y, target.z)
-								else:
-									can_dig = _is_soft_block(target.x, target.y, target.z)
-								if can_dig:
-									var old_block: int = owm.break_block(target.x, target.y, target.z)
-									if old_block != 0:
-										var item_id: String = _Data.BLOCK_TO_ITEM.get(old_block, "")
-										if not item_id.is_empty():
-											var def: ItemDef = ItemDatabase.items_db.get(item_id) as ItemDef
-											if def:
-												DroppedItem.spawn(owm, def, target)
-										SFXManager.play_block_break()
-								else:
-									_scroll_inventory_message("(không thể đào)")
+						tgt = _raycast_target_block()
+					if tgt != Vector3.ZERO:
+						var owm_t: Node = _open_world_manager()
+						if owm_t:
+							var blk_id_t: int = owm_t.get_block(tgt.x, tgt.y, tgt.z)
+							if _Data.is_tillable(blk_id_t):
+								owm_t.till_block(tgt.x, tgt.y, tgt.z)
+								SFXManager.play_block_break()
+								_damage_equipped_tool(1)
+							else:
+								_scroll_inventory_message("(không thể cuốc)")
+					return
+				if wep_id == "pickaxe" or wep_id == "shovel":
+					var mine_tgt: Vector3
+					if _has_target:
+						mine_tgt = _target_block
+					else:
+						mine_tgt = _raycast_target_block()
+					if mine_tgt != Vector3.ZERO:
+						_start_mining(mine_tgt)
 					return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			var world := get_tree().current_scene
@@ -434,16 +508,31 @@ func _unhandled_input(event: InputEvent) -> void:
 						return
 			if _bow_aiming:
 				return
-			if equipped_weapon != null:
-				match equipped_weapon.id:
-					"crossbow": _Bow.start_aim(self); return
-					"pumpkin_mortar": _Mortar.start_aim(self); return
-					"watermelon_cannon": _Bow.start_cannon_aim(self); return
-					"fishing_rod": _Fishing.action(self); return
-					"iron_halberd": return
+		if equipped_weapon != null:
+			match equipped_weapon.id:
+				"crossbow":
+					if _ranged_on_cd("crossbow"):
+						_scroll_inventory_message("(nỏ đang hồi chiêu)")
+						return
+					_Bow.start_aim(self); return
+				"pumpkin_mortar":
+					if _ranged_on_cd("pumpkin_mortar"):
+						_scroll_inventory_message("(pháo bí đỏ đang hồi chiêu)")
+						return
+					_Mortar.start_aim(self); return
+				"watermelon_cannon":
+					if _ranged_on_cd("watermelon_cannon"):
+						_scroll_inventory_message("(pháo dưa hấu đang hồi chiêu)")
+						return
+					_Bow.start_cannon_aim(self); return
+				"fishing_rod": _Fishing.action(self); return
+				"iron_halberd":
+					if _ranged_on_cd("iron_halberd"):
+						_scroll_inventory_message("(kích đang hồi chiêu)")
+					return
 			if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
 				var wep_id: String = equipped_weapon.id if equipped_weapon else ""
-				var is_heavy: bool = wep_id == "axe" or wep_id == "pickaxe"
+				var is_heavy: bool = wep_id == "axe" or wep_id == "pickaxe" or wep_id == "hoe"
 				if is_heavy:
 					if _attack_timer > 0.0: return
 					combo_step = 0
@@ -466,6 +555,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				match wep_id:
 					"pickaxe": attack_duration = 0.65; _melee_hit_progress = 0.35
 					"axe": attack_duration = 0.85; _melee_hit_progress = 0.35
+					"hoe": attack_duration = 0.60; _melee_hit_progress = 0.30
 					"iron_greatsword": attack_duration = 1.00; _melee_hit_progress = 0.40
 					"leather_gloves": attack_duration = 0.35; _melee_hit_progress = 0.20
 					_: attack_duration = 0.50; _melee_hit_progress = 0.25
@@ -498,11 +588,169 @@ func _is_soft_block(bx: float, by: float, bz: float) -> bool:
 	if owm == null:
 		return false
 	var blk: int = owm.get_block(bx, by, bz)
-	return blk == _Data.BlockID.SAND or blk == _Data.BlockID.SAND_DEEP or blk == _Data.BlockID.OCEAN_SAND or blk == _Data.BlockID.MUDDY_SAND or blk == _Data.BlockID.OCEAN_GRAVEL or blk == _Data.BlockID.DIRT or blk == _Data.BlockID.DARK_DIRT or blk == _Data.BlockID.GRASS or blk == _Data.BlockID.DARK_GRASS
+	return _Data.is_shovelable(blk)
+
+# ── Đào nhấn-giữ ────────────────────────────────────────────────────────────
+## Bắt đầu đào: xác thực block/công cụ rồi bật trạng thái giữ chuột.
+func _start_mining(target: Vector3) -> void:
+	if equipped_weapon == null:
+		return
+	var owm := _open_world_manager()
+	if owm == null or not owm.has_method("get_block"):
+		return
+	var bid: int = owm.get_block(target.x, target.y, target.z)
+	if bid == _Data.BlockID.AIR:
+		return
+	# Nước: múc ngay (cơ chế cũ, không hao độ bền)
+	if _Data.is_water(bid):
+		if owm.break_block(target.x, target.y, target.z) != 0:
+			SFXManager.play_block_break()
+		return
+	var hardness: float = _Data.get_block_hardness(bid)
+	if hardness < 0.0:
+		_scroll_inventory_message("(không thể phá)")
+		return
+	var wep := equipped_weapon.id
+	if wep != "pickaxe" and wep != "shovel":
+		return
+	if _equipped_durability_now() == 0:
+		_scroll_inventory_message("(công cụ đã vỡ)")
+		return
+	var correct: bool = (_Data.is_pickaxable(bid) and wep == "pickaxe") \
+		or (_Data.is_shovelable(bid) and wep == "shovel")
+	if hardness <= 0.0 or not correct:
+		if wep == "pickaxe":
+			_scroll_inventory_message("(cần xẻng để đào đất)")
+		else:
+			_scroll_inventory_message("(cần cúp để đào đá)")
+		return
+	_mining = true
+	_mine_progress = 0.0
+	_mine_block = target
+	_mine_block_id = bid
+
+func _stop_mining() -> void:
+	_mining = false
+	_mine_progress = 0.0
+	_mine_bar_hide()
+
+func _process_mining(delta: float) -> void:
+	if not _mining:
+		return
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		_stop_mining()
+		return
+	if equipped_weapon == null \
+			or (equipped_weapon.id != "pickaxe" and equipped_weapon.id != "shovel"):
+		_stop_mining()
+		return
+	if _equipped_durability_now() <= 0:
+		_stop_mining()
+		return
+	var target := _target_block if _has_target else Vector3.ZERO
+	if target == Vector3.ZERO:
+		_mine_progress = 0.0
+		_mine_bar_hide()
+		return
+	if target != _mine_block:
+		_mine_block = target
+		_mine_block_id = 0
+		_mine_progress = 0.0
+	var owm := _open_world_manager()
+	if owm == null:
+		return
+	var bid: int = owm.get_block(target.x, target.y, target.z)
+	if bid == _Data.BlockID.AIR or bid != _mine_block_id:
+		_mine_block_id = bid
+		_mine_progress = 0.0
+	if bid == _Data.BlockID.AIR:
+		_mine_bar_hide()
+		return
+	var hardness: float = _Data.get_block_hardness(bid)
+	if hardness <= 0.0:
+		_mine_progress = 0.0
+		_mine_bar_hide()
+		return
+	_mine_progress += delta / hardness
+	if _mine_progress >= 1.0:
+		_mine_progress = 0.0
+		_mine_bar_hide()
+		_break_mine_block(target, bid)
+		return
+	_mine_bar_ensure()
+	_mine_bar.show_at(target + Vector3(0, 0.62, 0), _mine_progress)
+
+func _break_mine_block(target: Vector3, bid: int) -> void:
+	var owm := _open_world_manager()
+	if owm == null:
+		return
+	var old_block: int = owm.break_block(target.x, target.y, target.z)
+	if old_block != 0:
+		var item_id: String = _Data.BLOCK_TO_ITEM.get(old_block, "")
+		if not item_id.is_empty():
+			var def: ItemDef = ItemDatabase.items_db.get(item_id) as ItemDef
+			if def:
+				DroppedItem.spawn(owm, def, target)
+		SFXManager.play_block_break()
+		_damage_equipped_tool(1)
+
+func _mine_bar_ensure() -> void:
+	if _mine_bar == null:
+		_mine_bar = MiningProgressBar.new()
+		add_child(_mine_bar)
+
+func _mine_bar_hide() -> void:
+	if _mine_bar != null:
+		_mine_bar.hide_bar()
+
+# ── Độ bền công cụ ──────────────────────────────────────────────────────────
+## Độ bền hiện tại của vũ khí đang cầm (-1 = không dùng độ bền).
+func _equipped_durability_now() -> int:
+	if equipped_weapon == null or equipped_weapon.max_durability <= 0:
+		return -1
+	if inventory == null:
+		return -1
+	if _equipped_slot_idx >= 0 and _equipped_slot_idx < inventory.slots.size():
+		var slot := inventory.slots[_equipped_slot_idx]
+		if slot.item == equipped_weapon and slot.durability >= 0:
+			return slot.durability
+		_equipped_slot_idx = -1
+	if _equipped_durability >= 0:
+		return _equipped_durability
+	return -1
+
+## Hao mòn độ bền; vỡ thì hủy công cụ + bỏ cầm.
+func _damage_equipped_tool(amount: int) -> void:
+	if equipped_weapon == null or equipped_weapon.max_durability <= 0:
+		return
+	if inventory == null:
+		return
+	if _equipped_durability_now() < 0:
+		return
+	var broken := false
+	if _equipped_slot_idx >= 0 and _equipped_slot_idx < inventory.slots.size() \
+			and inventory.slots[_equipped_slot_idx].item == equipped_weapon:
+		broken = not inventory.damage_slot_durability(_equipped_slot_idx, amount)
+	else:
+		_equipped_durability = maxi(_equipped_durability - amount, 0)
+		broken = _equipped_durability <= 0
+	if broken:
+		_on_tool_broken()
+
+func _on_tool_broken() -> void:
+	if inventory != null and _equipped_slot_idx >= 0 and _equipped_slot_idx < inventory.slots.size():
+		inventory.remove_item(_equipped_slot_idx, 1)
+	_equipped_slot_idx = -1
+	_equipped_durability = -1
+	equipped_weapon = null
+	_stop_mining()
+	_update_weapon_mesh()
+	SFXManager.play_hurt()
+	_scroll_inventory_message("(công cụ đã vỡ — hết độ bền!)")
 
 func _update_block_target() -> void:
 	_ensure_highlight()
-	var can_mine := equipped_weapon != null and (equipped_weapon.id == "pickaxe" or equipped_weapon.id == "shovel")
+	var can_mine := equipped_weapon != null and (equipped_weapon.id == "pickaxe" or equipped_weapon.id == "shovel" or equipped_weapon.id == "hoe")
 	if not can_mine:
 		_block_highlight.visible = false
 		_has_target = false
@@ -569,16 +817,24 @@ func _process(delta: float) -> void:
 			heal(1)
 	combo_timer = max(combo_timer - delta, 0.0)
 	_update_block_target()
+	_tick_ranged_cd(delta)
+	_process_mining(delta)
 	_Bow.update_pose(self)
 	if equipped_weapon != null and equipped_weapon.id == "iron_halberd":
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			if _halberd_charge_time < 0.0:
+			if _ranged_on_cd("iron_halberd"):
+				if _halberd_charge_time >= 0.0:
+					_halberd_charge_time = -1.0
+					if _halberd_throwing:
+						_Halberd.cancel_aim(self)
+			elif _halberd_charge_time < 0.0:
 				_halberd_charge_time = 0.0
-			_halberd_charge_time += delta
-			if _halberd_charge_time >= HALBERD_CHARGE_TIME and not _halberd_throwing:
-				_Halberd.start_throw_aim(self)
-			if _halberd_throwing:
-				_Halberd.update_aim(self, delta)
+			if _halberd_charge_time >= 0.0 and not _ranged_on_cd("iron_halberd"):
+				_halberd_charge_time += delta
+				if _halberd_charge_time >= HALBERD_CHARGE_TIME and not _halberd_throwing:
+					_Halberd.start_throw_aim(self)
+				if _halberd_throwing:
+					_Halberd.update_aim(self, delta)
 	if _bow_aiming:
 		if _state == State.HIT:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"

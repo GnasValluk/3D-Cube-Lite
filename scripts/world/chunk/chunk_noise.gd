@@ -12,7 +12,7 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	if _noise_cache.has(dim_id):
 		return _noise_cache[dim_id]
 
-	var base_seed: int = WorldSeed.seed_value + dim_id * 1000
+	var base_seed: int = SeedSnapshot.ensure() + dim_id * 1000
 	var freq_bio: float = 0.008
 	var freq_warp: float = 0.022
 

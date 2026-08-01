@@ -35,6 +35,35 @@ func _ready() -> void:
 	if DeviceManager:
 		DeviceManager.device_changed.connect(_on_device_changed)
 
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_SIZE_CHANGED:
+		_rebuild()
+
+## Rebuild toàn bộ overlay khi xoay màn hình / đổi button_scale
+func _rebuild() -> void:
+	for child in get_children():
+		child.queue_free()
+	joystick = null
+	_cam_touches.clear()
+	_pinch_last_dist = 0.0
+	_build()
+
+## Lề an toàn (notch / hole-punch) quy đổi từ pixel cửa sổ sang toạ độ canvas
+func _safe_insets() -> Dictionary:
+	var win := DisplayServer.window_get_size()
+	var base := get_viewport().get_visible_rect().size
+	var csx := 1.0
+	var csy := 1.0
+	if win.x > 0 and win.y > 0:
+		csx = base.x / float(win.x)
+		csy = base.y / float(win.y)
+	var sa := DisplayServer.get_display_safe_area()
+	var l := sa.position.x * csx
+	var t := sa.position.y * csy
+	var r := (win.x - (sa.position.x + sa.size.x)) * csx
+	var b := (win.y - (sa.position.y + sa.size.y)) * csy
+	return { "left": l, "top": t, "right": maxf(r, 0.0), "bottom": maxf(b, 0.0) }
+
 func _refresh_visibility() -> void:
 	if not DeviceManager:
 		visible = false
@@ -44,17 +73,20 @@ func _refresh_visibility() -> void:
 
 func _on_device_changed(_is_mob: bool) -> void:
 	_refresh_visibility()
+	_rebuild()
 
 func _build() -> void:
 	var vp := get_viewport().get_visible_rect().size
 	var s := _scale
+	var ins := _safe_insets()
+	var pad := 20.0 * s
 
-	# ── Joystick (góc trái dưới) ────────────────────────────────────────────
+	# ── Joystick (góc trái dưới, trong safe-area) ───────────────────────────
 	joystick = _VJoy.new()
 	joystick.base_radius  = 60.0 * s
 	joystick.knob_radius  = 26.0 * s
 	joystick.size = Vector2(joystick.base_radius * 2.2, joystick.base_radius * 2.2)
-	joystick.position = Vector2(20.0 * s, vp.y - joystick.size.y - 20.0 * s)
+	joystick.position = Vector2(ins["left"] + pad, vp.y - joystick.size.y - ins["bottom"] - pad)
 	joystick.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(joystick)
 
@@ -62,11 +94,11 @@ func _build() -> void:
 	var cam_area := _make_cam_area(vp, s)
 	add_child(cam_area)
 
-	# ── Nút Jump (góc phải dưới) ─────────────────────────────────────────────
+	# ── Nút Jump (góc phải dưới, trong safe-area) ───────────────────────────
 	var bsz := 62.0 * s
 	var br  := 8.0 * s
-	var bx  := vp.x - bsz - 20.0 * s
-	var by  := vp.y - bsz - 20.0 * s
+	var bx: float = vp.x - bsz - ins["right"] - pad
+	var by: float = vp.y - bsz - ins["bottom"] - pad
 
 	var btn_jump := _make_btn("↑", bx, by, bsz, br, Color(0.35, 0.75, 0.35, 0.75))
 	btn_jump.button_down.connect(func(): jump_held = true;  emit_signal("jump_pressed"))
@@ -94,13 +126,13 @@ func _build() -> void:
 	btn_int.button_up.connect(func():   interact_held = false)
 	add_child(btn_int)
 
-	# ── Nút Inventory (góc trái trên) ───────────────────────────────────────
-	var btn_inv := _make_btn("🎒", 20.0 * s, 80.0 * s, bsz * 0.85, br, Color(0.70, 0.60, 0.40, 0.70))
+	# ── Nút Inventory (góc trái trên, dưới safe-area) ───────────────────────
+	var btn_inv := _make_btn("🎒", ins["left"] + pad, ins["top"] + 80.0 * s, bsz * 0.85, br, Color(0.70, 0.60, 0.40, 0.70))
 	btn_inv.pressed.connect(func(): emit_signal("inventory_pressed"))
 	add_child(btn_inv)
 
 	# ── Nút Map (kế Inventory) ──────────────────────────────────────────────
-	var btn_map := _make_btn("🗺", 20.0 * s + bsz * 0.85 + 10.0 * s, 80.0 * s, bsz * 0.85, br, Color(0.30, 0.65, 0.45, 0.70))
+	var btn_map := _make_btn("🗺", ins["left"] + pad + bsz * 0.85 + 10.0 * s, ins["top"] + 80.0 * s, bsz * 0.85, br, Color(0.30, 0.65, 0.45, 0.70))
 	btn_map.pressed.connect(func(): emit_signal("map_pressed"))
 	add_child(btn_map)
 

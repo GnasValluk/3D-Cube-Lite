@@ -1,5 +1,5 @@
 class_name PlantProp
-extends DestroyableProp
+extends GrowingProp
 
 const VOXEL: float = 0.25
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
@@ -17,6 +17,40 @@ func setup(type: String, _h1: int, _h2: int, _has_silt: bool, _water_gap: float)
 	has_silt = _has_silt
 	water_gap = _water_gap
 
+func _birth_span_days() -> float:
+	return 25.0 if plant_type == "weed" else 30.0
+
+func _stage_thresholds() -> Array[float]:
+	if plant_type == "weed":
+		return [2.0, 5.0]
+	return [3.0, 8.0]
+
+func _apply_stage(_from: int, _to: int) -> void:
+	_rebuild_mesh()
+
+func _rebuild_mesh() -> void:
+	for i in range(get_child_count() - 1, -1, -1):
+		var ch := get_child(i)
+		if ch is MeshInstance3D:
+			remove_child(ch)
+			ch.queue_free()
+	_build_mesh()
+	_pop_growth()
+
+## Cây trưởng thành khi chặt còn rơi thêm mầm để trồng lại.
+func _on_destroy() -> void:
+	super._on_destroy()
+	if _stage != GrowingProp.Stage.MATURE:
+		return
+	var world := _find_world_manager()
+	if world == null:
+		return
+	ItemDatabase.ensure_db()
+	var seed_id := "taro_seed" if plant_type == "taro" else "seaweed_seed"
+	var def: ItemDef = ItemDatabase.items_db.get(seed_id)
+	if def != null:
+		DroppedItem.spawn(world, def, global_position, 1, _spawn_drop_velocity(), global_position.y)
+
 func _ready() -> void:
 	super._ready()
 	_build_mesh()
@@ -31,9 +65,15 @@ func _build_mesh() -> void:
 	var s := h1 * 16807 + 1
 
 	if plant_type == "weed":
-		_build_weed(st, s)
+		if _stage == GrowingProp.Stage.SPROUT:
+			_build_weed_sprout(st, s)
+		else:
+			_build_weed(st, s)
 	else:
-		_build_taro(st, s)
+		if _stage == GrowingProp.Stage.SPROUT:
+			_build_taro_sprout(st, s)
+		else:
+			_build_taro(st, s)
 
 	var mesh := st.commit()
 	if mesh:
@@ -43,6 +83,78 @@ func _build_mesh() -> void:
 		mi.material_override = mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
+
+func _build_weed_sprout(st: SurfaceTool, s: int) -> void:
+	## Cây mầm rong: 1 đoạn thân ngắn + 2 lá non dựng đứng, màu xanh tươi sáng.
+	var h1 := seed_h1
+	var h2 := seed_h2
+	var r2 := float(h2 & 0x7FFFFFFF) / 2147483648.0
+	var h3: int = h1 * 716199923 + h2 * 912334613
+	h3 = (h3 ^ (h3 >> 13)) * 974126171; h3 = h3 ^ (h3 >> 16)
+	var r3 := float(h3 & 0x7FFFFFFF) / 2147483648.0
+
+	var col_stem := Color(0.05, 0.72 + r3 * 0.10, 0.10 + r3 * 0.05)
+	var col_leaf := Color(0.07, 0.55 + r3 * 0.12, 0.08 + r3 * 0.04)
+	var sw: float = 0.012 + r2 * 0.006
+
+	s = s * 16807 + 1; var lean_x: float = (float(s & 0x7FFFFFFF) / 2147483648.0 - 0.5) * 0.06
+	s = s * 16807 + 1; var lean_z: float = (float(s & 0x7FFFFFFF) / 2147483648.0 - 0.5) * 0.06
+	var cur_x: float = (r2 - 0.5) * 0.12
+	var cur_z: float = (r3 - 0.5) * 0.12
+	var seg_h: float = VOXEL * 0.8
+
+	var mid := Vector3(cur_x + lean_x * 0.5, seg_h * 0.5, cur_z + lean_z * 0.5)
+	_add_quad(st, mid, Vector3(sw, 0, 0), Vector3(0, seg_h * 0.5, 0), Vector3(0, 0, 1), col_stem)
+	_add_quad(st, mid, Vector3(sw, 0, 0), Vector3(0, seg_h * 0.5, 0), Vector3(0, 0, -1), col_stem)
+	_add_quad(st, mid, Vector3(0, 0, sw), Vector3(0, seg_h * 0.5, 0), Vector3(1, 0, 0), col_stem)
+	_add_quad(st, mid, Vector3(0, 0, sw), Vector3(0, seg_h * 0.5, 0), Vector3(-1, 0, 0), col_stem)
+
+	var wroot := Vector3(cur_x, seg_h * 0.7, cur_z)
+	for wi in range(2):
+		var wa: float = float(wi) * PI + r2 * 0.4
+		var wdir := Vector3(cos(wa), 0.30 + r3 * 0.15, sin(wa)).normalized()
+		var wperp := Vector3(-sin(wa), 0.0, cos(wa)).normalized()
+		var wlen: float = 0.10 + r3 * 0.06
+		var ww: float = sw * 0.9
+		_add_quad(st, wroot + wdir * wlen * 0.5, wperp * ww, wdir * wlen * 0.5, wperp.cross(wdir).normalized(), col_leaf)
+		_add_quad(st, wroot + wdir * wlen * 0.5, wperp * ww, wdir * wlen * 0.5, -wperp.cross(wdir).normalized(), col_leaf)
+
+func _build_taro_sprout(st: SurfaceTool, s: int) -> void:
+	## Cây mầm môn: 1 cuống ngắn + 1 lá non nhỏ cuộn, màu xanh nhạt pha vàng.
+	var h1 := seed_h1
+	var r2 := float(h1 & 0x7FFFFFFF) / 2147483648.0
+	var h4: int = h1 * 374761393 + seed_h2 * 631152931
+	h4 = (h4 ^ (h4 >> 13)) * 1174126183; h4 = h4 ^ (h4 >> 16)
+	var r4 := float(h4 & 0x7FFFFFFF) / 2147483648.0
+
+	var col_stem := Color(0.30 + r4 * 0.08, 0.55 + r4 * 0.10, 0.12 + r4 * 0.04)
+	var col_leaf := Color(0.06 + r4 * 0.05, 0.32 + r4 * 0.14, 0.05 + r4 * 0.03)
+	var col_light := Color(0.08 + r4 * 0.04, 0.42 + r4 * 0.12, 0.07 + r4 * 0.03)
+	var col_vein := Color(0.10 + r4 * 0.04, 0.50 + r4 * 0.08, 0.09 + r4 * 0.03)
+
+	s = s * 16807 + 1; var la := float(s & 0x7FFFFFFF) / 2147483648.0 * TAU
+	s = s * 16807 + 1; var lb := float(s & 0x7FFFFFFF) / 2147483648.0
+	var lean: float = 0.06 + lb * 0.12
+	var stem_h: float = 0.30 + lb * 0.18
+	var leaf_r: float = 0.14 + lb * 0.08
+	var base := Vector3((r2 - 0.5) * 0.15, 0.0, (r2 - 0.5) * 0.15)
+	var stem_top := base + Vector3(cos(la) * lean, stem_h, sin(la) * lean)
+
+	var segs: int = 3
+	for seg in range(segs):
+		var t: float = float(seg + 1) / float(segs)
+		var pt: float = float(seg) / float(segs)
+		var mid_y: float = base.y + stem_h * (t + pt) * 0.5
+		var mid_x: float = base.x + cos(la) * lean * (t + pt) * 0.5
+		var mid_z: float = base.z + sin(la) * lean * (t + pt) * 0.5
+		var sw: float = 0.020 + lb * 0.010
+		var seg_mid := Vector3(mid_x, mid_y, mid_z)
+		var seg_h: float = stem_h / float(segs) * 0.5
+		_add_quad(st, seg_mid, Vector3(sw, 0, 0), Vector3(0, seg_h, 0), Vector3(0, 0, 1), col_stem)
+		_add_quad(st, seg_mid, Vector3(sw, 0, 0), Vector3(0, seg_h, 0), Vector3(0, 0, -1), col_stem)
+		_add_quad(st, seg_mid, Vector3(0, 0, sw), Vector3(0, seg_h, 0), Vector3(1, 0, 0), col_stem * 0.92)
+		_add_quad(st, seg_mid, Vector3(0, 0, sw), Vector3(0, seg_h, 0), Vector3(-1, 0, 0), col_stem * 0.92)
+	_draw_hex_leaf(st, stem_top, leaf_r, la, col_leaf, col_light, col_vein, s)
 
 func _build_weed(st: SurfaceTool, s: int) -> void:
 	var h1 := seed_h1
@@ -65,6 +177,8 @@ func _build_weed(st: SurfaceTool, s: int) -> void:
 	else:            seg_count = 5
 	seg_count = mini(seg_count, max_segs)
 	if seg_count < 1: seg_count = 1
+	if _stage == GrowingProp.Stage.YOUNG:
+		seg_count = mini(seg_count, 2)
 
 	var stem_g: float = 0.62 + r3 * 0.22
 	var stem_b: float = 0.08 + r3 * 0.10

@@ -261,7 +261,7 @@ func _input(event: InputEvent) -> void:
 	if not visible: return
 	if event is InputEventKey:
 		var k := event as InputEventKey
-		if k.pressed and k.keycode == KEY_G:
+		if k.pressed and k.is_action_pressed("map_grid"):
 			_on_toggle_grid()
 			if _node_toolbar:
 				var btn := _node_toolbar.get_node("TB4") as Button

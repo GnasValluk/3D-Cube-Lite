@@ -12,7 +12,10 @@ const _BlockData = preload("chunk_block_data.gd")
 const _RoadLamp = preload("chunk_road_lamp.gd")
 const _PalmProp = preload("res://scripts/world/props/palm_prop.gd")
 const _Terrain = preload("chunk_terrain.gd")
+const _Moss = preload("chunk_moss.gd")
+const _Village = preload("village.gd")
 const _WaterFlow = preload("water_flow.gd")
+const _OreTex = preload("res://scripts/items/models/ore_texture.gd")
 
 static func _is_water_bid(bid: int) -> bool:
 	return bid == _Data.BlockID.WATER \
@@ -41,6 +44,7 @@ var _water_tick_timer: float = 0.0
 var _has_water: bool = false
 var _max_water_ly: int = -1
 var _has_ores: bool = false
+var _has_soil: bool = false
 var _top_ly_cache := PackedInt32Array()
 
 ## Block data — cho phép set_block / get_block sau này (build/mine)
@@ -50,7 +54,6 @@ var block_data: _BlockData = null
 var _terrain_mesh_instance: MeshInstance3D = null
 var _water_mesh_instance: MeshInstance3D = null
 var _aquatic_mesh_instance: MeshInstance3D = null
-var _sediment_mesh_instance: MeshInstance3D = null
 var _textured_block_mesh_instances: Dictionary[int, MeshInstance3D] = {}
 var _mesh_container: Node3D = null
 var _lotus_lights: Array[OmniLight3D] = []
@@ -58,6 +61,46 @@ var _prop_queue: Array = []
 
 static var _mesh_cache: Dictionary = {}
 static var _pending_chunks: Dictionary = {}
+static var _pending_mutex := Mutex.new()
+
+## ── Task tracking: chờ mọi worker task xong trước khi process thoát ─────────
+## Worker chạy lúc teardown (chunk build, water, collision, decorative, prewarm)
+## đọc dữ liệu đang bị destroy → crash 0xC0000005 (từng tái hiện tất định ở
+## test_till/test_ore_tex/test_promote). Test gọi wait_for_tasks_async() trước
+## khi quit — engine bản này không có SceneTree.about_to_quit nên không thể
+## hook tập trung.
+static var _task_ids: Array[int] = []
+static var _task_mutex := Mutex.new()
+
+static func _track_task(tid: int) -> void:
+	_task_mutex.lock()
+	_task_ids.append(tid)
+	_task_mutex.unlock()
+
+static func _pending_task_count() -> int:
+	_task_mutex.lock()
+	var ids := _task_ids.duplicate()
+	_task_mutex.unlock()
+	var count := 0
+	for tid in ids:
+		if not WorkerThreadPool.is_task_completed(tid):
+			count += 1
+	return count
+
+## Đợi mọi task hoàn thành (kể cả task sinh deferred sau 1-2 frame).
+static func wait_for_tasks_async(tree: SceneTree, max_wait_ms: int = 15000) -> void:
+	var stable_frames := 0
+	var waited := 0
+	while stable_frames < 3:
+		if _pending_task_count() == 0:
+			stable_frames += 1
+		else:
+			stable_frames = 0
+		if waited >= max_wait_ms:
+			push_warning("WorldChunk.wait_for_tasks_async: timeout %dms" % max_wait_ms)
+			return
+		await tree.process_frame
+		waited += 16
 var _pending_data: Dictionary = {}
 static var _river_noise: FastNoiseLite = null
 static var _river_bed_noise: FastNoiseLite = null
@@ -65,12 +108,12 @@ static var _river_bed_noise: FastNoiseLite = null
 static func _ensure_river_noise() -> void:
 	if _river_noise == null:
 		_river_noise = FastNoiseLite.new()
-		_river_noise.seed = WorldSeed.seed_value + 9999
+		_river_noise.seed = SeedSnapshot.ensure() + 9999
 		_river_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 		_river_noise.frequency = 0.06
 	if _river_bed_noise == null:
 		_river_bed_noise = FastNoiseLite.new()
-		_river_bed_noise.seed = WorldSeed.seed_value + 10101
+		_river_bed_noise.seed = SeedSnapshot.ensure() + 10101
 		_river_bed_noise.noise_type = FastNoiseLite.TYPE_PERLIN
 		_river_bed_noise.frequency = 0.04
 
@@ -105,7 +148,7 @@ static func _reset_networks() -> void:
 	_River._noise_river = null
 
 static func _prewarm_networks() -> void:
-	var seed_v: int = WorldSeed.seed_value
+	var seed_v: int = SeedSnapshot.ensure()
 	if _networks_ready and _networks_seed == seed_v:
 		_prewarm_running = false
 		return
@@ -118,6 +161,7 @@ static func _prewarm_networks() -> void:
 
 static func prewarm_async() -> void:
 	var seed_v: int = WorldSeed.seed_value
+	SeedSnapshot.set_seed(seed_v)
 	if _networks_ready and _networks_seed == seed_v:
 		return
 	if _prewarm_running:
@@ -125,7 +169,7 @@ static func prewarm_async() -> void:
 	# Chặn ngay trên main thread — tránh loading screen start world với dữ liệu cũ
 	_networks_ready = false
 	_prewarm_running = true
-	WorkerThreadPool.add_task(_prewarm_networks)
+	_track_task(WorkerThreadPool.add_task(_prewarm_networks))
 
 static func _is_on_road(wx: float, wz: float) -> bool:
 	return _Road.is_on_road(wx, wz)
@@ -138,6 +182,9 @@ static func _cache_key(cx: int, cz: int, dim: int) -> String:
 
 func setup(cx: int, cz: int, size: int,
 		dimension_id: int = _Data._Dim.DimensionID.TWILIGHT, sync: bool = false) -> void:
+	# Đồng bộ SeedSnapshot với WorldSeed hiện tại (main thread) — test/flow có
+	# thể set WorldSeed.seed_value trực tiếp; worker chỉ đọc snapshot.
+	SeedSnapshot.set_seed(WorldSeed.seed_value)
 	_cx = cx; _cz = cz; _size = size
 	_dimension_id = dimension_id
 	_cols = int(_size / _Data.VOXEL)
@@ -155,14 +202,18 @@ func setup(cx: int, cz: int, size: int,
 		call_deferred("_schedule_decorative_rebuild")
 		return
 
+	_pending_mutex.lock()
 	_pending_chunks[ck] = self
-	WorkerThreadPool.add_task(
-		_thread_build.bind(ck, cx, cz, size, dimension_id), true, "chunk")
+	_pending_mutex.unlock()
+	_track_task(WorkerThreadPool.add_task(
+		_thread_build.bind(ck, cx, cz, size, dimension_id), true, "chunk"))
 
 static func _thread_build(ck: String, cx: int, cz: int, size: int, dim_id: int) -> void:
 	var data: Dictionary = compute_chunk(cx, cz, size, dim_id)
+	_pending_mutex.lock()
 	var chunk = _pending_chunks.get(ck)
 	_pending_chunks.erase(ck)
+	_pending_mutex.unlock()
 	if chunk != null and is_instance_valid(chunk) and chunk.is_inside_tree():
 		# Không apply_chunk trực tiếp — chỉ lưu data, manager promote 1 chunk/frame
 		# để tránh nhiều worker hoàn thành cùng lúc → node-creation spike trên main
@@ -513,7 +564,6 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					height_grid[ivx][ivz] = _Data.WATER_Y - 0.1
 					biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
 
-	# ── 4. Road grid ──────────────────────────────────────────────────────────
 	var road_grid: PackedByteArray
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		road_grid.resize(cols * cols)
@@ -534,6 +584,11 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	var bd := _BlockData.new()
 	bd.init(cols, cols)
 	_Terrain.fill_blocks(bd, biome_grid, height_grid, road_grid, cols, dim_id, cx, cz, size, nd, reef_mask)
+
+	# ── 5b. Đồi quặng trên bề mặt — chỉ khu vực xa spawn (deterministic) ─────
+	var ore_hill_info: Dictionary = { "cx": -1, "cz": -1 }
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		ore_hill_info = _Terrain.spawn_ore_hills(bd, biome_grid, height_grid, road_grid, cols, cx, cz, size)
 
 	# ── 6. Build terrain mesh từ block data (greedy mesher) ───────────────────
 	# top_ly_hint tính từ height grid — tránh scan lại 69 layer/column trong build
@@ -571,6 +626,24 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 
 			if not fast_mode and (b == _Data.TileType.GRASS or b == _Data.TileType.DARK_GRASS) and not is_road and h >= _Data.VOXEL * 0.9:
 				_Grass.add_voxel_grass(vx, vz, pos, grass_xforms, grass_colors, cols, height_grid)
+
+	# ── 6c. Rêu bám trên bề mặt đá/quặng (đứng/ngang tuỳ mặt block) ─────────
+	var moss_xforms: Array = []
+	var moss_colors: Array = []
+	if not fast_mode and dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		_Moss.add_moss(bd, cols, top_ly_hint, cx, cz, size, moss_xforms, moss_colors)
+
+	# ── 6d. Ngôi làng — đồng bằng dọc đường/sông (không trên đường) ───────
+	var village_data: Dictionary = { "has": false, "xforms": [], "colors": [], "info": {} }
+	if not fast_mode and dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		village_data = _Village.compute_village(cx, cz, size, dim_id,
+			biome_grid, height_grid, road_grid, river_flag, cols)
+
+	# ── 6e. Cầu tre — đường cắt sông (đặc trưng đường, không phụ thuộc làng) ─
+	var bridge_data: Dictionary = { "xforms": [], "colors": [] }
+	if not fast_mode and dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		bridge_data = _Village.compute_bridges(cx, cz, size, dim_id,
+			height_grid, river_flag, cols)
 	var mesh := st.commit()
 	if mesh == null:
 		return { "mesh": null, "water_mesh": null, "biome_grid": biome_grid,
@@ -666,9 +739,13 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	return {
 		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
 		"grass_blade_data": { "xforms": grass_xforms, "colors": grass_colors },
+		"moss_blade_data": { "xforms": moss_xforms, "colors": moss_colors },
+		"village_data": village_data,
+		"bridge_data": bridge_data,
+		"ore_hill": ore_hill_info,
 		"lotus_lights": lotus_lights, "biome_grid": biome_grid, "cols": cols,
+		"river_flag": river_flag,
 		"block_data_bytes": bd.to_bytes(), "lamp_positions": lamp_positions,
-		"sediment_mesh": (null if fast_mode else 	_Terrain.build_sediment_mesh(bd, cols)),
 		"textured_block_meshes": ore_meshes,
 		"plant_props": plant_props, "has_water": has_water,
 		"has_ores": not ore_meshes.is_empty(),
@@ -677,101 +754,40 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 
 
 
-## ── _get_textured_block_material: tạo 8x8 texture procedural theo block ────
-static var _textured_block_mats: Dictionary[int, Material] = {}
+## ── _get_textured_block_material: delegate OreTextures (mỗi ore 1 hoa văn) ──
 static func _get_textured_block_material(block_id: int) -> Material:
-	if _textured_block_mats.has(block_id):
-		return _textured_block_mats[block_id]
-	var base: Color
-	var speck_dark: Color
-	var speck_light: Color
-	var is_ore: bool = false
-	match block_id:
-		_Data.BlockID.SEDIMENT:
-			base = Color(0.50, 0.20, 0.10)
-			speck_dark = Color(0.55, 0.18, 0.08)
-			speck_light = Color(0.65, 0.30, 0.12)
-		_Data.BlockID.COPPER_ORE:
-			is_ore = true
-			base = Color(0.38, 0.35, 0.32)
-			speck_dark = Color(0.30, 0.28, 0.25)
-			speck_light = Color(0.80, 0.55, 0.25)
-		_Data.BlockID.BAUXITE_ORE:
-			is_ore = true
-			base = Color(0.38, 0.35, 0.32)
-			speck_dark = Color(0.30, 0.28, 0.25)
-			speck_light = Color(0.70, 0.70, 0.72)
-		_Data.BlockID.SILVER_ORE:
-			is_ore = true
-			base = Color(0.38, 0.38, 0.40)
-			speck_dark = Color(0.30, 0.30, 0.32)
-			speck_light = Color(0.85, 0.85, 0.92)
-		_Data.BlockID.IRON_ORE:
-			is_ore = true
-			base = Color(0.36, 0.33, 0.28)
-			speck_dark = Color(0.28, 0.25, 0.20)
-			speck_light = Color(0.55, 0.50, 0.45)
-		_Data.BlockID.GOLD_ORE:
-			is_ore = true
-			base = Color(0.38, 0.35, 0.30)
-			speck_dark = Color(0.30, 0.28, 0.22)
-			speck_light = Color(0.95, 0.80, 0.30)
-		_Data.BlockID.TITAN_ORE:
-			is_ore = true
-			base = Color(0.36, 0.34, 0.38)
-			speck_dark = Color(0.28, 0.26, 0.30)
-			speck_light = Color(0.65, 0.55, 0.80)
-		_Data.BlockID.PLATINUM_ORE:
-			is_ore = true
-			base = Color(0.38, 0.36, 0.38)
-			speck_dark = Color(0.30, 0.28, 0.30)
-			speck_light = Color(0.80, 0.85, 0.95)
-		_:
-			base = Color(0.50, 0.50, 0.50)
-			speck_dark = Color(0.30, 0.30, 0.30)
-			speck_light = Color(0.70, 0.70, 0.70)
-	var img := Image.create(8, 8, false, Image.FORMAT_RGBA8)
-	for y in range(8):
-		for x in range(8):
-			var h: int = x * 374761393 + y * 668265263 + 12345
-			h = (h ^ (h >> 13)) * 1274126177
-			h = h ^ (h >> 16)
-			var r := float(h & 0x7FFFFFFF) / 2147483648.0
-			var c := Color(
-				base.r + (r - 0.5) * 0.20,
-				base.g + (r - 0.5) * 0.15,
-				base.b + (r - 0.5) * 0.12
-			)
-			h = h * 16807 + 1
-			var speck := float(h & 0x7FFFFFFF) / 2147483648.0
-			if is_ore:
-				if speck > 0.82:
-					c = speck_dark
-				elif speck < 0.15:
-					c = speck_light
-			else:
-				if speck > 0.92:
-					c = speck_dark
-				elif speck < 0.06:
-					c = speck_light
-			img.set_pixel(x, y, c)
-	var tex := ImageTexture.create_from_image(img)
+	if block_id == _Data.BlockID.TILLED_SOIL:
+		return _OreTex.get_soil_material(false)
+	return _OreTex.get_material(block_id)
+
+## ── _build_xform_multimesh: BoxMesh đơn vị + vertex color (cỏ, rêu, làng, ...) ──
+## `unshaded=true` cho chi tiết nhỏ (cỏ/rêu); làng/cầu dùng shaded như cây dừa
+## (metallic 0, roughness cao, có ánh sáng).
+static func _build_xform_multimesh(xforms: Array, colors: Array,
+		shadow_on: bool = false, unshaded: bool = true) -> MultiMeshInstance3D:
+	var cube := BoxMesh.new()
+	cube.size = Vector3.ONE
 	var mat := StandardMaterial3D.new()
-	mat.albedo_texture = tex
-	mat.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	if is_ore:
-		mat.roughness = 0.65
-		mat.metallic_specular = 0.15
-		mat.emission_enabled = true
-		mat.emission_texture = tex
-		mat.emission_energy_multiplier = 0.25
+	mat.vertex_color_use_as_albedo = true
+	if unshaded:
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	else:
-		mat.roughness = 0.9
-		mat.metallic_specular = 0.0
-	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mat.render_priority = 1
-	_textured_block_mats[block_id] = mat
-	return mat
+		mat.metallic = 0.0
+		mat.roughness = 0.85
+	cube.material = mat
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = cube
+	mm.instance_count = xforms.size()
+	for i in range(xforms.size()):
+		mm.set_instance_transform(i, xforms[i] as Transform3D)
+		mm.set_instance_color(i, colors[i] as Color)
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if shadow_on \
+		else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mmi
 
 
 ## ── _build_textured_block_mesh: mesh có UV cho block có texture ─────────────
@@ -852,10 +868,11 @@ const _TEXTURED_BLOCK_IDS: Array[int] = [
 	_Data.BlockID.GOLD_ORE,
 	_Data.BlockID.TITAN_ORE,
 	_Data.BlockID.PLATINUM_ORE,
+	_Data.BlockID.COAL_ORE,
 ]
 
-## Ore chưa được sinh trong generation — đặt true khi bật feature để bỏ scan
-const _ORES_GENERATION_ENABLED: bool = false
+## Ore hiện được sinh qua đồi quặng (spawn_ore_hills) ở khu xa spawn
+const _ORES_GENERATION_ENABLED: bool = true
 
 static func _build_textured_block_meshes(bd: _BlockData, cols: int, max_ly: int = -1) -> Dictionary[int, ArrayMesh]:
 	const CHUNK_H := _BlockData.CHUNK_H
@@ -881,6 +898,117 @@ static func _build_textured_block_meshes(bd: _BlockData, cols: int, max_ly: int 
 		if m and m.get_surface_count() > 0:
 			result[bid] = m
 	return result
+
+## ── Đất tơi xốp: overlay mesh — ẩm/khô qua vertex color tint ────────────────
+## Ẩm khi có nước trong bán kính SOIL_RADIUS (tính từ block nước thực tế, đi
+## qua biên chunk bằng nb_data) — deterministic, không lưu state riêng.
+const _SOIL_DRY_TINT := Color(1.0, 0.96, 0.90)
+const _SOIL_WET_TINT := Color(0.55, 0.60, 0.72)
+
+static func _soil_cell_is_water(bd: _BlockData, nb_data: Dictionary, cols: int,
+		wx: int, wly: int, wz: int) -> bool:
+	if wx >= 0 and wx < cols and wz >= 0 and wz < cols:
+		return _is_water_bid(bd.get_block(wx, wly, wz))
+	var dir: String
+	var tx: int = wx
+	var tz: int = wz
+	if wx < 0:
+		dir = "w"; tx += cols
+	elif wx >= cols:
+		dir = "e"; tx -= cols
+	elif wz < 0:
+		dir = "n"; tz += cols
+	else:
+		dir = "s"; tz -= cols
+	if not nb_data.has(dir):
+		return false
+	var info: Dictionary = nb_data[dir]
+	var nb_bd: _BlockData = info["bd"]
+	var nb_cols: int = info["cols"]
+	if tx < 0 or tx >= nb_cols or tz < 0 or tz >= nb_cols:
+		return false
+	return _is_water_bid(nb_bd.get_block(tx, wly, tz))
+
+static func _soil_is_wet_at(bd: _BlockData, nb_data: Dictionary, cols: int,
+		x: int, ly: int, z: int) -> bool:
+	const CHUNK_H := _BlockData.CHUNK_H
+	var r: int = _Data.SOIL_RADIUS
+	var max_ly: int = mini(ly + r, CHUNK_H - 1)
+	for dx in range(-r, r + 1):
+		for dz in range(-r, r + 1):
+			for wly in range(ly, max_ly + 1):
+				if _soil_cell_is_water(bd, nb_data, cols, x + dx, wly, z + dz):
+					return true
+	return false
+
+static func _build_soil_mesh(bd: _BlockData, cols: int, nb_data: Dictionary = {}) -> ArrayMesh:
+	const Y_MIN := _BlockData.Y_MIN
+	const CHUNK_H := _BlockData.CHUNK_H
+	const SLAB := _BlockData.SLAB_HEIGHT
+	const B := _Data.BlockID
+	const _SIDE_MUL: float = 0.50
+	const _BOT_MUL: float = 0.35
+	var hw: float = _Data.VOXEL * 0.5
+	var half: float = float(cols) * _Data.VOXEL * 0.5
+
+	var top_ly := PackedInt32Array()
+	top_ly.resize(cols * cols)
+	top_ly.fill(-1)
+	for x in range(cols):
+		for z in range(cols):
+			for ly in range(CHUNK_H - 1, -1, -1):
+				if bd.get_block(x, ly, z) == B.TILLED_SOIL:
+					top_ly[x * cols + z] = ly
+					break
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+
+	for x in range(cols):
+		for z in range(cols):
+			var ly: int = top_ly[x * cols + z]
+			if ly < 0: continue
+			var cx_f: float = -half + (float(x) + 0.5) * _Data.VOXEL
+			var cz_f: float = -half + (float(z) + 0.5) * _Data.VOXEL
+			var cy_top: float = float(ly + Y_MIN) * SLAB + SLAB
+			var cy_bot: float = float(ly + Y_MIN) * SLAB
+
+			var wet: bool = _soil_is_wet_at(bd, nb_data, cols, x, ly, z)
+			var tint: Color = _SOIL_WET_TINT if wet else _SOIL_DRY_TINT
+
+			st.set_color(tint)
+			_Terrain._add_quad_uv(st, Vector3(cx_f, cy_top + 0.01, cz_f),
+				Vector3(hw, 0, 0), Vector3(0, 0, hw), Vector3(0, 1, 0))
+
+			if ly > 0:
+				var below: int = bd.get_block(x, ly - 1, z)
+				if below == B.AIR or _is_water_bid(below):
+					st.set_color(tint * _BOT_MUL)
+					_Terrain._add_quad_uv(st, Vector3(cx_f, cy_bot, cz_f),
+						Vector3(-hw, 0, 0), Vector3(0, 0, hw), Vector3(0, -1, 0))
+
+			var checks: Array = [
+				[z > 0, x, z - 1, Vector3(0, 0, -1), Vector3(0, 0, -hw)],
+				[z < cols - 1, x, z + 1, Vector3(0, 0, 1), Vector3(0, 0, hw)],
+				[x > 0, x - 1, z, Vector3(-1, 0, 0), Vector3(-hw, 0, 0)],
+				[x < cols - 1, x + 1, z, Vector3(1, 0, 0), Vector3(hw, 0, 0)],
+			]
+			for c in checks:
+				if not c[0]: continue
+				var nx: int = c[1]; var nz: int = c[2]
+				var nly: int = top_ly[nx * cols + nz]
+				if nly >= ly: continue
+				var nrm: Vector3 = c[3]; var off: Vector3 = c[4]
+				var n_top: float = float(nly + Y_MIN) * SLAB + SLAB if nly >= 0 else float(Y_MIN) * SLAB
+				var side_h: float = cy_top - max(cy_bot, n_top)
+				if side_h <= 0: continue
+				var cy_mid: float = cy_top - side_h * 0.5
+				var side_u: Vector3 = Vector3(hw, 0, 0) if abs(off.x) < 0.01 else Vector3(0, 0, hw)
+				st.set_color(tint * _SIDE_MUL)
+				_Terrain._add_quad_uv(st, Vector3(cx_f + off.x + nrm.x * 0.01, cy_mid, cz_f + off.z + nrm.z * 0.01),
+					side_u, Vector3(0, side_h * 0.5, 0), nrm)
+
+	return st.commit()
 
 ## ── _build_water_mesh: render exposed faces only (skip bottom, correct size) ─
 static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
@@ -1002,24 +1130,86 @@ func rebuild_water_mesh() -> void:
 		else:
 			add_child(mi_w)
 		_water_mesh_instance = mi_w
+	# Nước đổi → độ ẩm đất tơi xốp đổi theo
+	rebuild_soil_mesh()
 
 ## ── refresh_boundary_water: rebuild water mesh của chunk + 4 lân cận ────────
 func refresh_boundary_water() -> void:
-	if _has_water:
-		rebuild_water_mesh()
+	# Thu thập jobs (chunk này + lân cận có nước) trên main thread — chỉ vài
+	# lookup dictionary, rẻ. MESH BUILD CHẠY TRÊN MAIN (rate-limited trong
+	# WaterRebuildQueue._process): build ArrayMesh trên worker thread gây hư
+	# hỏng RenderingServer → crash 0xC0000005 khi process thoát (headless).
 	var parent := get_parent()
-	if parent == null: return
 	var chunks: Dictionary
-	if "_chunks" in parent:
+	if parent != null and "_chunks" in parent:
 		chunks = parent._chunks
 	else:
 		return
+	var jobs: Array = []
+	var seen: Dictionary = {}
+	_collect_water_job(chunks, self, jobs, seen)
 	for off in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
 		var key := Vector2i(_cx + off.x, _cz + off.y)
 		if chunks.has(key):
 			var nb := chunks[key] as WorldChunk
-			if nb and nb.block_data and nb._has_water:
-				nb.rebuild_water_mesh()
+			if nb:
+				_collect_water_job(chunks, nb, jobs, seen)
+	if jobs.is_empty():
+		return
+	if is_instance_valid(WaterRebuildQueue):
+		WaterRebuildQueue.push_jobs(jobs)
+
+## Gom 1 job rebuild water mesh của chunk `c` (nếu có nước) + refs lân cận.
+## Chạy trên main thread — chỉ đọc refs, không lock.
+static func _collect_water_job(chunks: Dictionary, c: WorldChunk, jobs: Array, seen: Dictionary) -> void:
+	var id := c.get_instance_id()
+	if seen.has(id):
+		return
+	seen[id] = true
+	if not c._has_water or c.block_data == null:
+		return
+	var nb: Dictionary = {}
+	for d in [["w", c._cx - 1, c._cz], ["e", c._cx + 1, c._cz], ["n", c._cx, c._cz - 1], ["s", c._cx, c._cz + 1]]:
+		var key := Vector2i(d[1], d[2])
+		if chunks.has(key):
+			var nb_chunk := chunks[key] as WorldChunk
+			if nb_chunk and nb_chunk.block_data:
+				nb[d[0]] = {"bd": nb_chunk.block_data, "cols": nb_chunk._cols}
+	jobs.append({
+		"inst_id": id,
+		"bd": c.block_data,
+		"cols": c._cols,
+		"dim_id": c._dimension_id,
+		"max_ly": c._max_water_ly,
+		"h_vox": _Data.VOXEL * 0.5,
+		"half": c._size * 0.5,
+		"nb": nb,
+	})
+
+## Build 1 water mesh từ job data — gọi TRÊN MAIN THREAD (xem refresh_boundary_water).
+static func _build_water_mesh_job(job: Dictionary) -> ArrayMesh:
+	return _build_water_mesh(job["bd"], job["cols"], job["dim_id"],
+		job["h_vox"], job["half"], job["nb"], job["max_ly"])
+
+## Main thread — gán mesh rebuild xong (từ worker) lên MeshInstance3D.
+func _apply_water_mesh(mesh: ArrayMesh) -> void:
+	if not is_inside_tree() or block_data == null:
+		return
+	_has_water = mesh != null and mesh.get_surface_count() > 0
+	if not _has_water:
+		_max_water_ly = -1
+	if _water_mesh_instance != null and is_instance_valid(_water_mesh_instance):
+		_water_mesh_instance.mesh = mesh
+	else:
+		var mi_w := MeshInstance3D.new()
+		mi_w.mesh = mesh
+		mi_w.material_override = _mat_cache[_dimension_id]["water"]
+		if _mesh_container != null:
+			_mesh_container.add_child(mi_w)
+		else:
+			add_child(mi_w)
+		_water_mesh_instance = mi_w
+	rebuild_soil_mesh()
 
 ## ── Materials ─────────────────────────────────────────────────────────────────
 func _make_water_shader(dim_id: int) -> ShaderMaterial:
@@ -1034,13 +1224,16 @@ uniform vec4 deep_color    : source_color = vec4(0.02, 0.18, 0.45, 0.85);
 uniform float wave_speed = 1.0;
 uniform float wave_height = 0.0;
 uniform float wave_freq = 8.0;
+uniform bool low_quality = false;
 
 void vertex() {
-	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	float w1 = sin(TIME * wave_speed + world_pos.x * wave_freq + world_pos.z * wave_freq * 0.7) * wave_height;
-	float w2 = sin(TIME * wave_speed * 1.7 + world_pos.x * wave_freq * 1.3 + world_pos.z * wave_freq * 0.9) * wave_height * 0.5;
-	float w3 = sin(TIME * wave_speed * 2.4 + world_pos.x * wave_freq * 0.6 + world_pos.z * wave_freq * 1.5) * wave_height * 0.3;
-	VERTEX.y += w1 + w2 + w3;
+	if (wave_height > 0.001) {
+		vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float w1 = sin(TIME * wave_speed + world_pos.x * wave_freq + world_pos.z * wave_freq * 0.7) * wave_height;
+		float w2 = sin(TIME * wave_speed * 1.7 + world_pos.x * wave_freq * 1.3 + world_pos.z * wave_freq * 0.9) * wave_height * 0.5;
+		float w3 = sin(TIME * wave_speed * 2.4 + world_pos.x * wave_freq * 0.6 + world_pos.z * wave_freq * 1.5) * wave_height * 0.3;
+		VERTEX.y += w1 + w2 + w3;
+	}
 }
 
 void fragment() {
@@ -1048,9 +1241,14 @@ void fragment() {
 	vec3 water_col = mix(deep_color.rgb, shallow_color.rgb, density);
 	vec3 world_pos = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	vec2 wuv = world_pos.xz * 3.0;
-	float c1 = sin(wuv.x * 4.0 + TIME * 1.2) * cos(wuv.y * 3.5 + TIME * 0.9);
-	float c2 = sin(wuv.x * 6.0 - TIME * 1.5) * cos(wuv.y * 5.0 + TIME * 1.1);
-	float caustic = max(0.0, c1 * c2 * 0.12);
+	float caustic;
+	if (low_quality) {
+		caustic = max(0.0, sin(wuv.x * 3.0 + TIME * 1.2) * 0.06 + 0.06);
+	} else {
+		float c1 = sin(wuv.x * 4.0 + TIME * 1.2) * cos(wuv.y * 3.5 + TIME * 0.9);
+		float c2 = sin(wuv.x * 6.0 - TIME * 1.5) * cos(wuv.y * 5.0 + TIME * 1.1);
+		caustic = max(0.0, c1 * c2 * 0.12);
+	}
 	vec3 refl = vec3(0.55, 0.72, 0.90) * 0.06;
 	vec3 final_col = water_col + refl + caustic;
 	ALBEDO = final_col;
@@ -1071,11 +1269,13 @@ uniform float wave_height = 0.0;
 uniform float wave_freq = 6.0;
 
 void vertex() {
-	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	float w1 = sin(TIME * wave_speed + world_pos.x * wave_freq + world_pos.z * wave_freq * 0.7) * wave_height;
-	float w2 = sin(TIME * wave_speed * 1.7 + world_pos.x * wave_freq * 1.3 + world_pos.z * wave_freq * 0.9) * wave_height * 0.5;
-	float w3 = sin(TIME * wave_speed * 2.4 + world_pos.x * wave_freq * 0.6 + world_pos.z * wave_freq * 1.5) * wave_height * 0.3;
-	VERTEX.y += w1 + w2 + w3;
+	if (wave_height > 0.001) {
+		vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float w1 = sin(TIME * wave_speed + world_pos.x * wave_freq + world_pos.z * wave_freq * 0.7) * wave_height;
+		float w2 = sin(TIME * wave_speed * 1.7 + world_pos.x * wave_freq * 1.3 + world_pos.z * wave_freq * 0.9) * wave_height * 0.5;
+		float w3 = sin(TIME * wave_speed * 2.4 + world_pos.x * wave_freq * 0.6 + world_pos.z * wave_freq * 1.5) * wave_height * 0.3;
+		VERTEX.y += w1 + w2 + w3;
+	}
 }
 
 void fragment() {
@@ -1088,6 +1288,8 @@ void fragment() {
 """
 	var m := ShaderMaterial.new()
 	m.shader = s
+	var is_mob: bool = DeviceManager != null and DeviceManager.is_mobile()
+	m.set_shader_parameter("low_quality", is_mob)
 	return m
 
 static var _mat_cache: Dictionary = {}
@@ -1138,7 +1340,6 @@ func apply_chunk(data: Dictionary) -> void:
 	_terrain_mesh_instance = null
 	_water_mesh_instance = null
 	_aquatic_mesh_instance = null
-	_sediment_mesh_instance = null
 	_textured_block_mesh_instances.clear()
 	for light in _lotus_lights:
 		LotusLightManager.unregister(light)
@@ -1168,15 +1369,6 @@ func apply_chunk(data: Dictionary) -> void:
 		mi_aq.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		container.add_child(mi_aq)
 		_aquatic_mesh_instance = mi_aq
-
-	var sediment_mesh: ArrayMesh = data.get("sediment_mesh")
-	if sediment_mesh:
-		var mi_s := MeshInstance3D.new()
-		mi_s.mesh = sediment_mesh
-		mi_s.material_override = _Terrain.get_sediment_material()
-		mi_s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		container.add_child(mi_s)
-		_sediment_mesh_instance = mi_s
 
 	var textured_block_meshes: Dictionary = data.get("textured_block_meshes", {})
 	for bid in textured_block_meshes:
@@ -1212,6 +1404,31 @@ func apply_chunk(data: Dictionary) -> void:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		container.add_child(mmi)
 
+	# Rêu đá — MultiMesh nhỏ (BoxMesh đơn vị + vertex color) như cỏ
+	var mbd: Dictionary = data.get("moss_blade_data", {})
+	var mxforms: Array = mbd.get("xforms", [])
+	var mcolors: Array = mbd.get("colors", [])
+	if mxforms.size() > 0:
+		var mmi_m := _build_xform_multimesh(mxforms, mcolors)
+		mmi_m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		container.add_child(mmi_m)
+
+	# Ngôi làng — MultiMesh có bóng đổ
+	var vbd: Dictionary = data.get("village_data", {})
+	var vxforms: Array = vbd.get("xforms", [])
+	var vcolors: Array = vbd.get("colors", [])
+	if vxforms.size() > 0:
+		var mmi_v := _build_xform_multimesh(vxforms, vcolors, true, false)
+		container.add_child(mmi_v)
+
+	# Cầu tre — MultiMesh có bóng đổ
+	var brd: Dictionary = data.get("bridge_data", {})
+	var brxforms: Array = brd.get("xforms", [])
+	var brcolors: Array = brd.get("colors", [])
+	if brxforms.size() > 0:
+		var mmi_b := _build_xform_multimesh(brxforms, brcolors, true, false)
+		container.add_child(mmi_b)
+
 	var lotus_positions: Array[Vector3] = data.get("lotus_lights", [] as Array[Vector3])
 	for lpos in lotus_positions:
 		var is_weed_light: bool = lpos.x > 400.0
@@ -1240,16 +1457,14 @@ func apply_chunk(data: Dictionary) -> void:
 	for light in _lotus_lights:
 		LotusLightManager.register(light)
 
-	# Collision trên worker thread — kết quả được queue vào CollisionQueue
-	# thay vì call_deferred trực tiếp để rate-limit trên main thread
-	var mesh_ref: ArrayMesh = mesh
-	var chunk_id: int = get_instance_id()  # dùng ID thay vì reference trực tiếp
-	WorkerThreadPool.add_task(func():
-		var shape: Shape3D = mesh_ref.create_trimesh_shape()
-		var chunk_inst = instance_from_id(chunk_id)
-		if is_instance_valid(chunk_inst):
-			CollisionQueue.push(chunk_inst, shape)
-	, false, "collision")
+	# Collision: queue (chunk, mesh) — shape ĐƯỢC TẠO TRÊN MAIN THREAD trong
+	# CollisionQueue._process (rate-limited).
+	# KHÔNG tạo shape trên worker: create_trimesh_shape → physics server
+	# (Jolt) — không thread-safe ở bản này — hư hỏng → crash 0xC0000005 lúc
+	# process thoát (đã tái hiện tất định bằng test_probe_tex).
+	if is_instance_valid(CollisionQueue):
+		CollisionQueue.push_mesh(self, mesh)
+
 
 	# Spawn đèn đường — dùng positions đã tính sẵn trên worker thread
 	if _dimension_id == _Data._Dim.DimensionID.REAL_WORLD:
@@ -1305,6 +1520,8 @@ func _notification(what: int) -> void:
 		# Xóa collision entries pending trong queue — tránh apply sau khi freed
 		if CollisionQueue:
 			CollisionQueue.remove_chunk(self)
+		if WaterRebuildQueue:
+			WaterRebuildQueue.clear_for_chunk(get_instance_id())
 
 func _apply_collision(shape: Shape3D) -> void:
 	if not is_inside_tree(): return
@@ -1319,20 +1536,26 @@ func _schedule_decorative_rebuild() -> void:
 	if block_data == null or _biome_grid.is_empty():
 		return
 	var ck: String = _cache_key(_cx, _cz, _dimension_id)
+	_pending_mutex.lock()
 	_pending_chunks[ck] = self
-	WorkerThreadPool.add_task(
+	_pending_mutex.unlock()
+	_track_task(WorkerThreadPool.add_task(
 		_thread_rebuild_decorative.bind(ck, _cx, _cz, _size, _dimension_id),
-		true, "decorative")
+		true, "decorative"))
 
 static func _thread_rebuild_decorative(ck: String, cx: int, cz: int, size: int, dim_id: int) -> void:
 	var data: Dictionary = compute_chunk(cx, cz, size, dim_id)
+	_pending_mutex.lock()
 	var chunk = _pending_chunks.get(ck)
 	_pending_chunks.erase(ck)
+	_pending_mutex.unlock()
 	if chunk == null or not is_instance_valid(chunk) or not chunk.is_inside_tree():
 		return
 	chunk.call_deferred("apply_decorative", {
 		"grass_blade_data": data.get("grass_blade_data", {}),
-		"sediment_mesh": data.get("sediment_mesh"),
+		"moss_blade_data": data.get("moss_blade_data", {}),
+		"village_data": data.get("village_data", {}),
+		"bridge_data": data.get("bridge_data", {}),
 		"textured_block_meshes": data.get("textured_block_meshes", {}),
 		"lamp_positions": data.get("lamp_positions", [])
 	})
@@ -1369,16 +1592,27 @@ func apply_decorative(data: Dictionary) -> void:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		container.add_child(mmi)
 
-	var sediment_mesh := data.get("sediment_mesh") as ArrayMesh
-	if sediment_mesh:
-		if _sediment_mesh_instance != null and is_instance_valid(_sediment_mesh_instance):
-			_sediment_mesh_instance.queue_free()
-		var mi_s := MeshInstance3D.new()
-		mi_s.mesh = sediment_mesh
-		mi_s.material_override = _Terrain.get_sediment_material()
-		mi_s.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		container.add_child(mi_s)
-		_sediment_mesh_instance = mi_s
+	var mbd: Dictionary = data.get("moss_blade_data", {})
+	var mxforms: Array = mbd.get("xforms", [])
+	var mcolors: Array = mbd.get("colors", [])
+	if mxforms.size() > 0:
+		var mmi_m := _build_xform_multimesh(mxforms, mcolors)
+		mmi_m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		container.add_child(mmi_m)
+
+	var vbd: Dictionary = data.get("village_data", {})
+	var vxforms: Array = vbd.get("xforms", [])
+	var vcolors: Array = vbd.get("colors", [])
+	if vxforms.size() > 0:
+		var mmi_v := _build_xform_multimesh(vxforms, vcolors, true, false)
+		container.add_child(mmi_v)
+
+	var brd: Dictionary = data.get("bridge_data", {})
+	var brxforms: Array = brd.get("xforms", [])
+	var brcolors: Array = brd.get("colors", [])
+	if brxforms.size() > 0:
+		var mmi_b := _build_xform_multimesh(brxforms, brcolors, true, false)
+		container.add_child(mmi_b)
 
 	var ore_meshes: Dictionary = data.get("textured_block_meshes", {})
 	for bid in ore_meshes:
@@ -1447,22 +1681,30 @@ func rebuild_mesh(at := Vector3i(-1, -1, -1)) -> void:
 	body.add_child(col)
 	add_child(body)
 
-	# Rebuild textured block (ore) overlay meshes — chỉ khi chunk có ore
-	if _has_ores:
-		var ore_meshes := _build_textured_block_meshes(block_data, _cols)
-		_has_ores = not ore_meshes.is_empty()
-		for bid in ore_meshes:
-			var ore_mesh: ArrayMesh = ore_meshes[bid]
-			if ore_mesh:
-				var mi_o := MeshInstance3D.new()
-				mi_o.mesh = ore_mesh
-				mi_o.material_override = _get_textured_block_material(bid)
-				mi_o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-				if _mesh_container != null:
-					_mesh_container.add_child(mi_o)
-				else:
-					add_child(mi_o)
-				_textured_block_mesh_instances[bid] = mi_o
+	# Rebuild textured block (ore) overlay meshes — scan lại từ block_data
+	# (không dùng cờ _has_ores: ore đặt tay vào chunk chưa từng có ore sẽ bị mất texture)
+	var max_top_ly: int = -1
+	if _top_ly_cache.size() == _cols * _cols:
+		max_top_ly = 0
+		for ly_v in _top_ly_cache:
+			max_top_ly = maxi(max_top_ly, ly_v)
+	var ore_meshes := _build_textured_block_meshes(block_data, _cols, max_top_ly)
+	_has_ores = not ore_meshes.is_empty()
+	for bid in ore_meshes:
+		var ore_mesh: ArrayMesh = ore_meshes[bid]
+		if ore_mesh:
+			var mi_o := MeshInstance3D.new()
+			mi_o.mesh = ore_mesh
+			mi_o.material_override = _get_textured_block_material(bid)
+			mi_o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			if _mesh_container != null:
+				_mesh_container.add_child(mi_o)
+			else:
+				add_child(mi_o)
+			_textured_block_mesh_instances[bid] = mi_o
+
+	# Rebuild đất tơi xốp overlay (ẩm/khô theo nước lân cận)
+	rebuild_soil_mesh()
 
 	block_data.dirty = false
 
@@ -1543,9 +1785,70 @@ func place_block_at(wx: float, wy: float, wz: float, block_id: int) -> bool:
 		rebuild_water_mesh()
 		rebuild_mesh(blk)
 	else:
+		if block_id == _Data.BlockID.TILLED_SOIL:
+			_has_soil = true
 		rebuild_mesh(blk)
 	_trigger_neighbor_water_tick(blk.x, blk.z)
 	return true
+
+## ── Cuốc đất: GRASS/DARK_GRASS/DIRT/DARK_DIRT → TILLED_SOIL ─────────────────
+## Trả về block cũ đã cuốc (0 = không cuốc được).
+func till_block_at(wx: float, wy: float, wz: float) -> int:
+	if block_data == null: return 0
+	var blk := world_to_local_block(wx, wy, wz)
+	var old_id: int = block_data.get_block(blk.x, blk.y, blk.z)
+	if not _Data.is_tillable(old_id): return 0
+	block_data.set_block(blk.x, blk.y, blk.z, _Data.BlockID.TILLED_SOIL)
+	_has_soil = true
+	_water_tick_timer = 0.0
+	rebuild_mesh(blk)
+	return old_id
+
+## ── rebuild_soil_mesh: rebuild overlay đất tơi xốp (khô/ẩm theo nước) ───────
+func rebuild_soil_mesh() -> void:
+	if block_data == null: return
+	if not _has_soil:
+		_has_soil = _scan_has_soil()
+		if not _has_soil: return
+	var nb_data := _get_neighbor_water_data()
+	var mesh := _build_soil_mesh(block_data, _cols, nb_data)
+	if mesh == null or mesh.get_surface_count() == 0:
+		_has_soil = false
+		_remove_soil_mesh_instance()
+		return
+	_has_soil = true
+	var mi := _textured_block_mesh_instances.get(_Data.BlockID.TILLED_SOIL) as MeshInstance3D
+	if mi == null or not is_instance_valid(mi):
+		mi = MeshInstance3D.new()
+		mi.mesh = mesh
+		mi.material_override = _get_textured_block_material(_Data.BlockID.TILLED_SOIL)
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if _mesh_container != null:
+			_mesh_container.add_child(mi)
+		else:
+			add_child(mi)
+		_textured_block_mesh_instances[_Data.BlockID.TILLED_SOIL] = mi
+	else:
+		mi.mesh = mesh
+
+func _remove_soil_mesh_instance() -> void:
+	var mi := _textured_block_mesh_instances.get(_Data.BlockID.TILLED_SOIL) as MeshInstance3D
+	if mi != null and is_instance_valid(mi):
+		mi.queue_free()
+	_textured_block_mesh_instances.erase(_Data.BlockID.TILLED_SOIL)
+
+## Đất tơi xốp luôn nằm trên bề mặt → scan theo top_ly_cache (625 lookup, rẻ).
+func _scan_has_soil() -> bool:
+	var cols := _cols
+	if _top_ly_cache.size() != cols * cols:
+		return false
+	for x in range(cols):
+		for z in range(cols):
+			var ly: int = _top_ly_cache[x * cols + z]
+			if ly < 0: continue
+			if block_data.get_block(x, ly, z) == _Data.BlockID.TILLED_SOIL:
+				return true
+	return false
 
 ## ── Aquatic shader ────────────────────────────────────────────────────────────
 static func make_aquatic_mat() -> ShaderMaterial:
@@ -1641,30 +1944,38 @@ func _trigger_neighbor_water_tick(lx: int, lz: int) -> void:
 		var key := Vector2i(_cx - 1, _cz)
 		if chunks.has(key):
 			var nb := chunks[key] as WorldChunk
-			if nb and nb._has_water:
-				nb._water_tick_timer = 0.0
-				nb.rebuild_water_mesh()
+			if nb:
+				if nb._has_water:
+					nb._water_tick_timer = 0.0
+					nb.rebuild_water_mesh()
+				nb.rebuild_soil_mesh()
 	if lx == _cols - 1:
 		var key := Vector2i(_cx + 1, _cz)
 		if chunks.has(key):
 			var nb := chunks[key] as WorldChunk
-			if nb and nb._has_water:
-				nb._water_tick_timer = 0.0
-				nb.rebuild_water_mesh()
+			if nb:
+				if nb._has_water:
+					nb._water_tick_timer = 0.0
+					nb.rebuild_water_mesh()
+				nb.rebuild_soil_mesh()
 	if lz == 0:
 		var key := Vector2i(_cx, _cz - 1)
 		if chunks.has(key):
 			var nb := chunks[key] as WorldChunk
-			if nb and nb._has_water:
-				nb._water_tick_timer = 0.0
-				nb.rebuild_water_mesh()
+			if nb:
+				if nb._has_water:
+					nb._water_tick_timer = 0.0
+					nb.rebuild_water_mesh()
+				nb.rebuild_soil_mesh()
 	if lz == _cols - 1:
 		var key := Vector2i(_cx, _cz + 1)
 		if chunks.has(key):
 			var nb := chunks[key] as WorldChunk
-			if nb and nb._has_water:
-				nb._water_tick_timer = 0.0
-				nb.rebuild_water_mesh()
+			if nb:
+				if nb._has_water:
+					nb._water_tick_timer = 0.0
+					nb.rebuild_water_mesh()
+				nb.rebuild_soil_mesh()
 
 ## ── _add_quad (shared helper, delegates to Terrain) ─────────────────────────
 static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,

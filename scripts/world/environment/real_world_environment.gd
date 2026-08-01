@@ -62,6 +62,8 @@ func _ready() -> void:
 
 	if SettingsManager:
 		SettingsManager.on_preset_changed(_reapply_preset)
+	if DeviceManager:
+		DeviceManager.device_changed.connect(func(_m: bool): _reapply_preset())
 
 	_setup_lights()
 
@@ -69,7 +71,7 @@ func _apply_graphics_preset(env: Environment) -> void:
 	if not SettingsManager:
 		return
 
-	var preset: int = SettingsManager.graphics_preset
+	var preset: int = SettingsManager.effective_graphics_preset()
 
 	match preset:
 		SettingsManager.GraphicsPreset.STANDARD:
@@ -152,7 +154,7 @@ func _setup_lights() -> void:
 			l.light_energy = 0.0
 
 func _apply_shadow_settings(dir: DirectionalLight3D) -> void:
-	var preset: int = SettingsManager.graphics_preset if SettingsManager else 0
+	var preset: int = SettingsManager.effective_graphics_preset() if SettingsManager else 0
 
 	match preset:
 		SettingsManager.GraphicsPreset.STANDARD:
@@ -179,6 +181,9 @@ func _apply_shadow_settings(dir: DirectionalLight3D) -> void:
 func _reapply_preset() -> void:
 	if environment:
 		_apply_graphics_preset(environment)
+	if _dir_light:
+		_apply_shadow_settings(_dir_light)
+	SettingsManager.apply_viewport_settings(get_viewport())
 
 func _process(delta: float) -> void:
 	var h: float = _get_hour()

@@ -9,6 +9,7 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"pickaxe":     _build_cup(pivot)
 		"shovel":    _build_xeng(pivot)
 		"axe":     _build_riu(pivot)
+		"hoe":     _build_cuoc(pivot)
 		"iron_sword":    _build_kiem(pivot)
 		"fishing_rod": _build_can_cau(pivot)
 		"iron_greatsword": _build_dai_kiem(pivot)
@@ -82,6 +83,23 @@ static func _build_xeng(p: Node3D) -> void:
 	_box(p, Vector3(0, 0.30, 0), Vector3(0.030, 0.035, 0.28), iron_d)
 	_box(p, Vector3(0, 0.37, 0), Vector3(0.05, 0.10, 0.07), iron)
 
+## ── Cuốc Sắt (Iron Hoe) — cán gỗ + lưỡi bản ngang ───────────────────────────
+static func _build_cuoc(p: Node3D) -> void:
+	var wood := _mat(Color(0.55, 0.32, 0.10))
+	var iron := _mat(Color(0.60, 0.60, 0.66))
+	var iron_d := _mat(Color(0.40, 0.40, 0.46))
+	var edge := _mat(Color(0.78, 0.80, 0.86))
+	# Cán gỗ
+	_cyl(p, Vector3(0, 0.16, 0), 0.040, 0.34, wood)
+	_cyl(p, Vector3(0, 0.06, 0), 0.045, 0.08, iron_d)
+	# Đai nối cán với lưỡi
+	_cyl(p, Vector3(0, 0.33, 0), 0.048, 0.05, iron)
+	# Lưỡi cuốc — bản ngang vuông góc cán
+	_box(p, Vector3(0, 0.38, 0), Vector3(0.07, 0.05, 0.30), iron)
+	_box(p, Vector3(0, 0.36, 0), Vector3(0.05, 0.05, 0.32), iron_d)
+	# Cạnh cắt (dưới cùng)
+	_box(p, Vector3(0, 0.33, 0), Vector3(0.03, 0.05, 0.34), edge)
+
 static func _build_riu(p: Node3D) -> void:
 	var wood := _mat(Color(0.48, 0.28, 0.08))
 	var iron := _mat(Color(0.58, 0.58, 0.62))
@@ -147,6 +165,15 @@ static func shovel_drop(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, 0, -2, 0, 1.0, 2.5, 1.0, handle)
 	ItemMeshShared.add_cube(p, 0, 1, 0, 2.5, 1.5, 1.2, blade)
 	ItemMeshShared.add_cube(p, 0, 3, 0, 2.0, 0.5, 1.5, blade.darkened(0.15))
+
+static func hoe_drop(p: Node3D) -> void:
+	var handle := Color(0.55, 0.40, 0.25)
+	var blade := Color(0.50, 0.50, 0.50)
+	var edge := Color(0.70, 0.72, 0.78)
+	ItemMeshShared.add_cube(p, 0, -2, 0, 1.0, 2.5, 1.0, handle)
+	ItemMeshShared.add_cube(p, 0, 1, 0, 3.0, 1.2, 1.0, blade)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 3.2, 1.0, 1.2, blade.darkened(0.15))
+	ItemMeshShared.add_cube(p, 0, -1, 0, 2.8, 0.6, 1.4, edge)
 
 static func axe_drop(p: Node3D) -> void:
 	var handle := Color(0.50, 0.35, 0.20)

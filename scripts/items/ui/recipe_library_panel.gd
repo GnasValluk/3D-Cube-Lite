@@ -1,6 +1,8 @@
 extends Control
 class_name RecipeLibraryPanel
 
+const _RecipeDB = preload("res://scripts/items/core/recipe_database.gd")
+
 const S: float = 1.6
 
 const BG_DEEP := Color(0.06, 0.04, 0.12)
@@ -15,6 +17,7 @@ var _categories: Array[String] = []
 var _cat_buttons: Array[Button] = []
 var _selected_cat: int = 0
 var _tween: Tween
+var _list_box: VBoxContainer
 
 func _ready() -> void:
 	_categories = [
@@ -24,12 +27,13 @@ func _ready() -> void:
 		tr("LIB_CAT_FOOD"),
 		tr("LIB_CAT_POTIONS"),
 		tr("LIB_CAT_MATERIALS"),
+		"Công Trình",
 	]
 
 	_setup_bg()
 	_setup_title()
 	_setup_category_tabs()
-	_setup_empty_state()
+	_setup_list()
 
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
@@ -100,19 +104,93 @@ func _setup_category_tabs() -> void:
 		add_child(btn)
 		_cat_buttons.append(btn)
 
-func _setup_empty_state() -> void:
-	var lbl := Label.new()
-	lbl.text = tr("NO_RECIPES")
-	lbl.position = Vector2(10, 100)
-	lbl.size = Vector2(PANEL_W - 20, 200)
-	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lbl.add_theme_font_size_override("font_size", int(S * 11))
-	lbl.add_theme_color_override("font_color", TEXT_MUTED)
-	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	add_child(lbl)
+func _setup_list() -> void:
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(10, 80)
+	scroll.size = Vector2(PANEL_W - 20, 600 - 90)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
+	_list_box = VBoxContainer.new()
+	_list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_list_box.add_theme_constant_override("separation", 8)
+	scroll.add_child(_list_box)
+
+func _recipe_category_idx(cat: String) -> int:
+	if cat == _RecipeDB.CAT_TOOLS:
+		return 2
+	if cat == _RecipeDB.CAT_MATERIALS:
+		return 5
+	if cat == _RecipeDB.CAT_STRUCTURES:
+		return 6
+	return -1
+
+func _populate() -> void:
+	_RecipeDB.ensure()
+	for ch in _list_box.get_children():
+		ch.queue_free()
+	for r in _RecipeDB.recipes:
+		if _selected_cat != 0 and _recipe_category_idx(r.get("category", "")) != _selected_cat:
+			continue
+		var card := Panel.new()
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(0.14, 0.10, 0.22, 0.85)
+		style.corner_radius_top_left = 8; style.corner_radius_top_right = 8
+		style.corner_radius_bottom_left = 8; style.corner_radius_bottom_right = 8
+		style.border_width_left = 1; style.border_width_right = 1
+		style.border_width_top = 1; style.border_width_bottom = 1
+		style.border_color = Color(0.55, 0.57, 0.62, 0.15)
+		card.add_theme_stylebox_override("panel", style)
+		card.custom_minimum_size = Vector2(PANEL_W - 20, 0)
+		_list_box.add_child(card)
+
+		var title := Label.new()
+		title.text = r.get("name", r.get("id", ""))
+		title.add_theme_font_size_override("font_size", int(S * 12))
+		title.add_theme_color_override("font_color", TEXT_BRIGHT)
+		title.position = Vector2(12, 6)
+		title.size = Vector2(PANEL_W - 44, 22)
+		card.add_child(title)
+
+		var cat := Label.new()
+		cat.text = r.get("category", "")
+		cat.add_theme_font_size_override("font_size", int(S * 8))
+		cat.add_theme_color_override("font_color", TEXT_MUTED)
+		cat.position = Vector2(PANEL_W - 130, 9)
+		cat.size = Vector2(100, 18)
+		cat.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		card.add_child(cat)
+
+		var ing_text := ""
+		var ing: Dictionary = r.get("ingredients", {})
+		var first := true
+		for ing_id in ing:
+			if not first:
+				ing_text += " + "
+			first = false
+			var def: ItemDef = ItemDatabase.items_db.get(ing_id) as ItemDef
+			ing_text += "%s x%d" % [def.name if def != null else ing_id, ing[ing_id]]
+		var ing_label := Label.new()
+		ing_label.text = ing_text
+		ing_label.add_theme_font_size_override("font_size", int(S * 9))
+		ing_label.add_theme_color_override("font_color", TEXT_DIM)
+		ing_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		ing_label.position = Vector2(12, 30)
+		ing_label.size = Vector2(PANEL_W - 44, 20)
+		card.add_child(ing_label)
+
+		var res_def: ItemDef = ItemDatabase.items_db.get(r.get("result", "")) as ItemDef
+		var res_label := Label.new()
+		res_label.text = "→ %s x%d" % [res_def.name if res_def != null else r.get("result", ""), r.get("count", 1)]
+		res_label.add_theme_font_size_override("font_size", int(S * 9))
+		res_label.add_theme_color_override("font_color", Color(0.65, 0.85, 0.55))
+		res_label.position = Vector2(12, 50)
+		res_label.size = Vector2(PANEL_W - 44, 20)
+		card.add_child(res_label)
+		card.custom_minimum_size = Vector2(0, 76)
 
 func open() -> void:
+	ItemDatabase.ensure_db()
+	_populate()
 	_play_appear()
 
 func close() -> void:
@@ -143,3 +221,4 @@ func _on_cat_toggled(pressed: bool, idx: int) -> void:
 		_selected_cat = idx
 		for i in _cat_buttons.size():
 			_cat_buttons[i].button_pressed = i == idx
+		_populate()

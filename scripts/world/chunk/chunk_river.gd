@@ -11,7 +11,7 @@ static func _intersection(gx: int, gz: int) -> Vector2:
 	var key: Vector2i = Vector2i(gx, gz)
 	if _int_cache.has(key):
 		return _int_cache[key]
-	var h: int = WorldSeed.seed_value + 8888 + gx * 73856093 + gz * 19349663
+	var h: int = SeedSnapshot.ensure() + 8888 + gx * 73856093 + gz * 19349663
 	h = (h ^ (h >> 13)) * 1274126177; h = h ^ (h >> 16)
 	var rx: float = float(h & 0x7FFFFFFF) / 2147483648.0
 	h = h * 16807 + 1
@@ -24,19 +24,30 @@ static func _intersection(gx: int, gz: int) -> Vector2:
 	return res
 
 static func _point_to_seg_d2(p: Vector2, a: Vector2, b: Vector2) -> float:
-	var ab: Vector2 = b - a
-	var len2: float = ab.length_squared()
+	var abx: float = b.x - a.x
+	var aby: float = b.y - a.y
+	var len2: float = abx * abx + aby * aby
+	var px: float = p.x
+	var py: float = p.y
+	var ddx: float
+	var ddy: float
 	if len2 == 0.0:
-		return p.distance_squared_to(a)
-	var t: float = clamp((p - a).dot(ab) / len2, 0.0, 1.0)
-	return p.distance_squared_to(a.lerp(b, t))
+		ddx = px - a.x
+		ddy = py - a.y
+		return ddx * ddx + ddy * ddy
+	var t: float = clamp(((px - a.x) * abx + (py - a.y) * aby) / len2, 0.0, 1.0)
+	var cx: float = a.x + abx * t
+	var cy: float = a.y + aby * t
+	ddx = px - cx
+	ddy = py - cy
+	return ddx * ddx + ddy * ddy
 
 static var _noise_river: FastNoiseLite = null
 
 static func _get_noise() -> FastNoiseLite:
 	if _noise_river == null:
 		_noise_river = FastNoiseLite.new()
-		_noise_river.seed = WorldSeed.seed_value + 12121
+		_noise_river.seed = SeedSnapshot.ensure() + 12121
 		_noise_river.noise_type = FastNoiseLite.TYPE_PERLIN
 		_noise_river.frequency = 0.012
 	return _noise_river
@@ -70,7 +81,7 @@ static func _make_curve_hash(a: Vector2, b: Vector2, h: int) -> PackedVector2Arr
 	return wp
 
 static func _index_curves() -> void:
-	var cell_sz: float = _Data.RIVER_GRID * 0.5
+	var cell_sz: float = _Data.RIVER_GRID * 0.25
 	for ci in range(_river_curves.size()):
 		var wp: PackedVector2Array = _river_curves[ci]
 		for i in range(wp.size() - 1):
@@ -97,7 +108,7 @@ static func _ensure_rivers() -> void:
 		return
 	_river_ready = true
 
-	var seed_base: int = WorldSeed.seed_value + 8888
+	var seed_base: int = SeedSnapshot.ensure() + 8888
 	var inters: Dictionary = {}
 	for gx in range(-_Data.RIVER_GRID_R, _Data.RIVER_GRID_R + 1):
 		for gz in range(-_Data.RIVER_GRID_R, _Data.RIVER_GRID_R + 1):
@@ -164,7 +175,7 @@ static func is_on_river(wx: float, wz: float) -> bool:
 # Returns -1 if not on river, else 0.0 (centerline) → 1.0 (outer bank edge)
 static func river_distance_factor(wx: float, wz: float) -> float:
 	_ensure_rivers()
-	var cell_sz: float = _Data.RIVER_GRID * 0.5
+	var cell_sz: float = _Data.RIVER_GRID * 0.25
 	var ck: Vector2i = Vector2i(int(wx / cell_sz), int(wz / cell_sz))
 	var segs: PackedInt32Array = _river_spatial.get(ck, PackedInt32Array())
 	if segs.is_empty():

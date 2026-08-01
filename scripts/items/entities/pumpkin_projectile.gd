@@ -140,7 +140,7 @@ func _check_hit() -> void:
 		if ch == _shooter:
 			continue
 		var offset: Vector3 = global_position - ch.global_position
-		if offset.length() < 1.0:
+		if offset.length() < 1.0 + ch.hit_radius:
 			_on_impact()
 			return
 

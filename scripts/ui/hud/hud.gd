@@ -427,60 +427,56 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
-			var kb := SettingsData.key_bindings if SettingsData else {}
-			var k_interact: int = kb.get("controls/interact", KEY_F)
-			var k_inventory: int = kb.get("controls/inventory", KEY_E)
-			var k_debug: int = kb.get("controls/debug", KEY_F2)
-
 			if _chest_open:
-				if k.keycode == k_interact or k.keycode == KEY_ESCAPE or k.keycode == k_inventory:
+				if k.is_action_pressed("controls/interact") or k.is_action_pressed("ui_cancel") or k.is_action_pressed("controls/inventory"):
 					close_chest()
 				return
 
 			if _furnace_open:
-				if k.keycode == k_interact or k.keycode == KEY_ESCAPE or k.keycode == k_inventory:
+				if k.is_action_pressed("controls/interact") or k.is_action_pressed("ui_cancel") or k.is_action_pressed("controls/inventory"):
 					close_furnace()
 				return
 
 			if _crafting_open:
-				if k.keycode == k_interact or k.keycode == KEY_ESCAPE or k.keycode == k_inventory:
+				if k.is_action_pressed("controls/interact") or k.is_action_pressed("ui_cancel") or k.is_action_pressed("controls/inventory"):
 					close_crafting()
 				return
 
 			if _inventory_open:
-				if k.keycode == k_inventory or k.keycode == KEY_ESCAPE:
+				if k.is_action_pressed("controls/inventory") or k.is_action_pressed("ui_cancel"):
 					_toggle_inventory()
 				return
 
 			if _placement_sys and _placement_sys.is_placing():
-				if k.keycode == KEY_ESCAPE:
+				if k.is_action_pressed("ui_cancel"):
 					_placement_sys.cancel_placement()
 					_build_hint.text = ""
 				return
 
-			if k.keycode >= KEY_1 and k.keycode <= KEY_9:
-				var cur := _mgr.get_current_character() if _mgr else null
-				if cur is PlayerCharacter and _hotbar.visible:
-					_hotbar.select_slot(k.keycode - KEY_1)
-					return
+			for i in range(9):
+				if k.is_action_pressed("hotbar_%d" % (i + 1)):
+					var cur := _mgr.get_current_character() if _mgr else null
+					if cur is PlayerCharacter and _hotbar.visible:
+						_hotbar.select_slot(i)
+						return
 
-			if k.keycode == k_interact:
+			if k.is_action_pressed("controls/interact"):
 				var player := _find_player_character()
 				if player:
 					player.interact_with_nearby()
 				return
 
-			if k.keycode == k_inventory:
+			if k.is_action_pressed("controls/inventory"):
 				var cur := _mgr.get_current_character() if _mgr else null
 				if cur is PlayerCharacter:
 					_toggle_inventory()
 				return
 
-			if k.keycode == k_debug:
+			if k.is_action_pressed("controls/debug"):
 				_toggle_debug()
 				return
 
-			if k.keycode == KEY_F3:
+			if k.is_action_pressed("phone_toggle"):
 				if _phone_ui:
 					if _phone_ui.visible:
 						_phone_ui.close()
@@ -488,7 +484,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 						_phone_ui.open()
 				return
 
-			if k.keycode == KEY_ESCAPE:
+			if k.is_action_pressed("ui_cancel"):
 				if _explore_map and _explore_map.visible:
 					_explore_map.close()
 				elif _build_menu and _build_menu.visible:
@@ -597,7 +593,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
 			if mb.button_index == MOUSE_BUTTON_WHEEL_UP or mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-				if Input.is_key_pressed(KEY_CTRL) and _hotbar.visible:
+				if Input.is_action_pressed("crouch") and _hotbar.visible:
 					var cur := _mgr.get_current_character() if _mgr else null
 					if cur is PlayerCharacter:
 						var idx: int = _hotbar.get_selected()
@@ -756,7 +752,9 @@ func _on_hotbar_slot_changed(idx: int) -> void:
 func _is_building_item(def: ItemDef) -> bool:
 	if def.type == ItemDef.Type.BLOCK:
 		return true
-	if def.id in ["twilight_gate", "chest", "crafting_table", "water_bucket"]:
+	if def.id in ["twilight_gate", "chest", "crafting_table", "water_bucket", "fishing_boat"]:
+		return true
+	if def.id in ["coconut_seed", "taro_seed", "seaweed_seed"]:
 		return true
 	return false
 

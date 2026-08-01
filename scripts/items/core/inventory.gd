@@ -59,10 +59,13 @@ func swap(idx_a: int, idx_b: int) -> void:
 		return
 	var temp_item: ItemDef = slots[idx_a].item
 	var temp_count: int = slots[idx_a].count
+	var temp_dur: int = slots[idx_a].durability
 	slots[idx_a].item = slots[idx_b].item
 	slots[idx_a].count = slots[idx_b].count
+	slots[idx_a].durability = slots[idx_b].durability
 	slots[idx_b].item = temp_item
 	slots[idx_b].count = temp_count
+	slots[idx_b].durability = temp_dur
 
 func transfer(from_idx: int, to_idx: int) -> bool:
 	if from_idx < 0 or from_idx >= slots.size() or to_idx < 0 or to_idx >= slots.size():
@@ -74,6 +77,7 @@ func transfer(from_idx: int, to_idx: int) -> bool:
 	if dst.is_empty():
 		dst.item = src.item
 		dst.count = src.count
+		dst.durability = src.durability
 		src.clear()
 		return true
 	if src.item.id == dst.item.id and dst.item.stackable and dst.count < dst.item.max_stack:
@@ -158,7 +162,10 @@ func to_dict() -> Array:
 		if slot.is_empty():
 			arr.append(null)
 		else:
-			arr.append({"id": slot.item.id, "count": slot.count})
+			var d: Dictionary = {"id": slot.item.id, "count": slot.count}
+			if slot.durability >= 0:
+				d["dur"] = slot.durability
+			arr.append(d)
 	return arr
 
 func from_dict(data: Array) -> void:
@@ -171,6 +178,8 @@ func from_dict(data: Array) -> void:
 			if db.has(item_id):
 				slots[i].item = db[item_id]
 				slots[i].count = count
+				if slots[i].durability >= 0:
+					slots[i].durability = clampi(int(data[i].get("dur", slots[i].durability)), 0, slots[i].item.max_durability)
 			else:
 				slots[i].item = null
 				slots[i].count = 0
@@ -205,5 +214,26 @@ func split_stack(idx: int, count: int) -> int:
 		return -1
 	slots[empty_idx].item = slot.item
 	slots[empty_idx].count = count
+	slots[empty_idx].durability = slot.durability
 	slot.count -= count
 	return empty_idx
+
+# ── Độ bền ──────────────────────────────────────────────────────────────────
+## Slot chứa item_def nào (nếu có). Dùng để truy độ bền của item đang cầm.
+func find_slot_of_item(item_def: ItemDef) -> int:
+	if item_def == null:
+		return -1
+	for i in range(slots.size()):
+		if not slots[i].is_empty() and slots[i].item == item_def:
+			return i
+	return -1
+
+## Trừ độ bền của slot. Trả về true nếu còn dùng được; false nếu vỡ.
+func damage_slot_durability(idx: int, amount: int) -> bool:
+	if idx < 0 or idx >= slots.size():
+		return true
+	var slot: ItemSlot = slots[idx]
+	if slot.is_empty() or slot.durability < 0:
+		return true
+	slot.durability = maxi(slot.durability - amount, 0)
+	return slot.durability > 0

@@ -26,7 +26,7 @@ static func take_damage(character: CharacterBase, amount: int, attacker: Node3D 
 		character.hp_changed.emit(character.hp, character.max_hp)
 		character.damage_taken.emit(dmg, attacker)
 	if character.hp <= 0:
-		_die(character, attacker)
+		character._die(attacker)
 
 static func add_shield(character: CharacterBase, amount: int) -> void:
 	character.shield += amount

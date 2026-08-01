@@ -27,6 +27,8 @@ var _slot_faces: Array[ColorRect] = []
 var _slot_labels: Array[Label] = []
 var _slot_icons: Array[TextureRect] = []
 var _slot_count_labels: Array[Label] = []
+var _slot_dur_bg: Array[ColorRect] = []
+var _slot_dur: Array[ColorRect] = []
 var _tooltip: Label = null
 var _tooltip_bg: ColorRect = null
 
@@ -141,6 +143,25 @@ func _drop_data(position, data):
 		panel.add_child(cnt)
 		_slot_count_labels.append(cnt)
 
+		# Thanh độ bền (kiểu Minecraft) — đáy slot
+		var dur_bg := ColorRect.new()
+		dur_bg.position = Vector2(4, ss - 7)
+		dur_bg.size = Vector2(ss - 8, 3)
+		dur_bg.color = Color(0.05, 0.05, 0.08, 0.85)
+		dur_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dur_bg.visible = false
+		panel.add_child(dur_bg)
+		_slot_dur_bg.append(dur_bg)
+
+		var dur := ColorRect.new()
+		dur.position = Vector2(4, ss - 7)
+		dur.size = Vector2(ss - 8, 3)
+		dur.color = Color(0.35, 0.85, 0.45)
+		dur.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dur.visible = false
+		panel.add_child(dur)
+		_slot_dur.append(dur)
+
 		var key_lbl := Label.new()
 		key_lbl.position = Vector2(3, 0)
 		key_lbl.size = Vector2(20, 20)
@@ -198,7 +219,11 @@ func _on_slot_mouse_entered(idx: int) -> void:
 		_slots[idx].add_theme_stylebox_override("panel", _slot_hover_style)
 		return
 	_tooltip.text = slot.item.name
+	if slot.item.max_durability > 0 and slot.durability >= 0:
+		_tooltip.text += "\nĐộ bền: %d/%d" % [slot.durability, slot.item.max_durability]
 	_tooltip_bg.size.x = max(170, _tooltip.get_minimum_size().x + 8)
+	_tooltip_bg.size.y = max(40, _tooltip.get_minimum_size().y + 6)
+	_tooltip.size.y = _tooltip_bg.size.y - 4
 	_tooltip_bg.visible = true
 	_tooltip.visible = true
 	_slots[idx].add_theme_stylebox_override("panel", _slot_hover_style)
@@ -296,7 +321,7 @@ func _auto_equip_selected() -> void:
 		return
 	var item: ItemDef = slot.item
 	print("[Hotbar] equipping item: ", item.id, " type=", item.type)
-	player.equip_weapon_direct(item)
+	player.equip_weapon_direct(item, _selected)
 
 func _find_player() -> PlayerCharacter:
 	if _player_ref != null:
@@ -362,6 +387,8 @@ func _process(_delta: float) -> void:
 			_slot_count_labels[i].text = ""
 			_slot_icons[i].texture = null
 			_slot_icons[i].visible = false
+			_slot_dur_bg[i].visible = false
+			_slot_dur[i].visible = false
 		else:
 			var tex := ItemDatabase.load_icon_2d(slot.item.id)
 			if tex:
@@ -375,6 +402,20 @@ func _process(_delta: float) -> void:
 				_slot_icons[i].visible = false
 				_slot_labels[i].text = slot.item.icon_char
 			_slot_count_labels[i].text = str(slot.count) if slot.count > 1 else ""
+			var ratio: float = slot.get_durability_ratio()
+			if ratio < 0.0:
+				_slot_dur_bg[i].visible = false
+				_slot_dur[i].visible = false
+			else:
+				_slot_dur_bg[i].visible = true
+				_slot_dur[i].visible = true
+				_slot_dur[i].size.x = (62.0 - 8.0) * ratio
+				if ratio > 0.5:
+					_slot_dur[i].color = Color(0.35, 0.85, 0.45)
+				elif ratio > 0.2:
+					_slot_dur[i].color = Color(0.95, 0.65, 0.15)
+				else:
+					_slot_dur[i].color = Color(0.90, 0.25, 0.20)
 
 	var player := _player_ref
 	if player == null:

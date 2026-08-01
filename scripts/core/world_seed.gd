@@ -3,7 +3,10 @@ extends Node
 const SAVE_PATH: String = "user://saves.json"
 const _WorldChunk := preload("res://scripts/world/chunk/world_chunk.gd")
 
-var seed_value: int = 42
+var seed_value: int = 42:
+	set(v):
+		seed_value = v
+		SeedSnapshot.set_seed(v)
 var target_scene: String = "res://scenes/open_world_real.tscn"
 var world_name: String = ""
 var is_loading: bool = false
@@ -11,10 +14,12 @@ var is_loading: bool = false
 func _ready() -> void:
 	randomize()
 	seed_value = randi() % 2147483647
+	SeedSnapshot.set_seed(seed_value)
 	target_scene = "res://scenes/open_world_real.tscn"
 
 func start_new_journey(name: String, seed_val: int) -> void:
 	seed_value = seed_val
+	SeedSnapshot.set_seed(seed_val)
 	world_name = name
 	target_scene = "res://scenes/open_world_real.tscn"
 	is_loading = false
@@ -42,6 +47,7 @@ func load_journey(idx: int) -> bool:
 	var s: Dictionary = saves.saves[idx]
 	world_name = s.get("name", "World")
 	seed_value = s.get("seed", randi() % 2147483647)
+	SeedSnapshot.set_seed(seed_value)
 	target_scene = "res://scenes/open_world_real.tscn"
 	is_loading = SaveManager and SaveManager.save_exists(world_name)
 	if SaveManager:

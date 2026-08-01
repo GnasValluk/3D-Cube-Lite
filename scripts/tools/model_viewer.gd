@@ -310,36 +310,34 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
-			var k_debug: int = ProjectSettings.get_setting("controls/debug", KEY_F2)
-			if k.keycode == k_debug:
+			if k.is_action_pressed("controls/debug"):
 				_toggle_debug()
 				return
 			if _debug_open:
 				return
-			match k.keycode:
-				KEY_RIGHT, KEY_D:
-					_next()
-				KEY_LEFT, KEY_A:
-					_prev()
-				KEY_UP, KEY_W:
-					_category = (_category + 1) % 4
-					_index = 0
-					_auto_rotate = true
-					_target_pos = Vector3.ZERO
-					_refresh()
-				KEY_DOWN, KEY_S:
-					_category = (_category - 1 + 4) % 4
-					_index = 0
-					_auto_rotate = true
-					_target_pos = Vector3.ZERO
-					_refresh()
-				KEY_SPACE:
-					_auto_rotate = not _auto_rotate
-				KEY_R:
-					_target_pos = Vector3.ZERO
-					_yaw = 0.0
-					_pitch = -25.0
-					_dist = 3.0
+			if k.is_action_pressed("move_right"):
+				_next()
+			elif k.is_action_pressed("move_left"):
+				_prev()
+			elif k.is_action_pressed("move_forward"):
+				_category = (_category + 1) % 4
+				_index = 0
+				_auto_rotate = true
+				_target_pos = Vector3.ZERO
+				_refresh()
+			elif k.is_action_pressed("move_back"):
+				_category = (_category - 1 + 4) % 4
+				_index = 0
+				_auto_rotate = true
+				_target_pos = Vector3.ZERO
+				_refresh()
+			elif k.keycode == KEY_SPACE:
+				_auto_rotate = not _auto_rotate
+			elif k.keycode == KEY_R:
+				_target_pos = Vector3.ZERO
+				_yaw = 0.0
+				_pitch = -25.0
+				_dist = 3.0
 
 func _next() -> void:
 	var mx := _max_index()

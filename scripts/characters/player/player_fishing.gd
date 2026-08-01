@@ -15,6 +15,7 @@ static func action(player) -> void:
 static func cast_line(player) -> void:
 	var target: Vector3 = player._calc_aim_dir() * 8.0 + player.global_position
 	target.y = 0.46
+	player._damage_equipped_tool(1)
 	var bob: Node = load("res://scripts/items/entities/fishing_bobber.gd").new()
 	var root: Node = player.get_tree().current_scene
 	if root:

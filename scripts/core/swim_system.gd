@@ -16,7 +16,7 @@ static func swim_physics(character: CharacterBase, delta: float) -> void:
 	if wants_jump:
 		character.velocity.y = character._jump_v * 0.7
 		character._swim_jump_cd = 0.6
-	elif character._is_player and Input.is_key_pressed(KEY_SPACE):
+	elif character._is_player and Input.is_action_pressed("jump"):
 		if character.global_position.y < -0.7:
 			character.velocity.y = 4.0
 		else:

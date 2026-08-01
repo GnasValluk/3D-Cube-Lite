@@ -105,7 +105,7 @@ const ALERT_RADIUS: float = 6.0
 
 # Hunting (Flowerhorn)
 const HUNT_RADIUS: float = 14.0
-const HUNT_ATTACK_DIST: float = 0.4
+const HUNT_ATTACK_DIST: float = 0.55
 const ORBIT_RADIUS: float = 6.0
 const ORBIT_SPEED: float = 0.6
 const HUNT_CHASE_SPEED_MULT: float = 1.5
@@ -135,11 +135,12 @@ func _build_character() -> void:
 
 	var col := CollisionShape3D.new()
 	var cs  := CapsuleShape3D.new()
-	cs.radius = 0.18
-	cs.height = 0.40
+	cs.radius = 0.26
+	cs.height = 0.56
 	col.shape = cs
-	col.position = Vector3(0, 0.2, 0)
+	col.position = Vector3(0, 0.28, 0)
 	add_child(col)
+	hit_radius = 0.26 * sc
 
 	var colors: Array = VARIANT_COLORS[fish_variant]
 	_fish_mesh = FishMesh.new()

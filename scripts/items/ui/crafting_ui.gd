@@ -1,6 +1,8 @@
 class_name CraftingUI
 extends Control
 
+const _RecipeDB = preload("res://scripts/items/core/recipe_database.gd")
+
 const S: float = 1.6
 const SS: float = 1.4
 
@@ -51,6 +53,7 @@ var _slot_hover_style: StyleBoxFlat
 var _slot_drop_style: StyleBoxFlat
 var _slot_script: GDScript
 var _tween: Tween
+var _current_recipe: Dictionary = {}
 
 func _ready() -> void:
 	_grid_inventory = Inventory.new(9)
@@ -223,7 +226,8 @@ func _setup_result_slot() -> void:
 	add_child(arrow)
 
 	var panel := _make_slot(rsx, rsy, _result_faces, _result_icons, _result_counts, _result_panels, "result", 0)
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.gui_input.connect(_on_slot_gui_input.bind("result", 0))
 
 func _setup_player_grid() -> void:
 	var sx: float = PAD
@@ -287,6 +291,8 @@ func _on_slot_left_click(_type: String, idx: int) -> void:
 			_transfer_from_grid(idx, slot.count)
 		"player", "hotbar":
 			_transfer_to_grid(idx, slot.count)
+		"result":
+			_craft()
 
 func _on_slot_right_click(_type: String, idx: int) -> void:
 	var inv: Inventory = _get_inv(_type)
@@ -447,8 +453,44 @@ func _clear_drop_highlights() -> void:
 	for p in _hotbar_panels:
 		p.add_theme_stylebox_override("panel", _slot_style)
 
+## Chế tạo: tiêu nguyên liệu trong lưới → cộng kết quả vào inventory.
+func _craft() -> void:
+	if _current_recipe.is_empty() or _player_ref == null:
+		return
+	var pi = _player_ref.inventory
+	if pi == null:
+		return
+	var need := _current_recipe.get("ingredients", {}) as Dictionary
+	if need.is_empty():
+		return
+	# Tiêu nguyên liệu từ lưới (theo thứ tự slot)
+	for ing in need:
+		var remain: int = need[ing]
+		for i in range(_grid_inventory.slots.size()):
+			if remain <= 0:
+				break
+			var slot := _grid_inventory.slots[i]
+			if slot.is_empty() or slot.item.id != ing:
+				continue
+			var take: int = mini(remain, slot.count)
+			_grid_inventory.remove_item(i, take)
+			remain -= take
+	ItemDatabase.ensure_db()
+	var def: ItemDef = ItemDatabase.items_db.get(_current_recipe.get("result", "")) as ItemDef
+	if def == null:
+		return
+	var count: int = _current_recipe.get("count", 1)
+	if pi.add_item(def, count) < count and _player_ref.has_method("_scroll_inventory_message"):
+		_player_ref._scroll_inventory_message(tr("INVENTORY_FULL"))
+	elif _player_ref.has_method("_scroll_inventory_message"):
+		_player_ref._scroll_inventory_message("+%d %s" % [count, def.name])
+	if _player_ref.get("equipped_weapon") != null \
+			and _player_ref.equipped_weapon.id == def.id:
+		_player_ref._update_weapon_mesh()
+
 func open(player: PlayerCharacter) -> void:
 	_player_ref = player
+	_current_recipe = {}
 	_play_appear()
 
 func close() -> void:
@@ -505,9 +547,21 @@ func _process(_delta: float) -> void:
 			_grid_counts[i].text = str(slot.count) if slot.count > 1 else ""
 
 	if _result_faces.size() > 0:
-		_result_faces[0].color = Color(0.20, 0.15, 0.30, 0.2)
-		_result_icons[0].texture = null; _result_icons[0].visible = false
-		_result_counts[0].text = ""
+		_current_recipe = _RecipeDB.match_grid(_grid_inventory)
+		var rdef: ItemDef = null
+		if not _current_recipe.is_empty():
+			ItemDatabase.ensure_db()
+			rdef = ItemDatabase.items_db.get(_current_recipe.get("result", "")) as ItemDef
+		if rdef == null:
+			_current_recipe = {}
+			_result_faces[0].color = Color(0.20, 0.15, 0.30, 0.2)
+			_result_icons[0].texture = null; _result_icons[0].visible = false
+			_result_counts[0].text = ""
+		else:
+			var rtex := ItemDatabase.load_icon_2d(rdef.id)
+			_result_faces[0].color = Color(0.20, 0.15, 0.30, 0.4) if rtex != null else rdef.icon_color
+			_result_icons[0].texture = rtex; _result_icons[0].visible = rtex != null
+			_result_counts[0].text = str(_current_recipe.get("count", 1))
 
 	for i in range(27):
 		var pidx: int = 9 + i

@@ -123,7 +123,7 @@ static func setup_library_panel(owner) -> void:
 	owner._lib_search_box.focus_mode = Control.FOCUS_CLICK
 	owner._lib_search_box.text_submitted.connect(func(_t): owner._lib_search_box.release_focus())
 	owner._lib_search_box.gui_input.connect(func(ev):
-		if ev is InputEventKey and ev.pressed and ev.keycode == KEY_ESCAPE:
+		if ev is InputEventKey and ev.pressed and ev.is_action_pressed("ui_cancel"):
 			owner._lib_search_box.release_focus()
 			owner.accept_event()
 	)

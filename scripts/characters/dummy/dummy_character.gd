@@ -18,6 +18,7 @@ func _build_character() -> void:
 	col.shape = box
 	col.position = Vector3(0, 1.0, 0)
 	add_child(col)
+	hit_radius = 0.5
 
 	_mesh_root = Node3D.new()
 	add_child(_mesh_root)
