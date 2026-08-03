@@ -1,4 +1,4 @@
-extends Node3D
+extends DestroyableProp
 class_name PortalGate
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
@@ -21,7 +21,11 @@ var _firefly_angles: Array[float] = []
 var _spores: Array[MeshInstance3D] = []
 var _spore_angles: Array[float] = []
 
+func _init() -> void:
+	super._init(150, DestroyableProp.WeaponReq.HEAVY, "twilight_gate")
+
 func _ready() -> void:
+	super._ready()
 	_build_platform()
 
 func _is_twilight() -> bool:

@@ -41,6 +41,8 @@ func animate(delta: float) -> void:
 			_dead(delta, t)
 		CharacterBase.State.SWIM:
 			_swim(delta, t)
+		CharacterBase.State.EAT:
+			_eat(delta, t)
 
 func _idle(delta: float, t: float) -> void:
 	# Chibi idle: nhún nhẹ, đầu lắc lư cute
@@ -149,6 +151,22 @@ func _swim(delta: float, t: float) -> void:
 	mesh.leg_r.rotation.x = sin(cyc - PI * 0.5) * 0.50
 	var kick: float = abs(sin(cyc * 1.5))
 	mesh.rig.position.y += kick * 0.02
+
+func _eat(delta: float, t: float) -> void:
+	# Nhai: tay phải đưa lên miệng, đầu gật theo nhịp nhai
+	var chew: float = abs(sin(t * 9.0))
+	mesh.rig.position.y = lerp(mesh.rig.position.y, 0.02, delta * 5.0)
+	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 7.0)
+	mesh.head.rotation.x = lerp(mesh.head.rotation.x, -0.18 - chew * 0.05, delta * 8.0)
+	mesh.head.rotation.y = lerp(mesh.head.rotation.y, sin(t * 1.2) * 0.05, delta * 6.0)
+	mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.10, delta * 6.0)
+	mesh.backpack.position.z = lerp(mesh.backpack.position.z, -0.02, delta * 5.0)
+	mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -1.15 - chew * 0.10, delta * 9.0)
+	mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.10, delta * 7.0)
+	mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.35 + chew * 0.08, delta * 8.0)
+	mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 0.25, delta * 7.0)
+	mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 6.0)
+	mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 6.0)
 
 func _hit(delta: float, _t: float) -> void:
 	var p: float = 1.0 - (base._hit_timer / 0.18)

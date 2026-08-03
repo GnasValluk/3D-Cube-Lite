@@ -29,17 +29,18 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 
 	var is_deep: bool = water_gap >= _Data.VOXEL * 0.5
 	var is_shore: bool = not is_deep and water_gap > -_Data.VOXEL * 0.5
+	var is_ocean: bool = biome == _Data.TileType.OCEAN_DEEP
 
-	# Lotus — all lake biomes, not rivers
-	if not is_river and is_deep:
+	# Lotus — lake/river biomes, not ocean
+	if not is_river and is_deep and not is_ocean:
 		_add_lotus_plant(st, wx, wz, pos, r1, r2, r3, r4, h1, lotus_lights)
 
 	# Track plant positions for destroyable props
-	if is_deep:
+	if is_deep and not is_ocean:
 		var weed_chance: float = 0.04 if is_river else (0.10 if has_silt else 0.04)
 		if r1 < weed_chance:
 			plant_props.append({ "type": "weed", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
-	if is_shore and not is_desert and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
+	if is_shore and not is_desert and not is_ocean and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
 		if r1 < 0.03:
 			plant_props.append({ "type": "taro", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
 

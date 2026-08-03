@@ -34,9 +34,14 @@ func _ready() -> void:
 	WorldChunk._noise_for_dim(_Dim.DimensionID.TWILIGHT)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.REAL_WORLD)
 
-	# Generate center chunk synchronously để có ground ngay frame đầu
+	# Generate center chunk synchronously để có ground ngay frame đầu.
+	# Khi load lại hành trình: center = chunk chứa điểm đứng đã lưu, spawn
+	# thẳng tại đó (không sinh vùng (0,0) rồi teleport → gây lag double-gen).
 	var cx := 0
 	var cz := 0
+	if WorldSeed.is_loading and WorldSeed.has_saved_player_pos:
+		cx = int(floor(WorldSeed.saved_player_pos.x / CHUNK_SIZE))
+		cz = int(floor(WorldSeed.saved_player_pos.z / CHUNK_SIZE))
 	_last_chunk = Vector2i(cx, cz)
 	# Count all chunks first before any loading
 	_total_initial = 1  # center chunk

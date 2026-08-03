@@ -29,33 +29,26 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_warp.seed = base_seed + 99
 	n_warp.frequency = freq_warp
 
+	## n_lake: hồ nội địa — tần số vừa, patch to hơn trước (λ ≈ 167 ô) để hồ
+	## đồng bằng rộng hơn; ngưỡng quyết định mật độ nằm ở world_chunk.
 	var n_lake := FastNoiseLite.new()
 	n_lake.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_lake.seed = base_seed + 5555
-	n_lake.frequency = 0.025
+	n_lake.frequency = 0.006
 
 	## n_lake_type: xác định hồ bùn hay hồ cát — tần số thấp hơn để patch lớn hơn
 	var n_lake_type := FastNoiseLite.new()
 	n_lake_type.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_lake_type.seed = base_seed + 8888
-	n_lake_type.frequency = 0.020
+	n_lake_type.frequency = 0.008
 
-	## n_continent: noise tần số rất thấp xác định lục địa vs biển
-	## Chỉ dùng cho REAL_WORLD — Twilight không có biển
-	var n_continent := FastNoiseLite.new()
-	n_continent.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	n_continent.seed = base_seed + 31337
-	n_continent.frequency = 0.00038  # giữ lại để biomes tham chiếu không bị lỗi
-	n_continent.fractal_type = FastNoiseLite.FRACTAL_FBM
-	n_continent.fractal_octaves = 5
-	n_continent.fractal_lacunarity = 2.0
-	n_continent.fractal_gain = 0.45
-
-	## n_ocean: noise tần số thấp ~10x n_lake → patch biển to ~10x hồ
+	## n_ocean: mask lục địa vs biển — tần số thấp, nhiều lục địa cỡ
+	## ~800-1600 block xen kẽ bồn biển (λ ≈ 1670 block). Đi biển ~1.5-3k block
+	## là gặp đất liền mới (trước đây λ 4000 → một bồn biển dài >5000 block).
 	var n_ocean := FastNoiseLite.new()
 	n_ocean.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_ocean.seed = base_seed + 77777
-	n_ocean.frequency = 0.00025
+	n_ocean.frequency = 0.0006
 	n_ocean.fractal_type = FastNoiseLite.FRACTAL_FBM
 	n_ocean.fractal_octaves = 4
 	n_ocean.fractal_lacunarity = 2.0
@@ -95,7 +88,7 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	var n_ocean_warp := FastNoiseLite.new()
 	n_ocean_warp.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_ocean_warp.seed = base_seed + 45678
-	n_ocean_warp.frequency = 0.0008
+	n_ocean_warp.frequency = 0.0006
 	n_ocean_warp.fractal_type = FastNoiseLite.FRACTAL_FBM
 	n_ocean_warp.fractal_octaves = 2
 	n_ocean_warp.fractal_lacunarity = 2.0
@@ -131,8 +124,9 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_desert.fractal_lacunarity = 2.0
 	n_desert.fractal_gain = 0.5
 
+
 	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
-		"lake_type": n_lake_type, "continent": n_continent, "ocean": n_ocean,
+		"lake_type": n_lake_type, "ocean": n_ocean,
 		"sea_rough": n_sea_rough, "sea_large": n_sea_large, "sea_biome": n_sea_biome,
 		"ocean_warp": n_ocean_warp, "sea_mountain": n_sea_mountain,
 		"reef": n_reef, "desert": n_desert }
@@ -147,6 +141,12 @@ static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 	var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0
 	var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0
 	var n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
+
+	# Bias vùng spawn (gốc tọa độ): ép DARK_GRASS → người chơi luôn xuất
+	# hiện trên đất cao khô ráo (khớp với bias ocean mask trong world_chunk).
+	var d2: float = wx * wx + wz * wz
+	if d2 < 2000000.0:
+		n += 0.8 * exp(-d2 / 500000.0)
 
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5

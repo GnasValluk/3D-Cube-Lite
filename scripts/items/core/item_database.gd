@@ -3,6 +3,25 @@ extends RefCounted
 
 static var items_db: Dictionary = {}
 
+## Thời gian ăn (giây) theo từng loại thức ăn — mặc định 3.0s
+const EAT_TIMES: Dictionary = {
+	"shrimp": 1.2,
+	"climbing_perch": 1.8,
+	"carp": 2.0,
+	"red_tilapia": 2.2,
+	"pumpkin": 2.5,
+	"taro": 2.5,
+	"snakehead": 2.8,
+	"flowerhorn": 3.0,
+	"coconut": 3.2,
+	"raw_pork": 4.0,
+	"eggplant_fruit": 2.5,
+	"eggplant_slice": 1.8,
+	"watermelon": 3.0,
+	"watermelon_slice": 1.2,
+	"pumpkin_slice": 1.2,
+}
+
 static func ensure_db() -> void:
 	if items_db.is_empty():
 		items_db = create_item_db()
@@ -41,7 +60,16 @@ static func create_item_db() -> Dictionary:
 	_add(db, "flowerhorn", "Flowerhorn", ItemDef.Type.FOOD, Color(0.92, 0.25, 0.15), "🐟", "Flowerhorn — rich, flavourful meat", true, 16, 55)
 	_add(db, "shrimp", "Freshwater Shrimp", ItemDef.Type.FOOD, Color(0.85, 0.35, 0.20), "🦐", "Freshwater shrimp — sweet, delicate meat", true, 16, 8)
 
-	_add(db, "pumpkin", "Pumpkin", ItemDef.Type.FOOD, Color(0.91,0.41,0.21), "🎃", "Pumpkin — hearty winter squash", true, 16, 14)
+	# ── Trứng sinh vật (chỉ có ở thư viện — ném parabol, chạm đất nở con) ─────
+	_add(db, "egg_carp",       "Trứng Cá Chép",      ItemDef.Type.MATERIAL, Color(0.95, 0.70, 0.10), "🥚", "Trứng cá chép — giữ chuột trái để ngắm, thả để ném; chạm nước nở cá chép", true, 16)
+	_add(db, "egg_perch",      "Trứng Cá Rô",        ItemDef.Type.MATERIAL, Color(0.30, 0.30, 0.30), "🥚", "Trứng cá rô — giữ chuột trái để ngắm, thả để ném; chạm nước nở cá rô", true, 16)
+	_add(db, "egg_tilapia",    "Trứng Cá Điêu Hồng", ItemDef.Type.MATERIAL, Color(0.88, 0.55, 0.45), "🥚", "Trứng cá điêu hồng — giữ chuột trái để ngắm, thả để ném; chạm nước nở cá điêu hồng", true, 16)
+	_add(db, "egg_snakehead",  "Trứng Cá Lóc",       ItemDef.Type.MATERIAL, Color(0.30, 0.25, 0.15), "🥚", "Trứng cá lóc — giữ chuột trái để ngắm, thả để ném; chạm nước nở cá lóc", true, 16)
+	_add(db, "egg_flowerhorn", "Trứng Cá La Hán",    ItemDef.Type.MATERIAL, Color(0.92, 0.25, 0.15), "🥚", "Trứng cá la hán — giữ chuột trái để ngắm, thả để ném; chạm nước nở cá la hán", true, 16)
+	_add(db, "egg_shrimp",     "Trứng Tôm",          ItemDef.Type.MATERIAL, Color(0.85, 0.35, 0.20), "🥚", "Trứng tôm — giữ chuột trái để ngắm, thả để ném; chạm nước nở tôm", true, 16)
+	_add(db, "egg_pig",        "Trứng Heo",          ItemDef.Type.MATERIAL, Color(0.87, 0.72, 0.63), "🥚", "Trứng heo — giữ chuột trái để ngắm, thả để ném; chạm đất nở heo con", true, 16)
+
+	_add(db, "pumpkin", "Trái Bí Đỏ", ItemDef.Type.FOOD, Color(0.91,0.41,0.21), "🎃", "Trái bí đỏ — cầu dẹp 8-10 múi khía sâu, cam cháy ấm, cuống gỗ 5 góc; chế biến món ăn, trang trí hoặc đục thành đèn lồng", true, 16, 14)
 
 	# ── Thịt ──────────────────────────────────────────────────────────────────
 	_add(db, "raw_pork", "Thịt Heo Sống", ItemDef.Type.FOOD, Color(0.85, 0.50, 0.45), "🥩", "Thịt heo tươi — nấu chín trước khi ăn", true, 16, 12)
@@ -51,11 +79,13 @@ static func create_item_db() -> Dictionary:
 	_add(db, "coconut", "Trái Dừa", ItemDef.Type.FOOD, Color(0.50, 0.35, 0.20), "🥥", "Trái dừa tươi — bổ dưỡng, giải khát", true, 16, 16)
 	_add(db, "palm_wood", "Gỗ Dừa", ItemDef.Type.MATERIAL, Color(0.78, 0.70, 0.48), "🪵", "Gỗ dừa chắc — nguyên liệu chế tạo", true, 64)
 	_add(db, "tropical_seaweed", "Rong nhiệt đới", ItemDef.Type.MATERIAL, Color(0.08, 0.55, 0.10), "🌊", "Rong nhiệt đới — nguyên liệu chế tạo", true, 32)
+	_add(db, "seagrass", "Cỏ Biển", ItemDef.Type.MATERIAL, Color(0.10, 0.62, 0.42), "🌿", "Cỏ biển tươi — lá dài mảnh, nguyên liệu chế tạo", true, 32)
 
 	# ── Mầm cây trồng ─────────────────────────────────────────────────────────
 	_add(db, "coconut_seed", "Mầm Dừa", ItemDef.Type.MATERIAL, Color(0.45, 0.72, 0.25), "🌱", "Mầm dừa — trồng trên đất tơi xốp, lớn thành cây dừa", true, 16)
 	_add(db, "taro_seed", "Mầm Môn Ngọt", ItemDef.Type.MATERIAL, Color(0.30, 0.55, 0.18), "🌱", "Mầm môn ngọt — trồng trên đất tơi xốp, thu hoạch củ môn", true, 16)
 	_add(db, "seaweed_seed", "Mầm Rong Nhiệt Đới", ItemDef.Type.MATERIAL, Color(0.10, 0.60, 0.12), "🌱", "Mầm rong nhiệt đới — trồng dưới nước trên cát/bùn", true, 16)
+	_add(db, "seagrass_seed", "Hạt Giống Cỏ Biển", ItemDef.Type.MATERIAL, Color(0.08, 0.55, 0.38), "🌱", "Hạt giống cỏ biển — gieo xuống biển nông trên nền cát, lớn thành bụi cỏ biển", true, 16)
 
 	# ── Quặng & Kim loại ──────────────────────────────────────────────────────
 	# Copper (Đồng)
@@ -122,10 +152,14 @@ static func create_item_db() -> Dictionary:
 	# ── Khối (đào từ thế giới) ─────────────────────────────────────────────────
 	_add(db, "block_grass",       "Cỏ",        ItemDef.Type.BLOCK, Color(0.22, 0.58, 0.14), "🧱", "Khối cỏ",           true, 64)
 	_add(db, "block_dark_grass",  "Cỏ Tối",    ItemDef.Type.BLOCK, Color(0.14, 0.40, 0.08), "🧱", "Khối cỏ tối",       true, 64)
+	_add(db, "block_young_grass", "Cỏ Non",    ItemDef.Type.BLOCK, Color(0.44, 0.38, 0.13), "🧱", "Khối cỏ non — bãi đất pha cỏ mới mọc ở đồng bằng", true, 64)
 	_add(db, "block_sand",        "Cát",       ItemDef.Type.BLOCK, Color(0.92, 0.78, 0.32), "🧱", "Khối cát",          true, 64)
 	_add(db, "block_dirt",        "Đất",       ItemDef.Type.BLOCK, Color(0.42, 0.22, 0.08), "🧱", "Khối đất",          true, 64)
 	_add(db, "block_silt",        "Phù Sa",    ItemDef.Type.BLOCK, Color(0.16, 0.15, 0.13), "🧱", "Khối phù sa",       true, 64)
 	_add(db, "block_stone",       "Đá",        ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Khối đá",           true, 64)
+	_add(db, "block_stone_qtr",   "Đá Tư",     ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Đá tư — ¼ khối đá, đặt làm bậc/trang trí", true, 64)
+	_add(db, "block_stone_eighth","Đá Vụn",    ItemDef.Type.BLOCK, Color(0.44, 0.44, 0.48), "🧱", "Đá vụn — ⅛ khối đá, tấm mỏng", true, 64)
+	_add(db, "block_stone_thin",  "Đá Phiến",  ItemDef.Type.BLOCK, Color(0.40, 0.40, 0.44), "🧱", "Đá phiến — dày 0.2 thay vì 0.5 như block thường", true, 64)
 	_add(db, "block_dark_dirt",   "Đất Tối",   ItemDef.Type.BLOCK, Color(0.28, 0.16, 0.06), "🧱", "Khối đất tối",      true, 64)
 	_add(db, "block_sand_deep",   "Cát Sâu",   ItemDef.Type.BLOCK, Color(0.80, 0.66, 0.28), "🧱", "Khối cát sâu",      true, 64)
 	_add(db, "block_trail",       "Đường Mòn", ItemDef.Type.BLOCK, Color(0.76, 0.58, 0.22), "🧱", "Khối đường mòn",    true, 64)
@@ -135,6 +169,20 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_ocean_gravel","Sỏi Biển",  ItemDef.Type.BLOCK, Color(0.35, 0.30, 0.25), "🧱", "Khối sỏi biển",     true, 64)
 	_add(db, "block_ocean_mud",   "Bùn Biển",  ItemDef.Type.BLOCK, Color(0.16, 0.20, 0.22), "🧱", "Khối bùn biển",     true, 64)
 	_add(db, "block_tilled_soil", "Đất Tơi Xốp", ItemDef.Type.BLOCK, Color(0.36, 0.22, 0.11), "🧱", "Đất tơi xốp — ẩm khi gần nước, trồng được mầm cây", true, 64)
+	_add(db, "block_oak_wood", "Gỗ Sồi", ItemDef.Type.BLOCK, Color(0.62, 0.47, 0.28), "🧱", "Khối gỗ sồi — vân nâu sáng ấm, chặt từ cây sồi bằng rìu, xây dựng và chế tạo", true, 64)
+
+	# ── Cà tím ───────────────────────────────────────────────────────────────
+	_add(db, "eggplant_fruit", "Trái Cà Tím", ItemDef.Type.FOOD, Color(0.42, 0.14, 0.50), "🍆", "Trái cà tím — tím hoàng gia mộng nước, vỏ bóng mượt vệt sáng trắng xanh, đài hoa xanh ngả tím; ăn được hoặc chế biến", true, 16, 10)
+	_add(db, "eggplant_slice", "Cà Tím Bổ Đôi", ItemDef.Type.FOOD, Color(0.94, 0.90, 0.78), "🍆", "Cà tím bổ đôi — ruột trắng kem sốp nhẹ, hạt vàng nâu quanh tâm, nguyên liệu nấu ăn", true, 32, 6)
+	_add(db, "eggplant_seed", "Hạt Giống Cà Tím", ItemDef.Type.MATERIAL, Color(0.62, 0.46, 0.24), "🌱", "Túi hạt giống cà tím — gieo trên đất tơi xốp, lớn thành bụi cà tím cho trái mộng nước", true, 16)
+	_add(db, "watermelon", "Trái Dưa Hấu", ItemDef.Type.FOOD, Color(0.22, 0.60, 0.28), "🍉", "Trái dưa hấu — quả cầu căng mọng vỏ xanh ngọc bích vằn xanh đen, vệt đất vàng ngà ở đáy; ăn được hoặc cắt lát", true, 16, 14)
+	_add(db, "watermelon_slice", "Miếng Dưa Hấu", ItemDef.Type.FOOD, Color(0.88, 0.16, 0.20), "🍉", "Miếng dưa hấu tam giác — ruột đỏ tươi mộng nước, hạt đen tuyền, vỏ xanh sẫm viền cùi trắng ngà", true, 32, 6)
+	_add(db, "watermelon_seed", "Hạt Giống Dưa Hấu", ItemDef.Type.MATERIAL, Color(0.30, 0.16, 0.08), "🌱", "Túi hạt giống dưa hấu — gieo trên đất tơi xốp, dây bò lớn thành thảm dưa cho quả căng tròn", true, 16)
+
+	# ── Bí đỏ ────────────────────────────────────────────────────────────────
+	_add(db, "pumpkin_slice", "Miếng Bí Đỏ", ItemDef.Type.FOOD, Color(0.95, 0.62, 0.16), "🎃", "Miếng bí đỏ — vỏ cam mỏng, thịt cam tươi mộng nước, lõi xơ vàng đan chéo cùng hạt bí ngà dẹt; ăn được hoặc nấu ăn", true, 32, 7)
+	_add(db, "pumpkin_seed", "Hạt Giống Bí Đỏ", ItemDef.Type.MATERIAL, Color(0.55, 0.45, 0.30), "🌱", "Túi vải đay hạt giống bí đỏ — gieo trên đất tơi xốp, dây bò thô mộc cho quả cam cháy mùa thu", true, 16)
+	_add(db, "jack_o_lantern", "Đèn Lồng Bí Đỏ", ItemDef.Type.BLOCK, Color(0.92, 0.55, 0.14), "🎃", "Đèn lồng bí đỏ — bí đã đục mắt/mũi/miệng hình tam giác zíc-zắc, nến voxel bên trong tỏa ánh lửa vàng đỏ; đặt trang trí", true, 64)
 
 	return db
 
@@ -143,6 +191,7 @@ static func _add(db: Dictionary, id: String, name: String, type: int, color: Col
 				heal: int = 0, atk: int = 0, def_val: int = 0, armor_slot: int = -1,
 				durability: int = 0) -> void:
 	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot, durability)
+	db[id].eat_time = EAT_TIMES.get(id, 3.0)
 
 static func load_icon_2d(item_id: String) -> Texture2D:
 	var path := "res://assets/icon_items/%s.png" % item_id

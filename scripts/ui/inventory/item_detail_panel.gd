@@ -59,7 +59,7 @@ static func setup_detail_panel(owner) -> void:
 	var btn_y: float = dy + owner.DETAIL_H - 40
 
 	owner._detail_use_btn = Button.new()
-	owner._detail_use_btn.text = owner.tr("USE_ITEM")
+	owner._detail_use_btn.text = owner.tr("EQUIP_ITEM")
 	owner._detail_use_btn.position = Vector2(dx + dw - 200, btn_y)
 	owner._detail_use_btn.size = Vector2(90, 30)
 	owner._detail_use_btn.add_theme_font_size_override("font_size", 18)
@@ -67,7 +67,7 @@ static func setup_detail_panel(owner) -> void:
 	owner._detail_use_btn.add_theme_stylebox_override("normal", btn_style)
 	owner._detail_use_btn.add_theme_stylebox_override("hover", btn_hover)
 	owner._detail_use_btn.mouse_filter = Control.MOUSE_FILTER_STOP
-	owner._detail_use_btn.pressed.connect(on_detail_use.bind(owner))
+	owner._detail_use_btn.pressed.connect(on_detail_equip.bind(owner))
 	owner._detail_use_btn.visible = false
 	owner.add_child(owner._detail_use_btn)
 
@@ -98,8 +98,8 @@ static func update_detail_panel(owner) -> void:
 			if item.def_bonus > 0:  stats_text += owner.tr("STAT_DEF_BONUS") % item.def_bonus + "  "
 			if item.heal_amount > 0: stats_text += owner.tr("STAT_HEAL") % item.heal_amount
 			owner._detail_stats.text = stats_text
-			var can_use: bool = item.type in [ItemDef.Type.FOOD, ItemDef.Type.WEAPON, ItemDef.Type.TOOL, ItemDef.Type.ARMOR]
-			owner._detail_use_btn.visible = can_use
+			var can_equip: bool = item.type == ItemDef.Type.ARMOR
+			owner._detail_use_btn.visible = can_equip
 			owner._detail_item_name.visible = true
 			owner._detail_desc.visible = true
 			owner._detail_stats.visible = true
@@ -114,7 +114,7 @@ static func update_detail_panel(owner) -> void:
 		owner._detail_use_btn.visible = false
 		owner._detail_drop_btn.visible = false
 
-static func on_detail_use(owner) -> void:
+static func on_detail_equip(owner) -> void:
 	if owner._player_ref == null or owner._inventory == null: return
 	var idx: int = owner._selected_slot
 	if idx < 0 or idx >= owner._inventory.slots.size(): return

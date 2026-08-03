@@ -1,12 +1,17 @@
 class_name Furnace
-extends StaticBody3D
+extends DestructibleEntity
 
 var _player_nearby: bool = false
 var _is_open: bool = false
 var _fire_particles: GPUParticles3D
 var _smoke_particles: GPUParticles3D
 
+func _init() -> void:
+	max_hp = 100
+	drop_item_id = "furnace"
+
 func _ready() -> void:
+	super._ready()
 	_setup_mesh()
 	_setup_area()
 	_setup_fire_vfx()
@@ -169,34 +174,51 @@ func _setup_fire_vfx() -> void:
 	_fire_particles.process_material = fire_mat
 	add_child(_fire_particles)
 
-	# Smoke particles
+	# Smoke particles — khói ống khói (cầu 3D hiển thị đều mọi góc, phình to
+	# theo thời gian sống để khói bay lên rõ ràng như đang cháy).
 	_smoke_particles = GPUParticles3D.new()
 	_smoke_particles.emitting = true
-	_smoke_particles.amount = 8
-	_smoke_particles.lifetime = 2.0
+	_smoke_particles.amount = 18
+	_smoke_particles.lifetime = 2.8
 	_smoke_particles.one_shot = false
 	_smoke_particles.explosiveness = 0.0
-	_smoke_particles.randomness = 0.6
-	_smoke_particles.position = Vector3(0, 0.90, -0.30)
+	_smoke_particles.randomness = 0.55
+	_smoke_particles.position = Vector3(0, 0.92, -0.30)
+	_smoke_particles.scale_amount_min = 0.22
+	_smoke_particles.scale_amount_max = 0.38
+	var smoke_grow := Curve.new()
+	smoke_grow.add_point(Vector2(0, 1.0))
+	smoke_grow.add_point(Vector2(1, 2.8))
+	_smoke_particles.scale_amount_curve = smoke_grow
 
 	var smoke_mat := ParticleProcessMaterial.new()
 	smoke_mat.direction = Vector3(0, 1, 0)
-	smoke_mat.spread = 20.0
-	smoke_mat.gravity = Vector3(0, -0.1, 0)
-	smoke_mat.initial_velocity_min = 0.05
-	smoke_mat.initial_velocity_max = 0.15
-	smoke_mat.scale_min = 0.03
-	smoke_mat.scale_max = 0.08
+	smoke_mat.spread = 14.0
+	smoke_mat.gravity = Vector3(0, 0.6, 0)
+	smoke_mat.initial_velocity_min = 0.30
+	smoke_mat.initial_velocity_max = 0.65
+	smoke_mat.scale_min = 0.7
+	smoke_mat.scale_max = 1.3
 	var smoke_grad := Gradient.new()
-	smoke_grad.set_color(0, Color(0.4, 0.4, 0.4, 0.4))
-	smoke_grad.set_color(1, Color(0.3, 0.3, 0.3, 0.0))
+	smoke_grad.set_color(0, Color(0.45, 0.45, 0.45, 0.50))
+	smoke_grad.set_color(1, Color(0.30, 0.30, 0.30, 0.0))
 	var smoke_tex := GradientTexture1D.new()
 	smoke_tex.gradient = smoke_grad
 	smoke_mat.color_ramp = smoke_tex
 
-	var smoke_quad := QuadMesh.new()
-	smoke_quad.size = Vector2(0.08, 0.08)
-	_smoke_particles.draw_pass_1 = smoke_quad
+	var smoke_sph := SphereMesh.new()
+	smoke_sph.radius = 0.5
+	smoke_sph.height = 1.0
+	smoke_sph.radial_segments = 10
+	smoke_sph.rings = 6
+	var smoke_sph_mat := StandardMaterial3D.new()
+	smoke_sph_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	smoke_sph_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	smoke_sph_mat.vertex_color_use_as_albedo = true
+	smoke_sph_mat.vertex_color_is_srgb = true
+	smoke_sph_mat.albedo_color = Color.WHITE
+	smoke_sph.material = smoke_sph_mat
+	_smoke_particles.draw_pass_1 = smoke_sph
 	_smoke_particles.process_material = smoke_mat
 	add_child(_smoke_particles)
 
@@ -236,3 +258,11 @@ func _find_hud() -> HUD:
 		if child is HUD:
 			return child
 	return null
+
+## Bị phá huỷ: tắt lửa/khói + đóng UI (UI sẽ trả đồ còn trong lò về túi người chơi).
+func _on_destroy() -> void:
+	if _fire_particles:
+		_fire_particles.emitting = false
+	if _smoke_particles:
+		_smoke_particles.emitting = false
+	close_ui()

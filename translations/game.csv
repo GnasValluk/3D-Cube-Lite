@@ -58,10 +58,11 @@ EQUIP_BACK,Back,Lưng
 EQUIP_SUB,Sub,Phụ
 STAT_ATK_BONUS,ATK: +%d,ATK: +%d
 STAT_DEF_BONUS,DEF: +%d,DEF: +%d
-STAT_HEAL,"Heal: +%d HP","Hồi: +%d HP"
-DROP_HINT,"Right-click = Split/Use  |  Drag to move","Chuột phải = Chia/Dùng  |  Kéo để di chuyển"
+STAT_HEAL,"Food: +%d","Hồi: +%d thức ăn"
+DROP_HINT,"Right-click = Split  |  Drag to move","Chuột phải = Chia đồ  |  Kéo để di chuyển"
 SORT_BUTTON,Sort,Sắp xếp
 USE_ITEM,Use,Sử dụng
+EQUIP_ITEM,Equip,Trang bị
 DROP_ITEM,Drop,Vứt
 HEAL_VN,Heal: +{d} HP,"Hồi: +{d} HP"
 DIM_TWILIGHT,Twilight,Chạng Vạng
@@ -117,7 +118,7 @@ TILE_GREEN_DESC,Twilight green platform,Thềm xanh lục chạng vạng
 SEED,"Seed: %d","Seed: %d"
 DELETE_JOURNEY,"Delete journey ""%s""?","Xoá hành trình ""%s""?"
 PICKUP_MSG,Picked up: {s} x{n},"Nhặt: {s} x{n}"
-ATE_FOOD,"Ate {s} (+{d} HP)","Đã ăn {s} (+{d} HP)"
+ATE_FOOD,"Ate {s} (+{d} food)","Đã ăn {s} (+{d} thức ăn)"
 PORTAL_PLACED,Twilight Gate placed!,Đã đặt Cổng Twilight!
 EQUIP_MSG,Equipped: {s},"Trang bị: {s}"
 WEAR_MSG,Worn: {s},"Mặc: {s}"
@@ -179,6 +180,7 @@ FISH_REEL,"Line retrieved","Đã thu cần"
 FISH_MISS,"No bite — cast again","Cá chưa cắn câu"
 INVENTORY_FULL,"Inventory full!","Túi đồ đầy!"
 GAME_SAVED,Game saved!,Đã lưu game!
+DEATH_CHEST_MSG,"You died! Your items are in a chest at your death point.","Bạn đã chết! Đồ đạc nằm trong rương tại điểm chết."
 FEAT_CHUNK_LOW,Reduced view distance for performance,Giảm tầm nhìn để tăng hiệu suất
 FEAT_WASD,WASD / Arrow keys movement,Di chuyển WASD / phím mũi tên
 FEAT_MOUSE_CAM,Mouse to rotate camera,Chuột xoay camera

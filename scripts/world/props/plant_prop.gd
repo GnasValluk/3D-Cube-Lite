@@ -9,20 +9,27 @@ var seed_h1: int = 0
 var seed_h2: int = 0
 var has_silt: bool = false
 var water_gap: float = 1.0
+var meadow: bool = false
 
-func setup(type: String, _h1: int, _h2: int, _has_silt: bool, _water_gap: float) -> void:
+func setup(type: String, _h1: int, _h2: int, _has_silt: bool, _water_gap: float, _meadow: bool = false) -> void:
 	plant_type = type
 	seed_h1 = _h1
 	seed_h2 = _h2
 	has_silt = _has_silt
 	water_gap = _water_gap
+	meadow = _meadow
 
 func _birth_span_days() -> float:
-	return 25.0 if plant_type == "weed" else 30.0
+	match plant_type:
+		"weed": return 25.0
+		"seagrass": return 35.0
+	return 30.0
 
 func _stage_thresholds() -> Array[float]:
 	if plant_type == "weed":
 		return [2.0, 5.0]
+	if plant_type == "seagrass":
+		return [3.0, 9.0]
 	return [3.0, 8.0]
 
 func _apply_stage(_from: int, _to: int) -> void:
@@ -46,7 +53,8 @@ func _on_destroy() -> void:
 	if world == null:
 		return
 	ItemDatabase.ensure_db()
-	var seed_id := "taro_seed" if plant_type == "taro" else "seaweed_seed"
+	var seed_id := "seagrass_seed" if plant_type == "seagrass" \
+		else ("taro_seed" if plant_type == "taro" else "seaweed_seed")
 	var def: ItemDef = ItemDatabase.items_db.get(seed_id)
 	if def != null:
 		DroppedItem.spawn(world, def, global_position, 1, _spawn_drop_velocity(), global_position.y)
@@ -69,17 +77,26 @@ func _build_mesh() -> void:
 			_build_weed_sprout(st, s)
 		else:
 			_build_weed(st, s)
-	else:
+	elif plant_type == "taro":
 		if _stage == GrowingProp.Stage.SPROUT:
 			_build_taro_sprout(st, s)
 		else:
 			_build_taro(st, s)
+	else:
+		if _stage == GrowingProp.Stage.SPROUT:
+			_build_seagrass_sprout(st, s)
+		else:
+			_build_seagrass(st, s)
 
 	var mesh := st.commit()
 	if mesh:
 		var mi := MeshInstance3D.new()
 		mi.mesh = mesh
 		var mat := _make_aquatic_mat()
+		if plant_type == "seagrass":
+			# Lá cao 2-5 đơn vị → sóng nhìn rõ hơn, đu đưa chậm theo dòng
+			mat.set_shader_parameter("sway_amount", 0.05)
+			mat.set_shader_parameter("sway_speed", 1.2)
 		mi.material_override = mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)
@@ -118,6 +135,83 @@ func _build_weed_sprout(st: SurfaceTool, s: int) -> void:
 		var ww: float = sw * 0.9
 		_add_quad(st, wroot + wdir * wlen * 0.5, wperp * ww, wdir * wlen * 0.5, wperp.cross(wdir).normalized(), col_leaf)
 		_add_quad(st, wroot + wdir * wlen * 0.5, wperp * ww, wdir * wlen * 0.5, -wperp.cross(wdir).normalized(), col_leaf)
+
+func _build_seagrass_sprout(st: SurfaceTool, s: int) -> void:
+	## Cây mầm cỏ biển: 2-3 lá ngắn dựng đứng kiểu lúa, màu xanh dương.
+	var h1 := seed_h1
+	var h2 := seed_h2
+	var r2 := float(h2 & 0x7FFFFFFF) / 2147483648.0
+	var h3: int = h1 * 716199923 + h2 * 912334613
+	h3 = (h3 ^ (h3 >> 13)) * 974126171; h3 = h3 ^ (h3 >> 16)
+	var r3 := float(h3 & 0x7FFFFFFF) / 2147483648.0
+
+	var col_base := Color(0.05, 0.26, 0.60, 0.85)
+	var col_tip  := Color(0.25, 0.60, 0.95, 0.85)
+	var cur_dir := Vector3(0.35 + r2 * 0.3, 0, 0.25 + r3 * 0.3).normalized()
+	var blade_count: int = 2 + (s & 1)
+	for bi in range(blade_count):
+		s = s * 16807 + 1; var ba := float(s & 0x7FFFFFFF) / 2147483648.0 * TAU
+		var origin := Vector3(cos(ba) * 0.05 * r3, 0, sin(ba) * 0.05 * r3)
+		var blade_h: float = 0.28 + r3 * 0.12
+		var w: float = VOXEL * 0.45
+		var prev := origin
+		for seg in range(2):
+			var t := float(seg + 1) / 2.0
+			var nxt := origin + Vector3(0, blade_h * t, 0) \
+				+ cur_dir * blade_h * 0.25 * sin(t * PI * 0.5)
+			var mid := (prev + nxt) * 0.5
+			var dir := (nxt - prev).normalized()
+			var perp := Vector3(-dir.z, 0, dir.x).normalized()
+			var col := col_base.lerp(col_tip, t * 0.9)
+			_add_quad(st, mid, perp * w * 0.5, dir * (nxt - prev).length() * 0.5, Vector3(0, 1, 0), col)
+			prev = nxt
+
+func _build_seagrass(st: SurfaceTool, s: int) -> void:
+	## Bụi cỏ biển kiểu lúa (model mới): lá mảnh dựng đứng như cây lúa,
+	## hơi cong theo dòng nước, ngọn nhọn — màu xanh dương. Bỏ model vòm cũ
+	## (lá rộng + rễ ngầm) trông giống weed. `meadow` = bụi thảm rộng, lá ngắn hơn.
+	var h1 := seed_h1
+	var h2 := seed_h2
+	var r2 := float(h2 & 0x7FFFFFFF) / 2147483648.0
+	var h3: int = h1 * 716199923 + h2 * 912334613
+	h3 = (h3 ^ (h3 >> 13)) * 974126171; h3 = h3 ^ (h3 >> 16)
+	var r3 := float(h3 & 0x7FFFFFFF) / 2147483648.0
+	var h4: int = h1 * 374761393 + h2 * 631152931
+	h4 = (h4 ^ (h4 >> 13)) * 1174126183; h4 = h4 ^ (h4 >> 16)
+	var r4 := float(h4 & 0x7FFFFFFF) / 2147483648.0
+
+	var blade_count: int = (14 + int(r2 * 8)) if meadow else (18 + int(r4 * 10))
+	var clump_r: float = (1.2 + r3 * 1.8) if meadow else (1.2 + r3 * 2.8)
+	var max_h: float = (1.6 + r4 * 0.6) if meadow else (2.2 + r4 * 0.9)
+
+	var col_base := Color(0.04 + r4 * 0.06, 0.22 + r4 * 0.10, 0.55 + r4 * 0.15, 0.85)
+	var col_tip  := Color(0.20 + r3 * 0.15, 0.55 + r3 * 0.15, 0.90 + r3 * 0.10, 0.85)
+
+	# Dòng chảy — mọi lá cong theo cùng một hướng dòng nước
+	s = s * 16807 + 1; var cur_ang := float(s & 0x7FFFFFFF) / 2147483648.0 * TAU
+	var cur_dir := Vector3(cos(cur_ang), 0, sin(cur_ang))
+
+	# Lá kiểu lúa — mảnh, dựng đứng, hơi cong theo dòng nước, ngọn nhọn
+	for bi in range(blade_count):
+		s = s * 16807 + 1; var ba := float(s & 0x7FFFFFFF) / 2147483648.0 * TAU
+		s = s * 16807 + 1; var br := float(s & 0x7FFFFFFF) / 2147483648.0
+		var pos_r: float = sqrt(br) * clump_r
+		var origin := Vector3(cos(ba) * pos_r, 0, sin(ba) * pos_r)
+		var blade_h: float = max_h * (0.8 + br * 0.4)
+		var w: float = VOXEL * (0.30 + r2 * 0.25)
+		var segs: int = 3 if meadow else 4
+		var prev := origin
+		for seg in range(segs):
+			var t := float(seg + 1) / float(segs)
+			var nxt := origin + Vector3(0, blade_h * t, 0) \
+				+ cur_dir * blade_h * 0.16 * t * t * (0.6 + br * 0.6)
+			var mid := (prev + nxt) * 0.5
+			var dir := (nxt - prev).normalized()
+			var perp := Vector3(-dir.z, 0, dir.x).normalized()
+			var taper: float = 1.0 - t * 0.8
+			var col := col_base.lerp(col_tip, t * 0.9)
+			_add_quad(st, mid, perp * w * 0.5 * taper, dir * (nxt - prev).length() * 0.5, Vector3(0, 1, 0), col)
+			prev = nxt
 
 func _build_taro_sprout(st: SurfaceTool, s: int) -> void:
 	## Cây mầm môn: 1 cuống ngắn + 1 lá non nhỏ cuộn, màu xanh nhạt pha vàng.
@@ -398,8 +492,10 @@ static func build_drop_mesh(parent: Node3D, plant_type: String) -> void:
 	var s := h1 * 16807 + 1
 	if plant_type == "weed":
 		_build_drop_weed_mesh(st, h1, h2, s)
-	else:
+	elif plant_type == "taro":
 		_build_drop_taro_mesh(st, h1, h2, s)
+	else:
+		_build_drop_seagrass_mesh(st, h1, h2, s)
 	var mesh := st.commit()
 	if mesh:
 		var mi := MeshInstance3D.new()
@@ -448,6 +544,41 @@ static func _build_drop_weed_mesh(st: SurfaceTool, h1: int, h2: int, s: int) -> 
 			_add_quad(st, wroot + wdir*wlen*0.5, wperp*ww, wdir*wlen*0.5, wperp.cross(wdir).normalized(), col_br1)
 			_add_quad(st, wroot + wdir*wlen*0.5, wperp*ww, wdir*wlen*0.5, -wperp.cross(wdir).normalized(), col_br1)
 		cur_x = nx; cur_z = nz; cur_y = ny
+
+static func _build_drop_seagrass_mesh(st: SurfaceTool, h1: int, h2: int, s: int) -> void:
+	var r2 := float(h2 & 0x7FFFFFFF) / 2147483648.0
+	var h3: int = h1 * 716199923 + h2 * 912334613
+	h3 = (h3 ^ (h3 >> 13)) * 974126171; h3 = h3 ^ (h3 >> 16)
+	var r3 := float(h3 & 0x7FFFFFFF) / 2147483648.0
+	var h4: int = h1 * 374761393 + h2 * 631152931
+	h4 = (h4 ^ (h4 >> 13)) * 1174126183; h4 = h4 ^ (h4 >> 16)
+	var r4 := float(h4 & 0x7FFFFFFF) / 2147483648.0
+
+	var col_base := Color(0.04, 0.22, 0.55, 0.85)
+	var col_tip  := Color(0.20, 0.55, 0.90, 0.85)
+	s = s * 16807 + 1; var cur_ang := float(s & 0x7FFFFFFF) / 2147483648.0 * TAU
+	var cur_dir := Vector3(cos(cur_ang), 0, sin(cur_ang))
+
+	# Bụi nhỏ kiểu lúa: 5 lá mảnh dựng đứng màu xanh dương
+	for bi in range(5):
+		s = s * 16807 + 1; var ba := float(s & 0x7FFFFFFF) / 2147483648.0 * TAU
+		s = s * 16807 + 1; var br := float(s & 0x7FFFFFFF) / 2147483648.0
+		var origin := Vector3(cos(ba) * 0.14 * br, 0, sin(ba) * 0.14 * br)
+		var blade_h: float = 0.45 + r4 * 0.25
+		var w: float = VOXEL * 0.35
+		var prev := origin
+		for seg in range(3):
+			var t := float(seg + 1) / 3.0
+			var nxt := origin + Vector3(0, blade_h * t, 0) \
+				+ cur_dir * blade_h * 0.16 * t * t * (0.6 + br * 0.5)
+			var mid := (prev + nxt) * 0.5
+			var dir := (nxt - prev).normalized()
+			var perp := Vector3(-dir.z, 0, dir.x).normalized()
+			var taper: float = 1.0 - t * 0.8
+			var col := col_base.lerp(col_tip, t * 0.9)
+			_add_quad(st, mid, perp * w * 0.5 * taper, dir * (nxt - prev).length() * 0.5,
+				Vector3(0, 1, 0), col)
+			prev = nxt
 
 static func _build_drop_taro_mesh(st: SurfaceTool, h1: int, h2: int, s: int) -> void:
 	var h4: int = h1 * 374761393 + h2 * 631152931

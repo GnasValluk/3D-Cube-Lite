@@ -8,7 +8,11 @@ const SIZE := 32
 var _stage: int = 0
 var _parent: Node3D = null
 var _chunks: Dictionary = {}
-var _keys: Array = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+# 5 chunk toàn biển (seed 123456789): origin giờ luôn là đất (bias spawn),
+# nên cross chuyển ra (-302,-230) — đã hunt + verify 0 ô không phải OCEAN_DEEP
+# (sau khi hạ ocean freq 0.0006 + threshold 0.48).
+var _keys: Array = [Vector2i(-302, -230), Vector2i(-301, -230), Vector2i(-300, -230),
+	Vector2i(-302, -229), Vector2i(-301, -229)]
 var _water_ok: int = 0
 var _wait: int = 0
 var _start_ms: int = 0
@@ -80,7 +84,7 @@ func _run() -> void:
 	_chunks = chunks
 	print("APPLY_TOTAL=%dms" % apply_total)
 
-	var center: Node3D = chunks[Vector2i(0, 0)]
+	var center: Node3D = chunks[_keys[0]]
 	_start_ms = Time.get_ticks_msec()
 	var t2 := Time.get_ticks_msec()
 	center.refresh_boundary_water()

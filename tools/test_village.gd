@@ -9,18 +9,18 @@ const _D = preload("res://scripts/world/chunk/chunk_data.gd")
 const SIZE := 32
 const SEED := 20260805
 
-# Tọa độ làng ổn định với SEED (đã hunt): (cx, cz)
+# Tọa độ làng ổn định với SEED (đã hunt 2026-08-02 sau khi hồ to hơn): (cx, cz)
 const VILLAGE_GATE := Vector2i(-7, 0)    # có cổng làng (bắc ngang đường)
-const VILLAGE_FULL := Vector2i(-14, 7)   # đầy đủ: nhà, đình, giếng, lò, chợ, chòi, bến
+const VILLAGE_FULL := Vector2i(-22, -19) # đầy đủ: nhà, đình, giếng, lò, chợ, chòi, bến
 const VILLAGE_HOUSE := Vector2i(-12, 0)  # có nhà ba gian + đình + giếng + lò + chợ
 const VILLAGE_NO_ROAD := Vector2i(9, -21)  # làng ven sông (không đường): chòi + bến
 const NO_VILLAGE := Vector2i(3, 1)       # không có làng (seed này)
 const NO_VILLAGE2 := Vector2i(-3, -2)    # không có làng (seed này)
 
-# Tọa độ chunk có cầu tre (đường cắt sông)
+# Tọa độ chunk có cầu tre (đường cắt sông) — hunt 2026-08-02 (hồ/lake thay đổi)
 const BRIDGE_A := Vector2i(-8, 8)
-const BRIDGE_B := Vector2i(-9, 10)
-const BRIDGE_C := Vector2i(20, 17)
+const BRIDGE_B := Vector2i(-21, 7)
+const BRIDGE_C := Vector2i(-16, 0)
 
 var _failures: int = 0
 

@@ -141,13 +141,9 @@ static func fire(player) -> void:
 
 	if not player.try_skill(player.stamina_cost_lmb):
 		return
-	if player._ranged_on_cd("pumpkin_mortar"):
-		player._scroll_inventory_message("(pháo bí đỏ đang hồi chiêu)")
-		return
 	if not consume_ammo(player, "pumpkin"):
 		player._scroll_inventory_message(player.tr("NO_MORTAR_AMMO"))
 		return
-	player._set_ranged_cd("pumpkin_mortar")
 	player._damage_equipped_tool(1)
 
 	var dir: Vector3 = player._calc_aim_dir()

@@ -11,7 +11,8 @@ const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 ## SHARDS   — titan: tinh thể tím chéo, đậm dần theo đường
 ## SPARKLE  — bạch kim: đá nền tối + điểm sáng lấp lánh thưa
 ## LUMPS    — than: cục than đen to, viền hơi sáng, vài điểm bóng loáng
-enum Pattern { BLOBS, SPECKLE, NUGGETS, VEINS, PATCHES, SHARDS, SPARKLE, LUMPS }
+## WOOD     — gỗ bàng: vân gỗ dọc nâu xám + vòng tuổi ngang + mắt gỗ tròn
+enum Pattern { BLOBS, SPECKLE, NUGGETS, VEINS, PATCHES, SHARDS, SPARKLE, LUMPS, WOOD }
 
 static var _mat_cache: Dictionary = {}
 static var _soil_mat_cache: Dictionary = {}
@@ -34,6 +35,8 @@ static func _style(bid: int) -> Dictionary:
 			return { "pattern": Pattern.SPARKLE, "base": Color(0.36, 0.36, 0.42), "mineral": Color(0.82, 0.87, 0.95), "emit": 0.30 }
 		_Data.BlockID.COAL_ORE:
 			return { "pattern": Pattern.LUMPS,   "base": Color(0.40, 0.40, 0.43), "mineral": Color(0.09, 0.09, 0.11), "emit": 0.06 }
+		_Data.BlockID.OAK_WOOD:
+			return { "pattern": Pattern.WOOD,   "base": Color(0.60, 0.47, 0.29), "mineral": Color(0.40, 0.30, 0.17), "emit": 0.02 }
 	return { "pattern": Pattern.SPECKLE, "base": Color(0.42, 0.42, 0.46), "mineral": Color(0.70, 0.70, 0.72), "emit": 0.25 }
 
 ## Hash ổn định theo seed — texture giống nhau trên mọi chunk
@@ -153,6 +156,28 @@ static func make_image(block_id: int) -> Image:
 							c = mineral.lightened(t * 0.25).darkened((1.0 - t) * 0.10)
 							if _hash(seed_v, 900 + x * 3, 750 + y) < 0.05:
 								c = c.lightened(0.30)  # điểm bóng loáng trên cục than
+					img.set_pixel(x, y, c)
+		Pattern.WOOD:
+			# Vân gỗ bàng: nền nâu xám, thớ dọc đậm nhạt xen kẽ, vòng tuổi ngang,
+			# 1 mắt gỗ tròn với vòng đậm quanh lõi
+			for y in range(8):
+				var ring: bool = y % 4 == 3  # vòng tuổi
+				for x in range(8):
+					var r0 := _hash(seed_v, x, y)
+					var c: Color = base + Color((r0 - 0.5) * 0.10, (r0 - 0.5) * 0.08, (r0 - 0.5) * 0.06)
+					var streak := _hash(seed_v, 500 + x * 13, 200)
+					if streak < 0.30:
+						c = c.darkened(0.10 + streak * 0.35)     # thớ đậm
+					elif streak > 0.82:
+						c = c.lightened(0.08 + (streak - 0.82) * 0.6)  # thớ sáng khói
+					if ring:
+						c = c.darkened(0.22)
+					var kd := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(3, 5))
+					if kd < 2.2:
+						var kt := kd / 2.2
+						c = mineral.lerp(c, kt)
+						if kd < 0.9:
+							c = c.darkened(0.15)  # lõi mắt gỗ
 					img.set_pixel(x, y, c)
 	return img
 

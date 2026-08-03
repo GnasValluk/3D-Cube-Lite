@@ -6,6 +6,7 @@ const _BlockData := preload("res://scripts/world/chunk/chunk_block_data.gd")
 const _Data := preload("res://scripts/world/chunk/chunk_data.gd")
 const _Bow := preload("player_bow.gd")
 const _Mortar := preload("player_mortar.gd")
+const _EggThrow := preload("player_egg_throw.gd")
 const _Halberd := preload("player_halberd.gd")
 const _Fishing := preload("player_fishing.gd")
 
@@ -18,6 +19,23 @@ var food: int = 20
 var max_food: int = 20
 var _food_timer: float = 0.0
 var _food_action_timer: float = 0.0
+var _starve_timer: float = 0.0
+
+## Slot hotbar đang chọn — HUD cập nhật khi đổi ô
+var _selected_slot: int = 0
+
+## Ăn bằng cách giữ chuột phải khi ô hotbar đang chọn chứa đồ ăn
+var _eating: bool = false
+var _eat_timer: float = 0.0
+var _eat_slot: int = -1
+var _eat_item: ItemDef = null
+
+## Respawn khi chết: rương tại điểm chết + hồi sinh tại điểm xuất phát
+var _death_chest_spawned: bool = false
+const WORLD_SPAWN_POS := Vector3(0, 3, 0)
+
+## Đói: 1 điểm / 60s khi đứng yên; nhanh hơn 75% khi di chuyển; nhanh hơn 100% khi bơi
+const FOOD_IDLE_INTERVAL: float = 60.0
 
 signal food_changed(current: int, max_food: int)
 
@@ -65,14 +83,6 @@ var _bow_string_node: Node3D = null
 const HALBERD_CHARGE_TIME: float = 0.7
 const HALBERD_MIN_RANGE: float = 6.0
 const HALBERD_MAX_RANGE: float = 16.67
-## Cooldown bắn của vũ khí tầm xa + ném kích (giây) — chống spam, cân bằng
-const RANGED_COOLDOWNS := {
-	"crossbow": 0.8,
-	"pumpkin_mortar": 2.5,
-	"watermelon_cannon": 5.0,
-	"iron_halberd": 4.0,
-}
-var _ranged_cd: Dictionary = {}
 var _halberd_charge_time: float = -1.0
 var _halberd_throwing: bool = false
 var _halberd_aim_dir: Vector3 = Vector3.FORWARD
@@ -192,23 +202,6 @@ func pickup_item(item_def: ItemDef, count: int) -> int:
 		_scroll_inventory_message(tr("PICKUP_MSG").format({"s": item_def.name, "n": count - remaining}))
 	return remaining
 
-# ── Cooldown vũ khí tầm xa ───────────────────────────────────────────────────
-func _ranged_on_cd(weapon_id: String) -> bool:
-	return _ranged_cd.get(weapon_id, 0.0) > 0.0
-
-func _set_ranged_cd(weapon_id: String) -> void:
-	_ranged_cd[weapon_id] = RANGED_COOLDOWNS.get(weapon_id, 1.0)
-
-func _tick_ranged_cd(delta: float) -> void:
-	if _ranged_cd.is_empty():
-		return
-	for k in _ranged_cd.keys():
-		var v: float = _ranged_cd[k] - delta
-		if v <= 0.0:
-			_ranged_cd.erase(k)
-		else:
-			_ranged_cd[k] = v
-
 func _scroll_inventory_message(msg: String) -> void:
 	var label := Label.new()
 	label.text = msg
@@ -241,6 +234,194 @@ func _find_hud() -> HUD:
 		if child is HUD:
 			return child
 	return null
+
+# ── Đói / thức ăn ─────────────────────────────────────────────────────────────
+
+func _tick_food(delta: float) -> void:
+	var interval := FOOD_IDLE_INTERVAL
+	if _underwater:
+		interval = FOOD_IDLE_INTERVAL / 2.0
+	elif velocity.length() > 1.0:
+		interval = FOOD_IDLE_INTERVAL / 1.75
+	_food_timer += delta
+	if _food_timer >= interval and food > 0:
+		_food_timer = 0.0
+		food -= 1
+		food_changed.emit(food, max_food)
+	_starve_timer += delta
+	if _starve_timer >= 3.0 and food <= 0:
+		_starve_timer = 0.0
+		_Damage.take_damage(self, maxi(1, ceili(max_hp * 0.05)))
+	_food_action_timer += delta
+	if _food_action_timer >= 4.0 and food >= 18 and hp < max_hp:
+		_food_action_timer = 0.0
+		heal(1)
+
+func get_selected_item() -> ItemDef:
+	if inventory == null or _selected_slot < 0 or _selected_slot >= inventory.slots.size():
+		return null
+	var slot: ItemSlot = inventory.slots[_selected_slot]
+	if slot.is_empty():
+		return null
+	return slot.item
+
+## Đang ngắm ném trứng (item hotbar là trứng + giữ chuột trái)
+func _is_egg_aiming() -> bool:
+	return _bow_aiming and _EggThrow.is_egg_item(get_selected_item())
+
+# ── Ăn: cầm đồ ăn ở slot hotbar + giữ chuột phải ────────────────────────────
+
+func _start_eating() -> void:
+	if _eating or not _active or not is_alive:
+		return
+	var item := get_selected_item()
+	if item == null or item.type != ItemDef.Type.FOOD or item.heal_amount <= 0:
+		return
+	_eating = true
+	_eat_slot = _selected_slot
+	_eat_item = item
+	_eat_timer = 0.0
+	_state = State.EAT
+
+func _stop_eating() -> void:
+	if not _eating:
+		return
+	_eating = false
+	_eat_item = null
+	_eat_slot = -1
+	_eat_timer = 0.0
+
+func _tick_eating(delta: float) -> void:
+	if inventory == null or _eat_slot < 0 or _eat_slot >= inventory.slots.size():
+		_stop_eating()
+		return
+	var slot: ItemSlot = inventory.slots[_eat_slot]
+	if slot.is_empty() or slot.item != _eat_item:
+		_stop_eating()
+		return
+	if _selected_slot != _eat_slot or _inventory_open:
+		_stop_eating()
+		return
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+		_stop_eating()
+		return
+	_eat_timer += delta
+	if _eat_timer >= _eat_item.eat_time:
+		_eat_timer = 0.0
+		_eat_bite(_eat_slot)
+
+func _eat_bite(slot_idx: int) -> void:
+	if inventory == null or slot_idx < 0 or slot_idx >= inventory.slots.size():
+		return
+	var slot: ItemSlot = inventory.slots[slot_idx]
+	if slot.is_empty():
+		return
+	var item: ItemDef = slot.item
+	if item.heal_amount <= 0:
+		return
+	var prev_food: int = food
+	food = mini(max_food, food + item.heal_amount)
+	var gained: int = food - prev_food
+	inventory.remove_item(slot_idx, 1)
+	food_changed.emit(food, max_food)
+	if food >= 18 and hp < max_hp:
+		heal(1)
+	_spawn_eat_vfx(item)
+	SFXManager.play_eat()
+	if gained > 0:
+		_scroll_inventory_message(tr("ATE_FOOD").format({"s": item.name, "d": gained}))
+
+func _spawn_eat_vfx(item: ItemDef) -> void:
+	var vfx := GPUParticles3D.new()
+	vfx.one_shot = true
+	vfx.emitting = true
+	vfx.amount = 8
+	vfx.lifetime = 0.6
+	vfx.explosiveness = 0.8
+	var pmat := ParticleProcessMaterial.new()
+	pmat.direction = Vector3(0, 1, 0)
+	pmat.spread = 45.0
+	pmat.gravity = Vector3(0, -3.0, 0)
+	pmat.initial_velocity_min = 0.5
+	pmat.initial_velocity_max = 1.3
+	pmat.scale_min = 0.03
+	pmat.scale_max = 0.07
+	var c: Color = item.icon_color if item != null else Color(0.9, 0.7, 0.3)
+	var grad := Gradient.new()
+	grad.set_color(0, Color(c.r, c.g, c.b, 0.9))
+	grad.set_color(1, Color(c.r, c.g, c.b, 0.0))
+	var grad_tex := GradientTexture1D.new()
+	grad_tex.gradient = grad
+	pmat.color_ramp = grad_tex
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.05, 0.05)
+	vfx.draw_pass_1 = quad
+	vfx.process_material = pmat
+	var parent := get_parent()
+	if parent == null:
+		return
+	parent.add_child(vfx)
+	vfx.global_position = global_position + Vector3(0, 1.15, 0.3)
+	vfx.finished.connect(vfx.queue_free)
+
+# ── Chết: rương đồ + hồi sinh ────────────────────────────────────────────────
+
+func _spawn_death_chest() -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var chest := Chest.new()
+	chest.name = "DeathChest"
+	scene.add_child(chest)
+	chest.global_position = global_position + Vector3(0, 0.6, 0)
+	var chest_inv := Inventory.new(45)
+	if inventory != null:
+		for slot in inventory.slots:
+			if not slot.is_empty() and slot.item != null:
+				chest_inv.add_item(slot.item, slot.count)
+	var equipped: Array = [equipped_weapon, equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_hands, equipped_back, equipped_sub]
+	var eq_dur: Array = [_equipped_durability, -1, -1, -1, -1, -1, -1, -1]
+	for i in equipped.size():
+		var it: ItemDef = equipped[i]
+		if it == null:
+			continue
+		chest_inv.add_item(it, 1)
+		if eq_dur[i] >= 0:
+			var idx := chest_inv.find_slot_of_item(it)
+			if idx >= 0:
+				chest_inv.slots[idx].durability = eq_dur[i]
+	chest.inventory = chest_inv
+	if inventory != null:
+		for slot in inventory.slots:
+			slot.clear()
+	equipped_weapon = null
+	equipped_head = null
+	equipped_body = null
+	equipped_legs = null
+	equipped_feet = null
+	equipped_hands = null
+	equipped_back = null
+	equipped_sub = null
+	_equipped_slot_idx = -1
+	_equipped_durability = -1
+	_update_weapon_mesh()
+
+func _do_respawn() -> void:
+	_stop_mining()
+	_stop_eating()
+	if _bow_aiming:
+		_Bow.cancel_aim(self)
+	global_position = WORLD_SPAWN_POS
+	velocity = Vector3.ZERO
+	food = max_food
+	oxygen = max_oxygen
+	stamina = max_stamina
+	food_changed.emit(food, max_food)
+	oxygen_changed.emit(int(oxygen), int(max_oxygen))
+	stamina_changed.emit(stamina, max_stamina)
+	revive()
+	_death_chest_spawned = false
+	_scroll_inventory_message(tr("DEATH_CHEST_MSG"))
 
 func use_item_from_inventory(idx: int) -> void:
 	if inventory == null:
@@ -408,7 +589,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				if k.is_action_pressed("controls/inventory") or k.is_action_pressed("controls/build") \
 						or k.is_action_pressed("ui_cancel") or k.is_action_pressed("jump"):
 					var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-					if is_mortar:
+					if _is_egg_aiming():
+						_EggThrow.cancel_aim(self)
+					elif is_mortar:
 						_Mortar.cancel_aim(self)
 					else:
 						_Bow.cancel_aim(self)
@@ -438,8 +621,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if not mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
 			_stop_mining()
+			_stop_eating()
 		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _bow_aiming:
-			if equipped_weapon and equipped_weapon.id == "crossbow":
+			if _is_egg_aiming():
+				_EggThrow.fire(self)
+			elif equipped_weapon and equipped_weapon.id == "crossbow":
 				_Bow.fire(self)
 			elif equipped_weapon and equipped_weapon.id == "pumpkin_mortar":
 				_Mortar.fire(self)
@@ -456,13 +642,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
 			if _bow_aiming:
 				var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-				if is_mortar:
+				if _is_egg_aiming():
+					_EggThrow.cancel_aim(self)
+				elif is_mortar:
 					_Mortar.cancel_aim(self)
 				else:
 					_Bow.cancel_aim(self)
 				return
 			if _halberd_charge_time >= 0.0 or _halberd_throwing:
 				_Halberd.cancel_aim(self)
+				return
+			# Ăn: cầm đồ ăn ở slot hotbar đang chọn — giữ chuột phải tới khi ăn xong
+			var held := get_selected_item()
+			if held != null and held.type == ItemDef.Type.FOOD:
+				_start_eating()
 				return
 			# Mining — cúp/xẻng on RIGHT click (giữ chuột để đào)
 			if equipped_weapon != null:
@@ -484,7 +677,7 @@ func _unhandled_input(event: InputEvent) -> void:
 							else:
 								_scroll_inventory_message("(không thể cuốc)")
 					return
-				if wep_id == "pickaxe" or wep_id == "shovel":
+				if wep_id == "pickaxe" or wep_id == "shovel" or wep_id == "axe":
 					var mine_tgt: Vector3
 					if _has_target:
 						mine_tgt = _target_block
@@ -494,75 +687,66 @@ func _unhandled_input(event: InputEvent) -> void:
 						_start_mining(mine_tgt)
 					return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-			var world := get_tree().current_scene
-			if world:
-				for ch in world.get_children():
-					if ch is Chest and ch.is_player_nearby():
-						ch.open_ui()
-						return
-					if ch is CraftingTable and ch.is_player_nearby():
-						ch.open_ui()
-						return
-					if ch is Furnace and ch.is_player_nearby():
-						ch.open_ui()
-						return
+			var holding_heavy: bool = equipped_weapon != null and \
+				(equipped_weapon.id == "axe" or equipped_weapon.id == "pickaxe" or equipped_weapon.id == "hoe")
+			if not holding_heavy:
+				var world := get_tree().current_scene
+				if world:
+					for ch in world.get_children():
+						if ch is Chest and ch.is_player_nearby():
+							ch.open_ui()
+							return
+						if ch is CraftingTable and ch.is_player_nearby():
+							ch.open_ui()
+							return
+						if ch is Furnace and ch.is_player_nearby():
+							ch.open_ui()
+							return
 			if _bow_aiming:
 				return
-		if equipped_weapon != null:
-			match equipped_weapon.id:
-				"crossbow":
-					if _ranged_on_cd("crossbow"):
-						_scroll_inventory_message("(nỏ đang hồi chiêu)")
-						return
-					_Bow.start_aim(self); return
-				"pumpkin_mortar":
-					if _ranged_on_cd("pumpkin_mortar"):
-						_scroll_inventory_message("(pháo bí đỏ đang hồi chiêu)")
-						return
-					_Mortar.start_aim(self); return
-				"watermelon_cannon":
-					if _ranged_on_cd("watermelon_cannon"):
-						_scroll_inventory_message("(pháo dưa hấu đang hồi chiêu)")
-						return
-					_Bow.start_cannon_aim(self); return
-				"fishing_rod": _Fishing.action(self); return
-				"iron_halberd":
-					if _ranged_on_cd("iron_halberd"):
-						_scroll_inventory_message("(kích đang hồi chiêu)")
-					return
-			if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
-				var wep_id: String = equipped_weapon.id if equipped_weapon else ""
-				var is_heavy: bool = wep_id == "axe" or wep_id == "pickaxe" or wep_id == "hoe"
-				if is_heavy:
-					if _attack_timer > 0.0: return
-					combo_step = 0
-				else:
-					var max_step: int = 1 if wep_id == "iron_greatsword" else 2
-					if combo_timer > 0.0 and combo_step < max_step:
-						combo_step += 1
-					elif _attack_timer <= 0.0:
+			if _EggThrow.is_egg_item(get_selected_item()):
+				_EggThrow.start_aim(self)
+				return
+			if equipped_weapon != null:
+				match equipped_weapon.id:
+					"crossbow": _Bow.start_aim(self); return
+					"pumpkin_mortar": _Mortar.start_aim(self); return
+					"watermelon_cannon": _Bow.start_cannon_aim(self); return
+					"fishing_rod": _Fishing.action(self); return
+					"iron_halberd": return
+				if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+					var wep_id: String = equipped_weapon.id if equipped_weapon else ""
+					var is_heavy: bool = wep_id == "axe" or wep_id == "pickaxe" or wep_id == "hoe"
+					if is_heavy:
+						if _attack_timer > 0.0: return
 						combo_step = 0
 					else:
+						var max_step: int = 1 if wep_id == "iron_greatsword" else 2
+						if combo_timer > 0.0 and combo_step < max_step:
+							combo_step += 1
+						elif _attack_timer <= 0.0:
+							combo_step = 0
+						else:
+							return
+						combo_timer = COMBO_WINDOW
+					if not try_skill(stamina_cost_lmb):
 						return
-					combo_timer = COMBO_WINDOW
-				if not try_skill(stamina_cost_lmb):
-					return
-				_aim_dir = _calc_aim_dir()
-				var fwd := global_transform.basis.z
-				if _aim_dir.dot(fwd) < 0.99:
-					rotation.y = atan2(_aim_dir.x, _aim_dir.z)
-				_lmb_cd = 0.0
-				match wep_id:
-					"pickaxe": attack_duration = 0.65; _melee_hit_progress = 0.35
-					"axe": attack_duration = 0.85; _melee_hit_progress = 0.35
-					"hoe": attack_duration = 0.60; _melee_hit_progress = 0.30
-					"iron_greatsword": attack_duration = 1.00; _melee_hit_progress = 0.40
-					"leather_gloves": attack_duration = 0.35; _melee_hit_progress = 0.20
-					_: attack_duration = 0.50; _melee_hit_progress = 0.25
-				_attack_timer = attack_duration * (2.0 if _underwater else 1.0)
-				_state = State.ATTACK
-				_melee_hit_once = false
-			return
+					_aim_dir = _calc_aim_dir()
+					var fwd := global_transform.basis.z
+					if _aim_dir.dot(fwd) < 0.99:
+						rotation.y = atan2(_aim_dir.x, _aim_dir.z)
+					_lmb_cd = 0.0
+					match wep_id:
+						"pickaxe": attack_duration = 0.65; _melee_hit_progress = 0.35
+						"axe": attack_duration = 0.85; _melee_hit_progress = 0.35
+						"hoe": attack_duration = 0.60; _melee_hit_progress = 0.30
+						"iron_greatsword": attack_duration = 1.00; _melee_hit_progress = 0.40
+						"leather_gloves": attack_duration = 0.35; _melee_hit_progress = 0.20
+						_: attack_duration = 0.50; _melee_hit_progress = 0.25
+					_attack_timer = attack_duration * (2.0 if _underwater else 1.0)
+					_state = State.ATTACK
+					_melee_hit_once = false
+				return
 
 func _on_bobber_done(item_id: String) -> void:
 	_Fishing.on_bobber_done(self, item_id)
@@ -611,15 +795,18 @@ func _start_mining(target: Vector3) -> void:
 		_scroll_inventory_message("(không thể phá)")
 		return
 	var wep := equipped_weapon.id
-	if wep != "pickaxe" and wep != "shovel":
+	if wep != "pickaxe" and wep != "shovel" and wep != "axe":
 		return
 	if _equipped_durability_now() == 0:
 		_scroll_inventory_message("(công cụ đã vỡ)")
 		return
 	var correct: bool = (_Data.is_pickaxable(bid) and wep == "pickaxe") \
-		or (_Data.is_shovelable(bid) and wep == "shovel")
+		or (_Data.is_shovelable(bid) and wep == "shovel") \
+		or (_Data.is_axable(bid) and wep == "axe")
 	if hardness <= 0.0 or not correct:
-		if wep == "pickaxe":
+		if _Data.is_axable(bid):
+			_scroll_inventory_message("(cần rìu để chặt gỗ)")
+		elif wep == "pickaxe":
 			_scroll_inventory_message("(cần xẻng để đào đất)")
 		else:
 			_scroll_inventory_message("(cần cúp để đào đá)")
@@ -641,7 +828,8 @@ func _process_mining(delta: float) -> void:
 		_stop_mining()
 		return
 	if equipped_weapon == null \
-			or (equipped_weapon.id != "pickaxe" and equipped_weapon.id != "shovel"):
+			or (equipped_weapon.id != "pickaxe" and equipped_weapon.id != "shovel" \
+			and equipped_weapon.id != "axe"):
 		_stop_mining()
 		return
 	if _equipped_durability_now() <= 0:
@@ -750,7 +938,7 @@ func _on_tool_broken() -> void:
 
 func _update_block_target() -> void:
 	_ensure_highlight()
-	var can_mine := equipped_weapon != null and (equipped_weapon.id == "pickaxe" or equipped_weapon.id == "shovel" or equipped_weapon.id == "hoe")
+	var can_mine := equipped_weapon != null and (equipped_weapon.id == "pickaxe" or equipped_weapon.id == "shovel" or equipped_weapon.id == "axe" or equipped_weapon.id == "hoe")
 	if not can_mine:
 		_block_highlight.visible = false
 		_has_target = false
@@ -786,12 +974,13 @@ func _update_block_target() -> void:
 func _process(delta: float) -> void:
 	var is_cannon_aiming := _bow_aiming and equipped_weapon != null and equipped_weapon.id == "watermelon_cannon"
 	var is_mortar_aiming := _bow_aiming and equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-	var is_bow_aim_no_cannon := _bow_aiming and not is_cannon_aiming and not is_mortar_aiming and not _halberd_throwing
+	var is_egg_aiming := _is_egg_aiming()
+	var is_bow_aim_no_cannon := _bow_aiming and not is_cannon_aiming and not is_mortar_aiming and not is_egg_aiming and not _halberd_throwing
 	if is_bow_aim_no_cannon:
 		var reduced := 3.6 * 0.55
 		move_speed = reduced
 		sprint_speed = reduced
-	elif is_cannon_aiming or is_mortar_aiming:
+	elif is_cannon_aiming or is_mortar_aiming or is_egg_aiming:
 		move_speed = 3.6 * 0.70
 		sprint_speed = 6.8 * 0.70
 	elif _halberd_charge_time >= 0.0 or _halberd_throwing:
@@ -802,49 +991,37 @@ func _process(delta: float) -> void:
 		move_speed = 3.6
 		sprint_speed = 6.8
 	super._process(delta)
-	_food_timer += delta
-	_food_action_timer += delta
-	if _food_timer >= 8.0 and food > 0:
-		_food_timer = 0.0
-		food -= 1
-		food_changed.emit(food, max_food)
-	if _food_action_timer >= 4.0:
-		if food <= 0:
-			_food_action_timer = 0.0
-			_Damage.take_damage(self, 1)
-		elif food >= 18 and hp < max_hp:
-			_food_action_timer = 0.0
-			heal(1)
+	if _active and is_alive:
+		_tick_food(delta)
+		if _eating:
+			_tick_eating(delta)
 	combo_timer = max(combo_timer - delta, 0.0)
 	_update_block_target()
-	_tick_ranged_cd(delta)
 	_process_mining(delta)
 	_Bow.update_pose(self)
 	if equipped_weapon != null and equipped_weapon.id == "iron_halberd":
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			if _ranged_on_cd("iron_halberd"):
-				if _halberd_charge_time >= 0.0:
-					_halberd_charge_time = -1.0
-					if _halberd_throwing:
-						_Halberd.cancel_aim(self)
-			elif _halberd_charge_time < 0.0:
+			if _halberd_charge_time < 0.0:
 				_halberd_charge_time = 0.0
-			if _halberd_charge_time >= 0.0 and not _ranged_on_cd("iron_halberd"):
-				_halberd_charge_time += delta
-				if _halberd_charge_time >= HALBERD_CHARGE_TIME and not _halberd_throwing:
-					_Halberd.start_throw_aim(self)
-				if _halberd_throwing:
-					_Halberd.update_aim(self, delta)
+			_halberd_charge_time += delta
+			if _halberd_charge_time >= HALBERD_CHARGE_TIME and not _halberd_throwing:
+				_Halberd.start_throw_aim(self)
+			if _halberd_throwing:
+				_Halberd.update_aim(self, delta)
 	if _bow_aiming:
 		if _state == State.HIT:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-			if is_mortar:
+			if _is_egg_aiming():
+				_EggThrow.cancel_aim(self)
+			elif is_mortar:
 				_Mortar.cancel_aim(self)
 			else:
 				_Bow.cancel_aim(self)
 		else:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-			if is_mortar:
+			if _is_egg_aiming():
+				_EggThrow.update_aim(self, delta)
+			elif is_mortar:
 				_Mortar.update_aim(self, delta)
 			else:
 				_Bow.update_aim(self, delta)
@@ -856,6 +1033,15 @@ func _on_dash() -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
+	if _eating and is_alive and _active and not _underwater:
+		_state = State.EAT
+		velocity.x *= 0.5
+		velocity.z *= 0.5
+	if not is_alive and _death_timer <= 0.0 and not _death_chest_spawned:
+		_death_chest_spawned = true
+		_spawn_death_chest()
+		_do_respawn()
+		return
 	if _halberd_dashing:
 		if _state == State.DASH:
 			_Halberd.check_dash_hit(self)

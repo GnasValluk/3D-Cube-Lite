@@ -41,6 +41,7 @@ func _ready() -> void:
 	_check(_D.is_tillable(_D.BlockID.DARK_GRASS), "cuốc được DARK_GRASS")
 	_check(_D.is_tillable(_D.BlockID.DIRT), "cuốc được DIRT")
 	_check(_D.is_tillable(_D.BlockID.DARK_DIRT), "cuốc được DARK_DIRT")
+	_check(_D.is_tillable(_D.BlockID.YOUNG_GRASS), "cuốc được YOUNG_GRASS")
 	_check(not _D.is_tillable(_D.BlockID.STONE), "không cuốc được STONE")
 	_check(not _D.is_tillable(_D.BlockID.SAND), "không cuốc được SAND")
 	_check(not _D.is_tillable(_D.BlockID.BEDROCK), "không cuốc được BEDROCK")
@@ -52,6 +53,10 @@ func _ready() -> void:
 		"ITEM_TO_BLOCK[block_tilled_soil] → 32")
 	_check(_D.BLOCK_TO_ITEM.get(_D.BlockID.TILLED_SOIL, "") == "block_tilled_soil",
 		"BLOCK_TO_ITEM[32] → block_tilled_soil")
+	_check(_D.ITEM_TO_BLOCK.get("block_young_grass", 0) == _D.BlockID.YOUNG_GRASS,
+		"ITEM_TO_BLOCK[block_young_grass] → 38")
+	_check(_D.BLOCK_TO_ITEM.get(_D.BlockID.YOUNG_GRASS, "") == "block_young_grass",
+		"BLOCK_TO_ITEM[38] → block_young_grass")
 
 	# ── 2. Item database ───────────────────────────────────────────────────
 	ItemDatabase.ensure_db()
@@ -63,6 +68,8 @@ func _ready() -> void:
 	_check(hoe != null and hoe.type == ItemDef.Type.TOOL, "hoe tồn tại, loại TOOL")
 	_check(hoe != null and hoe.atk_bonus == 2, "hoe sát thương 2")
 	_check(soil != null and soil.type == ItemDef.Type.BLOCK, "block_tilled_soil là BLOCK")
+	var yg: ItemDef = ItemDatabase.items_db.get("block_young_grass") as ItemDef
+	_check(yg != null and yg.type == ItemDef.Type.BLOCK, "block_young_grass là BLOCK")
 	_check(cseed != null and tseed != null and sseed != null, "3 mầm cây tồn tại")
 	_check(cseed != null and cseed.max_stack == 16, "mầm stack 16")
 	_check(_Placement._is_seed_item("coconut_seed"), "coconut_seed là seed item")

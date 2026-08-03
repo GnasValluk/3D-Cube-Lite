@@ -50,6 +50,8 @@ func _setup_mesh():
 		PlantProp.build_drop_mesh(root, "taro")
 	elif item_id == "tropical_seaweed":
 		PlantProp.build_drop_mesh(root, "weed")
+	elif item_id == "seagrass":
+		PlantProp.build_drop_mesh(root, "seagrass")
 	elif item_id in ["chest", "twilight_gate", "crafting_table", "furnace"]:
 		ItemMesh.build(root, item_id)
 	else:

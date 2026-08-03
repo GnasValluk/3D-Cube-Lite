@@ -1,5 +1,5 @@
 class_name Chest
-extends StaticBody3D
+extends DestructibleEntity
 
 var inventory: Inventory = null
 var _player_nearby: bool = false
@@ -8,7 +8,12 @@ var _treasure_root: Node3D
 var _sparkle: GPUParticles3D
 var _is_open: bool = false
 
+func _init() -> void:
+	max_hp = 60
+	drop_item_id = "chest"
+
 func _ready() -> void:
+	super._ready()
 	inventory = Inventory.new(27)
 	_setup_mesh()
 	_setup_area()
@@ -265,3 +270,20 @@ func _find_hud() -> HUD:
 		if child is HUD:
 			return child
 	return null
+
+## Bị phá huỷ: đóng UI (nếu đang mở) + đổ toàn bộ đồ trong rương ra ngoài.
+func _on_destroy() -> void:
+	close_ui()
+
+func _spill_inventory() -> void:
+	if inventory == null:
+		return
+	var world := _find_world_manager()
+	if world == null:
+		return
+	for slot in inventory.slots:
+		if slot.is_empty():
+			continue
+		var scatter: Vector3 = Vector3(randf_range(-0.7, 0.7), 0.2, randf_range(-0.7, 0.7))
+		DroppedItem.spawn(world, slot.item, global_position + scatter, slot.count,
+			_spawn_drop_velocity(), global_position.y)

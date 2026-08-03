@@ -1,13 +1,14 @@
 class_name GrowingProp
 extends DestroyableProp
 
-## Cây có vòng đời: MẦM → NON → TRƯỞNG THÀNH theo thời gian game (TimeSystem).
-## Ngày "sinh" được sinh ra từ hash vị trí → mỗi cây có tuổi riêng, ổn định
-## giữa các lần load world, và dần trưởng thành khi người chơi chơi lâu.
+## Cây có vòng đời: MẦM → NON → TRƯỞNG THÀNH (→ CHÍN nếu cây có 3 ngưỡng)
+## theo thời gian game (TimeSystem). Ngày "sinh" được sinh ra từ hash vị trí
+## → mỗi cây có tuổi riêng, ổn định giữa các lần load world, và dần trưởng
+## thành khi người chơi chơi lâu.
 
 const CYCLE_DURATION: float = 600.0  # 1 ngày game = 10 phút thực (TimeSystem.CYCLE_DURATION)
 
-enum Stage { SPROUT = 0, YOUNG = 1, MATURE = 2 }
+enum Stage { SPROUT = 0, YOUNG = 1, MATURE = 2, RIPE = 3 }
 
 const _CHECK_INTERVAL: float = 3.0
 
@@ -27,7 +28,8 @@ func _ready() -> void:
 func _birth_span_days() -> float:
 	return 40.0
 
-## [ngày hết MẦM, ngày hết NON] — từ đó trở đi là TRƯỞNG THÀNH.
+## [ngày hết MẦM, ngày hết NON, (ngày hết QUẢ NON)] — có 3 ngưỡng thì cây
+## có thêm giai đoạn CHÍN (RIPE); 2 ngưỡng thì TRƯỞNG THÀNH là giai đoạn cuối.
 func _stage_thresholds() -> Array[float]:
 	return [5.0, 15.0]
 
@@ -47,7 +49,11 @@ func _compute_stage() -> int:
 		return Stage.SPROUT
 	if age_days < th[1]:
 		return Stage.YOUNG
-	return Stage.MATURE
+	if th.size() < 3:
+		return Stage.MATURE
+	if age_days < th[2]:
+		return Stage.MATURE
+	return Stage.RIPE
 
 func _process(delta: float) -> void:
 	_check_timer -= delta

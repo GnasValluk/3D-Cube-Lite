@@ -51,6 +51,11 @@ func _ready() -> void:
 	for i in range(1, _characters.size()):
 		remove_child(_characters[i])
 
+	# Load lại hành trình: đặt player thẳng tại điểm đứng đã lưu (chunk trung
+	# tâm đã generate quanh vị trí này) — không spawn ở điểm đầu rồi teleport.
+	if WorldSeed.is_loading and WorldSeed.has_saved_player_pos:
+		_characters[0].global_position = WorldSeed.saved_player_pos
+
 	_characters[0].set_active(true)
 	_characters[0].play_spawn_animation()
 

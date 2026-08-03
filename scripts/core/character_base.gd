@@ -90,8 +90,8 @@ var _melee_hit_progress: float = 0.25
 # ── Oxygen / Swimming ──────────────────────────────────────
 @export var max_oxygen: float = 100.0
 var oxygen: float = 100.0
-const OXYGEN_DEPLETE_RATE: float = 5.0
-const OXYGEN_REFILL_RATE: float = 20.0
+const OXYGEN_DEPLETE_RATE: float = 7.0
+const OXYGEN_REFILL_RATE: float = 15.0
 const DROWN_DAMAGE_INTERVAL: float = 1.5
 var _drown_timer: float = 0.0
 var _underwater: bool = false
@@ -99,7 +99,7 @@ var _swim_jump_cd: float = 0.0
 var _water_check_cd: float = 0.0
 
 # ── State machine ─────────────────────────────────────────────────────────────
-enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD, SWIM }
+enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD, SWIM, EAT }
 var _state: State = State.IDLE
 
 # ── Timers ────────────────────────────────────────────────────────────────────
@@ -762,10 +762,9 @@ func _do_melee_hit() -> void:
 	for pn in prop_nodes:
 		if not is_instance_valid(pn):
 			continue
-		var prop := pn as DestroyableProp
-		if prop == null:
+		if not pn.has_method("try_destroy"):
 			continue
-		var offset: Vector3 = prop.global_position - global_position
+		var offset: Vector3 = pn.global_position - global_position
 		offset.y = 0.0
 		var dist: float = offset.length()
 		if dist <= max_dist:
@@ -776,7 +775,7 @@ func _do_melee_hit() -> void:
 					var pc := self as PlayerCharacter
 					if pc and pc.equipped_weapon != null:
 						dmg = pc.equipped_weapon.atk_bonus
-				if prop.try_destroy(weapon_id, dmg):
+				if pn.try_destroy(weapon_id, dmg):
 					landed = true
 
 	# Độ bền vũ khí: mỗi đòn trúng đích giảm 1 (như Minecraft)

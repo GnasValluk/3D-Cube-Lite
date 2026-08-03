@@ -229,15 +229,9 @@ static func fire(player) -> void:
 		player._scroll_inventory_message(player.tr("BOW_NO_ARROWS"))
 		return
 
-	if player._ranged_on_cd("crossbow"):
-		player._scroll_inventory_message("(nỏ đang hồi chiêu)")
-		return
-
 	if not consume_arrow(player):
 		player._scroll_inventory_message(player.tr("BOW_NO_ARROWS"))
 		return
-
-	player._set_ranged_cd("crossbow")
 
 	player._damage_equipped_tool(1)
 
@@ -261,12 +255,8 @@ static func fire_watermelon_cannon(player) -> void:
 		return
 	if not player.equipped_weapon or player.equipped_weapon.id != "watermelon_cannon":
 		return
-	if player._ranged_on_cd("watermelon_cannon"):
-		player._scroll_inventory_message("(pháo dưa hấu đang hồi chiêu)")
-		return
 	if not consume_watermelon_ammo(player):
 		return
-	player._set_ranged_cd("watermelon_cannon")
 	player._damage_equipped_tool(1)
 	var dir: Vector3 = player._calc_aim_dir()
 	var base_dmg: int = player.attack_power + player.equipped_weapon.atk_bonus

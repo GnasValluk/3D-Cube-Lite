@@ -48,6 +48,23 @@ func save_exists(world_name: String = "") -> bool:
 	if world_name.is_empty(): return false
 	return FileAccess.file_exists(get_world_dir(world_name) + "save.json")
 
+## Đọc vị trí player từ save (không parse cả save, chỉ lấy field position).
+## Trả về Vector3.INF nếu save không có vị trí hợp lệ — dùng để spawn thẳng
+## tại điểm đứng cuối cùng, tránh spawn ở điểm đầu rồi teleport gây lag.
+func get_saved_player_position(world_name: String = "") -> Vector3:
+	if world_name.is_empty(): world_name = WorldSeed.world_name
+	var dir := get_world_dir(world_name)
+	if not FileAccess.file_exists(dir + "save.json"): return Vector3.INF
+	var f := FileAccess.open(dir + "save.json", FileAccess.READ)
+	if not f: return Vector3.INF
+	var json := JSON.new()
+	if json.parse(f.get_as_text()) != OK: return Vector3.INF
+	var pd: Dictionary = json.data.get("player", {})
+	var pos: Array = pd.get("position", [])
+	if pos.size() == 3:
+		return Vector3(pos[0], pos[1], pos[2])
+	return Vector3.INF
+
 func save_game() -> bool:
 	var data = _collect_save_data()
 	if data.is_empty(): return false

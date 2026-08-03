@@ -52,18 +52,31 @@ var _last_chunk: Node = null
 var _last_cx: int = 99999
 var _last_cz: int = 99999
 
-# ── Model: rig + đèn + bọt nước ─────────────────────────────────────────────
+# ── Phá huỷ: thuyền có máu như cây, đòn heavy phá được, rớt lại vật phẩm ─────
+var max_hp: int = 120
+var hp: int
+var weapon_requirement: int = DestructibleEntity.WeaponReq.HEAVY
+var drop_item_id: String = "fishing_boat"
+var _destroyed: bool = false
+
+# ── Model: rig + đèn + khói ống xả + bọt/té nước chân vịt ───────────────────
 var _rig: Node3D = null
 var _boat_lights: Array[Light3D] = []
 var _lamp_mat: StandardMaterial3D = null
 var _bubbles: CPUParticles3D = null
+var _splash: CPUParticles3D = null
+var _smoke: CPUParticles3D = null
 var _light_timer: float = 0.0
 var _last_light_t: float = -1.0
+var _fx_timer: float = 0.0
 
 func _ready() -> void:
+	hp = max_hp
+	add_to_group("destroyable_props")
 	_build_mesh()
 	_build_lights()
 	_build_bubbles()
+	_build_smoke()
 	_build_collision()
 
 # ── Tương tác ────────────────────────────────────────────────────────────────
@@ -246,7 +259,7 @@ func _physics_process(delta: float) -> void:
 	# ── Lái: chỉ khi có tài xế (W/S = chèo, A/D = bẻ lái) ──
 	var throttle := 0.0
 	var rudder := 0.0
-	if is_driven() and bool(_driver.get("_is_player")):
+	if is_driven() and _driver.get("_is_player") == true:
 		if Input.is_action_pressed("move_forward"):
 			throttle = 1.0
 		elif Input.is_action_pressed("move_back"):
@@ -266,9 +279,17 @@ func _physics_process(delta: float) -> void:
 	velocity.x += drag.x * delta
 	velocity.z += drag.z * delta
 
-	# Bọt nước tại chân vịt — chỉ khi thuyền đang chạy trên nước
-	if _bubbles:
-		_bubbles.emitting = in_water and speed > 0.35
+	# ── Hiệu ứng: khói ống xả + bọt/té nước chân vịt ─────────────────────────
+	# (không đổi amount runtime — đổi amount làm CPUParticles reset, phun giật)
+	_fx_timer -= delta
+	if _fx_timer <= 0.0:
+		_fx_timer = 0.2
+		if _smoke:
+			_smoke.emitting = is_driven()
+		if _bubbles:
+			_bubbles.emitting = in_water and speed > 0.35
+		if _splash:
+			_splash.emitting = in_water and speed > 0.8
 
 	# ── Chèo ──
 	if throttle != 0.0 and float_frac > 0.02:
@@ -299,6 +320,11 @@ func _physics_process(delta: float) -> void:
 		var f: float = GROUND_FRICTION * (1.0 - float_frac)
 		velocity.x = move_toward(velocity.x, 0.0, f * delta)
 		velocity.z = move_toward(velocity.z, 0.0, f * delta)
+
+	# ── Tàu xuyên qua cá (bỏ va chạm; cá vẫn né theo khoảng cách) ──
+	for f in get_tree().get_nodes_in_group("fish"):
+		if f is PhysicsBody3D:
+			add_collision_exception_with(f)
 
 	move_and_slide()
 
@@ -705,27 +731,91 @@ func _build_lights() -> void:
 	# Đèn bão treo đuôi
 	mk.call(Vector3(-0.45, 0.59, 1.45), 1.1)
 
-# ── Bọt nước tại chân vịt khi chạy ──────────────────────────────────────────
+# ── Bọt nước + tia té nước tại chân vịt khi chạy ────────────────────────────
+## Gắn mesh cầu (sphere) + material trong suốt unshaded cho particle — mesh
+## phẳng (quad) nhìn mỏng từ hông; mesh cầu 3D hiển thị đều từ mọi góc.
+func _config_particles(p: CPUParticles3D, base_size: float) -> void:
+	var sph := SphereMesh.new()
+	sph.radius = 0.5
+	sph.height = 1.0
+	sph.radial_segments = 10
+	sph.rings = 6
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	m.vertex_color_is_srgb = true
+	m.albedo_color = Color.WHITE
+	sph.material = m
+	p.mesh = sph
+	p.scale_amount_min = base_size * 0.7
+	p.scale_amount_max = base_size * 1.3
+
 func _build_bubbles() -> void:
 	if _rig == null:
 		return
 	var p := CPUParticles3D.new()
 	p.name = "_PropBubbles"
-	p.amount = 24
-	p.lifetime = 1.0
+	p.amount = 36
+	p.lifetime = 1.1
 	p.one_shot = false
 	p.emitting = false
 	p.direction = Vector3(0, 1, 0)
 	p.spread = 55.0
 	p.gravity = Vector3(0, -1.4, 0)
 	p.initial_velocity_min = 0.3
-	p.initial_velocity_max = 0.75
-	p.scale_amount_min = 0.03
-	p.scale_amount_max = 0.08
-	p.color = Color(0.90, 0.95, 1.0, 0.85)
+	p.initial_velocity_max = 0.85
+	p.color = Color(0.92, 0.96, 1.0, 0.8)
 	p.position = Vector3(0, -0.42, 1.95)
+	_config_particles(p, 0.22)
 	_rig.add_child(p)
 	_bubbles = p
+	# Tia té nước trắng ngay mặt nước phía chân vịt
+	var sp := CPUParticles3D.new()
+	sp.name = "_PropSplash"
+	sp.amount = 28
+	sp.lifetime = 0.5
+	sp.one_shot = false
+	sp.emitting = false
+	sp.direction = Vector3(0, 1, 0)
+	sp.spread = 75.0
+	sp.gravity = Vector3(0, -9.5, 0)
+	sp.initial_velocity_min = 1.2
+	sp.initial_velocity_max = 2.8
+	sp.color = Color(0.95, 0.98, 1.0, 0.9)
+	sp.position = Vector3(0, -0.08, 1.95)
+	_config_particles(sp, 0.28)
+	_rig.add_child(sp)
+	_splash = sp
+
+# ── Khói trắng từ ống xả (máy nổ khi có tài xế) ─────────────────────────────
+func _build_smoke() -> void:
+	if _rig == null:
+		return
+	var p := CPUParticles3D.new()
+	p.name = "_ExhaustSmoke"
+	p.amount = 24
+	p.lifetime = 2.0
+	p.one_shot = false
+	p.emitting = false
+	p.direction = Vector3(0, 1, 0)
+	p.spread = 16.0
+	p.gravity = Vector3(0, 0.7, 0)
+	p.initial_velocity_min = 0.35
+	p.initial_velocity_max = 0.75
+	_config_particles(p, 0.34)
+	var grow := Curve.new()
+	grow.add_point(Vector2(0, 1.0))
+	grow.add_point(Vector2(1, 2.6))
+	p.scale_amount_curve = grow
+	var ramp := Gradient.new()
+	ramp.set_color(0, Color(0.95, 0.95, 0.95, 0.55))
+	ramp.set_color(0.6, Color(0.92, 0.92, 0.92, 0.25))
+	ramp.set_color(1, Color(0.90, 0.90, 0.90, 0.0))
+	p.color_ramp = ramp
+	p.position = Vector3(0, 1.55, 1.05)
+	_rig.add_child(p)
+	_smoke = p
 
 ## Cập nhật đèn theo đêm/mưa (interval để đỡ tốn CPU).
 func _update_lights(delta: float) -> void:
@@ -768,3 +858,105 @@ func _build_collision() -> void:
 	col.shape = box
 	col.position = Vector3(0, HULL_BOTTOM + HULL_DEP * 0.5, 0)
 	add_child(col)
+
+# ── Bị phá huỷ bởi đòn heavy (rìu/cúp/cuốc/đại kiếm) ─────────────────────────
+func try_destroy(weapon_id: String, damage: int = 1) -> bool:
+	if _destroyed or not _weapon_allowed(weapon_id):
+		return false
+	hp -= damage
+	if hp > 0:
+		_hit_flash()
+		_spawn_damage_number(damage)
+		SFXManager.play_hurt()
+	else:
+		_spawn_damage_number(damage)
+		SFXManager.play_block_break()
+		_die()
+	return true
+
+func _weapon_allowed(weapon_id: String) -> bool:
+	match weapon_requirement:
+		DestructibleEntity.WeaponReq.NONE:     return true
+		DestructibleEntity.WeaponReq.AXE:      return weapon_id == "axe" or weapon_id == "iron_greatsword"
+		DestructibleEntity.WeaponReq.SWORD:    return weapon_id == "iron_sword" or weapon_id == "iron_greatsword"
+		DestructibleEntity.WeaponReq.PICKAXE:  return weapon_id == "pickaxe"
+		DestructibleEntity.WeaponReq.HEAVY:    return weapon_id == "axe" or weapon_id == "pickaxe" \
+			or weapon_id == "hoe" or weapon_id == "iron_greatsword"
+	return false
+
+func _hit_flash() -> void:
+	for mi in _get_mesh_instances():
+		var mat := StandardMaterial3D.new()
+		mat.albedo_color = Color.WHITE
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var orig := mi.material_override
+		mi.material_override = mat
+		var tween := create_tween()
+		tween.tween_interval(0.08)
+		tween.tween_callback(func():
+			if is_instance_valid(mi):
+				mi.material_override = orig
+		)
+
+func _get_mesh_instances() -> Array[MeshInstance3D]:
+	var result: Array[MeshInstance3D] = []
+	for ch in get_children(true):
+		if ch is MeshInstance3D:
+			result.append(ch)
+		_collect_mi(ch, result)
+	return result
+
+static func _collect_mi(node: Node, result: Array[MeshInstance3D]) -> void:
+	for ch in node.get_children(true):
+		if ch is MeshInstance3D:
+			result.append(ch)
+		_collect_mi(ch, result)
+
+func _spawn_damage_number(dmg: int) -> void:
+	var world := get_tree().current_scene if get_tree() else null
+	if world == null:
+		return
+	var dn := FloatingDamage.new()
+	world.add_child(dn)
+	dn.setup(dmg, global_position + Vector3(0, 1.5, 0), Color.WHITE)
+
+func _die() -> void:
+	_destroyed = true
+	spawn_drop()
+	_on_destroy()
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(self, "scale", Vector3.ZERO, 0.25).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(self, "position:y", position.y + 0.5, 0.25)
+	tween.tween_interval(0.3)
+	tween.tween_callback(queue_free)
+
+func _spawn_drop_velocity() -> Vector3:
+	return Vector3(randf_range(-1.5, 1.5), randf_range(2.0, 3.5), randf_range(-1.5, 1.5))
+
+func spawn_drop() -> void:
+	if drop_item_id == "":
+		return
+	var world := _find_world_manager()
+	if world == null:
+		return
+	ItemDatabase.ensure_db()
+	var def: ItemDef = ItemDatabase.items_db.get(drop_item_id)
+	if def != null:
+		DroppedItem.spawn(world, def, global_position, 1, _spawn_drop_velocity(), global_position.y)
+
+## Thuyền vỡ: tài xế bị đá xuống nước (trả meta + va chạm + vị trí an toàn).
+func _on_destroy() -> void:
+	if _driver != null:
+		try_exit()
+
+func _find_world_manager() -> Node3D:
+	var p := get_parent()
+	while p != null:
+		if p is OpenWorldManager:
+			return p
+		p = p.get_parent()
+	var scene := get_tree().current_scene if get_tree() else null
+	if scene is Node3D:
+		return scene
+	return null

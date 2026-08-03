@@ -13,7 +13,7 @@ static func block_cube(p: Node3D, item_id: String) -> void:
 
 	if block_id == _DATA.BlockID.TILLED_SOIL:
 		_build_soil_item(p)
-	elif block_id >= _DATA.BlockID.COPPER_ORE:
+	elif block_id >= _DATA.BlockID.COPPER_ORE and block_id != _DATA.BlockID.YOUNG_GRASS:
 		_build_ore_item(p, block_id)
 	else:
 		var top_col: Color = _DATA.BLOCK_COLORS_RW[block_id]
@@ -25,6 +25,9 @@ static func block_cube(p: Node3D, item_id: String) -> void:
 				bot_col = _DATA.block_side_color(side_col)
 			2:  # DARK_GRASS
 				side_col = _DATA.BLOCK_COLORS_RW[8]  # DARK_DIRT
+				bot_col = _DATA.block_side_color(side_col)
+			38:  # YOUNG_GRASS — bãi cỏ non: mặt bên đất trống
+				side_col = _DATA.BLOCK_COLORS_RW[4]  # DIRT
 				bot_col = _DATA.block_side_color(side_col)
 			_:
 				side_col = _DATA.block_side_color(top_col)

@@ -1,7 +1,7 @@
 class_name DestroyableProp
 extends Node3D
 
-enum WeaponReq { NONE, AXE, SWORD, PICKAXE }
+enum WeaponReq { NONE, AXE, SWORD, PICKAXE, HEAVY }
 
 var max_hp: int = 3
 var hp: int
@@ -40,6 +40,8 @@ func _weapon_allowed(weapon_id: String) -> bool:
 		WeaponReq.AXE:     return weapon_id == "axe" or weapon_id == "iron_greatsword"
 		WeaponReq.SWORD:   return weapon_id == "iron_sword" or weapon_id == "iron_greatsword"
 		WeaponReq.PICKAXE: return weapon_id == "pickaxe"
+		WeaponReq.HEAVY:   return weapon_id == "axe" or weapon_id == "pickaxe" \
+			or weapon_id == "hoe" or weapon_id == "iron_greatsword"
 	return false
 
 func _hit_flash() -> void:
@@ -115,4 +117,7 @@ func _find_world_manager() -> Node3D:
 		if p is OpenWorldManager:
 			return p
 		p = p.get_parent()
+	var scene := get_tree().current_scene if get_tree() else null
+	if scene is Node3D:
+		return scene
 	return null

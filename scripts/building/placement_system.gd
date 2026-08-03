@@ -4,6 +4,9 @@ class_name PlacementSystem
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const _FurnaceScript = preload("res://scripts/items/entities/furnace.gd")
 const _FishingBoat = preload("res://scripts/items/entities/fishing_boat.gd")
+const _EggplantProp = preload("res://scripts/world/props/eggplant_prop.gd")
+const _WatermelonVine = preload("res://scripts/world/props/watermelon_vine_prop.gd")
+const _PumpkinVine = preload("res://scripts/world/props/pumpkin_vine_prop.gd")
 const VOXEL: float = 0.50
 
 var _placing: bool = false
@@ -94,7 +97,7 @@ func _make_ghost() -> void:
 	_ghost.rotation.y = _placement_rotation
 
 ## ── Mầm cây ─────────────────────────────────────────────────────────────────
-const SEED_ITEMS: Array[String] = ["coconut_seed", "taro_seed", "seaweed_seed"]
+const SEED_ITEMS: Array[String] = ["coconut_seed", "taro_seed", "seaweed_seed", "seagrass_seed", "eggplant_seed", "watermelon_seed", "pumpkin_seed"]
 
 static func _is_seed_item(item_id: String) -> bool:
 	return item_id in SEED_ITEMS
@@ -116,16 +119,21 @@ func _build_ghost_seed() -> void:
 	sprout.position = Vector3(0, VOXEL * 0.6, 0)
 	_ghost.add_child(sprout)
 
-## Nền trồng hợp lệ: dừa/môn chỉ trên đất tơi xốp; rong trên cát/bùn dưới nước.
+## Nền trồng hợp lệ: dừa/môn chỉ trên đất tơi xốp; rong/cỏ biển trên cát/bùn dưới nước.
 func _can_plant_seed(item_id: String, pos: Vector3) -> bool:
 	var owm := _find_world_manager()
 	if owm == null or not owm.has_method("get_block"):
 		return false
 	var below: int = owm.get_block(pos.x, pos.y - VOXEL, pos.z)
-	if item_id == "seaweed_seed":
+	if item_id == "seaweed_seed" or item_id == "seagrass_seed":
 		if not _is_seaweed_bed(below):
 			return false
-		return _Data.is_water(owm.get_block(pos.x, pos.y, pos.z))
+		if not _Data.is_water(owm.get_block(pos.x, pos.y, pos.z)):
+			return false
+		if item_id == "seagrass_seed":
+			var gap: float = _measure_water_gap(owm, pos)
+			return gap >= 1.25 and gap <= 3.5
+		return true
 	return below == _Data.BlockID.TILLED_SOIL
 
 static func _is_seaweed_bed(bid: int) -> bool:
@@ -144,7 +152,7 @@ func _measure_water_gap(owm: Node, pos: Vector3) -> float:
 		y += VOXEL
 	return gap
 
-## Trồng mầm: dừa → cây dừa, môn → cây môn, rong → cây rong nhiệt đới.
+## Trồng mầm: dừa → cây dừa, môn → cây môn, rong/cỏ biển → cây thủy sinh.
 func _plant_seed(item_id: String, pos: Vector3) -> void:
 	var world_mgr := _find_world_manager()
 	if world_mgr == null or not _can_plant_seed(item_id, pos):
@@ -160,6 +168,18 @@ func _plant_seed(item_id: String, pos: Vector3) -> void:
 	elif item_id == "taro_seed":
 		prop = PlantProp.new(50, DestroyableProp.WeaponReq.SWORD, "taro")
 		prop.setup("taro", randi(), randi(), true, 0.0)
+	elif item_id == "seagrass_seed":
+		prop = PlantProp.new(50, DestroyableProp.WeaponReq.SWORD, "seagrass")
+		prop.setup("seagrass", randi(), randi(), true, _measure_water_gap(world_mgr, pos), false)
+	elif item_id == "eggplant_seed":
+		prop = _EggplantProp.new(40, DestroyableProp.WeaponReq.SWORD, "eggplant_fruit")
+		prop.setup()
+	elif item_id == "watermelon_seed":
+		prop = _WatermelonVine.new(40, DestroyableProp.WeaponReq.SWORD, "watermelon")
+		prop.setup()
+	elif item_id == "pumpkin_seed":
+		prop = _PumpkinVine.new(40, DestroyableProp.WeaponReq.SWORD, "pumpkin")
+		prop.setup()
 	else:
 		prop = PlantProp.new(50, DestroyableProp.WeaponReq.SWORD, "tropical_seaweed")
 		prop.setup("weed", randi(), randi(), true, _measure_water_gap(world_mgr, pos))
@@ -172,7 +192,14 @@ func _build_ghost_block() -> void:
 	var block_mat := _ghost_mat(Color(0.80, 0.80, 0.80, 0.30), Color(0.40, 0.40, 0.40), 0.0)
 	var mi := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3(VOXEL, VOXEL, VOXEL)
+	var bid: int = _Data.ITEM_TO_BLOCK.get(_item_id, 0)
+	var shape: Vector3 = _Data.block_shape(bid)
+	if shape != Vector3.ZERO:
+		# Block hình dạng riêng — hộp đúng kích thước, đáy trùng với vị trí đặt
+		box.size = shape
+		mi.position = Vector3(0, shape.y * 0.5, 0)
+	else:
+		box.size = Vector3(VOXEL, VOXEL, VOXEL)
 	mi.mesh = box
 	mi.material_override = block_mat
 	_ghost.add_child(mi)

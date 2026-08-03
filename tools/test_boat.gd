@@ -68,7 +68,7 @@ func _ready() -> void:
 	# ── 1. Recipe chế tạo thuyền ───────────────────────────────────────────
 	print("-- 1. Recipe chế tạo --")
 	_Recipe.ensure()
-	_check(_Recipe.recipes.size() == 3, "có 3 recipe (thuyền, cần câu, xô nước)")
+	_check(_Recipe.recipes.size() == 13, "có 13 recipe (thuyền, cần câu, xô nước + 3 đá hình dạng + 2 cà tím + 2 dưa hấu + 3 bí đỏ)")
 	_check(_Recipe.recipes[0].id == "fishing_boat", "recipe[0] = fishing_boat")
 	var rb: Dictionary = _Recipe.match_counts({"palm_wood": 6, "coconut": 2, "tropical_seaweed": 2})
 	_check(rb.get("id", "") == "fishing_boat", "đủ nguyên liệu → chế được thuyền")
@@ -307,6 +307,50 @@ func _ready() -> void:
 	boat.velocity = Vector3.ZERO
 	await _wait_physics(20)
 	_check(not boat._bubbles.emitting, "bọt khí ngừng khi đứng im")
+
+	# ── 12. Tia té nước + khói ống xả ──────────────────────────────────────
+	print("-- 12. Tia té nước + khói ống xả --")
+	boat.global_position = Vector3(0, 0.5, 0)
+	boat.velocity = Vector3(0, 0, -3.0)
+	await _wait_physics(10)
+	_check(boat._splash.emitting, "tia té nước phun khi chạy nhanh trên nước")
+	boat.velocity = Vector3.ZERO
+	await _wait_physics(20)
+	_check(not boat._splash.emitting, "tia té nước ngừng khi đứng im")
+	_check(not boat._smoke.emitting, "khói tắt khi không có tài xế")
+	var fake_driver := CharacterBody3D.new()
+	fake_driver.name = "FakeDriver"
+	var fdscript := GDScript.new()
+	fdscript.source_code = "extends CharacterBody3D\nvar _is_player := false\n"
+	fdscript.reload()
+	fake_driver.set_script(fdscript)
+	add_child(fake_driver)
+	boat._driver = fake_driver
+	await _wait_physics(20)
+	_check(boat._smoke.emitting, "khói phun khi có tài xế (máy nổ)")
+	_check(boat._smoke.amount >= 14, "khói có cường độ tối thiểu (amount=%s)" % str(boat._smoke.amount))
+	boat._driver = null
+	await _wait_physics(10)
+	_check(not boat._smoke.emitting, "khói tắt khi tài xế rời")
+	fake_driver.queue_free()
+
+	# ── 13. VFX hiển thị được + tàu xuyên qua cá ────────────────────────────
+	print("-- 13. VFX mesh + xuyên qua cá --")
+	_check(boat._bubbles != null and boat._bubbles.mesh != null and boat._bubbles.material_override != null
+		or boat._bubbles != null and boat._bubbles.mesh != null and boat._bubbles.mesh.material != null,
+		"bọt khí có mesh + material")
+	_check(boat._splash != null and boat._splash.mesh != null, "tia té nước có mesh")
+	_check(boat._smoke != null and boat._smoke.mesh != null, "khói có mesh")
+	_check(boat._bubbles.scale_amount_max >= 0.15, "kích thước bọt khí nhìn thấy được (>=0.15)")
+	_check(boat._smoke.scale_amount_max >= 0.2, "kích thước khói nhìn thấy được (>=0.2)")
+	var fake_fish := CharacterBody3D.new()
+	fake_fish.name = "FakeFish"
+	fake_fish.add_to_group("fish")
+	add_child(fake_fish)
+	await _wait_physics(5)
+	_check(boat.get_collision_exceptions().has(fake_fish), "tàu bỏ va chạm với cá (exception)")
+	fake_fish.remove_from_group("fish")
+	fake_fish.queue_free()
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())

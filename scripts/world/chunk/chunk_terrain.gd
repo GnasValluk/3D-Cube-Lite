@@ -7,6 +7,11 @@ const _BlockData = preload("chunk_block_data.gd")
 ## BEDROCK LAYER: Layer 0 (Y_MIN) luôn là BEDROCK (không thể phá vỡ)
 ## STONE fill từ layer 1 đến top_slab-2
 ## Hồ có đáy STONE chắc chắn, không rớt void
+## ── Bãi cỏ non trên đồng bằng ────────────────────────────────────────────────
+## Không sample noise ở đây: bãi cỏ non được phân loại cell-level trong
+## world_chunk.compute_chunk, ĐÚNG cơ chế bãi khối đất (cùng noise n_biome,
+## cùng (wx+500)*0.7, dải ngưỡng 0.66–0.70 ngay dưới bãi đất 0.70).
+## fill_blocks chỉ map TileType.YOUNG_GRASS → BlockID.YOUNG_GRASS.
 static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 		road_grid: PackedByteArray, cols: int, dim_id: int, cx: int = 0, cz: int = 0, size: int = 32,
 		nd: Dictionary = {}, reef_mask: PackedFloat32Array = PackedFloat32Array()) -> void:
@@ -27,7 +32,10 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 			# Top surface block theo biome
 			var top_block: int = B.GRASS
 			match biome:
-				_Data.TileType.DARK_GRASS: top_block = B.DARK_GRASS
+				_Data.TileType.DARK_GRASS:
+					top_block = B.DARK_GRASS
+				_Data.TileType.YOUNG_GRASS:
+					top_block = B.YOUNG_GRASS  # bãi cỏ non (cơ chế bãi đất)
 				_Data.TileType.SAND:       top_block = B.SAND
 				_Data.TileType.SAND_WHITE: top_block = B.OCEAN_SAND
 				_Data.TileType.DIRT:       top_block = B.DIRT
@@ -76,7 +84,7 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 				elif ly <= top_slab - 2:
 					blk = B.STONE
 				elif ly == top_slab - 1 and top_slab > 1:
-					if top_block == B.DARK_GRASS or top_block == B.DIRT:
+					if top_block == B.DARK_GRASS or top_block == B.YOUNG_GRASS or top_block == B.DIRT:
 						blk = B.DARK_DIRT
 					else:
 						blk = B.SAND_DEEP
@@ -227,12 +235,18 @@ static func spawn_ore_hills(bd: _BlockData, biome_grid: Array, height_grid: Arra
 			height_grid[p.x][p.z] = nh
 		# Đồi quặng không mọc cỏ
 		var bg: int = biome_grid[p.x][p.z]
-		if bg == _Data.TileType.GRASS or bg == _Data.TileType.DARK_GRASS:
+		if bg == _Data.TileType.GRASS or bg == _Data.TileType.DARK_GRASS \
+				or bg == _Data.TileType.YOUNG_GRASS:
 			biome_grid[p.x][p.z] = _Data.TileType.DIRT
 
 	return { "cx": hx, "cz": hz, "plains": is_plains }
 
 ## ── _build_terrain_mesh: COLUMN-TOP OPTIMIZED ────────────────────────────────
+## Mỗi column vẽ 1 top face (strip) + 4 side face theo TỪNG LAYER thực tế:
+## mặt bên chỉ vẽ nơi hàng xóm cùng layer là AIR/WATER — không giả định cột
+## đặc liền từ top → đáy. Block đặt lơ lửng không tạo tường ảo chạy xuống
+## đáy thế giới; block đặt chồng lệch 1 ô không nuốt mặt bên của block dưới.
+## Mặt dưới vẽ cho run đặc khi dưới đáy là AIR/WATER (game có 2 góc nhìn).
 static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 		cols: int, dim_id: int, top_ly_hint: PackedInt32Array = PackedInt32Array()) -> void:
 	const Y_MIN  := _BlockData.Y_MIN
@@ -240,15 +254,23 @@ static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 	const SLAB   := _BlockData.SLAB_HEIGHT
 	const B      := _Data.BlockID
 	var hw: float = _Data.VOXEL * 0.5
-	var hh: float = SLAB * 0.5
 	var half: float = float(cols) * _Data.VOXEL * 0.5
 	var use_rw: bool = dim_id == _Data._Dim.DimensionID.REAL_WORLD
 	var colors: Array[Color] = _Data.BLOCK_COLORS_RW if use_rw else _Data.BLOCK_COLORS_TW
 
 	var top_ly  := PackedInt32Array()
 	var top_blk := PackedByteArray()
+	var gap_ly  := PackedInt32Array()
+	var gap_blk := PackedByteArray()
 	top_ly.resize(cols * cols)
 	top_blk.resize(cols * cols)
+	gap_ly.resize(cols * cols)
+	gap_blk.resize(cols * cols)
+
+	# Truy cập buffer trực tiếp (như fill_blocks) — tránh 21K method call/chunk
+	var layer_stride: int = cols
+	var layer_size: int = CHUNK_H * cols
+	var data: PackedByteArray = bd._data
 
 	if top_ly_hint.size() >= cols * cols:
 		# top_ly đã tính sẵn từ height grid (compute_chunk) — chỉ cần đọc block type
@@ -262,6 +284,32 @@ static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 					top_blk[x * cols + z] = B.AIR
 				else:
 					top_blk[x * cols + z] = bd.get_block(x, ly, z)
+		# gap_ly: đỉnh khối đặc phía DƯỚI khe hở (mặt đất dưới block lơ lửng)
+		for x in range(cols):
+			for z in range(cols):
+				var ly: int = top_ly[x * cols + z]
+				var gl: int = -1
+				var gb: int = B.AIR
+				if ly >= 0:
+					var i: int = x * layer_size + ly * layer_stride + z
+					while ly > 0:
+						ly -= 1
+						i -= layer_stride
+						var b: int = data[i]
+						if b == B.AIR or _Data.is_water(b):
+							# khe hở — tìm đỉnh khối đặc bên dưới (bỏ qua shape block)
+							while ly >= 0:
+								var b2: int = data[i]
+								if b2 != B.AIR and not _Data.is_water(b2) \
+										and not _Data.is_shaped_block(b2):
+									gl = ly
+									gb = b2
+									break
+								ly -= 1
+								i -= layer_stride
+							break
+				gap_ly[x * cols + z]  = gl
+				gap_blk[x * cols + z] = gb
 	else:
 		for x in range(cols):
 			for z in range(cols):
@@ -269,12 +317,35 @@ static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 				var best_blk: int = B.AIR
 				for ly in range(CHUNK_H - 1, -1, -1):
 					var blk: int = bd.get_block(x, ly, z)
-					if blk != B.AIR and not _Data.is_water(blk):
+					if blk != B.AIR and not _Data.is_water(blk) \
+							and not _Data.is_shaped_block(blk):
 						best_ly = ly
 						best_blk = blk
 						break
 				top_ly[x * cols + z]  = best_ly
 				top_blk[x * cols + z] = best_blk
+				var gl: int = -1
+				var gb: int = B.AIR
+				if best_ly >= 0:
+					var i: int = x * layer_size + best_ly * layer_stride + z
+					for ly in range(best_ly - 1, -1, -1):
+						i -= layer_stride
+						var b2: int = data[i]
+						if b2 == B.AIR or _Data.is_water(b2):
+							var ly2: int = ly
+							var i2: int = i
+							while ly2 >= 0:
+								var b3: int = data[i2]
+								if b3 != B.AIR and not _Data.is_water(b3) \
+										and not _Data.is_shaped_block(b3):
+									gl = ly2
+									gb = b3
+									break
+								ly2 -= 1
+								i2 -= layer_stride
+							break
+				gap_ly[x * cols + z]  = gl
+				gap_blk[x * cols + z] = gb
 
 	for x in range(cols):
 		var z: int = 0
@@ -302,57 +373,66 @@ static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 
 			z = z_end
 
+	# Mặt đất dưới block lơ lửng — vẽ lại top face của khối đặc bên dưới khe hở
+	# để không tạo lỗ hổng nhìn/ngã xuống void (collision trimesh cũng kín lại).
+	for x in range(cols):
+		var z: int = 0
+		while z < cols:
+			var gl: int = gap_ly[x * cols + z]
+			if gl < 0:
+				z += 1
+				continue
+			var gb: int = gap_blk[x * cols + z]
+			var z_end: int = z + 1
+			while z_end < cols \
+					and gap_ly[x * cols + z_end] == gl \
+					and gap_blk[x * cols + z_end] == gb:
+				z_end += 1
+			var strip: int = z_end - z
+			var cy_gap: float = float(gl + Y_MIN) * SLAB + SLAB
+			var gx_mid: float = -half + (float(x) + 0.5) * _Data.VOXEL
+			var gz_mid: float = -half + (float(z) + float(strip) * 0.5) * _Data.VOXEL
+			_add_quad(st, Vector3(gx_mid, cy_gap, gz_mid),
+				Vector3(hw, 0, 0), Vector3(0, 0, float(strip) * hw),
+				Vector3(0, 1, 0), colors[gb])
+			z = z_end
+
+	# ── Mặt bên + mặt dưới theo layer thực tế ──────────────────────────────
+	# Terrain cột đặc liền → tường nơi hàng xóm thấp hơn (tương đương cũ).
+	# Block đặt lẻ (lơ lửng / chồng lệch) → mặt bên chỉ vẽ nơi hàng xóm CÙNG
+	# layer là AIR/WATER — không bị nuốt mặt, không thấy void xuyên qua.
+	# Mặt dưới vẽ khi dưới đáy run là AIR/WATER (2 góc nhìn của game).
 	var side_mul: float = 0.50
+	var bot_mul: float = 0.35
 	for x in range(cols):
 		for z in range(cols):
-			var ly: int  = top_ly[x * cols + z]
-			if ly < 0: continue
-			var blk: int = top_blk[x * cols + z]
-			var cy_top: float  = float(ly + Y_MIN) * SLAB + SLAB
-			var cx_f: float    = -half + (float(x) + 0.5) * _Data.VOXEL
-			var cz_f: float    = -half + (float(z) + 0.5) * _Data.VOXEL
-			var top_col: Color = colors[blk]
-			var side_col: Color = Color(top_col.r*side_mul, top_col.g*side_mul,
-				top_col.b*side_mul, top_col.a)
-
-			var nx_ly: int
-			var diff: float
-
-			nx_ly = top_ly[x * cols + (z - 1)] if z > 0 else -1
-			diff = cy_top - (float(nx_ly + Y_MIN) * SLAB + SLAB if nx_ly >= 0 else (float(Y_MIN) * SLAB))
-			if nx_ly < ly:
-				var side_h: float = diff
-				var cy_mid: float = cy_top - side_h * 0.5
-				_add_quad(st, Vector3(cx_f, cy_mid, cz_f - hw),
-					Vector3(hw, 0, 0), Vector3(0, side_h * 0.5, 0),
-					Vector3(0, 0, -1), side_col)
-
-			nx_ly = top_ly[x * cols + (z + 1)] if z < cols - 1 else -1
-			diff = cy_top - (float(nx_ly + Y_MIN) * SLAB + SLAB if nx_ly >= 0 else (float(Y_MIN) * SLAB))
-			if nx_ly < ly:
-				var side_h: float = diff
-				var cy_mid: float = cy_top - side_h * 0.5
-				_add_quad(st, Vector3(cx_f, cy_mid, cz_f + hw),
-					Vector3(-hw, 0, 0), Vector3(0, side_h * 0.5, 0),
-					Vector3(0, 0, 1), side_col)
-
-			nx_ly = top_ly[(x - 1) * cols + z] if x > 0 else -1
-			diff = cy_top - (float(nx_ly + Y_MIN) * SLAB + SLAB if nx_ly >= 0 else (float(Y_MIN) * SLAB))
-			if nx_ly < ly:
-				var side_h: float = diff
-				var cy_mid: float = cy_top - side_h * 0.5
-				_add_quad(st, Vector3(cx_f - hw, cy_mid, cz_f),
-					Vector3(0, 0, -hw), Vector3(0, side_h * 0.5, 0),
-					Vector3(-1, 0, 0), side_col)
-
-			nx_ly = top_ly[(x + 1) * cols + z] if x < cols - 1 else -1
-			diff = cy_top - (float(nx_ly + Y_MIN) * SLAB + SLAB if nx_ly >= 0 else (float(Y_MIN) * SLAB))
-			if nx_ly < ly:
-				var side_h: float = diff
-				var cy_mid: float = cy_top - side_h * 0.5
-				_add_quad(st, Vector3(cx_f + hw, cy_mid, cz_f),
-					Vector3(0, 0, hw), Vector3(0, side_h * 0.5, 0),
-					Vector3(1, 0, 0), side_col)
+			var tC: int = top_ly[x * cols + z]
+			if tC < 0:
+				continue
+			var cx_f: float = -half + (float(x) + 0.5) * _Data.VOXEL
+			var cz_f: float = -half + (float(z) + 0.5) * _Data.VOXEL
+			# Liệt kê từng "run" đặc [lo..hi] trong cột (từ đỉnh xuống đáy)
+			var run_lo: int = -1
+			var run_hi: int = -1
+			var lv: int = tC
+			var li: int = x * layer_size + tC * layer_stride + z
+			while lv >= 0:
+				var bb: int = data[li]
+				if bb != B.AIR and not _Data.is_water(bb) \
+						and not _Data.is_shaped_block(bb):
+					if run_hi < 0:
+						run_hi = lv
+					run_lo = lv
+				elif run_hi >= 0:
+					_emit_column_run(st, data, cols, layer_size, layer_stride,
+						x, z, run_lo, run_hi, cx_f, cz_f, colors, side_mul, bot_mul)
+					run_lo = -1
+					run_hi = -1
+				lv -= 1
+				li -= layer_stride
+			if run_hi >= 0:
+				_emit_column_run(st, data, cols, layer_size, layer_stride,
+					x, z, run_lo, run_hi, cx_f, cz_f, colors, side_mul, bot_mul)
 
 ## ── _add_quad_uv: quad với UV (dùng cho ore texture) ────────────────────────
 static func _add_quad_uv(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,
@@ -375,3 +455,82 @@ static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,
 	st.add_vertex(center - u - v)
 	st.add_vertex(center + u + v)
 	st.add_vertex(center - u + v)
+
+## ── _emit_column_run: mặt bên + mặt dưới cho 1 run đặc [lo..hi] ─────────────
+## Mặt bên: gộp các layer liên tiếp mà hàng xóm cùng layer là AIR/WATER/shape
+## (hoặc ngoài chunk) thành span → 1 quad/span. Mặt dưới: vẽ khi layer dưới
+## đáy run là AIR/WATER — nhìn từ góc dưới không thấy xuyên qua block.
+static func _emit_column_run(st: SurfaceTool, data: PackedByteArray, cols: int,
+		layer_size: int, layer_stride: int, x: int, z: int, run_lo: int,
+		run_hi: int, cx_f: float, cz_f: float, colors: Array[Color],
+		side_mul: float, bot_mul: float) -> void:
+	const B := _Data.BlockID
+	const SLAB := _BlockData.SLAB_HEIGHT
+	const Y_MIN := _BlockData.Y_MIN
+	var hw: float = _Data.VOXEL * 0.5
+	var run_blk: int = data[x * layer_size + run_hi * layer_stride + z]
+	var top_col: Color = colors[run_blk]
+	var side_col: Color = Color(top_col.r * side_mul, top_col.g * side_mul,
+		top_col.b * side_mul, top_col.a)
+	var bot_col: Color = Color(top_col.r * bot_mul, top_col.g * bot_mul,
+		top_col.b * bot_mul, top_col.a)
+
+	# [normal, offset tâm mặt, trục u]
+	var faces: Array = [
+		[Vector3(0, 0, -1), Vector3(0, 0, -hw), Vector3(hw, 0, 0)],
+		[Vector3(0, 0, 1),  Vector3(0, 0, hw),  Vector3(-hw, 0, 0)],
+		[Vector3(-1, 0, 0), Vector3(-hw, 0, 0), Vector3(0, 0, -hw)],
+		[Vector3(1, 0, 0),  Vector3(hw, 0, 0),  Vector3(0, 0, hw)],
+	]
+	for f in faces:
+		var n: Vector3 = f[0]
+		var face_off: Vector3 = f[1]
+		var u: Vector3 = f[2]
+		var nx: int = x + int(n.x)
+		var nz: int = z + int(n.z)
+		var span_lo: int = -1
+		var span_hi: int = -1
+		var nli: int = nx * layer_size + run_hi * layer_stride + nz
+		var lv: int = run_hi
+		while lv >= run_lo:
+			var exposed: bool
+			if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
+				exposed = true
+			else:
+				var nb: int = data[nli]
+				exposed = nb == B.AIR or _Data.is_water(nb) \
+						or _Data.is_shaped_block(nb)
+			if exposed:
+				if span_lo < 0:
+					span_hi = lv
+				span_lo = lv
+			elif span_lo >= 0:
+				_emit_side_span(st, cx_f, cz_f, n, face_off, u, span_lo,
+					span_hi, side_col)
+				span_lo = -1
+			lv -= 1
+			nli -= layer_stride
+		if span_lo >= 0:
+			_emit_side_span(st, cx_f, cz_f, n, face_off, u, span_lo, span_hi,
+				side_col)
+
+	# Mặt dưới — layer 0 là đáy thế giới, không cần vẽ
+	if run_lo > 0:
+		var bel: int = data[x * layer_size + (run_lo - 1) * layer_stride + z]
+		if bel == B.AIR or _Data.is_water(bel) or _Data.is_shaped_block(bel):
+			var y_bot: float = float(run_lo + Y_MIN) * SLAB
+			_add_quad(st, Vector3(cx_f, y_bot, cz_f), Vector3(hw, 0, 0),
+				Vector3(0, 0, hw), Vector3(0, -1, 0), bot_col)
+
+## ── _emit_side_span: quad mặt bên cho span layer [lo..hi] (đã biết lộ thiên) ─
+static func _emit_side_span(st: SurfaceTool, cx_f: float, cz_f: float,
+		n: Vector3, face_off: Vector3, u: Vector3, lo: int, hi: int,
+		col: Color) -> void:
+	const SLAB := _BlockData.SLAB_HEIGHT
+	const Y_MIN := _BlockData.Y_MIN
+	var y_bot: float = float(lo + Y_MIN) * SLAB
+	var y_top: float = float(hi + Y_MIN) * SLAB + SLAB
+	var h: float = (y_top - y_bot) * 0.5
+	var cy_mid: float = (y_top + y_bot) * 0.5
+	_add_quad(st, Vector3(cx_f + face_off.x, cy_mid, cz_f + face_off.z),
+		u, Vector3(0, h, 0), n, col)

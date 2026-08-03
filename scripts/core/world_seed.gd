@@ -11,6 +11,12 @@ var target_scene: String = "res://scenes/open_world_real.tscn"
 var world_name: String = ""
 var is_loading: bool = false
 
+## Vị trí player đứng trước khi save — spawn thẳng tại đây khi load lại
+## hành trình (WorldManager + CharacterManager đọc để generate chunk + đặt
+## player đúng chỗ, tránh teleport sau khi load gây lag).
+var saved_player_pos: Vector3 = Vector3.INF
+var has_saved_player_pos: bool = false
+
 func _ready() -> void:
 	randomize()
 	seed_value = randi() % 2147483647
@@ -23,6 +29,8 @@ func start_new_journey(name: String, seed_val: int) -> void:
 	world_name = name
 	target_scene = "res://scenes/open_world_real.tscn"
 	is_loading = false
+	saved_player_pos = Vector3.INF
+	has_saved_player_pos = false
 	if SaveManager:
 		SaveManager.reset_load_state()
 	save_journey()
@@ -50,6 +58,11 @@ func load_journey(idx: int) -> bool:
 	SeedSnapshot.set_seed(seed_value)
 	target_scene = "res://scenes/open_world_real.tscn"
 	is_loading = SaveManager and SaveManager.save_exists(world_name)
+	saved_player_pos = Vector3.INF
+	has_saved_player_pos = false
+	if is_loading and SaveManager:
+		saved_player_pos = SaveManager.get_saved_player_position(world_name)
+		has_saved_player_pos = saved_player_pos != Vector3.INF
 	if SaveManager:
 		SaveManager.reset_load_state()
 	_WorldChunk.prewarm_async()

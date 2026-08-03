@@ -17,7 +17,7 @@ func _run() -> void:
 	for item_id in ids:
 		await _snap_item(item_id)
 	print("=== All item icons generated ===")
-	queue_free()
+	get_tree().quit(0)
 
 func _snap_item(item_id: String) -> void:
 	var vp := SubViewport.new()
@@ -76,9 +76,19 @@ func _snap_item(item_id: String) -> void:
 		if r == OK:
 			print("Saved: ", out)
 		else:
-			push_error("Save failed: ", out, " err=", r)
+			await _retry_save(img, out, r)
 	vp.queue_free()
 	await get_tree().process_frame
+
+func _retry_save(img: Image, out: String, r: Error) -> void:
+	var attempts := 5
+	for i in attempts:
+		await get_tree().create_timer(0.2).timeout
+		r = img.save_png(out)
+		if r == OK:
+			print("Saved (retry ", i + 1, "): ", out)
+			return
+	push_error("Save failed: ", out, " err=", r)
 
 static func _compute_aabb(root: Node3D) -> AABB:
 	var aabb: AABB

@@ -2,10 +2,6 @@ class_name PlayerHalberd
 extends RefCounted
 
 static func start_throw_aim(player) -> void:
-	if player._ranged_on_cd("iron_halberd"):
-		player._halberd_charge_time = -1.0
-		player._scroll_inventory_message("(kích đang hồi chiêu)")
-		return
 	player._halberd_throwing = true
 	player._bow_aiming = false
 	if player._bow_indicator_root == null:
@@ -87,9 +83,6 @@ static func fire_throw(player) -> void:
 		player._bow_indicator_root.visible = false
 	if not player.try_skill(player.stamina_cost_lmb):
 		return
-	if player._ranged_on_cd("iron_halberd"):
-		player._scroll_inventory_message("(kích đang hồi chiêu)")
-		return
 	var dir: Vector3 = player._halberd_aim_dir
 	if dir.length_squared() < 0.01:
 		dir = -player.global_transform.basis.z
@@ -106,8 +99,7 @@ static func fire_throw(player) -> void:
 		var hit: Dictionary = space.intersect_ray(q)
 		if not hit.is_empty():
 			landing_pos.y = hit.position.y
-	# Kích KHÔNG rời khỏi inventory — không spawn drop, thêm cooldown 4s
-	player._set_ranged_cd("iron_halberd")
+	# Kích KHÔNG rời khỏi inventory — không spawn drop
 	var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 10)
 	var dmg: int = int(base_dmg * lerp(1.0, 1.6, charge_pct))
 	_apply_throw_damage(player, dir, landing_pos, dmg)

@@ -221,6 +221,10 @@ func _build_home_screen() -> void:
 	_add_app_icon(apps_grid, 4, "\U0001F3A8", "Themes", Color(0.30, 0.25, 0.50), Color(0.45, 0.40, 0.65), func():
 		show_screen(_themes_screen)
 	)
+	_add_app_icon(apps_grid, 5, "\u23FB", "Shutdown", Color(0.55, 0.15, 0.15), Color(0.75, 0.30, 0.25), func():
+		if _hud:
+			_hud.exit_to_main_menu()
+	)
 
 	_home_screen.visible = false
 

@@ -288,6 +288,14 @@ func _on_save_pressed() -> void:
 	if player:
 		player._scroll_inventory_message(tr("GAME_SAVED"))
 
+## Nút Shutdown trên điện thoại: lưu game rồi về màn hình chính
+func exit_to_main_menu() -> void:
+	if _phone_ui and _phone_ui.visible:
+		_phone_ui.close()
+	if SaveManager:
+		SaveManager.save_game()
+	get_tree().change_scene_to_file("res://scenes/start_menu.tscn")
+
 func _on_library_pressed() -> void:
 	if _library:
 		_library.show_library()
@@ -737,13 +745,15 @@ func _on_build_menu_closed() -> void:
 
 func _on_hotbar_slot_changed(idx: int) -> void:
 	var def: ItemDef = _hotbar.get_selected_item()
+	var player := _find_player_character()
+	if player:
+		player._selected_slot = idx
 	if _placement_sys and _placement_sys.is_placing():
 		_placement_sys.cancel_placement()
 		_build_hint.text = ""
 	if def != null and _is_building_item(def):
 		if _placement_sys == null:
 			return
-		var player := _find_player_character()
 		if player:
 			_placement_sys.set_player_inventory(player.inventory, player)
 		_placement_sys.start_placement(def.id)
@@ -754,7 +764,7 @@ func _is_building_item(def: ItemDef) -> bool:
 		return true
 	if def.id in ["twilight_gate", "chest", "crafting_table", "water_bucket", "fishing_boat"]:
 		return true
-	if def.id in ["coconut_seed", "taro_seed", "seaweed_seed"]:
+	if def.id in ["coconut_seed", "taro_seed", "seaweed_seed", "seagrass_seed", "eggplant_seed", "watermelon_seed", "pumpkin_seed"]:
 		return true
 	return false
 
@@ -1045,37 +1055,33 @@ func _on_teleport_biome(biome_type: String) -> void:
 
 			match biome_type:
 				"plains":
-					var n_ocean: FastNoiseLite = nd.get("ocean")
 					var n_lake: FastNoiseLite  = nd.get("lake")
 					var n_bio: FastNoiseLite   = nd.get("biome")
 					var n_warp: FastNoiseLite  = nd.get("warp")
 					var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0 if n_warp else 0.0
 					var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0 if n_warp else 0.0
 					var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5 if n_bio else 0.0
-					var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5 if n_ocean else 0.0
+					var is_oc: bool = WorldChunk._ocean_mask_at(nd, wx, wz)
 					var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5 if n_lake else 0.0
 					# GRASS, không phải biển, không phải hồ
-					if bio_n < 0.40 and ov <= 0.50 and lv <= 0.45:
+					if bio_n < 0.40 and not is_oc and lv <= 0.45:
 						found = Vector2(wx, wz); found_ok = true; break
 				"ocean":
-					var n_ocean: FastNoiseLite = nd.get("ocean")
 					var n_bio: FastNoiseLite   = nd.get("biome")
 					var n_warp: FastNoiseLite  = nd.get("warp")
-					if n_ocean and n_bio and n_warp:
+					if n_bio and n_warp:
 						var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0
 						var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0
 						var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
-						var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
-						# GRASS + ocean noise cao — đây mới thực sự là biển
-						if bio_n < 0.40 and ov > 0.55:
+						var is_oc: bool = WorldChunk._ocean_mask_at(nd, wx, wz)
+						# GRASS + ocean mask — đây mới thực sự là biển
+						if bio_n < 0.40 and is_oc:
 							found = Vector2(wx, wz); found_ok = true; break
 				"desert":
 					var n_desert: FastNoiseLite = nd.get("desert")
-					var n_ocean: FastNoiseLite = nd.get("ocean")
-					if n_desert and n_ocean:
+					if n_desert:
 						var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
-						var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
-						if dv > 0.55 and ov <= 0.50:
+						if dv > 0.55 and not WorldChunk._ocean_mask_at(nd, wx, wz):
 							found = Vector2(wx, wz); found_ok = true; break
 		r += STEP
 
@@ -1109,29 +1115,23 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 	if n_desert:
 		var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
 		if dv > 0.55:
-			var n_ocean: FastNoiseLite = nd.get("ocean")
-			if n_ocean:
-				var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
-				if ov > 0.50:
-					return "🌊 " + tr("BIOME_OCEAN")
-				return "🏜️ " + tr("BIOME_DESERT")
+			if WorldChunk._ocean_mask_at(nd, wx, wz):
+				return "🌊 " + tr("BIOME_OCEAN")
+			return "🏜️ " + tr("BIOME_DESERT")
 
 	# DARK_GRASS (threshold = 0.40) → đồi, không thể là biển/hồ
 	if bio_n >= 0.40:
 		return "🌿 " + tr("BIOME_HILLS")
 
 	# GRASS — check ocean trước (patch to hơn hồ)
-	var n_ocean: FastNoiseLite = nd.get("ocean")
-	if n_ocean:
-		var ov: float = (n_ocean.get_noise_2d(wx, wz) + 1.0) * 0.5
-		if ov > 0.50:
-			return "🌊 " + tr("BIOME_OCEAN")
+	if WorldChunk._ocean_mask_at(nd, wx, wz):
+		return "🌊 " + tr("BIOME_OCEAN")
 
 	# GRASS — check lake
 	var n_lake: FastNoiseLite = nd.get("lake")
 	if n_lake:
 		var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-		if lv > 0.50:
+		if lv > 0.70:
 			return "🏞 " + tr("BIOME_LAKE_RIVER")
 
 	return "🌿 " + tr("BIOME_PLAINS")

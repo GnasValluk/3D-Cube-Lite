@@ -202,7 +202,7 @@ func _refresh_texts() -> void:
 	_lib_title_label.text = tr("ITEM_LIBRARY_TITLE")
 	_lib_hint_label.text = tr("LIB_CLICK_HINT")
 	_lib_search_box.placeholder_text = "🔍 " + tr("LIB_SEARCH_HINT")
-	_detail_use_btn.text = tr("USE_ITEM")
+	_detail_use_btn.text = tr("EQUIP_ITEM")
 	_detail_drop_btn.text = tr("DROP_ITEM")
 	for i in range(_equip_name_labels.size()):
 		_equip_name_labels[i].text = tr(_equip_name_keys[i])
@@ -536,10 +536,9 @@ func _on_slot_right_click(idx: int) -> void:
 		if new_idx >= 0:
 			_selected_slot = new_idx
 		return
-	# If single item, use it
+	# Single item: chỉ chọn ô — không còn "dùng" bằng chuột phải
+	# (ăn = cầm tay + giữ chuột phải; trang bị = nút Trang bị)
 	_selected_slot = idx
-	if _player_ref:
-		_player_ref.use_item_from_inventory(idx)
 
 func _on_slot_mouse_entered(idx: int) -> void:
 	var slot: ItemSlot = _inventory.slots[idx]

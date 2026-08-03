@@ -1,6 +1,6 @@
 extends RefCounted
 
-enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE, MUDDY_SAND, DESERT }
+enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE, MUDDY_SAND, DESERT, YOUNG_GRASS }
 
 ## ── Block IDs cho hệ thống voxel Minecraft-style ────────────────────────────
 ## 0 = AIR luôn luôn, giá trị khớp với TileType để map dễ dàng
@@ -39,6 +39,11 @@ enum BlockID {
 	WATER_LEVEL_1 = 31,
 	TILLED_SOIL  = 32,  # Đất tơi xốp — cuốc lên từ GRASS/DIRT; ẩm nếu có nước gần (≤3 block)
 	COAL_ORE     = 33,  # Quặng than — đào ra Than đá (không phải block item)
+	STONE_QTR    = 34,  # Đá tư — ¼ khối đá (0.5×0.5×0.5), không tính vào địa hình
+	STONE_EIGHTH = 35,  # Đá vụn — ⅛ khối đá (0.5×0.25×0.5)
+	STONE_THIN   = 36,  # Đá phiến — mỏng (1×0.2×1) thay vì slab 0.5
+	OAK_WOOD     = 37,  # Gỗ sồi — texture vân gỗ riêng, chặt từ cây sồi cổ thụ
+	YOUNG_GRASS  = 38,  # Cỏ non — bãi đất pha cỏ mới mọc, đám rải rác trên đồng bằng
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -66,6 +71,11 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.PLATINUM_ORE: "platinum_ore",
 	BlockID.TILLED_SOIL:  "block_tilled_soil",
 	BlockID.COAL_ORE:     "coal",       # Đào quặng than → rớt Than đá
+	BlockID.STONE_QTR:    "block_stone_qtr",
+	BlockID.STONE_EIGHTH: "block_stone_eighth",
+	BlockID.STONE_THIN:   "block_stone_thin",
+	BlockID.OAK_WOOD:     "block_oak_wood",
+	BlockID.YOUNG_GRASS:  "block_young_grass",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -94,6 +104,11 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"block_tilled_soil":  BlockID.TILLED_SOIL,
 	"coal_ore":           BlockID.COAL_ORE,
 	"water_bucket":       BlockID.WATER_SOURCE,
+	"block_stone_qtr":    BlockID.STONE_QTR,
+	"block_stone_eighth": BlockID.STONE_EIGHTH,
+	"block_stone_thin":   BlockID.STONE_THIN,
+	"block_oak_wood":     BlockID.OAK_WOOD,
+	"block_young_grass":  BlockID.YOUNG_GRASS,
 }
 
 const VOXEL: float = 1.0
@@ -106,7 +121,7 @@ const TRAIL_COLOR: Color = Color(0.68, 0.52, 0.26)
 const TRAIL_SIDE: Color = Color(0.46, 0.36, 0.18)
 
 ## ── Hằng số biển ──────────────────────────────────────────────────────────────
-const OCEAN_THRESHOLD:     float = 0.50
+const OCEAN_THRESHOLD:     float = 0.48
 const BEACH_WIDTH:         int   = 5
 const OCEAN_SHALLOW_DEPTH: float = -1.5
 const OCEAN_DEEP_DEPTH:    float = -6.0
@@ -131,8 +146,8 @@ const _Dim = preload("res://scripts/world/dimension_defs.gd")
 ## Index = BlockID value — màu đậm, bão hòa cao cho unshaded renderer
 const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0, 0, 0, 0),                 # 0 AIR
-	Color(0.22, 0.58, 0.14),           # 1 GRASS
-	Color(0.14, 0.40, 0.08),           # 2 DARK_GRASS
+	Color(0.18, 0.64, 0.12),           # 1 GRASS
+	Color(0.11, 0.46, 0.07),           # 2 DARK_GRASS
 	Color(0.92, 0.78, 0.32),           # 3 SAND (hồ nội địa)
 	Color(0.42, 0.22, 0.08),           # 4 DIRT
 	Color(0.16, 0.15, 0.13),           # 5 SILT
@@ -164,6 +179,11 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.20, 0.60, 0.80, 0.40),     # 31 WATER_LEVEL_1
 	Color(0.36, 0.22, 0.11),           # 32 TILLED_SOIL — đất tơi xốp (nâu đất, hơi sẫm hơn DIRT)
 	Color(0.28, 0.28, 0.30),           # 33 COAL_ORE
+	Color(0.42, 0.42, 0.46),           # 34 STONE_QTR — đá tư
+	Color(0.44, 0.44, 0.48),           # 35 STONE_EIGHTH — đá vụn
+	Color(0.40, 0.40, 0.44),           # 36 STONE_THIN — đá phiến mỏng
+	Color(0.54, 0.46, 0.38),           # 37 OAK_WOOD — gỗ sồi (nâu xám)
+	Color(0.44, 0.38, 0.13),           # 38 YOUNG_GRASS — bãi cỏ non (đất pha cỏ vàng xanh)
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -201,6 +221,11 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.22, 0.67, 0.57, 0.40),     # 31 WATER_LEVEL_1
 	Color(0.05, 0.07, 0.04),           # 32 TILLED_SOIL
 	Color(0.28, 0.28, 0.30),           # 33 COAL_ORE
+	Color(0.04, 0.08, 0.06),           # 34 STONE_QTR
+	Color(0.04, 0.09, 0.07),           # 35 STONE_EIGHTH
+	Color(0.04, 0.07, 0.05),           # 36 STONE_THIN
+	Color(0.07, 0.10, 0.08),           # 37 OAK_WOOD
+	Color(0.06, 0.09, 0.05),           # 38 YOUNG_GRASS
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -210,6 +235,22 @@ const TRAIL_SINK: float = 0.0
 ## Side màu tối hơn top — unshaded cần chênh lệch rõ để tạo cảm giác 3D
 static func block_side_color(top_col: Color) -> Color:
 	return Color(top_col.r * 0.50, top_col.g * 0.50, top_col.b * 0.50, top_col.a)
+
+## ── Block có hình dạng riêng (không phải voxel đầy) ─────────────────────────
+## Kích thước hộp tính theo đơn vị block (slab chuẩn = 1×0.5×1).
+## Block shape KHÔNG tham gia heightmap/top_ly — luôn vẽ đè lên terrain.
+const BLOCK_SHAPES: Dictionary = {
+	BlockID.STONE_QTR:    Vector3(0.5, 0.5, 0.5),   # ¼ khối đá
+	BlockID.STONE_EIGHTH: Vector3(0.5, 0.25, 0.5),  # ⅛ khối đá
+	BlockID.STONE_THIN:   Vector3(1.0, 0.2, 1.0),   # tấm mỏng 0.2
+}
+
+static func is_shaped_block(bid: int) -> bool:
+	return BLOCK_SHAPES.has(bid)
+
+## Kích thước hộp của block (Vector3.ZERO nếu là voxel đầy).
+static func block_shape(bid: int) -> Vector3:
+	return BLOCK_SHAPES.get(bid, Vector3.ZERO)
 
 ## Water helpers
 static func is_water(bid: int) -> bool:
@@ -255,7 +296,8 @@ static func is_soil(bid: int) -> bool:
 ## Block nào cuốc được thành đất tơi xốp.
 static func is_tillable(bid: int) -> bool:
 	return bid == BlockID.GRASS or bid == BlockID.DARK_GRASS \
-		or bid == BlockID.DIRT or bid == BlockID.DARK_DIRT
+		or bid == BlockID.DIRT or bid == BlockID.DARK_DIRT \
+		or bid == BlockID.YOUNG_GRASS
 
 ## ── Độ cứng block (giây đào với công cụ sắt đúng loại) ─────────────────────
 ## -1 = không thể phá vỡ. Không có trong bảng (0) = không đào được.
@@ -279,6 +321,9 @@ const BLOCK_HARDNESS: Dictionary = {
 	BlockID.OCEAN_FLOOR:  1.2,
 	# Cúp — đá & quặng (theo độ cứng thực tế: quặng kim loại cứng hơn đá nền)
 	BlockID.STONE:        1.2,
+	BlockID.STONE_QTR:    1.2,
+	BlockID.STONE_EIGHTH: 1.2,
+	BlockID.STONE_THIN:   1.2,
 	BlockID.BAUXITE_ORE:  1.3,
 	BlockID.COPPER_ORE:   1.6,
 	BlockID.GOLD_ORE:     1.7,
@@ -286,6 +331,10 @@ const BLOCK_HARDNESS: Dictionary = {
 	BlockID.IRON_ORE:     2.4,
 	BlockID.PLATINUM_ORE: 3.0,
 	BlockID.TITAN_ORE:    3.6,
+	# Rìu — gỗ
+	BlockID.OAK_WOOD:     1.4,
+	# Cỏ non — như cỏ thường
+	BlockID.YOUNG_GRASS:  1.2,
 	# Không thể phá
 	BlockID.BEDROCK:      -1.0,
 }
@@ -297,6 +346,7 @@ static func get_block_hardness(bid: int) -> float:
 ## Block nào cúp (pickaxe) đào được — đá và quặng.
 static func is_pickaxable(bid: int) -> bool:
 	return bid == BlockID.STONE \
+		or bid == BlockID.STONE_QTR or bid == BlockID.STONE_EIGHTH or bid == BlockID.STONE_THIN \
 		or (bid >= BlockID.COPPER_ORE and bid <= BlockID.PLATINUM_ORE) \
 		or bid == BlockID.COAL_ORE
 
@@ -304,9 +354,14 @@ static func is_pickaxable(bid: int) -> bool:
 static func is_shovelable(bid: int) -> bool:
 	return bid == BlockID.GRASS or bid == BlockID.DARK_GRASS or bid == BlockID.DIRT \
 		or bid == BlockID.DARK_DIRT or bid == BlockID.TILLED_SOIL \
+		or bid == BlockID.YOUNG_GRASS \
 		or bid == BlockID.SAND or bid == BlockID.SAND_DEEP or bid == BlockID.OCEAN_SAND \
 		or bid == BlockID.MUDDY_SAND or bid == BlockID.OCEAN_GRAVEL or bid == BlockID.OCEAN_MUD \
 		or bid == BlockID.SILT or bid == BlockID.TRAIL or bid == BlockID.OCEAN_FLOOR
+
+## Block nào rìu (axe) đào được — gỗ.
+static func is_axable(bid: int) -> bool:
+	return bid == BlockID.OAK_WOOD
 
 ## ── Legacy tile colors (giữ lại để tương thích các code cũ) ─────────────────
 const TILE_COLORS_TW: Array[Dictionary] = [

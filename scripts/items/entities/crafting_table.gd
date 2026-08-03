@@ -1,10 +1,15 @@
 class_name CraftingTable
-extends StaticBody3D
+extends DestructibleEntity
 
 var _player_nearby: bool = false
 var _is_open: bool = false
 
+func _init() -> void:
+	max_hp = 60
+	drop_item_id = "crafting_table"
+
 func _ready() -> void:
+	super._ready()
 	_setup_mesh()
 	_setup_area()
 
@@ -178,3 +183,7 @@ func _find_hud() -> HUD:
 		if child is HUD:
 			return child
 	return null
+
+## Bị phá huỷ: đóng UI (nếu đang mở) rồi rớt lại vật phẩm bàn chế tạo.
+func _on_destroy() -> void:
+	close_ui()
