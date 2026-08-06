@@ -4,9 +4,11 @@ class_name PlacementSystem
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const _FurnaceScript = preload("res://scripts/items/entities/furnace.gd")
 const _FishingBoat = preload("res://scripts/items/entities/fishing_boat.gd")
+const _Tractor = preload("res://scripts/items/entities/tractor.gd")
 const _EggplantProp = preload("res://scripts/world/props/eggplant_prop.gd")
 const _WatermelonVine = preload("res://scripts/world/props/watermelon_vine_prop.gd")
 const _PumpkinVine = preload("res://scripts/world/props/pumpkin_vine_prop.gd")
+const _OrangeTreeProp = preload("res://scripts/world/props/orange_tree_prop.gd")
 const VOXEL: float = 0.50
 
 var _placing: bool = false
@@ -84,6 +86,8 @@ func _make_ghost() -> void:
 		_build_ghost_portal()
 	elif _item_id == "fishing_boat":
 		_build_ghost_boat()
+	elif _item_id == "tractor":
+		_build_ghost_tractor()
 	elif _item_id == "chest":
 		_build_ghost_chest()
 	elif _item_id == "crafting_table":
@@ -97,7 +101,7 @@ func _make_ghost() -> void:
 	_ghost.rotation.y = _placement_rotation
 
 ## ── Mầm cây ─────────────────────────────────────────────────────────────────
-const SEED_ITEMS: Array[String] = ["coconut_seed", "taro_seed", "seaweed_seed", "seagrass_seed", "eggplant_seed", "watermelon_seed", "pumpkin_seed"]
+const SEED_ITEMS: Array[String] = ["coconut_seed", "taro_seed", "seaweed_seed", "seagrass_seed", "eggplant_seed", "watermelon_seed", "pumpkin_seed", "orange_seed"]
 
 static func _is_seed_item(item_id: String) -> bool:
 	return item_id in SEED_ITEMS
@@ -180,6 +184,9 @@ func _plant_seed(item_id: String, pos: Vector3) -> void:
 	elif item_id == "pumpkin_seed":
 		prop = _PumpkinVine.new(40, DestroyableProp.WeaponReq.SWORD, "pumpkin")
 		prop.setup()
+	elif item_id == "orange_seed":
+		prop = _OrangeTreeProp.new(150, DestroyableProp.WeaponReq.AXE, "orange")
+		prop.setup("plains")
 	else:
 		prop = PlantProp.new(50, DestroyableProp.WeaponReq.SWORD, "tropical_seaweed")
 		prop.setup("weed", randi(), randi(), true, _measure_water_gap(world_mgr, pos))
@@ -259,6 +266,25 @@ func _build_ghost_boat() -> void:
 	deck.material_override = deck_mat
 	deck.position = Vector3(0, 0.14, 0.3)
 	_ghost.add_child(deck)
+
+## Ghost máy kéo: đầu kéo dài 2.6 + rơ-moọc dài 2.3 (bám mặt đất).
+func _build_ghost_tractor() -> void:
+	var body_mat := _ghost_mat(Color(0.72, 0.10, 0.08, 0.30), Color(0.30, 0.05, 0.04), 0.2)
+	var trailer_mat := _ghost_mat(Color(0.45, 0.32, 0.16, 0.30), Color(0.16, 0.10, 0.05), 0.2)
+	var mi := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(1.1, 1.5, 2.6)
+	mi.mesh = box
+	mi.material_override = body_mat
+	mi.position = Vector3(0, 0.75, 0.1)
+	_ghost.add_child(mi)
+	var tr := MeshInstance3D.new()
+	var tbox := BoxMesh.new()
+	tbox.size = Vector3(1.15, 1.1, 2.3)
+	tr.mesh = tbox
+	tr.material_override = trailer_mat
+	tr.position = Vector3(0, 0.55, 2.85)
+	_ghost.add_child(tr)
 
 func _build_ghost_chest() -> void:
 	var body_mat := _ghost_mat(Color(0.35, 0.22, 0.12, 0.35), Color(0.15, 0.08, 0.05), 0.2)
@@ -464,6 +490,8 @@ func _make_throw_mesh(item_id: String) -> Node3D:
 		ItemMesh.build(root, item_id)
 	elif item_id == "fishing_boat":
 		ItemMesh.build(root, item_id)
+	elif item_id == "tractor":
+		ItemMesh.build(root, item_id)
 	elif item_id == "chest":
 		ItemMesh.build(root, item_id)
 	elif item_id == "crafting_table":
@@ -563,6 +591,13 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 		parent.add_child(boat_obj)
 		boat_obj.global_position = pos
 		boat_obj.rotation.y = _placement_rotation
+		SFXManager.play_block_place()
+	elif item_id == "tractor":
+		var tractor_obj = _Tractor.new()
+		tractor_obj.name = "Tractor"
+		parent.add_child(tractor_obj)
+		tractor_obj.global_position = pos
+		tractor_obj.rotation.y = _placement_rotation
 		SFXManager.play_block_place()
 	elif item_id == "chest":
 		var chest_obj := Chest.new()

@@ -20,6 +20,7 @@ const EAT_TIMES: Dictionary = {
 	"watermelon": 3.0,
 	"watermelon_slice": 1.2,
 	"pumpkin_slice": 1.2,
+	"orange": 2.2,
 }
 
 static func ensure_db() -> void:
@@ -50,6 +51,7 @@ static func create_item_db() -> Dictionary:
 	# ── Câu cá ────────────────────────────────────────────────────────────────
 	_add(db, "fishing_rod", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0, -1, 64)
 	_add(db, "fishing_boat", "Thuyền Đánh Cá", ItemDef.Type.TOOL, Color(0.55, 0.36, 0.18), "⛵", "Thuyền đánh cá — đặt xuống nước, nhấn F để lên thuyền chèo ra sông câu cá", false, 1)
+	_add(db, "tractor", "Máy Kéo Nông Nghiệp", ItemDef.Type.TOOL, Color(0.72, 0.10, 0.08), "🚜", "Máy kéo + rơ-moóc chở hàng — đặt xuống đất, nhấn F để lên lái xe băng qua ruộng", false, 1)
 	_add(db, "water_bucket", "Xô Nước", ItemDef.Type.TOOL, Color(0.15, 0.40, 0.70), "🌊", "Xô đựng nước — đặt khối nước tại vị trí chỉ định", false, 16)
 
 	# ── Cá (thức ăn) ──────────────────────────────────────────────────────────
@@ -139,7 +141,6 @@ static func create_item_db() -> Dictionary:
 	_add(db, "coal_ore",  "Quặng Than", ItemDef.Type.BLOCK,    Color(0.28, 0.28, 0.30), "🧱", "Quặng than — đào ra Than Đá", true, 64)
 	_add(db, "coal",      "Than Đá",    ItemDef.Type.MATERIAL, Color(0.18, 0.18, 0.20), "🪨", "Than đá — nhiên liệu đốt lò rèn", true, 64)
 	_add(db, "charcoal",  "Than Củi",   ItemDef.Type.MATERIAL, Color(0.14, 0.12, 0.10), "🪵", "Than củi — đốt từ gỗ, nhiên liệu nhẹ", true, 64)
-	_add(db, "rock_moss", "Rêu Đá",     ItemDef.Type.MATERIAL, Color(0.22, 0.52, 0.18), "🌿", "Rêu đá — mọc trên bề mặt đá/quặng, nguyên liệu chế tạo", true, 64)
 
 	# Dark Metal (Kim loại tối) — chỉ có dạng tinh luyện cao
 	_add(db, "dark_metal_high_ingot",   "Dark Metal High Ingot",   ItemDef.Type.MATERIAL, Color(0.25, 0.25, 0.28), "RM", "Thỏi kim loại tối tinh luyện — ma thuật", true, 64)
@@ -170,6 +171,7 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_ocean_mud",   "Bùn Biển",  ItemDef.Type.BLOCK, Color(0.16, 0.20, 0.22), "🧱", "Khối bùn biển",     true, 64)
 	_add(db, "block_tilled_soil", "Đất Tơi Xốp", ItemDef.Type.BLOCK, Color(0.36, 0.22, 0.11), "🧱", "Đất tơi xốp — ẩm khi gần nước, trồng được mầm cây", true, 64)
 	_add(db, "block_oak_wood", "Gỗ Sồi", ItemDef.Type.BLOCK, Color(0.62, 0.47, 0.28), "🧱", "Khối gỗ sồi — vân nâu sáng ấm, chặt từ cây sồi bằng rìu, xây dựng và chế tạo", true, 64)
+	_add(db, "block_hard_wood", "Gỗ Cứng", ItemDef.Type.BLOCK, Color(0.47, 0.36, 0.20), "🧱", "Khối gỗ cứng — vân nâu sẫm chắc chắn, chặt từ cây rừng rậm bằng rìu", true, 64)
 
 	# ── Cà tím ───────────────────────────────────────────────────────────────
 	_add(db, "eggplant_fruit", "Trái Cà Tím", ItemDef.Type.FOOD, Color(0.42, 0.14, 0.50), "🍆", "Trái cà tím — tím hoàng gia mộng nước, vỏ bóng mượt vệt sáng trắng xanh, đài hoa xanh ngả tím; ăn được hoặc chế biến", true, 16, 10)
@@ -183,6 +185,12 @@ static func create_item_db() -> Dictionary:
 	_add(db, "pumpkin_slice", "Miếng Bí Đỏ", ItemDef.Type.FOOD, Color(0.95, 0.62, 0.16), "🎃", "Miếng bí đỏ — vỏ cam mỏng, thịt cam tươi mộng nước, lõi xơ vàng đan chéo cùng hạt bí ngà dẹt; ăn được hoặc nấu ăn", true, 32, 7)
 	_add(db, "pumpkin_seed", "Hạt Giống Bí Đỏ", ItemDef.Type.MATERIAL, Color(0.55, 0.45, 0.30), "🌱", "Túi vải đay hạt giống bí đỏ — gieo trên đất tơi xốp, dây bò thô mộc cho quả cam cháy mùa thu", true, 16)
 	_add(db, "jack_o_lantern", "Đèn Lồng Bí Đỏ", ItemDef.Type.BLOCK, Color(0.92, 0.55, 0.14), "🎃", "Đèn lồng bí đỏ — bí đã đục mắt/mũi/miệng hình tam giác zíc-zắc, nến voxel bên trong tỏa ánh lửa vàng đỏ; đặt trang trí", true, 64)
+
+	# ── Cây cam ───────────────────────────────────────────────────────────────
+	_add(db, "orange", "Quả Cam", ItemDef.Type.FOOD, Color(0.95, 0.55, 0.12), "🍊", "Quả cam chín — căng mọng vỏ cam rực vân lõm nhẹ, núm xanh ngả vàng; mọng nước, giàu vitamin, ăn trực tiếp hoặc lấy hạt trồng", true, 16, 8)
+	_add(db, "orange_seed", "Hạt Giống Cam", ItemDef.Type.MATERIAL, Color(0.92, 0.58, 0.18), "🌱", "Túi hạt giống cam — gieo trên đất tơi xốp, lớn thành cây cam cho trái vàng rực", true, 16)
+
+	# ── Cây dầu ───────────────────────────────────────────────────────────────
 
 	return db
 

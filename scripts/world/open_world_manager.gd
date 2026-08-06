@@ -82,28 +82,42 @@ func _process(_delta: float) -> void:
 		return
 
 	var ppos := _player.global_position
-
-	# Promote completed async chunks — tối đa 1 chunk/frame để tránh spike
-	var promoted: int = 0
-	for ck in _loading.keys():
-		if promoted >= 1:
-			break
-		var chunk: WorldChunk = _loading[ck] as WorldChunk
-		if chunk._built or not chunk._pending_data.is_empty():
-			if not chunk._pending_data.is_empty():
-				chunk.apply_chunk(chunk._pending_data)
-				chunk._pending_data = {}
-			_loading.erase(ck)
-			_chunks[ck] = chunk
-			if SaveManager:
-				SaveManager.apply_block_modifications_for_chunk(chunk, ck.x, ck.y)
-			chunk.refresh_boundary_water()
-			promoted += 1
-			_check_initial_ready()
-
 	var cx: int = int(floor(ppos.x / CHUNK_SIZE))
 	var cz: int = int(floor(ppos.z / CHUNK_SIZE))
 	var cur := Vector2i(cx, cz)
+
+	# Promote completed async chunks — theo NGÂN SÁCH THỜI GIAN/frame thay vì
+	# cố định 1 chunk/frame. Chunk nào tính xong trên worker (cheap sau khi đưa
+	# shaped-block scan sang worker) được apply nhiều chunk trong cùng frame nếu
+	# còn dư budget → thế giới hiện nhanh hơn; khi gặp chunk nặng (nhiều cỏ/
+	# nước) tự giới hạn lại, không gây spike vượt 1 frame.
+	const PROMOTION_BUDGET_US: int = 15000
+	var budget_t0 := Time.get_ticks_usec()
+	var candidates: Array = []
+	for ck in _loading.keys():
+		var chunk: WorldChunk = _loading[ck] as WorldChunk
+		if chunk != null and (chunk._built or not chunk._pending_data.is_empty()):
+			candidates.append(ck)
+	if candidates.size() > 1:
+		candidates.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			var da := (a - cur).length_squared()
+			var db := (b - cur).length_squared()
+			return da < db)
+	for ck in candidates:
+		if Time.get_ticks_usec() - budget_t0 >= PROMOTION_BUDGET_US:
+			break
+		var chunk: WorldChunk = _loading[ck] as WorldChunk
+		if chunk == null or not (chunk._built or not chunk._pending_data.is_empty()):
+			continue
+		if not chunk._pending_data.is_empty():
+			chunk.apply_chunk(chunk._pending_data)
+			chunk._pending_data = {}
+		_loading.erase(ck)
+		_chunks[ck] = chunk
+		if SaveManager:
+			SaveManager.apply_block_modifications_for_chunk(chunk, ck.x, ck.y)
+		chunk.refresh_boundary_water()
+		_check_initial_ready()
 
 	var dist_moved := ppos.distance_squared_to(_last_pos)
 	if dist_moved < 0.25 and _pending.is_empty() and cur == _last_chunk:

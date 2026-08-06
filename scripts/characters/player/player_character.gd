@@ -183,6 +183,14 @@ func interact_with_nearby() -> void:
 			if boat.is_driver(self):
 				boat.try_exit()
 				return
+		if child is Tractor:
+			var tr := child as Tractor
+			if tr.is_player_nearby(self):
+				tr.try_board(self)
+				return
+			if tr.is_driver(self):
+				tr.try_exit()
+				return
 		if child is Chest and child.is_player_nearby():
 			child.open_ui()
 			return

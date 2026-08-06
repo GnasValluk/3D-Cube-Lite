@@ -131,16 +131,16 @@ func _ready() -> void:
 	# Trưởng thành: thân nâu sáng + tán nhiều chùm blob lá xanh um
 	oak.set_birth_age_days(80.0)
 	var mature_tufts: int = oak._tuft_data.size()
-	_check(mature_tufts >= 3 and mature_tufts <= 8,
-		"trưởng thành có 3-8 chùm lá (có %d)" % mature_tufts)
+	_check(mature_tufts >= 5 and mature_tufts <= 15,
+		"trưởng thành có 5-15 chùm lá (có %d)" % mature_tufts)
 	var trunk_voxels: int = oak._ordered.size()
-	_check(trunk_voxels >= 2000, "thân có ≥2000 voxel (có %d)" % trunk_voxels)
+	_check(trunk_voxels >= 800, "thân có ≥800 voxel (có %d)" % trunk_voxels)
 	var trunk_avg := _avg_color(oak._grid)
 	_check(trunk_avg.r > trunk_avg.g and trunk_avg.g > trunk_avg.b and trunk_avg.r > 0.22,
 		"thân nâu đậm ấm, không xám (r=%.2f g=%.2f b=%.2f)" % [trunk_avg.r, trunk_avg.g, trunk_avg.b])
 	var leaf_avg := _avg_tuft_color(oak._tuft_data)
-	_check(leaf_avg.g > leaf_avg.r and leaf_avg.g > leaf_avg.b and leaf_avg.g > 0.35,
-		"tán lá xanh tươi (r=%.2f g=%.2f b=%.2f)" % [leaf_avg.r, leaf_avg.g, leaf_avg.b])
+	_check(leaf_avg.g > leaf_avg.r and leaf_avg.g > leaf_avg.b and leaf_avg.r > 0.30,
+		"tán lá chuối vàng-xanh sáng (r=%.2f g=%.2f b=%.2f)" % [leaf_avg.r, leaf_avg.g, leaf_avg.b])
 	_check(oak.find_child("FallingLeaves", false, false) == null, "không còn hiệu ứng lá rơi")
 	_check(oak.find_child("FallingAcorns", false, false) == null, "không còn hiệu ứng sồi rơi")
 	var tuft0: Node3D = oak.find_child("Tuft0", false, false)
@@ -152,11 +152,33 @@ func _ready() -> void:
 		_check(tmi != null and tmi.multimesh.instance_count >= 50,
 			"chùm lá chính dày đặc (≥50 voxel, có %d)" % (tmi.multimesh.instance_count if tmi != null else 0))
 
-	# Non: chỉ 1 blob tán trung tâm, thân nhỏ hơn
+	# Collision khớp silhouette cây thật (không còn 1 trụ khổng lồ phủ cả tán).
+	var coli: StaticBody3D = oak.find_child("OakCollision", false, false)
+	_check(coli != null, "cây sồi có StaticBody collider (OakCollision)")
+	var sphere_count := 0
+	var biggest_radius := 0.0
+	if coli != null:
+		for ch in coli.get_children():
+			if ch is CollisionShape3D:
+				var shp: Shape3D = (ch as CollisionShape3D).shape
+				if shp is SphereShape3D:
+					sphere_count += 1
+					biggest_radius = maxf(biggest_radius, (shp as SphereShape3D).radius)
+				elif shp is CylinderShape3D:
+					biggest_radius = maxf(biggest_radius, (shp as CylinderShape3D).radius)
+	_check(sphere_count == mature_tufts,
+		"collision có đúng %d đùm lá (có %d)" % [mature_tufts, sphere_count])
+	_check(biggest_radius < oak._canopy_r() * 0.6,
+		"collision KHÔNG to hơn cây (bán kính tối đa %.2f < %.2f)" % [biggest_radius, oak._canopy_r() * 0.6])
+
+	# Không còn giai đoạn vị thành niên: 30 ngày (trước đây là cây non) đã
+	# phải là trưởng thành với tán đầy đủ chùm lá.
 	oak.set_birth_age_days(30.0)
-	var young_tufts: int = oak._tuft_data.size()
-	_check(young_tufts == 1, "cây non có 1 chùm tán trung tâm (có %d)" % young_tufts)
-	_check(oak._ordered.size() < trunk_voxels, "cây non ít voxel thân hơn cây trưởng thành")
+	var no_young_tufts: int = oak._tuft_data.size()
+	_check(oak._stage == GrowingProp.Stage.MATURE, "30 ngày = trưởng thành (đã bỏ cây non)")
+	_check(no_young_tufts >= 5 and no_young_tufts <= 15,
+		"30 ngày đã có tán đầy đủ 5-15 chùm (có %d)" % no_young_tufts)
+	_check(oak._ordered.size() >= trunk_voxels * 0.9, "30 ngày thân đầy đủ (≥90% voxel trưởng thành)")
 
 	# Mầm: sapling — thân nhỏ nâu + cụm lá nhỏ trên ngọn
 	oak.set_birth_age_days(3.0)

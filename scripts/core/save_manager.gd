@@ -3,6 +3,14 @@ extends Node
 const SAVE_VERSION = 1
 const AUTO_SAVE_INTERVAL = 30.0
 
+const FALLBACK_WORLD_NAME := "world_default"
+const MAX_WORLD_NAME_LEN := 60
+const _WINDOWS_RESERVED := [
+	"CON", "PRN", "AUX", "NUL",
+	"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+	"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+]
+
 var _auto_save_timer: float = 0.0
 var _pending_blocks: Dictionary = {}
 var _load_applied: bool = false
@@ -34,13 +42,21 @@ func get_world_dir(world_name: String = "") -> String:
 	if world_name.is_empty(): world_name = WorldSeed.world_name
 	return "user://saves/" + _sanitize(world_name) + "/"
 
+## Tên thư mục an toàn cho mọi hệ điều hành: chỉ giữ chữ/số/._-,
+## cắt độ dài, né tên reserved của Windows (CON/NUL/COM1...), luôn có giá trị.
 func _sanitize(name: String) -> String:
 	var safe = ""
 	for c in name:
-		if c.is_valid_unicode_identifier() or c == "." or c == "-":
+		if safe.length() >= MAX_WORLD_NAME_LEN:
+			break
+		if c.is_valid_unicode_identifier() or (c >= "0" and c <= "9") or c == "." or c == "-":
 			safe += c
 		elif c == " ":
 			safe += "_"
+	if safe.is_empty():
+		safe = FALLBACK_WORLD_NAME
+	if safe.to_upper() in _WINDOWS_RESERVED:
+		safe = safe + "_world"
 	return safe
 
 func save_exists(world_name: String = "") -> bool:
@@ -73,7 +89,14 @@ func save_game() -> bool:
 	data["seed"] = WorldSeed.seed_value
 	data["timestamp"] = Time.get_unix_time_from_system()
 	var dir = get_world_dir()
-	DirAccess.make_dir_recursive_absolute(dir)
+	var err := DirAccess.make_dir_recursive_absolute(dir)
+	if err != OK:
+		push_warning("save: không tạo được thư mục '%s' (err %d) — lưu vào %s" % [dir, err, FALLBACK_WORLD_NAME])
+		dir = "user://saves/" + FALLBACK_WORLD_NAME + "/"
+		err = DirAccess.make_dir_recursive_absolute(dir)
+		if err != OK:
+			push_error("save: không tạo được thư mục '%s' (err %d) — bỏ qua lần lưu này" % [dir, err])
+			return false
 	var f = FileAccess.open(dir + "save.json", FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.new().stringify(data, "\t"))

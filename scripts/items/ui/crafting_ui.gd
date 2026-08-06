@@ -1,118 +1,114 @@
 class_name CraftingUI
 extends Control
 
+## Bàn chế tạo kiểu danh sách: trái = danh sách công thức (tên + icon nguyên liệu),
+## phải = preview vật phẩm được chọn, nút Chế Tạo tiêu hao nguyên liệu thẳng từ túi.
+
 const _RecipeDB = preload("res://scripts/items/core/recipe_database.gd")
 
 const S: float = 1.6
-const SS: float = 1.4
 
 const BG_DEEP := Color(0.06, 0.04, 0.12)
 const BG_PANEL := Color(0.10, 0.07, 0.18)
 const BG_CARD := Color(0.14, 0.10, 0.22)
-const PURPLE := Color(0.22, 0.62, 0.28)
 const TEAL := Color(0.12, 0.52, 0.32)
 const PINK := Color(0.88, 0.35, 0.32)
-const ORANGE := Color(0.92, 0.62, 0.15)
-const CYAN := Color(0.18, 0.72, 0.52)
 const TEXT_BRIGHT := Color(0.95, 0.92, 1.0)
-const TEXT_MAIN := Color(0.82, 0.78, 0.95)
 const TEXT_DIM := Color(0.55, 0.50, 0.72)
 const TEXT_MUTED := Color(0.35, 0.32, 0.50)
 
-const SLOT_SIZE: float = 56.0
-const GAP: float = 5.0
-const COLS: int = 9
-const PAD: float = 20.0
-const GRID_W: float = COLS * (SLOT_SIZE + GAP) - GAP
+const PAD: float = 16.0
+const LIST_W: float = 402.0
+const PREVIEW_W: float = 320.0
+const PANEL_W: float = PAD * 4 + LIST_W + PREVIEW_W
+const PANEL_H: float = 620.0
+const CARD_W: float = 378.0
+const CARD_H: float = 84.0
 
-var _grid_inventory: Inventory
 var _player_ref: PlayerCharacter = null
+var _recipes: Array = []
+var _cards: Array[Panel] = []
+var _list_box: VBoxContainer
+var _selected_idx: int = -1
 
-var _grid_faces: Array[ColorRect] = []
-var _grid_icons: Array[TextureRect] = []
-var _grid_counts: Array[Label] = []
-var _grid_panels: Array[Panel] = []
-
-var _result_faces: Array[ColorRect] = []
-var _result_icons: Array[TextureRect] = []
-var _result_counts: Array[Label] = []
-var _result_panels: Array[Panel] = []
-
-var _player_faces: Array[ColorRect] = []
-var _player_icons: Array[TextureRect] = []
-var _player_counts: Array[Label] = []
-var _player_panels: Array[Panel] = []
-var _hotbar_faces: Array[ColorRect] = []
-var _hotbar_icons: Array[TextureRect] = []
-var _hotbar_counts: Array[Label] = []
-var _hotbar_panels: Array[Panel] = []
-
-var _content_h: float = 0.0
-var _slot_style: StyleBoxFlat
-var _slot_hover_style: StyleBoxFlat
-var _slot_drop_style: StyleBoxFlat
-var _slot_script: GDScript
+var _card_style: StyleBoxFlat
+var _card_hover_style: StyleBoxFlat
+var _craft_style: StyleBoxFlat
+var _craft_dis_style: StyleBoxFlat
+var _icon_slot_style: StyleBoxFlat
 var _tween: Tween
-var _current_recipe: Dictionary = {}
+
+var _pv_icon_tex: TextureRect
+var _pv_icon_face: ColorRect
+var _pv_name: Label
+var _pv_cat: Label
+var _pv_mat_box: VBoxContainer
+var _pv_mat_rows: Array = []
+var _craft_btn: Button
 
 func _ready() -> void:
-	_grid_inventory = Inventory.new(9)
-	_content_h = _build_layout()
-	size = Vector2(GRID_W + PAD * 2, _content_h)
+	_recipe_styles()
+	size = Vector2(PANEL_W, PANEL_H)
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
-	position += Vector2(160, 0)
+	position += Vector2(0, -10)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	_slot_style = StyleBoxFlat.new()
-	_slot_style.bg_color = BG_PANEL
-	_slot_style.corner_radius_top_left = 6
-	_slot_style.corner_radius_top_right = 6
-	_slot_style.corner_radius_bottom_left = 6
-	_slot_style.corner_radius_bottom_right = 6
-	_slot_style.border_width_left = 2
-	_slot_style.border_width_right = 2
-	_slot_style.border_width_top = 2
-	_slot_style.border_width_bottom = 2
-	_slot_style.border_color = Color(0.85, 0.80, 0.95, 0.10)
-
-	_slot_hover_style = _slot_style.duplicate()
-	_slot_hover_style.bg_color = Color(0.22, 0.18, 0.35, 0.80)
-	_slot_hover_style.border_color = Color(0.55, 0.57, 0.62, 0.60)
-
-	_slot_drop_style = _slot_style.duplicate()
-	_slot_drop_style.bg_color = Color(0.18, 0.35, 0.22, 0.75)
-	_slot_drop_style.border_color = Color(0.22, 0.62, 0.28, 0.60)
-
-	_slot_script = GDScript.new()
-	_slot_script.source_code = """
-extends Panel
-var _chest_ui = null
-var _chest_type = ""
-var _chest_idx = -1
-var _just_dragged = false
-func _get_drag_data(at_position):
-	_just_dragged = true
-	return _chest_ui._slot_get_drag_data(_chest_type, _chest_idx, at_position) if _chest_ui else null
-func _can_drop_data(position, data):
-	return _chest_ui._slot_can_drop_data(_chest_type, _chest_idx, position, data) if _chest_ui else false
-func _drop_data(position, data):
-	if _chest_ui: _chest_ui._slot_drop_data(_chest_type, _chest_idx, position, data)
-"""
-	_slot_script.reload()
 
 	_setup_background()
 	_setup_title()
-	_setup_crafting_grid()
-	_setup_result_slot()
-	_setup_player_grid()
+	_setup_list()
+	_setup_preview()
 	visible = false
 
-func _build_layout() -> float:
-	var top: float = PAD + 24
-	top += 3 * (SLOT_SIZE + GAP) + 8
-	top += 3 * (SLOT_SIZE + GAP) + 6
-	top += 1 * (SLOT_SIZE + GAP)
-	return top + PAD
+func _recipe_styles() -> void:
+	_card_style = StyleBoxFlat.new()
+	_card_style.bg_color = BG_CARD
+	_card_style.corner_radius_top_left = 8
+	_card_style.corner_radius_top_right = 8
+	_card_style.corner_radius_bottom_left = 8
+	_card_style.corner_radius_bottom_right = 8
+	_card_style.border_width_left = 1
+	_card_style.border_width_right = 1
+	_card_style.border_width_top = 1
+	_card_style.border_width_bottom = 1
+	_card_style.border_color = Color(0.55, 0.57, 0.62, 0.15)
+
+	_card_hover_style = _card_style.duplicate()
+	_card_hover_style.bg_color = Color(0.18, 0.30, 0.22, 0.95)
+	_card_hover_style.border_color = Color(0.22, 0.72, 0.38, 0.75)
+	_card_hover_style.border_width_left = 2
+	_card_hover_style.border_width_right = 2
+	_card_hover_style.border_width_top = 2
+	_card_hover_style.border_width_bottom = 2
+
+	_craft_style = StyleBoxFlat.new()
+	_craft_style.bg_color = Color(0.18, 0.55, 0.30)
+	_craft_style.corner_radius_top_left = 8
+	_craft_style.corner_radius_top_right = 8
+	_craft_style.corner_radius_bottom_left = 8
+	_craft_style.corner_radius_bottom_right = 8
+	_craft_style.border_width_left = 2
+	_craft_style.border_width_right = 2
+	_craft_style.border_width_top = 2
+	_craft_style.border_width_bottom = 2
+	_craft_style.border_color = Color(0.30, 0.80, 0.45, 0.6)
+
+	_craft_dis_style = _craft_style.duplicate()
+	_craft_dis_style.bg_color = Color(0.12, 0.13, 0.16)
+	_craft_dis_style.border_color = Color(0.30, 0.30, 0.32, 0.4)
+
+	# Khung icon giống slot inventory: bo góc, viền mờ, clip nội dung để icon
+	# 256px không bao giờ vượt khung.
+	_icon_slot_style = StyleBoxFlat.new()
+	_icon_slot_style.bg_color = Color(0.09, 0.07, 0.14, 0.9)
+	_icon_slot_style.corner_radius_top_left = 6
+	_icon_slot_style.corner_radius_top_right = 6
+	_icon_slot_style.corner_radius_bottom_left = 6
+	_icon_slot_style.corner_radius_bottom_right = 6
+	_icon_slot_style.border_width_left = 1
+	_icon_slot_style.border_width_right = 1
+	_icon_slot_style.border_width_top = 1
+	_icon_slot_style.border_width_bottom = 1
+	_icon_slot_style.border_color = Color(0.85, 0.80, 0.95, 0.16)
 
 func _setup_background() -> void:
 	var bg_style := StyleBoxFlat.new()
@@ -128,7 +124,7 @@ func _setup_background() -> void:
 	bg_style.border_color = Color(0.85, 0.80, 0.95, 0.12)
 
 	var bg := Panel.new()
-	bg.size = Vector2(GRID_W + PAD * 2, _content_h)
+	bg.size = Vector2(PANEL_W, PANEL_H)
 	bg.add_theme_stylebox_override("panel", bg_style)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bg)
@@ -142,347 +138,341 @@ func _setup_title() -> void:
 	title.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.6))
 	title.add_theme_constant_override("shadow_offset_x", 1)
 	title.add_theme_constant_override("shadow_offset_y", 1)
-	title.position = Vector2(PAD, PAD - 4)
-	title.size = Vector2(GRID_W, 30)
+	title.position = Vector2(0, 14)
+	title.size = Vector2(PANEL_W, 28)
 	add_child(title)
 
-func _make_slot(px: float, py: float, faces: Array, icons: Array, counts: Array, panels: Array, slot_type: String, slot_idx: int) -> Panel:
-	var panel := Panel.new()
-	panel.size = Vector2(SLOT_SIZE, SLOT_SIZE)
-	panel.position = Vector2(px, py)
-	panel.clip_contents = true
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	panel.add_theme_stylebox_override("panel", _slot_style)
-	panel.set_script(_slot_script)
-	panel._chest_ui = self
-	panel._chest_type = slot_type
-	panel._chest_idx = slot_idx
-	panel.mouse_entered.connect(_on_slot_entered.bind(panels, slot_type, slot_idx))
-	panel.mouse_exited.connect(_on_slot_exited.bind(panels))
-	add_child(panel)
+func _setup_list() -> void:
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(PAD, 52)
+	scroll.size = Vector2(LIST_W, PANEL_H - 52 - PAD)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
+	_list_box = VBoxContainer.new()
+	_list_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_list_box.add_theme_constant_override("separation", 8)
+	scroll.add_child(_list_box)
+
+func _setup_preview() -> void:
+	var px: float = PAD * 2 + LIST_W
+	var pv := Panel.new()
+	pv.position = Vector2(px, 52)
+	pv.size = Vector2(PREVIEW_W, PANEL_H - 52 - PAD)
+	pv.add_theme_stylebox_override("panel", _card_style)
+	add_child(pv)
+
+	var icx: float = (PREVIEW_W - 110) / 2.0
+	var box := Panel.new()
+	box.position = Vector2(icx, 18)
+	box.size = Vector2(110, 110)
+	box.clip_contents = true
+	box.add_theme_stylebox_override("panel", _icon_slot_style)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pv.add_child(box)
+
+	_pv_icon_face = ColorRect.new()
+	_pv_icon_face.position = Vector2(1, 1)
+	_pv_icon_face.size = Vector2(108, 108)
+	_pv_icon_face.color = Color(0.20, 0.15, 0.30, 0.4)
+	_pv_icon_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(_pv_icon_face)
+
+	_pv_icon_tex = TextureRect.new()
+	_pv_icon_tex.position = Vector2(1, 1)
+	_pv_icon_tex.size = Vector2(108, 108)
+	_pv_icon_tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	_pv_icon_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_pv_icon_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(_pv_icon_tex)
+
+	_pv_name = Label.new()
+	_pv_name.position = Vector2(14, 134)
+	_pv_name.size = Vector2(PREVIEW_W - 28, 26)
+	_pv_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pv_name.add_theme_font_size_override("font_size", int(S * 15))
+	_pv_name.add_theme_color_override("font_color", TEXT_BRIGHT)
+	pv.add_child(_pv_name)
+
+	_pv_cat = Label.new()
+	_pv_cat.position = Vector2(14, 162)
+	_pv_cat.size = Vector2(PREVIEW_W - 28, 20)
+	_pv_cat.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_pv_cat.add_theme_font_size_override("font_size", int(S * 9))
+	_pv_cat.add_theme_color_override("font_color", TEXT_MUTED)
+	pv.add_child(_pv_cat)
+
+	var mat_lbl := Label.new()
+	mat_lbl.text = tr("CRAFT_MATERIALS")
+	mat_lbl.position = Vector2(16, 194)
+	mat_lbl.add_theme_font_size_override("font_size", int(S * 12))
+	mat_lbl.add_theme_color_override("font_color", TEXT_DIM)
+	pv.add_child(mat_lbl)
+
+	_pv_mat_box = VBoxContainer.new()
+	_pv_mat_box.position = Vector2(16, 222)
+	_pv_mat_box.size = Vector2(PREVIEW_W - 32, 260)
+	_pv_mat_box.add_theme_constant_override("separation", 6)
+	pv.add_child(_pv_mat_box)
+
+	_craft_btn = Button.new()
+	_craft_btn.text = tr("CRAFT_BUTTON")
+	_craft_btn.position = Vector2(16, PANEL_H - 52 - PAD - 64)
+	_craft_btn.size = Vector2(PREVIEW_W - 32, 48)
+	_craft_btn.add_theme_font_size_override("font_size", int(S * 14))
+	_craft_btn.add_theme_color_override("font_color", TEXT_BRIGHT)
+	_craft_btn.add_theme_stylebox_override("normal", _craft_style)
+	_craft_btn.add_theme_stylebox_override("hover", _craft_style)
+	_craft_btn.add_theme_stylebox_override("pressed", _craft_style)
+	_craft_btn.add_theme_stylebox_override("disabled", _craft_dis_style)
+	_craft_btn.add_theme_color_override("font_disabled_color", TEXT_MUTED)
+	_craft_btn.pressed.connect(_craft)
+	pv.add_child(_craft_btn)
+
+## Thêm icon vật phẩm vào parent tại (px,py) kích thước sz; bọc trong khung slot
+## clip_contents (giống inventory) để icon 256px không bao giờ vượt khung.
+## count_str nếu khác "" thì hiện góc phải-dưới.
+func _add_icon(parent: Control, px: float, py: float, sz: float, item_id: String, count_str: String = "") -> void:
+	ItemDatabase.ensure_db()
+	var def: ItemDef = ItemDatabase.items_db.get(item_id) as ItemDef
+	var tex := ItemDatabase.load_icon_2d(item_id)
+
+	var slot := Panel.new()
+	slot.position = Vector2(px, py)
+	slot.size = Vector2(sz, sz)
+	slot.clip_contents = true
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	slot.add_theme_stylebox_override("panel", _icon_slot_style)
+	parent.add_child(slot)
 
 	var face := ColorRect.new()
-	face.position = Vector2(3, 3)
-	face.size = Vector2(SLOT_SIZE - 6, SLOT_SIZE - 6)
-	face.color = Color(0.20, 0.15, 0.30, 0.4)
+	face.position = Vector2(1, 1)
+	face.size = Vector2(sz - 2, sz - 2)
+	face.color = Color(0.05, 0.04, 0.10, 0.55) if tex != null else (def.icon_color if def != null else Color(0.20, 0.15, 0.30, 0.5))
 	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(face)
-	faces.append(face)
+	slot.add_child(face)
 
-	var slot_icon := TextureRect.new()
-	slot_icon.position = Vector2(3, 3)
-	slot_icon.size = Vector2(SLOT_SIZE - 6, SLOT_SIZE - 6)
-	slot_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	slot_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	slot_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	slot_icon.visible = false
-	panel.add_child(slot_icon)
-	icons.append(slot_icon)
+	if tex != null:
+		var t := TextureRect.new()
+		t.texture = tex
+		t.position = Vector2(1, 1)
+		t.size = Vector2(sz - 2, sz - 2)
+		t.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot.add_child(t)
 
-	var cnt := Label.new()
-	cnt.position = Vector2(3, SLOT_SIZE - 22)
-	cnt.size = Vector2(SLOT_SIZE - 6, 18)
-	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	cnt.add_theme_font_size_override("font_size", int(S * 10))
-	cnt.add_theme_color_override("font_color", TEXT_DIM)
-	cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(cnt)
-	counts.append(cnt)
+	if count_str != "":
+		var c := Label.new()
+		c.text = count_str
+		c.position = Vector2(1, sz - 18)
+		c.size = Vector2(sz - 2, 16)
+		c.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		c.add_theme_font_size_override("font_size", int(S * 9))
+		c.add_theme_color_override("font_color", TEXT_BRIGHT)
+		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot.add_child(c)
 
-	panels.append(panel)
-	return panel
+func _rebuild_list() -> void:
+	for ch in _list_box.get_children():
+		ch.queue_free()
+	_cards.clear()
 
-func _setup_crafting_grid() -> void:
-	var grid_cols: int = 3
-	var grid_sy: float = PAD + 22
-	var grid_sx: float = PAD
+	var craftable: Array = []
+	var locked: Array = []
+	for r in _RecipeDB.recipes:
+		(craftable if _can_craft(r) else locked).append(r)
+	_recipes = craftable + locked
 
-	var lbl := Label.new()
-	lbl.text = tr("CRAFTING_GRID")
-	lbl.position = Vector2(grid_sx, grid_sy - 24)
-	lbl.add_theme_font_size_override("font_size", int(S * 12))
-	lbl.add_theme_color_override("font_color", TEXT_DIM)
-	add_child(lbl)
+	for i in range(_recipes.size()):
+		var card := Panel.new()
+		card.custom_minimum_size = Vector2(CARD_W, CARD_H)
+		card.mouse_filter = Control.MOUSE_FILTER_STOP
+		card.add_theme_stylebox_override("panel", _card_style)
+		card.gui_input.connect(_on_card_input.bind(i))
+		_list_box.add_child(card)
+		_cards.append(card)
 
-	for row in range(3):
-		for col in range(grid_cols):
-			var px: float = grid_sx + col * (SLOT_SIZE + GAP)
-			var pyf: float = grid_sy + row * (SLOT_SIZE + GAP)
-			var i: int = row * grid_cols + col
-			var panel := _make_slot(px, pyf, _grid_faces, _grid_icons, _grid_counts, _grid_panels, "grid", i)
-			panel.gui_input.connect(_on_slot_gui_input.bind("grid", i))
+		var r: Dictionary = _recipes[i]
+		ItemDatabase.ensure_db()
+		var rdef: ItemDef = ItemDatabase.items_db.get(r.get("result", "")) as ItemDef
+		var rid: String = r.get("result", "")
 
-func _setup_result_slot() -> void:
-	var grid_sx: float = PAD
-	var grid_sy: float = PAD + 22
-	var rsx: float = grid_sx + 3 * (SLOT_SIZE + GAP) - (SLOT_SIZE + GAP) + (SLOT_SIZE + GAP + 10)
-	var rsy: float = grid_sy + 1 * (SLOT_SIZE + GAP) - 2
+		_add_icon(card, 10, 8, 46, rid, "")
+		var name := Label.new()
+		name.text = r.get("name", rid)
+		name.position = Vector2(66, 14)
+		name.size = Vector2(CARD_W - 66 - 64, 22)
+		name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		name.add_theme_font_size_override("font_size", int(S * 12))
+		name.add_theme_color_override("font_color", TEXT_BRIGHT)
+		card.add_child(name)
 
-	var arrow := Label.new()
-	arrow.text = "▼"
-	arrow.position = Vector2(rsx - 32, rsy + 10)
-	arrow.add_theme_font_size_override("font_size", int(S * 14))
-	arrow.add_theme_color_override("font_color", TEXT_MUTED)
-	add_child(arrow)
+		var cnt := Label.new()
+		cnt.text = "x%d" % r.get("count", 1)
+		cnt.position = Vector2(CARD_W - 60, 17)
+		cnt.size = Vector2(50, 18)
+		cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		cnt.add_theme_font_size_override("font_size", int(S * 10))
+		cnt.add_theme_color_override("font_color", Color(0.65, 0.85, 0.55))
+		card.add_child(cnt)
 
-	var panel := _make_slot(rsx, rsy, _result_faces, _result_icons, _result_counts, _result_panels, "result", 0)
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	panel.gui_input.connect(_on_slot_gui_input.bind("result", 0))
+		# Dòng nguyên liệu: icon + số lượng từng loại
+		var ing: Dictionary = r.get("ingredients", {})
+		var x: float = 12.0
+		var y: float = 60.0
+		var first := true
+		for ing_id in ing:
+			if not first:
+				var plus := Label.new()
+				plus.text = "+"
+				plus.position = Vector2(x, y - 1)
+				plus.add_theme_font_size_override("font_size", int(S * 9))
+				plus.add_theme_color_override("font_color", TEXT_MUTED)
+				card.add_child(plus)
+				x += 14.0
+			first = false
+			_add_icon(card, x, y, 18, ing_id)
+			var need := Label.new()
+			need.text = "x%d" % int(ing[ing_id])
+			need.position = Vector2(x + 20, y + 1)
+			need.add_theme_font_size_override("font_size", int(S * 8))
+			need.add_theme_color_override("font_color", TEXT_DIM)
+			card.add_child(need)
+			x += 20.0 + 16.0 * int(ing[ing_id]) + 26.0
+			if x > CARD_W - 60:
+				break
 
-func _setup_player_grid() -> void:
-	var sx: float = PAD
-	var chest_rows: int = 3
-	var py: float = PAD + 22 + chest_rows * (SLOT_SIZE + GAP) + 10
-
-	var lbl := Label.new()
-	lbl.text = "Inventory"
-	lbl.position = Vector2(sx, py - 24)
-	lbl.add_theme_font_size_override("font_size", int(S * 12))
-	lbl.add_theme_color_override("font_color", TEXT_DIM)
-	add_child(lbl)
-
-	for row in range(3):
-		for col in range(COLS):
-			var i: int = 9 + row * COLS + col
-			var px: float = sx + col * (SLOT_SIZE + GAP)
-			var py2: float = py + row * (SLOT_SIZE + GAP)
-			var panel := _make_slot(px, py2, _player_faces, _player_icons, _player_counts, _player_panels, "player", i)
-			panel.gui_input.connect(_on_slot_gui_input.bind("player", i))
-
-	var hot_y: float = py + 3 * (SLOT_SIZE + GAP) + 6
-	for col in range(COLS):
-		var i: int = col
-		var px: float = sx + col * (SLOT_SIZE + GAP)
-		var panel := _make_slot(px, hot_y, _hotbar_faces, _hotbar_icons, _hotbar_counts, _hotbar_panels, "hotbar", i)
-		panel.gui_input.connect(_on_slot_gui_input.bind("hotbar", i))
-
-func _get_panel(_type: String, idx: int) -> Panel:
-	match _type:
-		"grid": return _grid_panels[idx] if idx >= 0 and idx < _grid_panels.size() else null
-		"result": return _result_panels[idx] if idx >= 0 and idx < _result_panels.size() else null
-		"player": return _player_panels[idx] if idx >= 0 and idx < _player_panels.size() else null
-		"hotbar": return _hotbar_panels[idx] if idx >= 0 and idx < _hotbar_panels.size() else null
-	return null
-
-func _on_slot_gui_input(event: InputEvent, _type: String, idx: int) -> void:
-	if not visible or _player_ref == null:
+func _on_card_input(event: InputEvent, idx: int) -> void:
+	if not (event is InputEventMouseButton):
 		return
-	if event is InputEventMouseButton:
-		if event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed:
-				var p := _get_panel(_type, idx)
-				if p: p._just_dragged = false
-			else:
-				var p := _get_panel(_type, idx)
-				if p and not p._just_dragged:
-					_on_slot_left_click(_type, idx)
-		elif event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
-			_on_slot_right_click(_type, idx)
+	var mb := event as InputEventMouseButton
+	if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+		if idx >= 0 and idx < _recipes.size() and _can_craft(_recipes[idx]):
+			_select(idx)
 
-func _on_slot_left_click(_type: String, idx: int) -> void:
-	var inv: Inventory = _get_inv(_type)
-	if inv == null:
-		return
-	var slot: ItemSlot = inv.slots[idx]
-	if slot.is_empty():
-		return
-	match _type:
-		"grid":
-			_transfer_from_grid(idx, slot.count)
-		"player", "hotbar":
-			_transfer_to_grid(idx, slot.count)
-		"result":
-			_craft()
+func _select(idx: int) -> void:
+	_selected_idx = idx
+	for i in range(_cards.size()):
+		_cards[i].add_theme_stylebox_override("panel", _card_hover_style if i == idx else _card_style)
+	_render_preview()
 
-func _on_slot_right_click(_type: String, idx: int) -> void:
-	var inv: Inventory = _get_inv(_type)
-	if inv == null:
-		return
-	var slot: ItemSlot = inv.slots[idx]
-	if slot.is_empty():
-		return
-	var half: int = slot.count / 2
-	if half < 1:
-		return
-	match _type:
-		"grid":
-			_transfer_from_grid(idx, half)
-		"player", "hotbar":
-			_transfer_to_grid(idx, half)
+func _clear_pv_mat() -> void:
+	for ch in _pv_mat_box.get_children():
+		ch.queue_free()
+	_pv_mat_rows.clear()
 
-func _get_inv(_type: String) -> Inventory:
-	match _type:
-		"grid": return _grid_inventory
-		"result": return null
-		"player", "hotbar": return _player_ref.inventory if _player_ref else null
-	return null
-
-func _transfer_from_grid(idx: int, count: int) -> void:
-	var gi = _grid_inventory
-	var pi = _player_ref.inventory
-	if gi == null or pi == null:
+func _render_preview() -> void:
+	_clear_pv_mat()
+	if _selected_idx < 0 or _selected_idx >= _recipes.size():
+		_pv_icon_tex.texture = null
+		_pv_icon_face.color = Color(0.20, 0.15, 0.30, 0.4)
+		_pv_name.text = "—"
+		_pv_cat.text = ""
+		_craft_btn.disabled = true
+		_craft_btn.text = tr("CRAFT_BUTTON")
 		return
-	var slot: ItemSlot = gi.slots[idx]
-	if slot.is_empty() or count < 1:
-		return
-	var remaining: int = pi.add_item(slot.item, count)
-	if remaining < count:
-		gi.remove_item(idx, count - remaining)
+	ItemDatabase.ensure_db()
+	var r: Dictionary = _recipes[_selected_idx]
+	var rdef: ItemDef = ItemDatabase.items_db.get(r.get("result", "")) as ItemDef
+	var rid: String = r.get("result", "")
 
-func _transfer_to_grid(idx: int, count: int) -> void:
-	var gi = _grid_inventory
-	var pi = _player_ref.inventory
-	if gi == null or pi == null:
-		return
-	var slot: ItemSlot = pi.slots[idx]
-	if slot.is_empty() or count < 1:
-		return
-	var remaining: int = gi.add_item(slot.item, count)
-	if remaining < count:
-		pi.remove_item(idx, count - remaining)
+	var tex := ItemDatabase.load_icon_2d(rid)
+	_pv_icon_tex.texture = tex
+	_pv_icon_face.color = Color(0.05, 0.04, 0.10, 0.55) if tex != null else (rdef.icon_color if rdef != null else Color(0.20, 0.15, 0.30, 0.5))
+	_pv_name.text = r.get("name", rid)
+	_pv_cat.text = r.get("category", "")
+	_pv_cat.text = ("%s · x%d" % [_pv_cat.text, r.get("count", 1)]) if _pv_cat.text != "" else "x%d" % r.get("count", 1)
 
-func _on_slot_entered(panels: Array, _type: String, idx: int) -> void:
-	for p in panels:
-		p.add_theme_stylebox_override("panel", _slot_style)
-	if idx >= 0 and idx < panels.size():
-		panels[idx].add_theme_stylebox_override("panel", _slot_hover_style)
+	var ing: Dictionary = r.get("ingredients", {})
+	for ing_id in ing:
+		var row := HBoxContainer.new()
+		row.custom_minimum_size = Vector2(PREVIEW_W - 32, 30)
+		row.add_theme_constant_override("separation", 8)
+		_pv_mat_box.add_child(row)
 
-func _on_slot_exited(panels: Array) -> void:
-	for p in panels:
-		p.add_theme_stylebox_override("panel", _slot_style)
+		var wrap := Control.new()
+		wrap.custom_minimum_size = Vector2(26, 26)
+		wrap.size = Vector2(26, 26)
+		row.add_child(wrap)
+		_add_icon(wrap, 0, 1, 24, ing_id)
 
-func _slot_get_drag_data(_type: String, idx: int, _at_position: Vector2):
-	if _type == "result":
-		return null
-	var inv: Inventory = _get_inv(_type)
-	if inv == null:
-		return null
-	var slot: ItemSlot = inv.slots[idx]
-	if slot.is_empty():
-		return null
-	var data := { "from_type": _type, "from_idx": idx, "from_inv": inv, "item_id": slot.item.id, "count": slot.count }
-	var preview := Panel.new()
-	var ss: float = SLOT_SIZE
-	preview.size = Vector2(ss, ss)
-	var ps := _slot_style.duplicate()
-	ps.bg_color = Color(0.14, 0.10, 0.22, 0.90)
-	ps.border_color = Color(0.22, 0.62, 0.28, 0.70)
-	preview.add_theme_stylebox_override("panel", ps)
-	var face := ColorRect.new()
-	face.position = Vector2(3, 3)
-	face.size = Vector2(ss - 6, ss - 6)
-	face.color = slot.item.icon_color
-	preview.add_child(face)
-	var cnt := Label.new()
-	cnt.position = Vector2(3, ss - 22)
-	cnt.size = Vector2(ss - 6, 18)
-	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	cnt.add_theme_font_size_override("font_size", int(S * 10))
-	cnt.add_theme_color_override("font_color", TEXT_BRIGHT)
-	cnt.text = str(slot.count) if slot.count > 1 else ""
-	preview.add_child(cnt)
-	set_drag_preview(preview)
-	return data
+		var def: ItemDef = ItemDatabase.items_db.get(ing_id) as ItemDef
+		var nm := Label.new()
+		nm.text = def.name if def != null else ing_id
+		nm.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		nm.add_theme_font_size_override("font_size", int(S * 10))
+		nm.add_theme_color_override("font_color", TEXT_BRIGHT)
+		row.add_child(nm)
 
-func _slot_can_drop_data(_type: String, idx: int, _position: Vector2, data) -> bool:
-	if _type == "result":
+		var have := Label.new()
+		have.text = "0"
+		have.add_theme_font_size_override("font_size", int(S * 10))
+		row.add_child(have)
+
+		var sep := Label.new()
+		sep.text = "/"
+		sep.add_theme_font_size_override("font_size", int(S * 10))
+		sep.add_theme_color_override("font_color", TEXT_MUTED)
+		row.add_child(sep)
+
+		var need := Label.new()
+		need.text = "%d" % int(ing[ing_id])
+		need.add_theme_font_size_override("font_size", int(S * 10))
+		need.add_theme_color_override("font_color", Color(0.65, 0.85, 0.55))
+		row.add_child(need)
+
+		_pv_mat_rows.append({ "ing": ing_id, "need": int(ing[ing_id]), "have": have })
+
+	_craft_btn.disabled = not _can_craft(r)
+	_craft_btn.text = tr("CRAFT_CANNOT") if not _can_craft(r) else tr("CRAFT_BUTTON")
+
+func _can_craft(recipe: Dictionary) -> bool:
+	if _player_ref == null:
 		return false
-	if data == null or not (data is Dictionary):
-		return false
-	if not data.has("from_inv") or not data.has("from_idx"):
-		return false
-	var from_inv: Inventory = data["from_inv"]
-	var from_idx: int = data["from_idx"]
-	var src := from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
-	if src == null or src.is_empty():
-		return false
-	var dst_inv: Inventory = _get_inv(_type)
-	if dst_inv == null:
-		return false
-	var dst := dst_inv.slots[idx]
-	if dst.is_empty():
-		_highlight_drop(_type, idx, true)
-		return true
-	if dst.item.id == src.item.id and dst.item.stackable and dst.count < dst.item.max_stack:
-		_highlight_drop(_type, idx, true)
-		return true
-	return false
-
-func _slot_drop_data(_type: String, idx: int, _position: Vector2, data) -> void:
-	_clear_drop_highlights()
-	if _type == "result":
-		return
-	if data == null or not (data is Dictionary):
-		return
-	if not data.has("from_inv") or not data.has("from_idx"):
-		return
-	var from_inv: Inventory = data["from_inv"]
-	var from_idx: int = data["from_idx"]
-	var src := from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
-	if src == null or src.is_empty():
-		return
-	var dst_inv: Inventory = _get_inv(_type)
-	if dst_inv == null:
-		return
-	var item: ItemDef = src.item
-	var count: int = src.count
-	if dst_inv == from_inv:
-		if dst_inv.can_transfer(from_idx, idx):
-			dst_inv.transfer(from_idx, idx)
-		else:
-			dst_inv.swap(from_idx, idx)
-	else:
-		var remaining: int = dst_inv.add_item(item, count)
-		if remaining < count:
-			from_inv.remove_item(from_idx, count - remaining)
-
-func _highlight_drop(_type: String, idx: int, on: bool) -> void:
-	var panels: Array = []
-	match _type:
-		"grid": panels = _grid_panels
-		"player": panels = _player_panels
-		"hotbar": panels = _hotbar_panels
-	if idx >= 0 and idx < panels.size():
-		panels[idx].add_theme_stylebox_override("panel", _slot_drop_style if on else _slot_style)
-
-func _clear_drop_highlights() -> void:
-	for p in _grid_panels:
-		p.add_theme_stylebox_override("panel", _slot_style)
-	for p in _player_panels:
-		p.add_theme_stylebox_override("panel", _slot_style)
-	for p in _hotbar_panels:
-		p.add_theme_stylebox_override("panel", _slot_style)
-
-## Chế tạo: tiêu nguyên liệu trong lưới → cộng kết quả vào inventory.
-func _craft() -> void:
-	if _current_recipe.is_empty() or _player_ref == null:
-		return
 	var pi = _player_ref.inventory
 	if pi == null:
-		return
-	var need := _current_recipe.get("ingredients", {}) as Dictionary
-	if need.is_empty():
-		return
-	# Tiêu nguyên liệu từ lưới (theo thứ tự slot)
-	for ing in need:
-		var remain: int = need[ing]
-		for i in range(_grid_inventory.slots.size()):
-			if remain <= 0:
-				break
-			var slot := _grid_inventory.slots[i]
-			if slot.is_empty() or slot.item.id != ing:
-				continue
-			var take: int = mini(remain, slot.count)
-			_grid_inventory.remove_item(i, take)
-			remain -= take
+		return false
+	var ing: Dictionary = recipe.get("ingredients", {})
+	for ing_id in ing:
+		if pi.get_item_count(ing_id) < int(ing[ing_id]):
+			return false
+	return _has_space_for_result(recipe)
+
+func _has_space_for_result(recipe: Dictionary) -> bool:
+	var pi = _player_ref.inventory
+	if pi == null:
+		return false
 	ItemDatabase.ensure_db()
-	var def: ItemDef = ItemDatabase.items_db.get(_current_recipe.get("result", "")) as ItemDef
+	var def: ItemDef = ItemDatabase.items_db.get(recipe.get("result", "")) as ItemDef
+	if def == null:
+		return false
+	if not pi.is_full():
+		return true
+	if def.stackable:
+		for slot in pi.slots:
+			if not slot.is_empty() and slot.item.id == def.id and slot.count < def.item.max_stack:
+				return true
+	return false
+
+func _craft() -> void:
+	if _selected_idx < 0 or _selected_idx >= _recipes.size():
+		return
+	if _player_ref == null:
+		return
+	var recipe: Dictionary = _recipes[_selected_idx]
+	if not _can_craft(recipe):
+		return
+	var pi = _player_ref.inventory
+	var ing: Dictionary = recipe.get("ingredients", {})
+	for ing_id in ing:
+		pi.remove_item_by_id(ing_id, int(ing[ing_id]))
+	ItemDatabase.ensure_db()
+	var def: ItemDef = ItemDatabase.items_db.get(recipe.get("result", "")) as ItemDef
 	if def == null:
 		return
-	var count: int = _current_recipe.get("count", 1)
-	if pi.add_item(def, count) < count and _player_ref.has_method("_scroll_inventory_message"):
-		_player_ref._scroll_inventory_message(tr("INVENTORY_FULL"))
-	elif _player_ref.has_method("_scroll_inventory_message"):
+	var count: int = recipe.get("count", 1)
+	pi.add_item(def, count)
+	if _player_ref.has_method("_scroll_inventory_message"):
 		_player_ref._scroll_inventory_message("+%d %s" % [count, def.name])
 	if _player_ref.get("equipped_weapon") != null \
 			and _player_ref.equipped_weapon.id == def.id:
@@ -490,20 +480,13 @@ func _craft() -> void:
 
 func open(player: PlayerCharacter) -> void:
 	_player_ref = player
-	_current_recipe = {}
+	_RecipeDB.ensure()
+	_selected_idx = -1
+	_rebuild_list()
+	_render_preview()
 	_play_appear()
 
 func close() -> void:
-	if _player_ref:
-		var pi = _player_ref.inventory
-		if pi:
-			for i in range(_grid_inventory.slots.size()):
-				var slot = _grid_inventory.slots[i]
-				if not slot.is_empty():
-					var remaining: int = pi.add_item(slot.item, slot.count)
-					var moved: int = slot.count - remaining
-					if moved > 0:
-						_grid_inventory.remove_item(i, moved)
 	_player_ref = null
 	_play_disappear()
 
@@ -528,64 +511,22 @@ func _play_disappear() -> void:
 	)
 
 func _process(_delta: float) -> void:
-	if _player_ref == null:
+	if not visible or _player_ref == null:
 		return
 	var pi = _player_ref.inventory
 	if pi == null:
 		return
-
-	for i in range(min(_grid_inventory.slots.size(), _grid_faces.size())):
-		var slot: ItemSlot = _grid_inventory.slots[i]
-		if slot.is_empty():
-			_grid_faces[i].color = Color(0.20, 0.15, 0.30, 0.4)
-			_grid_icons[i].texture = null; _grid_icons[i].visible = false
-			_grid_counts[i].text = ""
-		else:
-			var tex := ItemDatabase.load_icon_2d(slot.item.id)
-			_grid_faces[i].color = Color(0.20, 0.15, 0.30, 0.4) if tex != null else slot.item.icon_color
-			_grid_icons[i].texture = tex; _grid_icons[i].visible = tex != null
-			_grid_counts[i].text = str(slot.count) if slot.count > 1 else ""
-
-	if _result_faces.size() > 0:
-		_current_recipe = _RecipeDB.match_grid(_grid_inventory)
-		var rdef: ItemDef = null
-		if not _current_recipe.is_empty():
-			ItemDatabase.ensure_db()
-			rdef = ItemDatabase.items_db.get(_current_recipe.get("result", "")) as ItemDef
-		if rdef == null:
-			_current_recipe = {}
-			_result_faces[0].color = Color(0.20, 0.15, 0.30, 0.2)
-			_result_icons[0].texture = null; _result_icons[0].visible = false
-			_result_counts[0].text = ""
-		else:
-			var rtex := ItemDatabase.load_icon_2d(rdef.id)
-			_result_faces[0].color = Color(0.20, 0.15, 0.30, 0.4) if rtex != null else rdef.icon_color
-			_result_icons[0].texture = rtex; _result_icons[0].visible = rtex != null
-			_result_counts[0].text = str(_current_recipe.get("count", 1))
-
-	for i in range(27):
-		var pidx: int = 9 + i
-		if pidx < pi.slots.size() and i < _player_faces.size():
-			var slot: ItemSlot = pi.slots[pidx]
-			if slot.is_empty():
-				_player_faces[i].color = Color(0.20, 0.15, 0.30, 0.4)
-				_player_icons[i].texture = null; _player_icons[i].visible = false
-				_player_counts[i].text = ""
-			else:
-				var tex := ItemDatabase.load_icon_2d(slot.item.id)
-				_player_faces[i].color = Color(0.20, 0.15, 0.30, 0.4) if tex != null else slot.item.icon_color
-				_player_icons[i].texture = tex; _player_icons[i].visible = tex != null
-				_player_counts[i].text = str(slot.count) if slot.count > 1 else ""
-
-	for i in range(9):
-		if i < pi.slots.size() and i < _hotbar_faces.size():
-			var slot: ItemSlot = pi.slots[i]
-			if slot.is_empty():
-				_hotbar_faces[i].color = Color(0.20, 0.15, 0.30, 0.4)
-				_hotbar_icons[i].texture = null; _hotbar_icons[i].visible = false
-				_hotbar_counts[i].text = ""
-			else:
-				var tex := ItemDatabase.load_icon_2d(slot.item.id)
-				_hotbar_faces[i].color = Color(0.20, 0.15, 0.30, 0.4) if tex != null else slot.item.icon_color
-				_hotbar_icons[i].texture = tex; _hotbar_icons[i].visible = tex != null
-				_hotbar_counts[i].text = str(slot.count) if slot.count > 1 else ""
+	# Cập nhật trạng thái đủ/thiếu nguyên liệu cho từng card
+	for i in range(_cards.size()):
+		var ok: bool = _can_craft(_recipes[i])
+		_cards[i].modulate = Color(1, 1, 1, 1) if ok else Color(1, 1, 1, 0.40)
+	# Cập nhật preview: have/need + nút chế tạo
+	if _selected_idx >= 0 and _selected_idx < _recipes.size():
+		var r: Dictionary = _recipes[_selected_idx]
+		for row in _pv_mat_rows:
+			var have: int = pi.get_item_count(row.ing)
+			row.have.text = "%d" % have
+			row.have.add_theme_color_override("font_color", TEXT_BRIGHT if have >= row.need else PINK)
+		var ok: bool = _can_craft(r)
+		_craft_btn.disabled = not ok
+		_craft_btn.text = tr("CRAFT_CANNOT") if not ok else tr("CRAFT_BUTTON")

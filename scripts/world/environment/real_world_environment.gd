@@ -76,7 +76,10 @@ func _apply_graphics_preset(env: Environment) -> void:
 	match preset:
 		SettingsManager.GraphicsPreset.STANDARD:
 			env.glow_enabled = false
-			env.adjustment_enabled = false
+			env.adjustment_enabled = true
+			env.adjustment_brightness = 1.0
+			env.adjustment_contrast = 1.04
+			env.adjustment_saturation = 1.18
 			env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 			env.tonemap_exposure = 1.0
 			env.tonemap_white = 1.0

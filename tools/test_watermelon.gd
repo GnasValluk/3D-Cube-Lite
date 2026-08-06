@@ -65,7 +65,7 @@ func _ready() -> void:
 	# ── 2. Recipe ───────────────────────────────────────────────────────────
 	print("-- 2. Recipe cắt lát + lấy hạt --")
 	_Recipe.ensure()
-	_check(_Recipe.recipes.size() == 13, "tổng 13 recipe (thêm 3 công thức bí đỏ, 2 dưa hấu)")
+	_check(_Recipe.recipes.size() == 15, "tổng 15 recipe (3 bí đỏ, 2 dưa hấu, 1 cam, máy kéo)")
 	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "watermelon_slice"),
 		"có recipe cắt miếng dưa hấu")
 	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "watermelon_seed"),

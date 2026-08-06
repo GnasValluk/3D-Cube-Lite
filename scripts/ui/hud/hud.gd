@@ -49,6 +49,7 @@ var _explore_map: ExploreMap
 var _explore_sys: ExploreSystem
 var _mini_map: MiniMap
 var _phone_ui: PhoneUI
+var _nearest_hint = null
 
 enum { LOAD_IDLE, LOAD_LOADING, LOAD_READY, LOAD_FADEOUT }
 var _load_state: int = LOAD_IDLE
@@ -82,6 +83,7 @@ const _RecipeLibrary = preload("res://scripts/items/ui/recipe_library_panel.gd")
 const _FurnaceUI = preload("res://scripts/items/ui/furnace_ui.gd")
 const _Library = preload("res://scripts/ui/library/creature_library.gd")
 const _Debug = preload("debug_menu.gd")
+const _NearestHint = preload("res://scripts/ui/hud/nearest_creature_hint.gd")
 
 func _ready() -> void:
 	_setup_ui()
@@ -181,6 +183,10 @@ func _setup_ui() -> void:
 
 	_phone_ui = PhoneUI.new()
 	add_child(_phone_ui)
+
+	_nearest_hint = _NearestHint.new()
+	_nearest_hint.player_getter = Callable(self, "_find_player_character")
+	add_child(_nearest_hint)
 
 	_build_hint = Label.new()
 	_build_hint.position = Vector2(17, 78)
@@ -557,7 +563,7 @@ func open_crafting(table) -> void:
 		close_chest()
 	_crafting_open = true
 	_current_crafting = table
-	_recipe_library.open()
+	_recipe_library.visible = false
 	var player := _find_player_character()
 	if player:
 		_crafting_ui.open(player)
@@ -762,7 +768,7 @@ func _on_hotbar_slot_changed(idx: int) -> void:
 func _is_building_item(def: ItemDef) -> bool:
 	if def.type == ItemDef.Type.BLOCK:
 		return true
-	if def.id in ["twilight_gate", "chest", "crafting_table", "water_bucket", "fishing_boat"]:
+	if def.id in ["twilight_gate", "chest", "crafting_table", "water_bucket", "fishing_boat", "tractor"]:
 		return true
 	if def.id in ["coconut_seed", "taro_seed", "seaweed_seed", "seagrass_seed", "eggplant_seed", "watermelon_seed", "pumpkin_seed"]:
 		return true

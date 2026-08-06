@@ -1,38 +1,57 @@
 extends RefCounted
 
-## ── Ngôi Làng — làng quê đồng bằng (DARK_GRASS) dọc theo đường/sông ─────────
-## Deterministic theo chunk (cùng cx,cz → cùng làng). Không spawn trên đường đi,
-## cổng làng bắc ngang đường, nhà cửa quay mặt về phía đường (như đèn đường).
-## Làng = tập các "hộp màu" (Transform3D + Color) dựng qua MultiMesh.
-## Công trình: nhà ba gian, chòi, cổng làng, đình miếu, giếng, lò gạch,
-## chợ quê, bến nước, cầu tre.
+## ── Quán Rượu — half-timbered châu Âu, bên mép đường cái ────────────────────
+## Deterministic theo chunk (cùng cx,cz → cùng quán). Mọc tại ngã 3 (10%) và
+## ngã tư (80%) của mạng lưới đường — đặt LỆCH khỏi tâm ngã, nằm sát vai đường,
+## mặt nhà quay về phía đường. Không bao giờ đè lên lòng đường.
+##
+## Quán = tập "hộp màu" (Transform3D + Color) dựng qua MultiMesh.
+## Công trình: khối chính (trệt + tầng 2 + áp mái) mái ngói xanh so le, cánh phụ
+## 2 tầng có jetty nhô ra, ống khói đá + khói voxel, biển hiệu, hiên + bậc thang,
+## nền móng đá, thùng rượu / xe kéo / thùng gỗ / cây xanh.
 
 const _Data = preload("chunk_data.gd")
 const _Road = preload("chunk_road.gd")
 
-const VILLAGE_MIN_DIST: float = 120.0    # cách spawn (0,0) tối thiểu (block)
-const VILLAGE_CHANCE: int = 20           # xác suất 1 chunk có làng (%)
-const ROAD_RANGE_CELLS: float = 18.0     # đường cách tâm làng tối đa (ô)
-const RIVER_RANGE_CELLS: float = 14.0    # sông cách tâm làng tối đa (ô)
+static var DEBUG: bool = false
+static var _dbg_count: int = 0
 
-# ── Bảng màu làng quê ────────────────────────────────────────────────────────
-const C_THATCH: Color = Color(0.62, 0.46, 0.20)   # lá dừa khô
-const C_THATCH_DARK: Color = Color(0.48, 0.34, 0.14)
-const C_WOOD: Color = Color(0.47, 0.36, 0.25)      # vách gỗ
-const C_WOOD_DARK: Color = Color(0.33, 0.23, 0.14) # cột gỗ
-const C_LIME: Color = Color(0.86, 0.78, 0.54)      # vôi vàng nhạt
-const C_BRICK: Color = Color(0.68, 0.26, 0.16)     # gạch thẻ đỏ
-const C_TILE: Color = Color(0.72, 0.30, 0.18)      # ngói đỏ
-const C_TILE_DARK: Color = Color(0.52, 0.20, 0.12)
-const C_STONE: Color = Color(0.56, 0.52, 0.47)     # đá vôi
-const C_STONE_DARK: Color = Color(0.42, 0.39, 0.35)
-const C_MOSS: Color = Color(0.32, 0.52, 0.20)      # rêu phong
-const C_WATER: Color = Color(0.16, 0.46, 0.56)     # nước giếng
-const C_BAMBOO: Color = Color(0.66, 0.58, 0.30)    # tre nứa
-const C_DOOR: Color = Color(0.40, 0.28, 0.16)      # cửa gỗ
-const C_PROD_RED: Color = Color(0.80, 0.20, 0.12)  # cà chua
-const C_PROD_YEL: Color = Color(0.85, 0.72, 0.20)  # bắp
-const C_PROD_GRN: Color = Color(0.35, 0.62, 0.22)  # rau
+const TAVERN_MIN_DIST: float = 120.0   # cách spawn (0,0) tối thiểu (m)
+const T3_CHANCE: int = 10               # xác suất ngã 3 có quán (%)
+const T4_CHANCE: int = 80               # xác suất ngã tư có quán (%)
+const FOOT_RX: int = 9                   # bán kính chân công trình (ô, trục X)
+const FOOT_RZ: int = 7                   # bán kính chân công trình (ô, trục Z)
+
+# ── Bảng màu quán rượu ─────────────────────────────────────────────────────────
+const C_ROOF:      Color = Color(0.31, 0.61, 0.88)   # ngói xanh dương sáng
+const C_ROOF_DK:   Color = Color(0.19, 0.44, 0.72)   # ngói xanh đậm (so le)
+const C_ROOF_HI:   Color = Color(0.40, 0.72, 0.96)   # viên ngói sáng (mép)
+const C_TRIM:      Color = Color(0.31, 0.21, 0.12)   # khung gỗ sậm (half-timber)
+const C_TRIM_W:    Color = Color(0.43, 0.30, 0.16)   # khung gỗ nhạt hơn
+const C_WALL:      Color = Color(0.93, 0.89, 0.80)   # tường trát sữa/kem
+const C_WALL_B:    Color = Color(0.79, 0.75, 0.65)   # tường cũ bẩn
+const C_WALL_P:    Color = Color(0.78, 0.68, 0.56)   # mảng trát bong tróc
+const C_STONE:     Color = Color(0.55, 0.51, 0.46)   # nền móng đá
+const C_STONE_DK:  Color = Color(0.41, 0.37, 0.33)
+const C_WINDOW:    Color = Color(0.08, 0.17, 0.28)   # kính xanh đen
+const C_DOOR:      Color = Color(0.36, 0.24, 0.14)   # cửa gỗ
+const C_DECK:      Color = Color(0.52, 0.40, 0.25)   # sàn ván gỗ
+const C_DECK_DK:   Color = Color(0.38, 0.28, 0.17)
+const C_SMOKE_A:   Color = Color(0.58, 0.58, 0.62)
+const C_SMOKE_B:   Color = Color(0.71, 0.74, 0.80)
+const C_BARREL:    Color = Color(0.71, 0.55, 0.30)   # thùng rượu gỗ
+const C_BARREL_DK: Color = Color(0.50, 0.39, 0.22)
+const C_IRON:      Color = Color(0.20, 0.17, 0.15)   # đai sắt
+const C_CRATE:     Color = Color(0.62, 0.45, 0.27)   # thùng gỗ
+const C_CRATE_DK:  Color = Color(0.48, 0.34, 0.18)
+const C_CART:      Color = Color(0.55, 0.42, 0.26)   # xe kéo
+const C_LOAD:      Color = Color(0.72, 0.62, 0.42)   # bao tải
+const C_SIGN:      Color = Color(0.95, 0.94, 0.89)   # bảng hiệu trắng
+const C_SIGN_LT:   Color = Color(0.12, 0.10, 0.09)   # chữ/bảng viền đen
+const C_TREE:      Color = Color(0.37, 0.25, 0.13)   # thân cây
+const C_LEAF_A:    Color = Color(0.20, 0.52, 0.18)   # tán lá
+const C_LEAF_B:    Color = Color(0.16, 0.42, 0.14)
+const C_LEAF_C:    Color = Color(0.27, 0.60, 0.20)
 
 static func _vh_hash(seed_v: int, salt: int) -> int:
 	var h: int = seed_v ^ (salt * 2654435761)
@@ -40,151 +59,22 @@ static func _vh_hash(seed_v: int, salt: int) -> int:
 	h = h ^ (h >> 16)
 	return h & 0x7FFFFFFF
 
-## ── Entry: compute_village ───────────────────────────────────────────────────
+## ── Entry: compute_village ─────────────────────────────────────────────────────
 static func compute_village(cx: int, cz: int, size: int, dim_id: int,
 		biome_grid: Array, height_grid: Array, road_grid: PackedByteArray,
-		river_flag: PackedByteArray, cols: int) -> Dictionary:
+		_river_flag: PackedByteArray, cols: int) -> Dictionary:
 	var empty := { "has": false, "xforms": [], "colors": [], "info": {} }
 	if dim_id != _Data._Dim.DimensionID.REAL_WORLD:
 		return empty
 
-	var cw_x: float = float(cx) * size + size * 0.5
-	var cw_z: float = float(cz) * size + size * 0.5
-	if sqrt(cw_x * cw_x + cw_z * cw_z) < VILLAGE_MIN_DIST:
-		return empty
-
-	var seed_v: int = cx * 1372589 ^ cz * 1731733
-
-	if _vh_hash(seed_v, 1) % 100 >= VILLAGE_CHANCE:
-		return empty
-
-	# Tâm làng: giữa chunk, biome đồng bằng (DARK_GRASS), đất phẳng
-	var hx: int = 8 + _vh_hash(seed_v, 2) % (cols - 16)
-	var hz: int = 8 + _vh_hash(seed_v, 3) % (cols - 16)
-	if biome_grid[hx][hz] != _Data.TileType.DARK_GRASS:
-		return empty
-	if road_grid.size() > 0 and road_grid[hx * cols + hz] != 0:
-		return empty
-	var ch: float = height_grid[hx][hz]
-	if ch <= _Data.WATER_Y or ch > 2.5:
-		return empty
-	# Vùng làng quanh tâm phải đồng bằng phẳng
-	for dx in range(-6, 7):
-		for dz in range(-6, 7):
-			var nx: int = hx + dx
-			var nz: int = hz + dz
-			if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
-				return empty
-			if biome_grid[nx][nz] != _Data.TileType.DARK_GRASS:
-				return empty
-			if absf(height_grid[nx][nz] - ch) > 0.6:
-				return empty
-
-	var center: Vector2 = Vector2(
-		float(cx) * size - float(size) * 0.5 + (float(hx) + 0.5) * _Data.VOXEL,
-		float(cz) * size - float(size) * 0.5 + (float(hz) + 0.5) * _Data.VOXEL)
-
-	var road := _nearest_road(center, size)
-	var river := _nearest_river(river_flag, cols, center, cx, cz, size)
-	if road.is_empty() and river.is_empty():
-		return empty
-	if not road.is_empty() and road.dist > ROAD_RANGE_CELLS:
-		road = {}
-	if not river.is_empty() and river.dist > RIVER_RANGE_CELLS:
-		river = {}
-	if road.is_empty() and river.is_empty():
-		return empty
-
-	var use_road: bool = not road.is_empty() and (river.is_empty() or road.dist <= river.dist)
-	var toward: Vector2 = (road.pt - center) if use_road \
-		else (Vector2(river.pt.x, river.pt.y) - center)
-	if toward.length() < 0.1:
-		toward = Vector2(0, 1)
-	toward = toward.normalized()
-
 	var xforms: Array = []
 	var colors: Array = []
 	var buildings: Array = []
-
-	var g_y: float = height_grid[hx][hz] + 0.02
-
-	# ── Cổng làng bắc ngang đường (đầu làng bên phải đường) ────────────────
-	var gate_placed: bool = false
-	if use_road:
-		var gate_pt: Vector2 = road.pt + road.dir * 6.0
-		var gate_cell: Vector2i = _world_to_cell(gate_pt, cx, cz, size, cols)
-		if _cell_ok(gate_cell, cols) and biome_grid[gate_cell.x][gate_cell.y] == _Data.TileType.DARK_GRASS:
-			var gy: float = height_grid[gate_cell.x][gate_cell.y] + 0.02
-			_add_gate(xforms, colors, gate_pt, road.dir, gy)
-			gate_placed = true
-			buildings.append({ "type": "gate", "x": gate_pt.x, "z": gate_pt.y, "yaw": 0.0, "facing": road.dir })
-
-	# ── Nhà ba gian — mặt nhà quay về phía đường/sông ──────────────────────
-	var side: float = 1.0 if _vh_hash(seed_v, 4) % 2 == 0 else -1.0
-	var yaw_h: float = atan2(-toward.x, -toward.y)
-	var perp_r: Vector2 = toward.orthogonal()
-	var house_pt: Vector2 = center
-	if use_road:
-		perp_r = Vector2(road.dir.y, -road.dir.x)
-		house_pt = road.pt + perp_r * (side * (4.0 + float(_vh_hash(seed_v, 5) % 4))) \
-			+ road.dir * float(_vh_hash(seed_v, 6) % 5 - 2)
-	else:
-		house_pt = center + toward * 4.0
-	var house_cell: Vector2i = _world_to_cell(house_pt, cx, cz, size, cols)
-	if _footprint_ok(house_cell, cols, biome_grid, height_grid, road_grid, 4, 3):
-		var hy: float = height_grid[house_cell.x][house_cell.y] + 0.02
-		_add_house(xforms, colors, house_pt, yaw_h, hy)
-		buildings.append({ "type": "house", "x": house_pt.x, "z": house_pt.y, "yaw": yaw_h, "facing": toward })
-
-	# ── Đình miếu, giếng, lò gạch, chợ quanh sân làng ──────────────────────
-	var plaza_off: float = 3.0 + float(_vh_hash(seed_v, 7) % 3)
-	var s1: Vector2 = center + perp_r * (side * plaza_off) - (road.dir if use_road else perp_r) * 2.0
-	var sc1: Vector2i = _world_to_cell(s1, cx, cz, size, cols)
-	if _footprint_ok(sc1, cols, biome_grid, height_grid, road_grid, 3, 2):
-		var y1: float = height_grid[sc1.x][sc1.y] + 0.02
-		_add_shrine(xforms, colors, s1, yaw_h, y1)
-		buildings.append({ "type": "shrine", "x": s1.x, "z": s1.y, "yaw": yaw_h, "facing": toward })
-
-	var s2: Vector2 = center + perp_r * (side * (plaza_off - 1.0)) + (road.dir if use_road else perp_r) * 3.0
-	var sc2: Vector2i = _world_to_cell(s2, cx, cz, size, cols)
-	if _footprint_ok(sc2, cols, biome_grid, height_grid, road_grid, 2, 2):
-		var y2: float = height_grid[sc2.x][sc2.y] + 0.02
-		_add_well(xforms, colors, s2, y2)
-		buildings.append({ "type": "well", "x": s2.x, "z": s2.y, "yaw": 0.0, "facing": Vector2(0, 1) })
-
-	var s3: Vector2 = center - perp_r * (side * 3.5) + (road.dir if use_road else perp_r) * 1.0
-	var sc3: Vector2i = _world_to_cell(s3, cx, cz, size, cols)
-	if _footprint_ok(sc3, cols, biome_grid, height_grid, road_grid, 3, 3):
-		var y3: float = height_grid[sc3.x][sc3.y] + 0.02
-		_add_kiln(xforms, colors, s3, y3)
-		buildings.append({ "type": "kiln", "x": s3.x, "z": s3.y, "yaw": 0.0, "facing": Vector2(0, 1) })
-
-	var s4: Vector2 = center - perp_r * (side * (plaza_off + 0.5)) - (road.dir if use_road else perp_r) * 2.5
-	var sc4: Vector2i = _world_to_cell(s4, cx, cz, size, cols)
-	if _footprint_ok(sc4, cols, biome_grid, height_grid, road_grid, 3, 2):
-		var y4: float = height_grid[sc4.x][sc4.y] + 0.02
-		_add_stall(xforms, colors, s4, yaw_h, y4)
-		_add_stall(xforms, colors, s4 + (road.dir if use_road else perp_r) * 3.0, yaw_h, y4)
-		buildings.append({ "type": "market", "x": s4.x, "z": s4.y, "yaw": yaw_h, "facing": toward })
-
-	# ── Chòi + bến nước phía sông ──────────────────────────────────────────
-	if not river.is_empty():
-		var rv: Vector2 = Vector2(river.pt.x, river.pt.y)
-		var toward_r: Vector2 = (rv - center).normalized()
-		var yaw_r: float = atan2(-toward_r.x, -toward_r.y)
-		var hut_pt: Vector2 = center + toward_r * (river.dist - 1.5)
-		var hut_cell: Vector2i = _world_to_cell(hut_pt, cx, cz, size, cols)
-		if _cell_ok(hut_cell, cols):
-			var hy2: float = height_grid[hut_cell.x][hut_cell.y] + 0.02
-			_add_hut(xforms, colors, hut_pt, yaw_r, hy2)
-			buildings.append({ "type": "hut", "x": hut_pt.x, "z": hut_pt.y, "yaw": yaw_r, "facing": toward_r })
-		_add_dock(xforms, colors, river, height_grid, cx, cz, size, cols)
-		buildings.append({ "type": "dock", "x": river.pt.x, "z": river.pt.y, "yaw": 0.0, "facing": toward_r })
-
+	_find_taverns(xforms, colors, buildings, cx, cz, size,
+		biome_grid, height_grid, road_grid, cols)
 	if buildings.is_empty():
 		return empty
 
-	# Chunk node nằm tại (cx*size, cz*size) → quy về tọa độ local như cỏ/rêu
 	var origin := Vector3(cx * size, 0.0, cz * size)
 	for i in range(xforms.size()):
 		xforms[i] = Transform3D((xforms[i] as Transform3D).basis,
@@ -194,81 +84,114 @@ static func compute_village(cx: int, cz: int, size: int, dim_id: int,
 		"has": true,
 		"xforms": xforms,
 		"colors": colors,
-		"info": {
-			"center": Vector2i(hx, hz),
-			"center_world": center,
-			"road_dist": road.dist if not road.is_empty() else -1.0,
-			"river_dist": river.dist if not river.is_empty() else -1.0,
-			"road_dir": road.dir if use_road else Vector2.ZERO,
-			"facing": toward,
-			"gate": gate_placed,
-			"buildings": buildings,
-		}
+		"info": { "buildings": buildings },
 	}
 
-## ── Đường gần nhất + tiếp tuyến ─────────────────────────────────────────────
-static func _nearest_road(center: Vector2, size: int) -> Dictionary:
+## ── Quét các node lưới đường phủ chunk (+ mép); roll xác suất từng ngã ────────
+static func _find_taverns(xforms: Array, colors: Array, buildings: Array,
+		cx: int, cz: int, size: int, biome_grid: Array, height_grid: Array,
+		road_grid: PackedByteArray, cols: int) -> void:
 	_Road._ensure_roads()
-	var pad: float = 24.0
-	var best := {}
-	var best_d2: float = 1e18
-	for ci in range(_Road._road_curves.size()):
-		var curve: PackedVector2Array = _Road._road_curves[ci]
-		if curve.size() < 2:
-			continue
-		var bb: Rect2 = _Road.curve_bbox(ci)
-		if bb.end.x < center.x - pad or bb.position.x > center.x + pad:
-			continue
-		if bb.end.y < center.y - pad or bb.position.y > center.y + pad:
-			continue
-		for i in range(curve.size() - 1):
-			var a: Vector2 = curve[i]
-			var b2: Vector2 = curve[i + 1]
-			var ab: Vector2 = b2 - a
-			var len2: float = ab.length_squared()
-			if len2 < 0.001:
-				continue
-			var t: float = clamp((center - a).dot(ab) / len2, 0.0, 1.0)
-			var pt: Vector2 = a.lerp(b2, t)
-			var d2: float = center.distance_squared_to(pt)
-			if d2 < best_d2:
-				best_d2 = d2
-				best = { "pt": pt, "dir": ab / sqrt(len2), "dist": sqrt(d2) }
-	return best
+	var min_wx: float = float(cx) * size - float(size) * 0.5
+	var min_wz: float = float(cz) * size - float(size) * 0.5
+	var max_wx: float = min_wx + float(size)
+	var max_wz: float = min_wz + float(size)
+	var GRID: float = _Data.ROAD_GRID
+	var margin: float = 45.0   # jitter node ±22 + vươn quán ~21: node phải được chunk chứa quán đánh giá
+	var gx0: int = floori((min_wx - margin) / GRID)
+	var gx1: int = floori((max_wx + margin) / GRID)
+	var gz0: int = floori((min_wz - margin) / GRID)
+	var gz1: int = floori((max_wz + margin) / GRID)
+	gx0 = maxi(gx0, -_Data.ROAD_GRID_R)
+	gx1 = mini(gx1, _Data.ROAD_GRID_R)
+	gz0 = maxi(gz0, -_Data.ROAD_GRID_R)
+	gz1 = mini(gz1, _Data.ROAD_GRID_R)
+	for gx in range(gx0, gx1 + 1):
+		for gz in range(gz0, gz1 + 1):
+			_try_tavern(xforms, colors, buildings, gx, gz, size,
+				biome_grid, height_grid, road_grid, cols, min_wx, min_wz)
 
-## ── Sông gần nhất (ô river_flag) ────────────────────────────────────────────
-static func _nearest_river(river_flag: PackedByteArray, cols: int, center: Vector2,
-		cx: int, cz: int, size: int) -> Dictionary:
-	var best := {}
-	var best_d2: float = 1e18
-	if river_flag.is_empty():
-		return best
-	var min_x: float = float(cx) * size - float(size) * 0.5
-	var min_z: float = float(cz) * size - float(size) * 0.5
-	for vx in range(cols):
-		for vz in range(cols):
-			if river_flag[vx * cols + vz] == 0:
-				continue
-			var p: Vector2 = Vector2(min_x + (float(vx) + 0.5), min_z + (float(vz) + 0.5))
-			var d2: float = p.distance_squared_to(center)
-			if d2 < best_d2:
-				best_d2 = d2
-				best = { "pt": p, "dist": sqrt(d2) }
-	return best
+## ── Một node ngã/xu: roll xác suất, tìm chỗ đậu quán ──────────────────────────
+static func _try_tavern(xforms: Array, colors: Array, buildings: Array,
+		gx: int, gz: int, _size: int, biome_grid: Array, height_grid: Array,
+		road_grid: PackedByteArray, cols: int, min_wx: float, min_wz: float) -> void:
+	if DEBUG:
+		_dbg_count += 1
+		if _dbg_count > 100000:
+			return
+	var deg: int = _Road.intersection_degree(gx, gz)
+	if deg < 3 or deg > 4:
+		return
+	var seed_base: int = SeedSnapshot.ensure() + 7777
+	var h: int = _vh_hash(seed_base ^ (gx * 53031 + gz * 70003), 0x1F0B2E)
+	var r: int = h & 0x7FFFFFFF
+	var chance: int = T3_CHANCE if deg == 3 else T4_CHANCE
+	if r % 100 >= chance:
+		if DEBUG:
+			print("TT node(%d,%d) deg=%d ROLL-FAIL %d/%d" % [gx, gz, deg, r % 100, chance])
+		return
+	if DEBUG:
+		print("TT node(%d,%d) deg=%d roll-OK %d/%d" % [gx, gz, deg, r % 100, chance])
 
-## ── Tool: world → cell ──────────────────────────────────────────────────────
-static func _world_to_cell(p: Vector2, cx: int, cz: int, size: int, cols: int) -> Vector2i:
-	var min_x: float = float(cx) * size - float(size) * 0.5
-	var min_z: float = float(cz) * size - float(size) * 0.5
-	return Vector2i(
-		int(floor((p.x - min_x) / _Data.VOXEL)),
-		int(floor((p.y - min_z) / _Data.VOXEL)))
+	var has: Array = _Road.intersection_has(gx, gz)
+	var dirs: Array = [Vector2(1, 0), Vector2(0, 1), Vector2(-1, 0), Vector2(0, -1)]
+	var con_idx: Array = []
+	for d in range(4):
+		if has[d]:
+			con_idx.append(d)
+	if con_idx.is_empty():
+		return
+	var node_pt: Vector2 = _Road.intersection_point(gx, gz)
 
+	for attempt in range(30):
+		var ha: int = _vh_hash(h ^ 0x51AB, attempt + 1)
+		var di: int = con_idx[ha % con_idx.size()]
+		var rd: Vector2 = dirs[di]
+		var perp: Vector2 = Vector2(-rd.y, rd.x)
+		var sign: float = 1.0 if (ha & 1) == 0 else -1.0
+		var back: float = 7.5 + float((ha >> 4) % 3) * 1.7   # 7.5 / 9.2 / 10.9 dọc đường
+		var side: float = 9.0 + float((ha >> 8) % 3) * 0.8   # 9.0/9.8/10.6 — cách tim đường ≥ 1.5+7+0.5
+
+		var center: Vector2 = node_pt + rd * back + perp * (sign * side)
+		if center.length() < TAVERN_MIN_DIST:
+			if DEBUG:
+				print("  try%d too-close-to-spawn (%.1f)" % [attempt, center.length()])
+			continue
+		var cc := Vector2i(int(floor(center.x - min_wx)), int(floor(center.y - min_wz)))
+		if DEBUG and attempt == 0:
+			print("  try0 node=(%.1f,%.1f) rd=%s perp=%s back=%.1f side=%.1f sign=%.1f center=(%.1f,%.1f) cc=%s" %
+				[node_pt.x, node_pt.y, str(rd), str(perp), back, side, sign, center.x, center.y, str(cc)])
+		if not _cell_ok(cc, cols):
+			if DEBUG:
+				print("  try%d cell-out cc=%s" % [attempt, str(cc)])
+			continue
+		if not _footprint_ok(cc, cols, biome_grid, height_grid, road_grid, FOOT_RX, FOOT_RZ):
+			if DEBUG:
+				print("  try%d foot-FAIL center=(%.1f,%.1f) cc=%s" % [attempt, center.x, center.y, str(cc)])
+			continue
+		if DEBUG:
+			print("  try%d PLACED center=(%.1f,%.1f) cc=%s" % [attempt, center.x, center.y, str(cc)])
+
+		var road_pt: Vector2 = node_pt + rd * back
+		var toward: Vector2 = road_pt - center
+		if toward.length() < 0.1:
+			toward = Vector2(0, 1)
+		toward = toward.normalized()
+		var yaw: float = atan2(-toward.x, -toward.y)
+		var gy: float = height_grid[cc.x][cc.y] + 0.02
+		_add_tavern(xforms, colors, center, yaw, gy)
+		buildings.append({
+			"type": "tavern", "x": center.x, "z": center.y,
+			"yaw": yaw, "deg": deg, "gx": gx, "gz": gz,
+		})
+		return
+
+## ── Kiểm tra ô trong chunk ─────────────────────────────────────────────────────
 static func _cell_ok(c: Vector2i, cols: int) -> bool:
 	return c.x >= 0 and c.x < cols and c.y >= 0 and c.y < cols
 
-## ── Kiểm tra chân công trình: đất phẳng, không đường, không nước ──────────
-static func _footprint_ok(c: Vector2i, cols: int, biome_grid: Array,
+## ── Kiểm tra chân công trình: đất phẳng, không đường, không nước ─────────────
+static func _footprint_ok(c: Vector2i, cols: int, _biome_grid: Array,
 		height_grid: Array, road_grid: PackedByteArray, rx: int, rz: int) -> bool:
 	if not _cell_ok(c, cols):
 		return false
@@ -278,127 +201,30 @@ static func _footprint_ok(c: Vector2i, cols: int, biome_grid: Array,
 			var nx: int = c.x + dx
 			var nz: int = c.y + dz
 			if not _cell_ok(Vector2i(nx, nz), cols):
+				if DEBUG:
+					print("    foot: out-of-chunk cell (%d,%d)" % [nx, nz])
 				return false
 			if height_grid[nx][nz] <= _Data.WATER_Y:
+				if DEBUG:
+					print("    foot: water cell (%d,%d) h=%.2f" % [nx, nz, height_grid[nx][nz]])
 				return false
-			if absf(height_grid[nx][nz] - ref_h) > 0.5:
+			if absf(height_grid[nx][nz] - ref_h) > 1.0:
+				if DEBUG:
+					print("    foot: uneven cell (%d,%d) dh=%.2f" % [nx, nz, height_grid[nx][nz] - ref_h])
 				return false
 			if road_grid.size() > 0 and road_grid[nx * cols + nz] != 0:
+				if DEBUG:
+					print("    foot: road cell (%d,%d)" % [nx, nz])
 				return false
 	return true
 
-## ── Cầu tre bắc qua sông nơi đường gặp nước (đặc trưng của đường, như đèn) ──
-## Không phụ thuộc làng — bất kỳ chunk REAL_WORLD nào có đường cắt sông đều có cầu.
-static func compute_bridges(cx: int, cz: int, size: int, dim_id: int,
-		height_grid: Array, river_flag: PackedByteArray, cols: int) -> Dictionary:
-	var empty := { "xforms": [], "colors": [] }
-	if dim_id != _Data._Dim.DimensionID.REAL_WORLD:
-		return empty
-	var xforms: Array = []
-	var colors: Array = []
-	_find_bridges(xforms, colors, cx, cz, size, height_grid, river_flag, cols)
-	var origin := Vector3(cx * size, 0.0, cz * size)
-	for i in range(xforms.size()):
-		xforms[i] = Transform3D((xforms[i] as Transform3D).basis,
-			(xforms[i] as Transform3D).origin - origin)
-	return { "xforms": xforms, "colors": colors }
-
-## ── Quét đường cắt sông trong chunk; dựng cầu tre tại run sông 2~10 ô ───────
-static func _find_bridges(xforms: Array, colors: Array, cx: int, cz: int, size: int,
-		height_grid: Array, river_flag: PackedByteArray, cols: int) -> void:
-	if river_flag.is_empty():
-		return
-	_Road._ensure_roads()
-	var min_x: float = float(cx) * size - float(size) * 0.5
-	var min_z: float = float(cz) * size - float(size) * 0.5
-	var pad: float = 10.0
-	var placed: int = 0
-	for ci in range(_Road._road_curves.size()):
-		var curve: PackedVector2Array = _Road._road_curves[ci]
-		if curve.size() < 2:
-			continue
-		var bb: Rect2 = _Road.curve_bbox(ci)
-		if bb.end.x < min_x - pad or bb.position.x > min_x + size + pad:
-			continue
-		if bb.end.y < min_z - pad or bb.position.y > min_z + size + pad:
-			continue
-		for i in range(curve.size() - 1):
-			var a: Vector2 = curve[i]
-			var b2: Vector2 = curve[i + 1]
-			var ab: Vector2 = b2 - a
-			var seg_len: float = ab.length()
-			if seg_len < 0.5:
-				continue
-			var seg_dir: Vector2 = ab / seg_len
-			var steps: int = int(seg_len / 0.8) + 1
-			var run_len := 0
-			var run_cells: Array = []
-			for s in range(steps + 1):
-				var p: Vector2 = a.lerp(b2, float(s) / float(steps))
-				var vx: int = int(floor(p.x - min_x))
-				var vz: int = int(floor(p.y - min_z))
-				var in_chunk: bool = vx >= 0 and vx < cols and vz >= 0 and vz < cols
-				var is_river: bool = in_chunk and river_flag[vx * cols + vz] != 0
-				if is_river:
-					run_len += 1
-					run_cells.append(p)
-				elif run_len >= 2 and run_len <= 10:
-					if _bridge_ok(run_cells, seg_dir, cx, cz, size, cols, height_grid):
-						_place_bridge(xforms, colors, run_cells, seg_dir)
-						placed += 1
-					run_len = 0
-					run_cells.clear()
-				else:
-					run_len = 0
-					run_cells.clear()
-			if run_len >= 2 and run_len <= 10:
-				if _bridge_ok(run_cells, seg_dir, cx, cz, size, cols, height_grid):
-					_place_bridge(xforms, colors, run_cells, seg_dir)
-					placed += 1
-			if placed >= 3:
-				return
-
-## ── 2 đầu run phải khô (đất liền) ───────────────────────────────────────────
-static func _bridge_ok(run_cells: Array, seg_dir: Vector2, cx: int, cz: int,
-		size: int, cols: int, height_grid: Array) -> bool:
-	var lo: Vector2 = run_cells[0] - seg_dir * 1.2
-	var hi: Vector2 = run_cells[run_cells.size() - 1] + seg_dir * 1.2
-	return _dry_land(lo, cx, cz, size, cols, height_grid) \
-		and _dry_land(hi, cx, cz, size, cols, height_grid)
-
-## ── Dựng cầu tại run ─────────────────────────────────────────────────────────
-static func _place_bridge(xforms: Array, colors: Array, run_cells: Array,
-		seg_dir: Vector2) -> void:
-	var run_len: int = run_cells.size()
-	var deck_y: float = _Data.WATER_Y + 0.15
-	var perp_b: Vector2 = Vector2(seg_dir.y, -seg_dir.x)
-	var mid2: Vector2 = (run_cells[0] + run_cells[run_cells.size() - 1]) * 0.5
-	var yaw_b: float = atan2(perp_b.x, -perp_b.y)
-	_emit_boxes(xforms, colors, [
-		[Vector3(0, 0.0, 0), Vector3(float(run_len + 1), 0.12, 2.1), C_BAMBOO],
-		[Vector3(0, 0.55, -1.02), Vector3(float(run_len + 1), 0.5, 0.1), C_WOOD_DARK],
-		[Vector3(0, 0.55, 1.02), Vector3(float(run_len + 1), 0.5, 0.1), C_WOOD_DARK],
-	], yaw_b, Vector3(mid2.x, deck_y, mid2.y))
-	for i in range(1, run_len + 1):
-		var p: Vector2 = run_cells[0] + seg_dir * float(i)
-		_emit_box(xforms, colors, Vector3(p.x, _Data.WATER_Y - 0.05, p.y),
-			Vector3(0.18, _Data.WATER_Y + 0.35, 0.18), C_WOOD_DARK)
-
-## ── Điểm khô (đất liền, không sông) ─────────────────────────────────────────
-static func _dry_land(p: Vector2, cx: int, cz: int, size: int, cols: int,
-		height_grid: Array) -> bool:
-	var c: Vector2i = _world_to_cell(p, cx, cz, size, cols)
-	if not _cell_ok(c, cols):
-		return false
-	return height_grid[c.x][c.y] > _Data.WATER_Y + 0.1
-
-## ── Emit hộp (world space) ──────────────────────────────────────────────────
+## ── Emit hộp (world space) ─────────────────────────────────────────────────────
 static func _emit_box(xforms: Array, colors: Array, pos: Vector3,
 		sz: Vector3, col: Color) -> void:
 	xforms.append(Transform3D(Basis().scaled(sz), pos))
 	colors.append(col)
 
-## ── Emit nhóm hộp local → world (xoay yaw quanh Y) ─────────────────────────
+## ── Emit nhóm hộp local → world (xoay yaw quanh Y) ────────────────────────────
 static func _emit_boxes(xforms: Array, colors: Array, local: Array,
 		yaw: float, base: Vector3) -> void:
 	var rot := Basis(Vector3.UP, yaw)
@@ -409,243 +235,268 @@ static func _emit_boxes(xforms: Array, colors: Array, local: Array,
 		xforms.append(Transform3D(rot.scaled(sz), base + rot * pos))
 		colors.append(col)
 
-## ── Nhà ba gian Nam Bộ (mặt trước = -Z) ─────────────────────────────────────
-static func _add_house(xforms: Array, colors: Array, at: Vector2, yaw: float, gy: float) -> void:
-	var local: Array = []
-	var w: float = 5.0
-	var d: float = 4.0
-	var hw: float = w * 0.5
-	var hd: float = d * 0.5
-	# Nền gạch tàu
-	local.append([Vector3(0, 0.05, 0), Vector3(w + 0.3, 0.16, d + 0.3), C_BRICK])
-	# Vách gỗ 4 phía
-	local.append([Vector3(0, 1.25, -hd - 0.14), Vector3(w, 2.3, 0.3), C_WOOD])
-	local.append([Vector3(-hw - 0.14, 1.25, 0), Vector3(0.3, 2.3, d), C_WOOD])
-	local.append([Vector3(hw + 0.14, 1.25, 0), Vector3(0.3, 2.3, d), C_WOOD])
-	# Mặt trước: 2 vách + cửa 4 cánh mở hé + lanh tô
-	local.append([Vector3(-1.55, 1.25, hd + 0.14), Vector3(1.5, 2.3, 0.3), C_WOOD])
-	local.append([Vector3(1.55, 1.25, hd + 0.14), Vector3(1.5, 2.3, 0.3), C_WOOD])
-	for k in range(4):
-		var dx: float = -0.45 + float(k) * 0.3
-		local.append([Vector3(dx, 0.55, hd + 0.2), Vector3(0.26, 1.1, 0.12), C_DOOR])
-	local.append([Vector3(0, 2.25, hd + 0.14), Vector3(1.3, 0.9, 0.3), C_WOOD])
-	# Cửa sổ 2 bên
-	local.append([Vector3(-2.1, 1.5, hd - 0.8), Vector3(0.7, 0.6, 0.08), C_DOOR])
-	local.append([Vector3(2.1, 1.5, hd - 0.8), Vector3(0.7, 0.6, 0.08), C_DOOR])
-	# Cột gỗ bo góc 4 góc
+## ── Thanh vạch gạch (bước từng khối) giữa 2 điểm trong mặt phẳng ──────────────
+static func _bar(local: Array, v: Vector3, w: Vector3, th: float, col: Color) -> void:
+	var delta: Vector3 = w - v
+	var span: float = maxf(absf(delta.x), maxf(absf(delta.y), absf(delta.z)))
+	var steps: int = maxi(2, int(ceil(span / 0.5)))
+	for i in range(steps):
+		var t: float = (float(i) + 0.5) / float(steps)
+		local.append([v + delta * t, Vector3(th, th, th), col])
+
+## ── Cửa sổ ×2×2 (kính xanh đen + khung gỗ + thanh chữ thập) ──────────────────
+static func _win(local: Array, x: float, z: float, y: float, w: float, h: float) -> void:
+	var th: float = 0.10
+	local.append([Vector3(x, y, z), Vector3(w + 0.16, h + 0.12, th + 0.06), C_TRIM])
+	local.append([Vector3(x - 0.12, y, z), Vector3(w - 0.20, h - 0.40, th + 0.10), C_WINDOW])
+	local.append([Vector3(x + 0.12, y, z), Vector3(w - 0.20, h - 0.40, th + 0.10), C_WINDOW])
+	local.append([Vector3(x, y + (h - 0.40) * 0.25, z), Vector3(w - 0.20, 0.08, th + 0.12), C_TRIM])
+	local.append([Vector3(x - 0.30, y, z), Vector3(0.08, h - 0.40, th + 0.12), C_TRIM])
+	local.append([Vector3(x + 0.30, y, z), Vector3(0.08, h - 0.40, th + 0.12), C_TRIM])
+
+## ── Mái so le: chạy từ đỉnh (ngọn) ra mép, mỗi lớp 1 phiến ngói ──────────────
+## cx_off = lệch trục ridge (0 = mái chính; >0 = mái cánh phải)
+static func _roof(local: Array, ridge_y: float, half_w: float,
+		z_a: float, z_b: float, step: float, drop: float, cx_off: float = 0.0) -> void:
+	var z_mid: float = (z_a + z_b) * 0.5
+	var z_len: float = z_b - z_a
+	var rows: int = maxi(1, int(ceil(half_w / step)))
+	for i in range(rows):
+		var xc: float = (float(i) + 0.5) * step
+		var yc: float = ridge_y - float(i) * drop
+		var col: Color = C_ROOF_DK if (i & 1) == 1 else C_ROOF
+		local.append([Vector3(xc + cx_off, yc, z_mid), Vector3(step * 1.02, 0.17, z_len), col])
+		local.append([Vector3(-xc + cx_off, yc, z_mid), Vector3(step * 1.02, 0.17, z_len), col])
+	# Sống nóc + viền mép
+	local.append([Vector3(cx_off, ridge_y + 0.08, z_mid), Vector3(0.5, 0.20, z_len), C_ROOF_HI])
+	local.append([Vector3(cx_off, ridge_y - 0.06, z_mid), Vector3(1.1, 0.14, z_len), C_ROOF_DK])
+
+## ── Cửa + khung cửa (mặt trước) ───────────────────────────────────────────────
+static func _door(local: Array) -> void:
+	local.append([Vector3(0.0, 1.25, -2.32), Vector3(1.55, 2.05, 0.30), C_DOOR])
+	local.append([Vector3(-0.88, 1.25, -2.32), Vector3(0.18, 2.2, 0.34), C_TRIM])
+	local.append([Vector3(0.88, 1.25, -2.32), Vector3(0.18, 2.2, 0.34), C_TRIM])
+	local.append([Vector3(0.0, 2.62, -2.32), Vector3(1.9, 0.35, 0.30), C_TRIM])
+	# nẹp dọc cửa + tay cầm
+	local.append([Vector3(0.0, 1.25, -2.36), Vector3(0.10, 2.05, 0.06), C_DECK_DK])
+	local.append([Vector3(0.55, 1.15, -2.38), Vector3(0.12, 0.12, 0.10), Color(0.80, 0.72, 0.30)])
+
+## ── Tường trệt khối chính (main): 4 vách + nền móng đá ───────────────────────
+static func _tavern_wall_main(local: Array) -> void:
+	var yb: float = 0.30
+	var yt: float = 3.20
+	var ym: float = (yb + yt) * 0.5
+	var zh: float = yt - yb
+	# vách sau (z=+6.55)
+	local.append([Vector3(0.0, ym, 6.55), Vector3(11.2, zh + 0.1, 0.34), C_WALL])
+	# vách trái (x=-5.35)
+	local.append([Vector3(-5.35, ym, 2.0), Vector3(0.34, zh + 0.1, 9.2), C_WALL_B])
+	# vách phải (x=+5.35)
+	local.append([Vector3(5.35, ym, 2.0), Vector3(0.34, zh + 0.1, 9.2), C_WALL_B])
+	# vách trước (z=-2.35): 2 tấm 2 bên cửa
+	local.append([Vector3(-3.45, ym, -2.35), Vector3(3.2, zh, 0.34), C_WALL])
+	local.append([Vector3(5.15, ym, -2.35), Vector3(7.8, zh, 0.34), C_WALL])
+	# mảng trát bong tróc (mặt trước + sau)
+	local.append([Vector3(-3.6, 1.4, -2.42), Vector3(1.1, 0.9, 0.14), C_WALL_P])
+	local.append([Vector3(2.6, 2.2, -2.42), Vector3(1.4, 0.7, 0.14), C_WALL_P])
+	local.append([Vector3(4.4, 1.0, -2.42), Vector3(0.9, 0.6, 0.14), C_WALL_P])
+	# nền móng đá main
+	local.append([Vector3(0.0, 0.10, 2.0), Vector3(12.4, 0.22, 10.2), C_STONE])
+	local.append([Vector3(0.0, -0.02, 2.0), Vector3(12.8, 0.16, 10.6), C_STONE_DK])
+
+## ── Cánh phụ (wing) 2 tầng, jetty nhô ra trước, mái nhỏ tụt dưới mái chính ───
+static func _tavern_wing(local: Array) -> void:
+	var xw0: float = 5.6
+	var xw1: float = 9.4
+	var xw: float = (xw0 + xw1) * 0.5
+	# Nền móng cánh
+	local.append([Vector3(xw, 0.10, 0.9), Vector3(4.2, 0.22, 5.6), C_STONE])
+	local.append([Vector3(xw, -0.02, 0.9), Vector3(4.4, 0.16, 5.8), C_STONE_DK])
+	# tường trệt cánh (z -1.6..3.4, y 0.3..3.2)
+	local.append([Vector3(xw, 1.75, 3.42), Vector3(4.0, 3.0, 0.34), C_WALL])
+	local.append([Vector3(xw, 1.75, -1.62), Vector3(4.0, 3.0, 0.34), C_WALL])
+	local.append([Vector3(xw0 - 0.17, 1.75, 0.9), Vector3(0.34, 3.0, 5.0), C_WALL_B])
+	local.append([Vector3(xw1 + 0.17, 1.75, 0.9), Vector3(0.34, 3.0, 5.0), C_WALL_B])
+	# jetty: sàn đua ra trước (z -2.5..-1.5) + sườn đỡ chéo
+	local.append([Vector3(xw, 4.55, -2.0), Vector3(4.2, 0.30, 1.15), C_DECK])
+	for px in [xw0 + 0.4, xw1 - 0.4]:
+		local.append([Vector3(px, 4.15, -1.85), Vector3(0.30, 1.15, 0.5), C_TRIM])
+		_bar(local, Vector3(px - 0.35, 3.55, -1.9), Vector3(px + 0.05, 4.35, -1.9), 0.26, C_TRIM)
+		_bar(local, Vector3(px + 0.35, 3.55, -1.9), Vector3(px - 0.05, 4.35, -1.9), 0.26, C_TRIM)
+	# tường tầng 2 cánh (y 3.4..5.5, jetty z -2.5)
+	local.append([Vector3(xw, 4.45, 3.42), Vector3(4.0, 2.2, 0.34), C_WALL_B])
+	local.append([Vector3(xw, 4.45, -2.52), Vector3(4.0, 2.2, 0.30), C_WALL])
+	local.append([Vector3(xw, 4.45, 0.9), Vector3(0.34, 2.2, 6.0), C_WALL_B])
+	local.append([Vector3(xw0 - 0.17, 4.45, 0.9), Vector3(0.34, 2.2, 6.0), C_WALL_B])
+	local.append([Vector3(xw1 + 0.17, 4.45, 0.9), Vector3(0.34, 2.2, 6.0), C_WALL_B])
+	# khung tầng 2 cánh + cửa sổ jetty
+	local.append([Vector3(xw0, 4.45, -2.52), Vector3(0.28, 2.2, 5.6), C_TRIM])
+	local.append([Vector3(xw1, 4.45, -2.52), Vector3(0.28, 2.2, 5.6), C_TRIM])
+	local.append([Vector3(xw, 3.62, -2.52), Vector3(4.0, 0.22, 0.28), C_TRIM_W])
+	local.append([Vector3(xw, 5.42, -2.52), Vector3(4.0, 0.22, 0.28), C_TRIM_W])
+	_win(local, xw - 1.1, -2.42, 4.35, 0.75, 0.75)
+	_win(local, xw + 1.1, -2.42, 4.35, 0.75, 0.75)
+	# mái cánh: ridge x=7.5, tụt dưới mái chính
+	_roof(local, 6.0, 2.1, -2.9, 4.1, 0.6, 0.28, xw)
+
+## ── Khung timbers lộ ra: tầng trệt X liên tục, tầng 2 dọc/ngang, gable chữ thập ──
+static func _framing(local: Array) -> void:
+	# cột góc + vành trệt
+	for px in [-5.3, 5.3]:
+		for zz in [-2.0, 6.05]:
+			local.append([Vector3(px, 1.75, zz), Vector3(0.30, 3.2, 0.30), C_TRIM])
+	for zz in [-2.2, 6.0]:
+		local.append([Vector3(0.0, 0.20, zz), Vector3(11.4, 0.16, 0.30), C_TRIM])
+	# tầng trệt: cột đứng giữa
+	for px in [-3.5, -1.75, 1.75, 3.5]:
+		local.append([Vector3(px, 1.75, -2.18), Vector3(0.26, 3.2, 0.26), C_TRIM])
+		local.append([Vector3(px, 1.75, 6.0), Vector3(0.26, 3.2, 0.26), C_TRIM])
+	# chữ X liên tục mặt trước (bỏ qua ô cửa)
+	for px in [-5.3, -3.5, -1.75, 1.75, 3.5]:
+		var xa: float = px + 0.15
+		var xb: float = px + 1.60
+		_bar(local, Vector3(xa, 0.55, -2.2), Vector3(xb, 3.05, -2.2), 0.16, C_TRIM)
+		_bar(local, Vector3(xb, 0.55, -2.2), Vector3(xa, 3.05, -2.2), 0.16, C_TRIM)
+	# chữ X mặt trái (vách x=-5.35)
+	for zz in [-1.5, 0.4, 2.3, 4.2]:
+		var za: float = zz + 0.15
+		var zb: float = zz + 1.60
+		_bar(local, Vector3(-5.38, 0.55, za), Vector3(-5.38, 3.05, zb), 0.16, C_TRIM)
+		_bar(local, Vector3(-5.38, 0.55, zb), Vector3(-5.38, 3.05, za), 0.16, C_TRIM)
+	# tầng 2: cột dọc + ghi ngang (mặt trước + sau)
+	for px in [-5.3, -3.95, -2.6, -1.25, 1.25, 2.6, 3.95, 5.3]:
+		local.append([Vector3(px, 4.9, -2.2), Vector3(0.28, 3.4, 0.18), C_TRIM])
+		local.append([Vector3(px, 4.9, 6.0), Vector3(0.28, 3.4, 0.18), C_TRIM])
+	for px in [-4.55, -3.2, -1.85, -0.5, 0.5, 1.85, 3.2, 4.55]:
+		_bar(local, Vector3(px, 3.65, -2.2), Vector3(px, 6.2, -2.2), 0.14, C_TRIM)
+		_bar(local, Vector3(px, 3.65, 6.0), Vector3(px, 6.2, 6.0), 0.14, C_TRIM)
+	# thanh ngang tầng 2
+	for yy in [3.9, 5.2]:
+		local.append([Vector3(0.0, yy, -2.2), Vector3(11.0, 0.14, 0.14), C_TRIM])
+		local.append([Vector3(0.0, yy, 6.0), Vector3(11.0, 0.14, 0.14), C_TRIM])
+	# dấu thập trong khung vuông — mặt gable trái (x=-5.36)
+	var gy2: float = 6.9
 	for sx in [-1, 1]:
-		for sz in [-1, 1]:
-			local.append([Vector3(sx * hw, 1.25, sz * hd), Vector3(0.38, 2.6, 0.38), C_WOOD_DARK])
-	# Mái lá dừa nước — 2 lớp + nóc + mái rủ không đều
-	local.append([Vector3(0, 2.6, 0), Vector3(w + 1.4, 0.34, d + 1.4), C_THATCH])
-	local.append([Vector3(0, 2.85, 0), Vector3(w + 0.6, 0.28, d + 0.6), C_THATCH_DARK])
-	local.append([Vector3(0, 3.05, 0), Vector3(2.8, 0.24, 1.0), C_THATCH_DARK])
-	# Mép mái rủ
-	local.append([Vector3(0, 2.42, hd + 0.95), Vector3(w + 1.3, 0.12, 0.55), C_THATCH])
-	local.append([Vector3(0, 2.42, -hd - 0.95), Vector3(w + 1.1, 0.12, 0.5), C_THATCH])
-	local.append([Vector3(hw + 1.0, 2.42, 0), Vector3(0.5, 0.12, d + 1.1), C_THATCH])
-	local.append([Vector3(-hw - 0.85, 2.42, 0), Vector3(0.45, 0.12, d + 1.3), C_THATCH])
-	# Rêu trên mái
-	local.append([Vector3(1.8, 2.75, 1.6), Vector3(0.5, 0.16, 0.35), C_MOSS])
-	local.append([Vector3(-2.2, 2.75, -1.4), Vector3(0.4, 0.14, 0.3), C_MOSS])
-	# Hiên trước (mặt đường): nền + cột + mái hiên
-	local.append([Vector3(0, 0.02, hd + 0.9), Vector3(3.4, 0.14, 1.5), C_BRICK])
-	local.append([Vector3(-1.1, 1.3, hd + 1.45), Vector3(0.26, 2.5, 0.26), C_WOOD_DARK])
-	local.append([Vector3(1.1, 1.3, hd + 1.45), Vector3(0.26, 2.5, 0.26), C_WOOD_DARK])
-	local.append([Vector3(0, 2.95, hd + 1.15), Vector3(4.4, 0.22, 2.2), C_THATCH])
-	local.append([Vector3(0, 3.05, hd + 1.15), Vector3(3.6, 0.18, 1.8), C_THATCH_DARK])
+		for sy in [-1, 1]:
+			local.append([Vector3(sx * 1.05, gy2 + sy * 1.05, -5.38), Vector3(0.30, 0.30, 0.26), C_TRIM])
+	_bar(local, Vector3(-1.75, gy2 - 1.6, -5.38), Vector3(1.75, gy2 + 1.6, -5.38), 0.18, C_TRIM)
+	_bar(local, Vector3(-1.75, gy2 + 1.6, -5.38), Vector3(1.75, gy2 - 1.6, -5.38), 0.18, C_TRIM)
+
+## ── Mái + fascia + ống khói + biển hiệu + hiên + bậc ──────────────────────────
+static func _tavern_top(local: Array) -> void:
+	# mái chính so le
+	_roof(local, 9.2, 6.9, -3.2, 7.4, 0.6, 0.30)
+	# fascia viền mép mái (gỗ sậm) — 2 đầu hồi + mép trước/sau
+	for xx in [-6.95, 6.95]:
+		local.append([Vector3(xx, 5.5, 2.1), Vector3(0.22, 0.16, 11.0), C_TRIM_W])
+	for zz in [-3.15, 7.35]:
+		local.append([Vector3(0.0, 5.6, zz), Vector3(16.0, 0.14, 0.22), C_TRIM_W])
+	# ống khói đá (phải) + khói voxel mờ dần
+	local.append([Vector3(2.2, 7.6, -2.3), Vector3(1.3, 0.22, 1.3), C_STONE_DK])
+	local.append([Vector3(2.2, 8.35, -2.3), Vector3(1.0, 1.2, 1.0), C_STONE])
+	local.append([Vector3(2.2, 9.05, -2.3), Vector3(0.85, 1.1, 0.85), C_STONE_DK])
+	local.append([Vector3(2.2, 10.15, -2.3), Vector3(1.15, 0.22, 1.15), C_STONE])
+	local.append([Vector3(2.2, 10.45, -2.3), Vector3(0.55, 0.30, 0.55), Color(0.28, 0.27, 0.30)])
+	var smoke_off: Array = [-0.15, 0.20, -0.05, 0.30, 0.0]
+	for si in range(5):
+		var wd: float = 0.50 - float(si) * 0.05
+		local.append([Vector3(2.2 + smoke_off[si], 11.0 + float(si) * 0.5, -2.3 + smoke_off[si] * 0.6),
+			Vector3(wd, 0.46, wd), C_SMOKE_A.lerp(C_SMOKE_B, float(si) / 4.0)])
+	# biển hiệu treo cạnh cửa: khung + chữ "TV" đen trên nền trắng
+	var bx: float = -0.85
+	local.append([Vector3(bx, 3.1, -2.42), Vector3(0.08, 0.9, 0.08), C_TRIM])
+	local.append([Vector3(bx, 3.1, -2.5), Vector3(0.06, 1.3, 0.06), C_TRIM])
+	local.append([Vector3(bx, 2.5, -2.55), Vector3(1.45, 0.10, 0.10), C_TRIM])
+	local.append([Vector3(bx, 1.85, -2.6), Vector3(1.45, 1.05, 0.10), C_TRIM])
+	local.append([Vector3(bx, 1.85, -2.62), Vector3(1.26, 0.86, 0.14), C_SIGN])
+	# chữ T
+	local.append([Vector3(bx - 0.36, 2.12, -2.62), Vector3(0.34, 0.42, 0.20), C_SIGN_LT])
+	local.append([Vector3(bx - 0.36, 1.72, -2.62), Vector3(0.12, 0.38, 0.20), C_SIGN_LT])
+	# chữ V (2 nét chéo)
+	_bar(local, Vector3(bx + 0.16, 1.60, -2.62), Vector3(bx + 0.36, 2.32, -2.62), 0.22, C_SIGN_LT)
+	_bar(local, Vector3(bx + 0.56, 1.60, -2.62), Vector3(bx + 0.36, 2.32, -2.62), 0.22, C_SIGN_LT)
+	# hiên gỗ: sàn + cột + xà + lan can
+	local.append([Vector3(0.0, 0.14, -2.95), Vector3(5.8, 0.18, 2.0), C_DECK])
+	for px in [-2.4, 2.4]:
+		local.append([Vector3(px, 1.9, -2.95), Vector3(0.30, 3.4, 0.30), C_TRIM_W])
+		local.append([Vector3(px, 3.55, -2.95), Vector3(0.42, 0.14, 0.42), C_TRIM])
+	local.append([Vector3(0.0, 3.2, -2.95), Vector3(5.6, 0.22, 0.30), C_TRIM])
+	# lan can 2 bên hiên
+	for px in [-2.55, 2.55]:
+		local.append([Vector3(px, 1.05, -2.95), Vector3(0.12, 1.0, 0.12), C_DECK_DK])
+		local.append([Vector3(px, 0.5, -2.95), Vector3(0.12, 0.9, 0.12), C_DECK_DK])
+		local.append([Vector3(px, 1.5, -2.95), Vector3(0.10, 0.12, 0.12), C_DECK_DK])
+	# bậc thang 3 bậc ra phía đường
+	local.append([Vector3(0.0, 0.02, -3.95), Vector3(2.4, 0.18, 1.6), C_DECK])
+	local.append([Vector3(0.0, 0.02, -4.70), Vector3(2.2, 0.15, 1.3), C_STONE_DK])
+	local.append([Vector3(0.0, 0.02, -5.35), Vector3(2.1, 0.12, 1.1), C_STONE])
+
+## ── Props: thùng rượu, thùng gỗ, xe kéo, cây xanh ─────────────────────────────
+static func _props(local: Array) -> void:
+	# 3 thùng rượu nằm (trục z) bên phải hiên + 1 thùng đứng cạnh móng
+	for q in range(3):
+		var pz: float = -4.5 + float(q) * 1.25
+		local.append([Vector3(4.6, 0.52, pz), Vector3(0.78, 0.78, 1.15), C_BARREL])
+		for off in [-1.05, 0.0, 1.05]:
+			local.append([Vector3(4.6, 0.52, pz + off), Vector3(0.80, 0.34, 0.12), C_IRON])
+		local.append([Vector3(4.6, 0.52, pz - 0.62), Vector3(0.80, 0.48, 0.10), C_BARREL_DK])
+		local.append([Vector3(4.6, 0.52, pz + 0.62), Vector3(0.80, 0.48, 0.10), C_BARREL_DK])
+	local.append([Vector3(7.0, 0.60, -2.9), Vector3(0.80, 1.15, 0.80), C_BARREL])
+	for off in [0.34, 0.0, -0.34]:
+		local.append([Vector3(7.0, 0.60, -2.9 + off), Vector3(0.82, 1.20, 0.24), C_IRON])
+	# 2 thùng gỗ trước hiên trái
+	for q in [0, 1]:
+		var cx2: float = 3.4 + float(q) * 1.7
+		local.append([Vector3(cx2, 0.30, -1.2), Vector3(0.90, 0.60, 0.90), C_CRATE])
+		local.append([Vector3(cx2, 0.62, -1.2), Vector3(0.86, 0.10, 0.86), C_CRATE_DK])
+	# xe kéo 4 bánh nan hoa chữ thập (trái sau)
+	local.append([Vector3(-6.1, 0.45, 5.6), Vector3(3.0, 0.28, 1.8), C_CART])
+	for s in [-1, 1]:
+		local.append([Vector3(-6.1 + s * 1.15, 0.95, 5.15), Vector3(0.42, 0.55, 0.14), C_CART])
+		local.append([Vector3(-6.1 + s * 1.15, 0.95, 6.05), Vector3(0.42, 0.55, 0.14), C_CART])
+		_wheel(local, -6.1 + s * 1.15, 0.62, 5.15)
+		_wheel(local, -6.1 + s * 1.15, 0.62, 6.05)
+	# bao tải chồng lên xe
+	local.append([Vector3(-6.1, 1.62, 5.6), Vector3(1.8, 0.42, 1.2), C_LOAD])
+	local.append([Vector3(-5.5, 2.05, 5.75), Vector3(1.3, 0.38, 0.9), C_LOAD])
+	# cây xanh 2 bên
+	_add_tree(local, -8.2, -2.0, 1.0)
+	_add_tree(local, 9.8, 1.4, 0.9)
+
+## ── Bánh xe: vành + nan hoa chữ thập ──────────────────────────────────────────
+static func _wheel(local: Array, cx2: float, cy: float, cz2: float) -> void:
+	local.append([Vector3(cx2, cy, cz2), Vector3(0.18, 0.18, 0.16), C_CART])
+	local.append([Vector3(cx2, cy, cz2), Vector3(0.54, 0.10, 0.14), C_CART])
+	local.append([Vector3(cx2, cy, cz2), Vector3(0.10, 0.54, 0.14), C_CART])
+
+## ── 1 cây: thân + các búi tán lá ──────────────────────────────────────────────
+static func _add_tree(local: Array, tx: float, tz: float, s: float) -> void:
+	local.append([Vector3(tx, 1.3 * s, tz), Vector3(0.46 * s, 2.8 * s, 0.46 * s), C_TREE])
+	var blobs: Array = [
+		[0.0, 2.6 * s, 0.0, 2.0 * s, C_LEAF_A],
+		[-1.5 * s, 2.9 * s, 0.7 * s, 1.5 * s, C_LEAF_B],
+		[1.3 * s, 3.3 * s, -0.9 * s, 1.4 * s, C_LEAF_A],
+		[-0.4 * s, 3.9 * s, -1.5 * s, 1.5 * s, C_LEAF_C],
+		[0.8 * s, 4.2 * s, 0.9 * s, 1.3 * s, C_LEAF_B],
+		[-1.1 * s, 2.2 * s, -1.2 * s, 1.1 * s, C_LEAF_C],
+	]
+	for b in blobs:
+		local.append([Vector3(tx + b[0], b[1], tz + b[2]), Vector3(b[3], b[3], b[3]), b[4]])
+
+## ── Builder chính quán rượu ───────────────────────────────────────────────────
+static func _add_tavern(xforms: Array, colors: Array, at: Vector2, yaw: float, gy: float) -> void:
+	var local: Array = []
+	_tavern_wall_main(local)
+	_door(local)
+	_tavern_wing(local)
+	_framing(local)
+	_tavern_top(local)
+	_props(local)
+	# cửa sổ tầng trệt + tầng 2 (khối chính)
+	_win(local, -2.7, -2.3, 1.55, 0.85, 0.90)
+	_win(local, 2.7, -2.3, 1.55, 0.85, 0.90)
+	_win(local, -5.2, 2.0, 1.55, 0.85, 0.90)
+	_win(local, 5.2, 2.0, 1.55, 0.85, 0.90)
+	for px in [-3.9, -2.6, -1.3, 1.3, 2.6, 3.9]:
+		_win(local, px, -2.25, 4.6, 0.80, 0.90)
 	_emit_boxes(xforms, colors, local, yaw, Vector3(at.x, gy, at.y))
-
-## ── Chòi giữ đồng / chòi câu cá (nhà sàn) ───────────────────────────────────
-static func _add_hut(xforms: Array, colors: Array, at: Vector2, yaw: float, gy: float) -> void:
-	var local: Array = []
-	for sx in [-1, 1]:
-		for sz in [-1, 1]:
-			local.append([Vector3(sx * 1.1, 1.05, sz * 1.1), Vector3(0.16, 2.2, 0.16), C_WOOD_DARK])
-	local.append([Vector3(0, 2.1, 0), Vector3(2.6, 0.14, 2.6), C_BAMBOO])
-	local.append([Vector3(0, 2.26, 0), Vector3(2.35, 0.08, 2.35), C_BAMBOO])
-	# Mái nón lá dừa khô
-	local.append([Vector3(0, 3.15, 0), Vector3(3.0, 0.32, 3.0), C_THATCH])
-	local.append([Vector3(0, 3.5, 0), Vector3(2.1, 0.3, 2.1), C_THATCH_DARK])
-	local.append([Vector3(0, 3.8, 0), Vector3(1.2, 0.26, 1.2), C_THATCH_DARK])
-	local.append([Vector3(0, 4.05, 0), Vector3(0.4, 0.22, 0.4), C_THATCH])
-	# Thang tre nhỏ bên hông
-	for i in range(4):
-		local.append([Vector3(1.35, 0.25 + i * 0.35, 0.2), Vector3(0.09, 0.28, 0.7), C_BAMBOO])
-	local.append([Vector3(1.35, 0.75, 0.55), Vector3(0.09, 0.09, 0.3), C_BAMBOO])
-	local.append([Vector3(1.35, 1.1, 0.7), Vector3(0.09, 0.09, 0.3), C_BAMBOO])
-	# Lan can trước
-	local.append([Vector3(0, 2.5, -1.32), Vector3(2.4, 0.45, 0.09), C_BAMBOO])
-	_emit_boxes(xforms, colors, local, yaw, Vector3(at.x, gy, at.y))
-
-## ── Cổng làng — bắc ngang đường (X = ngang đường, Z = dọc đường) ────────────
-static func _add_gate(xforms: Array, colors: Array, at: Vector2, road_dir: Vector2, gy: float) -> void:
-	var yaw: float = atan2(road_dir.x, road_dir.y)
-	var local: Array = []
-	# 2 cột gạch thẻ đỏ 2 bên đường
-	for sx in [-1, 1]:
-		local.append([Vector3(sx * 2.15, 1.7, 0), Vector3(0.9, 3.4, 0.9), C_BRICK])
-		local.append([Vector3(sx * 2.15, 3.5, 0), Vector3(1.1, 0.28, 1.1), C_TILE_DARK])
-		local.append([Vector3(sx * 2.15, 3.75, 0), Vector3(0.7, 0.16, 0.7), C_TILE])
-	# Rêu phong trên cột
-	local.append([Vector3(-2.15, 3.2, 0.35), Vector3(0.95, 0.3, 0.18), C_MOSS])
-	local.append([Vector3(2.15, 2.6, -0.35), Vector3(0.95, 0.25, 0.16), C_MOSS])
-	# Mái ngói vảy cá 2 tầng cong
-	local.append([Vector3(0, 3.35, 0), Vector3(5.6, 0.4, 2.0), C_TILE])
-	local.append([Vector3(0, 3.75, 0), Vector3(4.4, 0.32, 1.5), C_TILE_DARK])
-	local.append([Vector3(0, 4.05, 0), Vector3(2.4, 0.26, 0.6), C_TILE])
-	# Mái rủ + góc hất
-	local.append([Vector3(0, 3.2, 1.05), Vector3(5.5, 0.12, 0.45), C_TILE])
-	local.append([Vector3(0, 3.2, -1.05), Vector3(5.4, 0.12, 0.42), C_TILE])
-	local.append([Vector3(2.9, 3.6, 0.3), Vector3(0.45, 0.14, 0.45), C_TILE_DARK])
-	local.append([Vector3(-2.9, 3.6, -0.3), Vector3(0.45, 0.14, 0.45), C_TILE_DARK])
-	# Vòm cửa bán nguyệt + lanh tô + bảng làng
-	local.append([Vector3(0, 1.15, 0.28), Vector3(2.2, 1.1, 0.5), C_LIME])
-	local.append([Vector3(0, 2.35, 0.28), Vector3(2.6, 0.35, 0.5), C_TILE_DARK])
-	local.append([Vector3(0, 2.75, 0.28), Vector3(2.5, 0.55, 0.4), C_WOOD_DARK])
-	local.append([Vector3(0, 2.75, 0.48), Vector3(2.1, 0.32, 0.12), C_LIME])
-	# Máng xối dọc đường
-	local.append([Vector3(0, 3.75, 0.75), Vector3(5.5, 0.3, 0.12), C_WOOD_DARK])
-	_emit_boxes(xforms, colors, local, yaw, Vector3(at.x, gy, at.y))
-
-## ── Đình làng / miếu thờ cổ ─────────────────────────────────────────────────
-static func _add_shrine(xforms: Array, colors: Array, at: Vector2, yaw: float, gy: float) -> void:
-	var local: Array = []
-	# Sân đình lát gạch tàu
-	local.append([Vector3(0, 0.05, 0.4), Vector3(4.6, 0.16, 4.2), C_BRICK])
-	# Nền + tường vôi
-	local.append([Vector3(0, 0.35, 0), Vector3(3.4, 0.3, 2.8), C_STONE])
-	local.append([Vector3(0, 1.35, -1.25), Vector3(3.4, 2.3, 0.28), C_LIME])
-	local.append([Vector3(-1.68, 1.35, 0), Vector3(0.28, 2.3, 2.6), C_LIME])
-	local.append([Vector3(1.68, 1.35, 0), Vector3(0.28, 2.3, 2.6), C_LIME])
-	# Cột gạch sơn đỏ sẫm trước hiên
-	local.append([Vector3(-1.1, 1.35, 1.3), Vector3(0.32, 2.6, 0.32), Color(0.55, 0.18, 0.12)])
-	local.append([Vector3(1.1, 1.35, 1.3), Vector3(0.32, 2.6, 0.32), Color(0.55, 0.18, 0.12)])
-	# Tượng thờ bên trong
-	local.append([Vector3(0, 0.75, -0.4), Vector3(0.55, 0.9, 0.45), C_WOOD_DARK])
-	# Mái ngói xếp tầng + gờ mái
-	local.append([Vector3(0, 2.75, 0), Vector3(4.8, 0.34, 4.0), C_TILE])
-	local.append([Vector3(0, 3.05, 0), Vector3(3.4, 0.3, 2.8), C_TILE_DARK])
-	local.append([Vector3(0, 3.35, 0), Vector3(1.5, 0.26, 0.6), C_TILE])
-	# 4 góc hất + rồng/mây trắng xanh trên gờ
-	for sx in [-1, 1]:
-		for sz in [-1, 1]:
-			local.append([Vector3(sx * 2.45, 2.95, sz * 2.05), Vector3(0.4, 0.3, 0.4), C_TILE_DARK])
-	local.append([Vector3(0.6, 3.3, 0.6), Vector3(0.5, 0.2, 0.16), Color(0.62, 0.78, 0.85)])
-	local.append([Vector3(-0.7, 3.3, -0.5), Vector3(0.5, 0.2, 0.16), Color(0.62, 0.78, 0.85)])
-	# Rêu trên mái
-	local.append([Vector3(1.9, 2.9, -1.6), Vector3(0.55, 0.18, 0.3), C_MOSS])
-	# Bát hương
-	local.append([Vector3(0, 0.25, 1.05), Vector3(0.28, 0.18, 0.28), Color(0.8, 0.78, 0.7)])
-	_emit_boxes(xforms, colors, local, yaw, Vector3(at.x, gy, at.y))
-
-## ── Giếng làng — thành đá tròn + nước + mái che + gáo dừa ──────────────────
-static func _add_well(xforms: Array, colors: Array, at: Vector2, gy: float) -> void:
-	var local: Array = []
-	for sx in [-1, 1]:
-		local.append([Vector3(sx * 0.6, 0.28, 0), Vector3(0.4, 0.56, 1.6), C_STONE])
-		local.append([Vector3(0, 0.28, sx * 0.6), Vector3(1.6, 0.56, 0.4), C_STONE])
-	# Nước trong giếng
-	local.append([Vector3(0, 0.04, 0), Vector3(1.1, 0.08, 1.1), C_WATER])
-	# Mái che: 2 cột + xà + mái lá
-	for sx in [-1, 1]:
-		local.append([Vector3(sx * 0.95, 1.3, 0), Vector3(0.14, 2.5, 0.14), C_WOOD_DARK])
-	local.append([Vector3(0, 1.6, 0), Vector3(0.12, 0.12, 1.9), C_WOOD_DARK])
-	local.append([Vector3(0, 2.55, 0), Vector3(2.5, 0.16, 1.5), C_THATCH])
-	local.append([Vector3(0, 2.68, 0), Vector3(1.9, 0.12, 1.1), C_THATCH_DARK])
-	# Gáo dừa treo
-	local.append([Vector3(0, 1.35, 0.35), Vector3(0.16, 0.22, 0.16), C_BAMBOO])
-	# Rêu trên thành
-	local.append([Vector3(0.65, 0.5, 0.3), Vector3(0.3, 0.14, 0.5), C_MOSS])
-	local.append([Vector3(-0.65, 0.45, -0.4), Vector3(0.3, 0.12, 0.5), C_MOSS])
-	_emit_boxes(xforms, colors, local, 0.0, Vector3(at.x, gy, at.y))
-
-## ── Lò gạch cổ — tháp vòm thu nhỏ dần + lỗ thoát khói + dây leo ────────────
-static func _add_kiln(xforms: Array, colors: Array, at: Vector2, gy: float) -> void:
-	var local: Array = []
-	local.append([Vector3(0, 0.6, 0), Vector3(4.8, 1.2, 4.8), C_BRICK])
-	local.append([Vector3(0, 1.9, 0), Vector3(3.8, 1.0, 3.8), C_BRICK])
-	local.append([Vector3(0, 3.0, 0), Vector3(2.8, 0.9, 2.8), Color(0.74, 0.3, 0.14)])
-	local.append([Vector3(0, 4.0, 0), Vector3(1.8, 0.8, 1.8), Color(0.62, 0.24, 0.12)])
-	# Đỉnh + lỗ thoát khói
-	local.append([Vector3(0, 4.9, 0), Vector3(0.9, 0.6, 0.9), C_TILE_DARK])
-	local.append([Vector3(0, 5.45, 0), Vector3(0.45, 0.5, 0.45), Color(0.15, 0.13, 0.12)])
-	# Vệt gạch cháy đen
-	local.append([Vector3(0, 1.6, 0), Vector3(4.95, 0.26, 4.95), Color(0.3, 0.16, 0.1)])
-	local.append([Vector3(0, 3.1, 0), Vector3(2.95, 0.2, 2.95), Color(0.3, 0.16, 0.1)])
-	# Cửa lò vòm
-	local.append([Vector3(0, 0.65, 2.48), Vector3(1.5, 1.1, 0.3), Color(0.2, 0.13, 0.1)])
-	# Dây leo phủ từ đỉnh xuống
-	local.append([Vector3(0.9, 4.6, 0.9), Vector3(0.3, 0.7, 0.3), C_MOSS])
-	local.append([Vector3(-0.9, 4.2, -0.9), Vector3(0.26, 0.9, 0.26), C_MOSS])
-	local.append([Vector3(0.9, 3.6, -0.9), Vector3(0.24, 0.8, 0.24), C_MOSS])
-	local.append([Vector3(-1.4, 2.6, 1.2), Vector3(0.3, 0.7, 0.3), C_MOSS])
-	_emit_boxes(xforms, colors, local, 0.0, Vector3(at.x, gy, at.y))
-
-## ── Chợ quê — dãy sạp gỗ + mái lá + nông sản ───────────────────────────────
-static func _add_stall(xforms: Array, colors: Array, at: Vector2, yaw: float, gy: float) -> void:
-	var local: Array = []
-	# 2 cột + mái lá
-	for sx in [-1, 1]:
-		local.append([Vector3(sx * 1.1, 1.15, 0), Vector3(0.14, 2.3, 0.14), C_WOOD_DARK])
-	local.append([Vector3(0, 2.35, 0), Vector3(3.0, 0.16, 2.1), C_THATCH])
-	local.append([Vector3(0, 2.48, 0), Vector3(2.5, 0.12, 1.6), C_THATCH_DARK])
-	# Kệ gỗ bậc thang
-	local.append([Vector3(0, 0.55, 0.1), Vector3(2.5, 0.8, 0.9), C_WOOD])
-	local.append([Vector3(0, 1.1, 0.25), Vector3(1.9, 0.6, 0.7), C_WOOD])
-	# Nông sản trưng bày
-	local.append([Vector3(-0.6, 1.0, 0.1), Vector3(0.3, 0.3, 0.3), C_PROD_RED])
-	local.append([Vector3(0.1, 1.0, 0.1), Vector3(0.28, 0.34, 0.28), C_PROD_YEL])
-	local.append([Vector3(0.7, 1.0, 0.1), Vector3(0.3, 0.26, 0.3), C_PROD_GRN])
-	local.append([Vector3(-0.2, 1.45, 0.28), Vector3(0.32, 0.28, 0.32), C_PROD_RED])
-	local.append([Vector3(0.45, 1.45, 0.28), Vector3(0.3, 0.3, 0.3), C_PROD_YEL])
-	# Mái bạt nhăn nhẹ
-	local.append([Vector3(0.4, 2.5, 0.5), Vector3(0.7, 0.08, 0.5), Color(0.75, 0.65, 0.5)])
-	_emit_boxes(xforms, colors, local, yaw, Vector3(at.x, gy, at.y))
-
-## ── Bến nước — sàn gỗ nhô ra sông + cọc buộc ghe + bậc thang ───────────────
-static func _add_dock(xforms: Array, colors: Array, river: Dictionary,
-		height_grid: Array, cx: int, cz: int, size: int, cols: int) -> void:
-	var rp: Vector2 = Vector2(river.pt.x, river.pt.y)
-	# Tìm ô đất liền kề sông để đặt bến
-	var land_cell: Vector2i = Vector2i(-1, -1)
-	var best_d2: float = 1e18
-	for off in range(cols * cols):
-		var vx: int = off / cols
-		var vz: int = off % cols
-		var p: Vector2 = Vector2(
-			float(cx) * size - float(size) * 0.5 + (float(vx) + 0.5),
-			float(cz) * size - float(size) * 0.5 + (float(vz) + 0.5))
-		var d2: float = p.distance_squared_to(rp)
-		if d2 >= best_d2:
-			continue
-		if height_grid[vx][vz] <= _Data.WATER_Y:
-			continue
-		best_d2 = d2
-		land_cell = Vector2i(vx, vz)
-	if land_cell.x < 0:
-		return
-	var land_world: Vector2 = Vector2(
-		float(cx) * size - float(size) * 0.5 + (float(land_cell.x) + 0.5),
-		float(cz) * size - float(size) * 0.5 + (float(land_cell.y) + 0.5))
-	var toward: Vector2 = (rp - land_world)
-	if toward.length() < 0.1:
-		return
-	toward = toward.normalized()
-	var gy: float = height_grid[land_cell.x][land_cell.y] + 0.02
-	# Sàn gỗ nhô ra nước + cọc + bậc thang
-	var local: Array = []
-	local.append([Vector3(0, 0.35, 0.5), Vector3(2.4, 0.16, 2.6), C_WOOD])
-	local.append([Vector3(0, 0.25, 2.2), Vector3(1.8, 0.12, 1.2), C_WOOD])
-	local.append([Vector3(0, 0.15, 3.2), Vector3(1.2, 0.1, 0.8), C_WOOD])
-	for sx in [-1, 1]:
-		local.append([Vector3(sx * 0.9, 0.4, 2.2), Vector3(0.14, 0.8, 0.14), C_WOOD_DARK])
-	# Cọc buộc ghe xuồng
-	local.append([Vector3(0, 0.6, 4.0), Vector3(0.18, 1.2, 0.18), C_WOOD_DARK])
-	local.append([Vector3(0.55, 0.35, 4.6), Vector3(0.15, 0.7, 0.15), C_WOOD_DARK])
-	# Bậc thang gạch xuống mực nước
-	local.append([Vector3(0, 0.1, -0.4), Vector3(2.0, 0.2, 0.8), C_BRICK])
-	# Lan can tay vịn
-	local.append([Vector3(0, 0.85, 1.4), Vector3(2.2, 0.5, 0.08), C_BAMBOO])
-	var yaw: float = atan2(-toward.x, -toward.y)
-	_emit_boxes(xforms, colors, local, yaw, Vector3(land_world.x, gy, land_world.y))

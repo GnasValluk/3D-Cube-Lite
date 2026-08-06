@@ -95,6 +95,10 @@ CRAFTING_LABEL,Crafting Table,Bàn Chế Tạo
 RECIPE_LIBRARY,Recipe Library,Sách Công Thức
 NO_RECIPES,No recipes available,Chưa có công thức
 CRAFTING_GRID,Crafting Grid,Lưới Chế Tạo
+CRAFT_BUTTON,Craft,Chế Tạo
+CRAFT_MATERIALS,Materials,Nguyên Liệu
+CRAFT_RESULT,Result,Kết Quả
+CRAFT_CANNOT,Missing materials,Thiếu nguyên liệu
 LIB_CAT_ALL,All,Tất cả
 LIB_CAT_WEAPONS,Weapons,Vũ khí
 LIB_CAT_TOOLS,Tools,Công cụ
@@ -240,3 +244,20 @@ FPS_UNLIMITED,Unlimited,Không giới hạn
 FURNACE_LABEL,Furnace,Lò Nung
 FURNACE_INPUT,Raw Material,Nguyên Liệu
 FURNACE_OUTPUT,Product,Sản Phẩm
+FURNACE_FUEL,Fuel,Chất Đốt
+FURNACE_RECIPES,Recipes,Công Thức
+CREATURE_TYPE_MOB,Creature,Sinh vật
+CREATURE_TYPE_PLANT,Plant,Thực vật
+CREATURE_NEARBY,Distance,Khoảng cách
+CREATURE_HP,HP,HP
+CREATURE_STAGE_SPROUT,Sprout,Mầm
+CREATURE_STAGE_YOUNG,Young,Non
+CREATURE_STAGE_MATURE,Mature,Trưởng thành
+CREATURE_STAGE_RIPE,Ripe,Chín
+PLANT_OAK,Oak Tree,Cây sồi
+PLANT_DENSE,Dense Tree,Cây rừng thẫm
+PLANT_ORANGE,Orange Tree,Cây cam
+PLANT_PALM,Palm Tree,Cây cọ
+PLANT_WATERMELON,Watermelon Vine,Dây dưa hấu
+PLANT_PUMPKIN,Pumpkin Vine,Dây bí ngô
+PLANT_EGGPLANT,Eggplant,Cà tím

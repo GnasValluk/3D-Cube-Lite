@@ -8,6 +8,7 @@ const _DARKEN: float = 0.72
 
 const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
+const _CoconutMesh = preload("res://scripts/items/models/coconut.gd")
 
 var _variant: String = "river"
 var _size: int = PalmSize.MEDIUM
@@ -44,6 +45,10 @@ func _birth_span_days() -> float:
 func _stage_thresholds() -> Array[float]:
 	return [8.0, 25.0]
 
+## Cây dừa không có giai đoạn vị thành niên — mầm xong là trưởng thành.
+func _has_young_stage() -> bool:
+	return false
+
 func _ready() -> void:
 	super._ready()
 	_build_tree()
@@ -55,8 +60,7 @@ func _ready() -> void:
 func _get_h() -> float:
 	if _stage == GrowingProp.Stage.SPROUT:
 		return 0.5
-	var stage_scale: float = 0.55 if _stage == GrowingProp.Stage.YOUNG else 1.0
-	return _base_h * stage_scale
+	return _base_h
 
 func _on_destroy() -> void:
 	super._on_destroy()
@@ -110,8 +114,6 @@ func _get_base_r() -> float:
 			_: r = 0.22
 	if _stage == GrowingProp.Stage.SPROUT:
 		r *= 0.40
-	elif _stage == GrowingProp.Stage.YOUNG:
-		r *= 0.65
 	return r
 
 func _get_top_r() -> float:
@@ -128,8 +130,6 @@ func _get_top_r() -> float:
 			PalmSize.MEDIUM: r = 0.10
 			PalmSize.TALL:   r = 0.12
 			_: r = 0.10
-	if _stage == GrowingProp.Stage.YOUNG:
-		r *= 0.65
 	return r
 
 # ── GRID helpers ────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ func _build_tree() -> void:
 
 	if _stage == GrowingProp.Stage.SPROUT:
 		_build_sprout()
-		_commit_visual(_ordered.size(), 0)
+		_commit_visual()
 		return
 
 	var h: float = _get_h()
@@ -171,14 +171,11 @@ func _build_tree() -> void:
 
 	_trunk_voxels(h, base_r, top_r)
 	_frond_voxels(h, top_r)
-	var main_count := _ordered.size()
+	_commit_visual()
 	if _stage == GrowingProp.Stage.MATURE:
-		_coconut_voxels(h, top_r)
-	var nut_count := _ordered.size() - main_count
+		_commit_coconuts(h, top_r)
 
-	_commit_visual(main_count, nut_count)
-
-func _commit_visual(main_count: int, nut_count: int) -> void:
+func _commit_visual(main_count: int = -1) -> void:
 	if _ordered.is_empty():
 		return
 
@@ -190,39 +187,18 @@ func _commit_visual(main_count: int, nut_count: int) -> void:
 	cube_mat.roughness = 0.85
 	cube.material = cube_mat
 
-	if main_count > 0:
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = cube
-		mm.instance_count = main_count
-		for i in range(main_count):
-			mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[i]))
-			mm.set_instance_color(i, _grid[_key(_ordered[i])])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.name = "PalmVisual"
-		add_child(mmi)
-
-	if nut_count > 0:
-		var nut_mat := StandardMaterial3D.new()
-		nut_mat.vertex_color_use_as_albedo = true
-		nut_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		nut_mat.metallic = 0.0
-		nut_mat.roughness = 0.85
-		var nut_mm := MultiMesh.new()
-		nut_mm.transform_format = MultiMesh.TRANSFORM_3D
-		nut_mm.use_colors = true
-		nut_mm.mesh = cube
-		nut_mm.instance_count = nut_count
-		for i in range(nut_count):
-			var idx := main_count + i
-			nut_mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[idx]))
-			nut_mm.set_instance_color(i, _grid[_key(_ordered[idx])])
-		var nut_mmi := MultiMeshInstance3D.new()
-		nut_mmi.multimesh = nut_mm
-		nut_mmi.name = "CoconutVisual"
-		add_child(nut_mmi)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = cube
+	mm.instance_count = _ordered.size()
+	for i in range(_ordered.size()):
+		mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[i]))
+		mm.set_instance_color(i, _grid[_key(_ordered[i])])
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.name = "PalmVisual"
+	add_child(mmi)
 
 func _apply_stage(_from: int, _to: int) -> void:
 	_rebuild()
@@ -277,7 +253,8 @@ func _build_sprout() -> void:
 # ── TRUNK ───────────────────────────────────────────────────────────────────
 
 func _trunk_voxels(h: float, base_r: float, top_r: float) -> void:
-	var ny: int = ceili(h / VOXEL)
+	var lv := VOXEL * 2.0
+	var ny: int = ceili(h / lv)
 	var is_river: bool = _variant == "river"
 	var col_base := Color(0.62, 0.48, 0.28) if not is_river else Color(0.45, 0.28, 0.14)
 	var col_dark := Color(0.48, 0.35, 0.18) if not is_river else Color(0.35, 0.20, 0.10)
@@ -285,7 +262,7 @@ func _trunk_voxels(h: float, base_r: float, top_r: float) -> void:
 
 	for vy in range(ny):
 		var t: float = float(vy) / float(ny)
-		var y: float = vy * VOXEL
+		var y: float = vy * lv
 
 		var curve_amp: float = 0.20 if not is_river else 0.06
 		var curve_x := sin(t * PI * 0.7) * curve_amp * (1.0 - t * 0.4)
@@ -298,19 +275,19 @@ func _trunk_voxels(h: float, base_r: float, top_r: float) -> void:
 		if t > 0.82:
 			r *= 1.0 + (t - 0.82) / 0.18 * 0.20
 
-		var is_scar: bool = vy % 3 == 0 and vy % 9 != 0
-		var is_ring: bool = vy % 9 == 0
+		var is_scar: bool = vy % 2 == 0 and vy % 4 != 0
+		var is_ring: bool = vy % 4 == 0
 		if is_scar:
-			r += VOXEL * 0.4
+			r += lv * 0.3
 		if is_ring:
-			r += VOXEL * 0.6
+			r += lv * 0.5
 
-		var rv: int = ceili(r / VOXEL)
+		var rv: int = ceili(r / lv)
 
 		for vx in range(-rv - 1, rv + 2):
 			for vz in range(-rv - 1, rv + 2):
-				var dx := vx * VOXEL
-				var dz := vz * VOXEL
+				var dx := vx * lv
+				var dz := vz * lv
 				var d_sq := dx * dx + dz * dz
 				if d_sq <= r * r:
 					var col := _trunk_color(t, is_scar, is_ring, col_base, col_dark, col_scar)
@@ -356,23 +333,18 @@ func _crown_pos(h: float) -> Vector3:
 
 func _frond_voxels(h: float, _top_r: float) -> void:
 	var is_river: bool = _variant == "river"
-	var is_young_tree: bool = _stage == GrowingProp.Stage.YOUNG
 	var count: int = (8 + randi() % 4) if not is_river else (14 + randi() % 4)
-	if is_young_tree:
-		count = (6 + randi() % 3) if not is_river else (9 + randi() % 3)
 	var crown := _crown_pos(h)
 	var seed_a: float = randf() * TAU
 
+	# Nhóm lá non trong tán trưởng thành: vài lá ngắn dựng cao, còn lại là
+	# lá già dài trĩu xuống — tán dừa lúc nào cũng rậm đủ lớp.
 	var young_n: int = maxi(1, count / 4)
-	if is_young_tree:
-		young_n = count
 
 	for fi in range(count):
-		var is_young: bool = is_young_tree or fi < young_n
+		var is_young: bool = fi < young_n
 		var angle_y: float
-		if is_young_tree:
-			angle_y = seed_a + float(fi) / float(count) * TAU
-		elif is_young:
+		if is_young:
 			angle_y = seed_a + float(fi) / float(young_n) * TAU * 0.5
 		else:
 			angle_y = seed_a + float(fi - young_n) / float(count - young_n) * TAU
@@ -436,7 +408,7 @@ func _frond_voxels(h: float, _top_r: float) -> void:
 			right = Vector3.RIGHT
 		var up_dir := right.cross(dir).normalized()
 
-		var steps: int = maxi(2, ceili(frond_len / VOXEL))
+		var steps: int = maxi(2, ceili(frond_len / (VOXEL * 2.0)))
 		for si in range(steps + 1):
 			var lt: float = float(si) / float(steps)
 			var pos := crown + dir * lt * frond_len
@@ -472,59 +444,52 @@ func _frond_voxels(h: float, _top_r: float) -> void:
 
 # ── COCONUTS ────────────────────────────────────────────────────────────────
 
-func _coconut_voxels(h: float, top_r: float) -> void:
-	var nut_count: int = 2 + randi() % 2
+## Gắn model quả dừa chuẩn (CoconutMesh.whole_data — elip + đài hoa + 3 gờ)
+## vào chòm lá ngọn: 2-4 quả treo quanh tán, phát sáng nhẹ. Một MultiMesh
+## duy nhất cho mọi quả (1 draw call), màu vertex giữ nguyên chi tiết model.
+func _commit_coconuts(h: float, top_r: float) -> void:
+	var data: Array = _CoconutMesh.whole_data("green")
+	if data.is_empty():
+		return
+	var positions: Array[Vector3] = []
 	var crown := _crown_pos(h)
-	var col_green := Color(0.25, 0.55, 0.20)
-	var col_light := Color(0.40, 0.70, 0.30)
-	var col_brown := Color(0.40, 0.28, 0.15)
-	var col_fiber := Color(0.50, 0.35, 0.18)
-
+	var nut_count: int = 2 + randi() % 2
 	for ni in range(nut_count):
 		var a: float = float(ni) / float(nut_count) * TAU + randf() * 0.3
 		var dist: float = top_r * 0.6 + randf() * 0.25
-		var off_y: float = -0.1 - randf() * 0.15
+		var off_y: float = -0.10 - randf() * 0.15
+		positions.append(crown + Vector3(cos(a) * dist, off_y, sin(a) * dist))
 
-		var cx := crown.x + cos(a) * dist
-		var cy := crown.y + off_y
-		var cz := crown.z + sin(a) * dist
+	var cube := BoxMesh.new()
+	cube.size = Vector3.ONE
+	var mat := StandardMaterial3D.new()
+	mat.vertex_color_use_as_albedo = true
+	mat.metallic = 0.0
+	mat.roughness = 0.7
+	mat.emission_enabled = true
+	mat.emission = Color(0.30, 0.65, 0.26) * 0.55
+	mat.emission_energy_multiplier = 1.0
+	cube.material = mat
 
-		var rx: float = 0.07 + randf() * 0.02
-		var ry: float = 0.09 + randf() * 0.03
-		var rz: float = 0.07 + randf() * 0.02
-
-		var b := ceili(maxf(rx, maxf(ry, rz)) / VOXEL)
-		for vx in range(-b, b + 1):
-			for vy in range(-b, b + 1):
-				for vz in range(-b, b + 1):
-					var px := vx * VOXEL
-					var py := vy * VOXEL
-					var pz := vz * VOXEL
-					var dx := px / rx
-					var dy := py / ry
-					var dz := pz / rz
-					if dy < 0:
-						dy *= 1.0 + absf(dy) * 0.6
-					if dx * dx + dy * dy + dz * dz <= 1.0:
-						var col := col_green
-						if dy > 0.5:
-							col = col_green.lerp(col_light, (dy - 0.5) * 2.0)
-						elif dy < -0.3:
-							col = col_green.lerp(col_brown, absf(dy) * 0.5)
-						col = _jitter(col)
-						_fill(cx + px, cy + py, cz + pz, col)
-
-		# Coir fibres (mo dừa)
-		var fiber_count: int = 3 + randi() % 4
-		for _fi in range(fiber_count):
-			var fa: float = randf() * TAU
-			var fd: float = 0.10 + randf() * 0.08
-			var fy: float = -0.04 + randf() * 0.08
-			var col := col_fiber
-			if randf() < 0.3:
-				col = col_fiber.darkened(0.3)
-			col = _jitter(col)
-			_fill(cx + cos(fa) * fd, cy + fy, cz + sin(fa) * fd, col)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = cube
+	mm.instance_count = data.size() * positions.size()
+	var pi := 0
+	for p in positions:
+		for d in data:
+			var dp: Vector3 = d["pos"]
+			var ds: Vector3 = d["size"]
+			var scale := _CoconutMesh.V * 1.5
+			var t := Transform3D(Basis.from_scale(ds * scale), dp * scale + p)
+			mm.set_instance_transform(pi, t)
+			mm.set_instance_color(pi, d["color"])
+			pi += 1
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = mm
+	mmi.name = "CoconutVisual"
+	add_child(mmi)
 
 # ── HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) ───────────
 

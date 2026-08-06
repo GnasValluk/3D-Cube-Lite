@@ -8,23 +8,11 @@ static func _noise(x: float, y: float) -> float:
 		+ sin(x * 0.0017 + y * 0.0037 + 3.8) * 0.20 \
 		+ sin(x * 0.0109 + y * 0.0083 + 5.1) * 0.10
 
-static func add_voxel_grass(vx: int, vz: int, pos: Vector3, out_xforms: Array, out_colors: Array, cols: int, height_grid: Array) -> void:
+static func add_voxel_grass(vx: int, vz: int, pos: Vector3, out_xforms: Array, out_colors: Array, cols: int, wdist: PackedInt32Array) -> void:
 	var wx: int = int(round(pos.x))
 	var wz: int = int(round(pos.z))
 
-	var near_water: bool = false
-	for dx in range(-3, 4):
-		for dz in range(-3, 4):
-			var nx := vx + dx
-			var nz := vz + dz
-			if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
-				continue
-			if height_grid[nx][nz] <= 0.5:
-				near_water = true
-				break
-		if near_water:
-			break
-	if not near_water:
+	if wdist[vx * cols + vz] > 3:
 		return
 
 	var cx := wx / 12

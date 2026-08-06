@@ -7,6 +7,50 @@ static var _road_curve_bboxes: Array[Rect2] = []
 static var _road_spatial: Dictionary = {}
 static var _road_ready: bool = false
 static var _int_cache: Dictionary = {}
+static var _node_has_cache: Dictionary = {}
+
+## 4 hướng nối của node lưới (has[d]: d=0→E, 1→S, 2→W, 3→N), luôn ≥2.
+## Deterministic theo SeedSnapshot — dùng chung với _ensure_roads().
+static func _node_has(gx: int, gz: int) -> Array:
+	var key: Vector2i = Vector2i(gx, gz)
+	if _node_has_cache.has(key):
+		return _node_has_cache[key]
+	var seed_base: int = SeedSnapshot.ensure() + 7777
+	var h: int = seed_base + gx * 40009 + gz * 70003
+	h = (h ^ (h >> 13)) * 1274126177; h = h ^ (h >> 16)
+	var r0: float = float(h & 0x7FFFFFFF) / 2147483648.0
+	h = h * 16807 + 1; var r1: float = float(h & 0x7FFFFFFF) / 2147483648.0
+	h = h * 16807 + 1; var r2: float = float(h & 0x7FFFFFFF) / 2147483648.0
+	h = h * 16807 + 1; var r3: float = float(h & 0x7FFFFFFF) / 2147483648.0
+	var has: Array = [r0 < 0.40, r1 < 0.40, r2 < 0.15, r3 < 0.15]
+	var cnt: int = 0
+	for v in has:
+		if v: cnt += 1
+	if cnt < 2:
+		for d in range(4):
+			if not has[d]:
+				has[d] = true
+				cnt += 1
+				if cnt >= 2:
+					break
+	_node_has_cache[key] = has
+	return has
+
+## Bậc nút đường: 2 = đường thẳng/góc, 3 = ngã 3, 4 = ngã tư.
+static func intersection_degree(gx: int, gz: int) -> int:
+	var cnt: int = 0
+	for v in _node_has(gx, gz):
+		if v:
+			cnt += 1
+	return cnt
+
+## Bản sao mảng has (không cho phép sửa vào cache).
+static func intersection_has(gx: int, gz: int) -> Array:
+	return _node_has(gx, gz).duplicate()
+
+## Tọa độ tâm node lưới.
+static func intersection_point(gx: int, gz: int) -> Vector2:
+	return _intersection(gx, gz)
 
 static func _intersection(gx: int, gz: int) -> Vector2:
 	var key: Vector2i = Vector2i(gx, gz)
@@ -120,24 +164,7 @@ static func _ensure_roads() -> void:
 
 	for gx in range(-_Data.ROAD_GRID_R, _Data.ROAD_GRID_R + 1):
 		for gz in range(-_Data.ROAD_GRID_R, _Data.ROAD_GRID_R + 1):
-			# Dùng hash thay vì RandomNumberGenerator.new() để tránh 13K object alloc
-			var h: int = seed_base + gx * 40009 + gz * 70003
-			h = (h ^ (h >> 13)) * 1274126177; h = h ^ (h >> 16)
-			var r0: float = float(h & 0x7FFFFFFF) / 2147483648.0
-			h = h * 16807 + 1; var r1: float = float(h & 0x7FFFFFFF) / 2147483648.0
-			h = h * 16807 + 1; var r2: float = float(h & 0x7FFFFFFF) / 2147483648.0
-			h = h * 16807 + 1; var r3: float = float(h & 0x7FFFFFFF) / 2147483648.0
-			var has: Array = [r0 < 0.40, r1 < 0.40, r2 < 0.15, r3 < 0.15]
-			var cnt: int = 0
-			for v in has:
-				if v: cnt += 1
-			if cnt < 2:
-				for d in range(4):
-					if not has[d]:
-						has[d] = true
-						cnt += 1
-						if cnt >= 2:
-							break
+			var has: Array = _node_has(gx, gz)
 
 			var dirs: Array = [Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(0, -1)]
 			for d in range(4):

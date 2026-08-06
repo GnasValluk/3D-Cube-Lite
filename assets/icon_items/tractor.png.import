@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ckny1g60d6eiu"
-path="res://.godot/imported/rock_moss.png-de97fe10efe7d7cda26a233cc49283ef.ctex"
+uid="uid://ifw3rihkvmel"
+path="res://.godot/imported/tractor.png-795fc62527545775fc6bdfb2e5a9bd3d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icon_items/rock_moss.png"
-dest_files=["res://.godot/imported/rock_moss.png-de97fe10efe7d7cda26a233cc49283ef.ctex"]
+source_file="res://assets/icon_items/tractor.png"
+dest_files=["res://.godot/imported/tractor.png-795fc62527545775fc6bdfb2e5a9bd3d.ctex"]
 
 [params]
 

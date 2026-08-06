@@ -112,7 +112,7 @@ func _build_tree() -> void:
 		_commit_visual(_ordered.size(), 0)
 		return
 	if _stage == GrowingProp.Stage.RIPE:
-		_build_pumpkins(false)
+		_build_ripe_pumpkins()
 		_build_sparkles()
 	else:
 		_build_pumpkins(true)
@@ -293,6 +293,37 @@ func _build_trumpet(center: Vector3, tilt_ang: float,
 ## Quả bí: cầu dẹp nhẹ hai đầu + 8-10 múi khía dọc rãnh sâu (múi nhô cao,
 ## rãnh sẫm màu) + cuống gỗ 5 góc; green=true → quả non xanh lục sẫm,
 ## green=false → quả chín cam cháy + vệt xanh chuyển sắc quanh cuống.
+## Quả bí chín: mỗi trái to đặt LỆCH khỏi gốc dây (gần đó) + sợi dây bò nối
+## từ gốc đến trái — bí đỏ mọc xa nguồn nước, dây vươn xa đặt trái bên cạnh.
+func _build_ripe_pumpkins() -> void:
+	var col_skin := Color(0.88, 0.48, 0.12)
+	var col_groove := Color(0.62, 0.30, 0.07)
+	var col_top := Color(0.30, 0.48, 0.20)
+	var col_stem := Color(0.36, 0.28, 0.13)
+	for fi in range(_fruit_count):
+		var fa: float = randf() * TAU
+		var dist: float = 0.60 + randf() * 0.50
+		var fruit_pos := Vector3(cos(fa) * dist, 0.075, sin(fa) * dist)
+		_build_fruit_strand(fruit_pos, fa)
+		var rx: float = 0.135 + randf() * 0.025
+		var ry: float = rx * (0.78 + randf() * 0.08)
+		_build_pumpkin(fruit_pos, rx, ry, col_skin, col_groove, col_top, col_stem, false)
+
+## Sợi dây bò từ gốc ra đến quả — uốn lượn sát mặt đất, khớp đúng 2 đầu.
+func _build_fruit_strand(target: Vector3, ang: float) -> void:
+	var col := Color(0.30, 0.55, 0.20)
+	var steps: int = 5 + randi() % 3
+	var perp := Vector3(-sin(ang), 0.0, cos(ang))
+	var prev := Vector3.ZERO
+	for si in range(1, steps + 1):
+		var t := float(si) / float(steps)
+		var wob := sin(t * 5.0 + ang) * 0.05 * sin(t * PI)
+		var cur := target * t + perp * wob
+		_fill(prev.x, 0.045, prev.z, col)
+		_fill(cur.x, 0.05, cur.z, col)
+		_vox_vine += 1
+		prev = cur
+
 func _build_pumpkins(green: bool) -> void:
 	var col_skin := Color(0.20, 0.42, 0.16) if green else Color(0.88, 0.48, 0.12)
 	var col_groove := Color(0.13, 0.30, 0.12) if green else Color(0.62, 0.30, 0.07)

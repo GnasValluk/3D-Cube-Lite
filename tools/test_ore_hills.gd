@@ -35,6 +35,7 @@ const NATURAL_TOPS: Dictionary = {
 	_D.BlockID.DIRT: true, _D.BlockID.SILT: true, _D.BlockID.MUDDY_SAND: true,
 	_D.BlockID.OCEAN_SAND: true, _D.BlockID.TRAIL: true,
 	_D.BlockID.OCEAN_FLOOR: true, _D.BlockID.OCEAN_GRAVEL: true, _D.BlockID.OCEAN_MUD: true,
+	_D.BlockID.YOUNG_GRASS: true, _D.BlockID.DARK_DIRT: true, _D.BlockID.SAND_DEEP: true,
 }
 
 var _failures: int = 0

@@ -44,6 +44,7 @@ enum BlockID {
 	STONE_THIN   = 36,  # Đá phiến — mỏng (1×0.2×1) thay vì slab 0.5
 	OAK_WOOD     = 37,  # Gỗ sồi — texture vân gỗ riêng, chặt từ cây sồi cổ thụ
 	YOUNG_GRASS  = 38,  # Cỏ non — bãi đất pha cỏ mới mọc, đám rải rác trên đồng bằng
+	HARD_WOOD    = 39,  # Gỗ cứng — vân gỗ nâu sẫm, chặt từ cây rừng rậm
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -76,6 +77,7 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.STONE_THIN:   "block_stone_thin",
 	BlockID.OAK_WOOD:     "block_oak_wood",
 	BlockID.YOUNG_GRASS:  "block_young_grass",
+	BlockID.HARD_WOOD:    "block_hard_wood",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -109,6 +111,7 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"block_stone_thin":   BlockID.STONE_THIN,
 	"block_oak_wood":     BlockID.OAK_WOOD,
 	"block_young_grass":  BlockID.YOUNG_GRASS,
+	"block_hard_wood":    BlockID.HARD_WOOD,
 }
 
 const VOXEL: float = 1.0
@@ -184,6 +187,7 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.40, 0.40, 0.44),           # 36 STONE_THIN — đá phiến mỏng
 	Color(0.54, 0.46, 0.38),           # 37 OAK_WOOD — gỗ sồi (nâu xám)
 	Color(0.44, 0.38, 0.13),           # 38 YOUNG_GRASS — bãi cỏ non (đất pha cỏ vàng xanh)
+	Color(0.38, 0.29, 0.17),           # 39 HARD_WOOD — gỗ cứng (nâu sẫm)
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -226,6 +230,7 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.04, 0.07, 0.05),           # 36 STONE_THIN
 	Color(0.07, 0.10, 0.08),           # 37 OAK_WOOD
 	Color(0.06, 0.09, 0.05),           # 38 YOUNG_GRASS
+	Color(0.06, 0.08, 0.06),           # 39 HARD_WOOD
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -333,6 +338,7 @@ const BLOCK_HARDNESS: Dictionary = {
 	BlockID.TITAN_ORE:    3.6,
 	# Rìu — gỗ
 	BlockID.OAK_WOOD:     1.4,
+	BlockID.HARD_WOOD:    1.6,
 	# Cỏ non — như cỏ thường
 	BlockID.YOUNG_GRASS:  1.2,
 	# Không thể phá
@@ -361,7 +367,7 @@ static func is_shovelable(bid: int) -> bool:
 
 ## Block nào rìu (axe) đào được — gỗ.
 static func is_axable(bid: int) -> bool:
-	return bid == BlockID.OAK_WOOD
+	return bid == BlockID.OAK_WOOD or bid == BlockID.HARD_WOOD
 
 ## ── Legacy tile colors (giữ lại để tương thích các code cũ) ─────────────────
 const TILE_COLORS_TW: Array[Dictionary] = [

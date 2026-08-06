@@ -6,18 +6,26 @@ static func whole(parent: Node3D, variant: String = "green") -> void:
 	var pivot := Node3D.new()
 	pivot.scale = Vector3(1.5, 1.5, 1.5)
 	parent.add_child(pivot)
+	for d in whole_data(variant):
+		var p: Vector3 = d["pos"]
+		var s: Vector3 = d["size"]
+		ItemMeshShared.add_cube(pivot, p.x, p.y, p.z, s.x, s.y, s.z, d["color"])
 
+## Dữ liệu khối của quả dừa nguyên (model chuẩn: elip + đài hoa 4 cánh + 3 gờ
+## dọc) dùng chung cho icon item và cây dừa (palm). Mỗi phần tử là 1 cube:
+## {"pos": Vector3 (đơn vị model), "size": Vector3, "color": Color}.
+static func whole_data(variant: String = "green") -> Array[Dictionary]:
 	var green: Color = Color(0.18, 0.62, 0.25) if variant == "green" else Color(0.38, 0.25, 0.14)
 	var green_light: Color = green.lightened(0.12)
 	var green_dark: Color = green.darkened(0.12)
 	var brown: Color = Color(0.42, 0.28, 0.15)
 	var dark: Color = Color(0.28, 0.18, 0.10)
-	var fiber: Color = Color(0.50, 0.35, 0.18)
 
 	var rx: float = 3.2
 	var ry: float = 4.0
 	var rz: float = 3.2
 
+	var out: Array[Dictionary] = []
 	for vx in range(-ceili(rx), ceili(rx) + 1):
 		for vy in range(-ceili(ry), ceili(ry) + 1):
 			for vz in range(-ceili(rz), ceili(rz) + 1):
@@ -51,7 +59,7 @@ static func whole(parent: Node3D, variant: String = "green") -> void:
 				col.g = clampf(col.g + (jr - 0.5) * 0.06, 0.0, 1.0)
 				col.b = clampf(col.b + (jr - 0.5) * 0.06, 0.0, 1.0)
 
-				ItemMeshShared.add_cube(pivot, vx, vy, vz, 1.0, 1.0, 1.0, col)
+				out.append({ "pos": Vector3(vx, vy, vz), "size": Vector3.ONE, "color": col })
 
 	# Stem calyx (ngôi sao 3-4 cánh ở đỉnh)
 	var stem_y := ceili(ry) + 1
@@ -60,8 +68,8 @@ static func whole(parent: Node3D, variant: String = "green") -> void:
 		for si in range(2):
 			var sx := cos(a + float(si) * 0.3) * 1.2
 			var sz := sin(a + float(si) * 0.3) * 1.2
-			ItemMeshShared.add_cube(pivot, sx, stem_y, sz, 0.8, 0.5, 0.8, dark)
-	ItemMeshShared.add_cube(pivot, 0, stem_y + 0.5, 0, 0.8, 0.6, 0.8, brown)
+			out.append({ "pos": Vector3(sx, stem_y, sz), "size": Vector3(0.8, 0.5, 0.8), "color": dark })
+	out.append({ "pos": Vector3(0, stem_y + 0.5, 0), "size": Vector3(0.8, 0.6, 0.8), "color": brown })
 
 	# 3 đường gờ chạy dọc
 	for ri in range(3):
@@ -72,7 +80,9 @@ static func whole(parent: Node3D, variant: String = "green") -> void:
 			var gx := cos(ra) * (rx + inset)
 			var gz := sin(ra) * (rz + inset)
 			var gc := green_dark if variant == "green" else dark
-			ItemMeshShared.add_cube(pivot, gx, vy2, gz, 0.6, 0.7, 0.6, gc)
+			out.append({ "pos": Vector3(gx, vy2, gz), "size": Vector3(0.6, 0.7, 0.6), "color": gc })
+
+	return out
 
 
 static func half(parent: Node3D) -> void:

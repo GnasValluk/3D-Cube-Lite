@@ -57,7 +57,7 @@ func _ready() -> void:
 	# ── 2. Recipe ───────────────────────────────────────────────────────────
 	print("-- 2. Recipe bổ đôi + lấy hạt --")
 	_Recipe.ensure()
-	_check(_Recipe.recipes.size() == 13, "tổng 13 recipe (3 bí đỏ, 2 dưa hấu, 2 cà tím)")
+	_check(_Recipe.recipes.size() == 15, "tổng 15 recipe (3 bí đỏ, 2 dưa hấu, 2 cà tím, 1 cam, máy kéo)")
 	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "eggplant_slice"),
 		"có recipe bổ đôi cà tím")
 	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "eggplant_seed"),

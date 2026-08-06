@@ -17,6 +17,15 @@ static func ensure() -> void:
 	_built = true
 	recipes = [
 		{
+			"id": "tractor",
+			"name": "Máy Kéo Nông Nghiệp",
+			"result": "tractor",
+			"count": 1,
+			"ingredients": { "steel_ingot": 6, "iron_ingot": 8, "palm_wood": 10 },
+			"category": CAT_STRUCTURES,
+			"desc": "Máy kéo + rơ-moóc chở hàng — đặt xuống đất, F để lên lái, chở bí dưa về làng.",
+		},
+		{
 			"id": "fishing_boat",
 			"name": "Thuyền Đánh Cá",
 			"result": "fishing_boat",
@@ -132,6 +141,15 @@ static func ensure() -> void:
 			"ingredients": { "pumpkin": 1 },
 			"category": CAT_MATERIALS,
 			"desc": "Đục mắt/mũi/miệng tam giác zíc-zắc, đặt nến voxel — đèn lồng tỏa ánh lửa vàng đỏ ấm áp cho đêm hội.",
+		},
+		{
+			"id": "orange_seed",
+			"name": "Hạt Giống Cam",
+			"result": "orange_seed",
+			"count": 2,
+			"ingredients": { "orange": 1 },
+			"category": CAT_MATERIALS,
+			"desc": "Lấy hạt từ quả cam chín — gieo trên đất tơi xốp để trồng thêm cây cam.",
 		},
 	]
 

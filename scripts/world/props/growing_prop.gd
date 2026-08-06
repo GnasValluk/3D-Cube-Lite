@@ -1,10 +1,11 @@
 class_name GrowingProp
 extends DestroyableProp
 
-## Cây có vòng đời: MẦM → NON → TRƯỞNG THÀNH (→ CHÍN nếu cây có 3 ngưỡng)
-## theo thời gian game (TimeSystem). Ngày "sinh" được sinh ra từ hash vị trí
-## → mỗi cây có tuổi riêng, ổn định giữa các lần load world, và dần trưởng
-## thành khi người chơi chơi lâu.
+## Cây có vòng đời: MẦM → TRƯỞNG THÀNH (→ CHÍN nếu có 3 ngưỡng) theo thời
+## gian game (TimeSystem). Các cây thân gỗ ghi đè `_has_young_stage()` = false
+## để bỏ hẳn giai đoạn NON (vị thành niên) — mầm xong là trưởng thành luôn.
+## Ngày "sinh" được sinh ra từ hash vị trí → mỗi cây có tuổi riêng, ổn định
+## giữa các lần load world, và dần trưởng thành khi người chơi chơi lâu.
 
 const CYCLE_DURATION: float = 600.0  # 1 ngày game = 10 phút thực (TimeSystem.CYCLE_DURATION)
 
@@ -33,6 +34,10 @@ func _birth_span_days() -> float:
 func _stage_thresholds() -> Array[float]:
 	return [5.0, 15.0]
 
+## Cây thân gỗ ghi đè = false: không có giai đoạn vị thành niên (NON).
+func _has_young_stage() -> bool:
+	return true
+
 func _get_now_cycle() -> float:
 	if TimeSystem != null:
 		return TimeSystem.get_cycle_time()
@@ -47,8 +52,9 @@ func _compute_stage() -> int:
 	var th := _stage_thresholds()
 	if age_days < th[0]:
 		return Stage.SPROUT
-	if age_days < th[1]:
-		return Stage.YOUNG
+	if _has_young_stage():
+		if age_days < th[1]:
+			return Stage.YOUNG
 	if th.size() < 3:
 		return Stage.MATURE
 	if age_days < th[2]:

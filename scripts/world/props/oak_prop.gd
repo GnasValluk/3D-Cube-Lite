@@ -2,10 +2,10 @@ class_name OakProp
 extends GrowingProp
 
 ## Cây sồi kiểu Minecraft — thân cột nâu đậm thẳng đứng (vỏ nâu sẫm ấm, không
-## rêu/xám), tán lá xanh um dạng khối blob chunky: lõi xanh rừng thẫm,
-## giữa xanh tươi, ngoài xanh sáng đón nắng; nhiều cành nhánh vươn ra
-## mang chùm lá riêng, gió đu nhẹ theo chùm. Vòng đời: mầm (sapling)
-## → cây non → trưởng thành. Chặt rìu rơi khối gỗ sồi.
+## rêu/xám), tán lá xanh lá chuối (vàng-xanh sáng) dạng khối blob chunky lớn:
+## lõi sẫm, giữa tươi, ngoài sáng đón nắng; nhiều cành nhánh vươn ra mang chùm
+## lá riêng, gió đu nhẹ theo chùm. Vòng đời: mầm (sapling) → trưởng thành.
+## Chặt rìu rơi khối gỗ sồi.
 
 enum OakSize { SMALL, MEDIUM, TALL }
 
@@ -32,15 +32,14 @@ var _canopy_centers: Array[Vector3] = []
 
 func setup(variant: String = "plains") -> void:
 	_variant = variant
+	# Loại bỏ dạng ít lá: cây sồi luôn chỉ có cỡ vừa/lớn, tán lúc nào cũng um tùm.
 	var r := randf()
-	if r < 0.15: _size = OakSize.SMALL
-	elif r < 0.45: _size = OakSize.MEDIUM
+	if r < 0.45: _size = OakSize.MEDIUM
 	else: _size = OakSize.TALL
 	_base_h = _roll_base_h()
 
 func _roll_base_h() -> float:
 	match _size:
-		OakSize.SMALL:  return 3.2 + randf() * 0.4
 		OakSize.MEDIUM: return 4.2 + randf() * 0.6
 		OakSize.TALL:   return 5.4 + randf() * 0.6
 	return 4.4
@@ -51,6 +50,10 @@ func _birth_span_days() -> float:
 func _stage_thresholds() -> Array[float]:
 	return [15.0, 55.0]
 
+## Cây sồi không có giai đoạn vị thành niên — mầm xong là trưởng thành.
+func _has_young_stage() -> bool:
+	return false
+
 func _ready() -> void:
 	super._ready()
 	_build_tree()
@@ -59,8 +62,7 @@ func _ready() -> void:
 func _get_h() -> float:
 	if _stage == GrowingProp.Stage.SPROUT:
 		return 0.5
-	var stage_scale: float = 0.62 if _stage == GrowingProp.Stage.YOUNG else 1.0
-	return _base_h * stage_scale
+	return _base_h
 
 func _on_destroy() -> void:
 	super._on_destroy()
@@ -84,18 +86,29 @@ func _process(delta: float) -> void:
 
 func _setup_collision() -> void:
 	var h := _get_h()
-	var br := _get_base_r()
-	var canopy_r := _canopy_r()
-	if _stage == GrowingProp.Stage.YOUNG:
-		canopy_r *= 0.6
 	var body := StaticBody3D.new()
-	var col := CollisionShape3D.new()
-	var shape := CylinderShape3D.new()
-	shape.radius = maxf(br, canopy_r * 0.6) + 0.2
-	shape.height = h + 0.4
-	col.shape = shape
-	col.position.y = h * 0.5
-	body.add_child(col)
+	body.name = "OakCollision"
+	# Thân cây: trụ nhỏ khớp đúng phần gỗ thật (bán kính theo gốc thân).
+	var trunk := CollisionShape3D.new()
+	var cyl := CylinderShape3D.new()
+	cyl.radius = _get_base_r() * 0.85 + 0.10
+	cyl.height = maxf(h * 0.55, 0.35)
+	trunk.shape = cyl
+	trunk.position.y = h * 0.5
+	body.add_child(trunk)
+	# Tán: 1 quả cầu nhỏ cho mỗi đùm lá tại đúng tâm đùm — khớp silhouette
+	# thật của cây thay vì 1 trụ khổng lồ phủ cả tán (trước đây to hơn cây).
+	for t in _tuft_data:
+		if not "r" in t:
+			continue
+		var tc: Vector3 = t["center"]
+		var tr2: float = t["r"]
+		var slab := CollisionShape3D.new()
+		var sph := SphereShape3D.new()
+		sph.radius = maxf(tr2 * 0.85, 0.18)
+		slab.shape = sph
+		slab.position = tc
+		body.add_child(slab)
 	add_child(body)
 
 func _get_base_r() -> float:
@@ -109,8 +122,6 @@ func _get_base_r() -> float:
 		r *= 1.1
 	if _stage == GrowingProp.Stage.SPROUT:
 		r *= 0.40
-	elif _stage == GrowingProp.Stage.YOUNG:
-		r *= 0.70
 	return r
 
 func _get_top_r() -> float:
@@ -120,8 +131,6 @@ func _get_top_r() -> float:
 		OakSize.MEDIUM: r = 0.19
 		OakSize.TALL:   r = 0.22
 		_: r = 0.19
-	if _stage == GrowingProp.Stage.YOUNG:
-		r *= 0.70
 	return r
 
 ## Bán kính tán — xòe rộng theo phương ngang kiểu Minecraft.
@@ -129,15 +138,13 @@ func _canopy_r() -> float:
 	var r: float
 	match _size:
 		OakSize.SMALL:  r = 1.10
-		OakSize.MEDIUM: r = 1.40
-		OakSize.TALL:   r = 1.70
-		_: r = 1.40
+		OakSize.MEDIUM: r = 1.55
+		OakSize.TALL:   r = 1.90
+		_: r = 1.55
 	if _variant == "river":
 		r *= 1.1
 	if _stage == GrowingProp.Stage.SPROUT:
 		r *= 0.25
-	elif _stage == GrowingProp.Stage.YOUNG:
-		r *= 0.60
 	return r
 
 # ── GRID helpers ────────────────────────────────────────────────────────────
@@ -163,18 +170,18 @@ func _add_tuft_voxel(tuft: Dictionary, x: float, y: float, z: float, col: Color)
 	(tuft["pos"] as Array).append(Vector3(round(x / VOXEL) * VOXEL, round(y / VOXEL) * VOXEL, round(z / VOXEL) * VOXEL))
 	(tuft["col"] as Array).append(col * _DARKEN)
 
-## Lá dùng lưới thô 0.125 (2× voxel thân) — khối lá chunky kiểu Minecraft,
-## vẫn đồng bộ 8 sub-cube với lưới chính.
+## Lá dùng lưới thô 0.1875 (3× voxel thân) — khối lá chunky kiểu Minecraft.
 func _add_tuft_voxel_c(tuft: Dictionary, x: float, y: float, z: float, col: Color) -> void:
-	var s := VOXEL * 2.0
+	var s := VOXEL * 3.0
 	(tuft["pos"] as Array).append(Vector3(round(x / s) * s, round(y / s) * s, round(z / s) * s))
 	(tuft["col"] as Array).append(col * _DARKEN)
 
-## Đoạn trụ voxel hóa giữa 2 điểm (thân mảnh cành).
+## Đoạn trụ voxel hóa giữa 2 điểm (thân mảnh cành) — lưới 0.125.
 func _stroke(a: Vector3, b: Vector3, r: float, col: Color) -> void:
+	var lv := VOXEL * 2.0
 	var dist := a.distance_to(b)
-	var steps := maxi(2, ceili(dist / (VOXEL * 0.8)))
-	var rv := maxi(1, ceili(r / VOXEL))
+	var steps := maxi(2, ceili(dist / (lv * 0.8)))
+	var rv := maxi(1, ceili(r / lv))
 	for si in range(steps + 1):
 		var t := float(si) / float(steps)
 		var p := a.lerp(b, t)
@@ -188,7 +195,7 @@ func _stroke(a: Vector3, b: Vector3, r: float, col: Color) -> void:
 				var c2: Color = col
 				if randf() < 0.15:
 					c2 = col.darkened(0.10)
-				_fill(p.x + vx * VOXEL, p.y, p.z + vz * VOXEL, c2)
+				_fill(p.x + vx * lv, p.y, p.z + vz * lv, c2)
 
 # ── MAIN BUILD ──────────────────────────────────────────────────────────────
 
@@ -293,8 +300,9 @@ func _build_sprout() -> void:
 	var ny: int = ceili(stem_h / VOXEL)
 	for vy in range(ny):
 		_fill(0.0, vy * VOXEL, 0.0, stem)
-	var tuft: Dictionary = { "center": Vector3(0.0, stem_h + 0.10, 0.0), "pos": [], "col": [] }
-	_build_blob(tuft, Vector3.ZERO, 0.16 + randf() * 0.06)
+	var br := 0.16 + randf() * 0.06
+	var tuft: Dictionary = { "center": Vector3(0.0, stem_h + 0.10, 0.0), "pos": [], "col": [], "r": br }
+	_build_blob(tuft, br)
 	_tuft_data.append(tuft)
 
 # ── TRUNK (thân cột nâu đậm, gần thẳng, vỏ nâu sẫm ấm) ─────────────────────
@@ -302,30 +310,31 @@ func _build_sprout() -> void:
 func _build_trunk(h: float) -> void:
 	var base_r := _get_base_r()
 	var top_r := _get_top_r()
-	var ny: int = ceili(h / VOXEL)
+	var lv := VOXEL * 2.0
+	var ny: int = ceili(h / lv)
 	var wob := randf() * TAU
 	for vy in range(ny):
 		var t: float = float(vy) / float(ny)
-		var y := vy * VOXEL
+		var y := vy * lv
 		var r := lerpf(base_r, top_r, t)
-		r *= 1.0 + sin(vy * 0.35 + wob) * 0.05
-		if vy < 4:
-			r *= 1.0 + (1.0 - float(vy) / 4.0) * 0.15   # phình nhẹ chân
-		var cx := sin(vy * 0.5 + wob) * 0.03 * (1.0 - t)
-		var cz := cos(vy * 0.4 + wob * 1.7) * 0.03 * (1.0 - t)
-		var rv: int = ceili(r / VOXEL)
+		r *= 1.0 + sin(vy * 0.7 + wob) * 0.05
+		if vy < 2:
+			r *= 1.0 + (1.0 - float(vy) / 2.0) * 0.15   # phình nhẹ chân
+		var cx := sin(vy * 1.0 + wob) * 0.03 * (1.0 - t)
+		var cz := cos(vy * 0.8 + wob * 1.7) * 0.03 * (1.0 - t)
+		var rv: int = ceili(r / lv)
 		for vx in range(-rv - 1, rv + 2):
 			for vz in range(-rv - 1, rv + 2):
-				var dx := vx * VOXEL - cx
-				var dz := vz * VOXEL - cz
+				var dx := vx * lv - cx
+				var dz := vz * lv - cz
 				if dx * dx + dz * dz > r * r:
 					continue
 				_fill(dx, y, dz, _bark_vary())
 		# sẹo cành ngắn rải rác trên thân (vài chấm sẫm)
-		if vy > ny / 3 and vy % 29 == 7 and randf() < 0.6:
+		if vy > ny / 3 and vy % 15 == 3 and randf() < 0.6:
 			var sa: float = randf() * TAU
 			_fill(cos(sa) * r, y, sin(sa) * r, Color(0.30, 0.19, 0.08))
-			_fill(cos(sa + 0.35) * r * 0.8, y + VOXEL * 0.5, sin(sa + 0.35) * r * 0.8, Color(0.30, 0.19, 0.08))
+			_fill(cos(sa + 0.35) * r * 0.8, y + lv * 0.5, sin(sa + 0.35) * r * 0.8, Color(0.30, 0.19, 0.08))
 
 func _bark_vary() -> Color:
 	var r := randf()
@@ -338,8 +347,7 @@ func _bark_vary() -> Color:
 # ── BRANCH ARMS (cành vươn lên mang chùm lá) ───────────────────────────────
 
 func _branch_arms(h: float) -> void:
-	var is_young: bool = _stage == GrowingProp.Stage.YOUNG
-	var n_arm: int = 2 if is_young else (3 + randi() % 3)
+	var n_arm: int = 3 + randi() % 3
 	var base_r := _get_base_r()
 	_canopy_centers.clear()
 	var seed_a: float = randf() * TAU
@@ -356,53 +364,82 @@ func _branch_arms(h: float) -> void:
 # ── CANOPY: khối blob lá chunky kiểu Minecraft ─────────────────────────────
 
 func _build_canopy(h: float) -> void:
-	var is_young: bool = _stage == GrowingProp.Stage.YOUNG
 	var canopy := _canopy_r()
-	# Chùm trung tâm trên ngọn thân
+	# Chùm trung tâm trên ngọn thân + chùm ở đầu từng cành.
 	var centers: Array[Vector3] = [Vector3(0.0, h * 0.96, 0.0)]
 	centers.append_array(_canopy_centers)
-	var max_blobs: int = 1 if is_young else centers.size()
-	var made := 0
+	# Cây sồi LUÔN rất nhiều lá: mỗi điểm gắn sinh nhiều đùm lá tròn to,
+	# lệch vị trí quanh gốc, mỗi đùm 1 tông màu trong bảng palette.
 	for c in centers:
-		if made >= max_blobs:
-			break
-		var r: float = canopy * (0.78 if made == 0 else (0.46 + randf() * 0.12))
-		if is_young:
-			r = canopy * (0.55 if made == 0 else 0.38)
-		var tuft: Dictionary = { "center": c, "pos": [], "col": [] }
-		_build_blob(tuft, Vector3.ZERO, r)
-		_tuft_data.append(tuft)
-		made += 1
+		var n_sub: int = 3 if c == centers[0] else 2
+		for si in range(n_sub):
+			var ang: float = randf() * TAU
+			var dist: float = (0.15 + randf() * 0.40) * canopy * 0.8
+			var off := Vector3(cos(ang) * dist, (randf() - 0.5) * 0.30, sin(ang) * dist)
+			var r: float
+			if c == centers[0]:
+				r = canopy * (0.62 + randf() * 0.24)
+			else:
+				r = canopy * (0.46 + randf() * 0.18)
+			var tuft: Dictionary = { "center": c + off, "pos": [], "col": [], "r": r }
+			_build_blob(tuft, r)
+			_tuft_data.append(tuft)
 
-func _build_blob(tuft: Dictionary, center: Vector3, r: float) -> void:
-	var s := VOXEL * 2.0
-	var rv: int = ceili(r / s)
-	for vx in range(-rv - 1, rv + 2):
-		for vy in range(-rv - 1, rv + 2):
-			for vz in range(-rv - 1, rv + 2):
-				var dx := vx * s
-				var dy := vy * s
-				var dz := vz * s
-				var d := sqrt(dx * dx + dy * dy + dz * dz)
-				if d > r:
+## Đùm lá: elip dẹp (giống tán cây cam) trên lưới voxel thô 0.1875 (3× voxel
+## thân) — khối chunky kiểu Minecraft, dày hơn lưới 0.25 để lá không quá thưa.
+func _build_blob(tuft: Dictionary, r: float) -> void:
+	var tone := _LEAF_TONES[randi() % _LEAF_TONES.size()]
+	var squash := 0.70 + randf() * 0.25
+	var edge: float = 0.85 + randf() * 0.15
+	var lv := VOXEL * 3.0
+	var br: int = ceili(r / lv)
+	var r_inv := 1.0 / r
+	var ry_inv := 1.0 / (r * 0.55)
+	var squash_inv := 1.0 / (r * squash)
+	var m2 := 1.0
+	for vx in range(-br, br + 1):
+		var sx := (vx * lv) * r_inv
+		var sx2 := sx * sx
+		for vy in range(-br, br + 1):
+			var sy2 := (vy * lv) * ry_inv
+			sy2 *= sy2
+			var dp2 := sx2 + sy2
+			for vz in range(-br, br + 1):
+				var sz := (vz * lv) * squash_inv
+				var d2 := dp2 + sz * sz
+				if d2 > m2:
 					continue
-				var d01 := clampf(d / maxf(r, 0.001), 0.0, 1.0)
-				var edge: float = 0.82 + randf() * 0.18
+				var px := vx * lv
+				var py := vy * lv
+				var pz := vz * lv
+				var d := sqrt(d2)
+				var d01 := d
 				if d01 > edge and randf() > 0.45:
 					continue
-				if d01 < 0.75 and randf() < 0.06:
+				if d01 < 0.70 and randf() < 0.04:
 					continue
-				_add_tuft_voxel_c(tuft, dx, dy, dz, _leaf_color(d01, randf()))
+				_add_tuft_voxel_c(tuft, px, py, pz, _leaf_color(tone, d01, randf()))
 
-## Màu lá: lõi xanh rừng thẫm → giữa xanh tươi → ngoài xanh sáng đón nắng.
-func _leaf_color(d01: float, rnd: float) -> Color:
-	if rnd < 0.10 and d01 > 0.6:
-		return Color(0.32, 0.80, 0.22)
+## Bảng tông lá chuối (vàng-xanh sáng): lõi vàng-xanh sẫm → giữa vàng-xanh
+## tươi → ngoài vàng-xanh sáng đón nắng — mỗi đùm lá mang 1 tông riêng.
+const _LEAF_TONES: Array[Color] = [
+	Color(0.45, 0.62, 0.12),
+	Color(0.52, 0.70, 0.14),
+	Color(0.58, 0.76, 0.16),
+	Color(0.64, 0.82, 0.18),
+	Color(0.70, 0.88, 0.20),
+	Color(0.76, 0.92, 0.24),
+]
+
+## Màu lá: lõi sẫm hơn tông → giữa bằng tông → ngoài sáng hơn tông đón nắng.
+func _leaf_color(tone: Color, d01: float, rnd: float) -> Color:
+	if rnd < 0.08 and d01 > 0.6:
+		return tone.lightened(0.25)
 	if d01 > 0.72:
-		return Color(0.24, 0.70, 0.16)
+		return tone.lightened(0.12)
 	if d01 > 0.42:
-		return Color(0.18, 0.60, 0.12)
-	return Color(0.11, 0.48, 0.09)
+		return tone
+	return tone.darkened(0.20)
 
 func _jitter(col: Color) -> Color:
 	var j := (randf() - 0.5) * 0.06

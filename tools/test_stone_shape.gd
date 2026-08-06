@@ -65,12 +65,19 @@ func _build_terrain_ref(chunk: Node, cols: int, st: SurfaceTool) -> void:
 		_Data._Dim.DimensionID.REAL_WORLD, chunk._top_ly_cache)
 
 ## Nếu hit vào box shape → trả kích thước hộp, ngược lại Vector3.ZERO.
+## Mọi đá shape gộp trong 1 StaticBody3D compound → dùng shape index của hit.
 func _hit_box_size(hit: Dictionary) -> Vector3:
 	if hit.is_empty():
 		return Vector3.ZERO
 	var body = hit.get("collider")
 	if body is StaticBody3D:
-		for child in body.get_children():
+		var si: int = hit.get("shape", -1)
+		var children: Array = body.get_children()
+		if si >= 0 and si < children.size() and children[si] is CollisionShape3D:
+			var cs := children[si] as CollisionShape3D
+			if cs.shape is BoxShape3D:
+				return (cs.shape as BoxShape3D).size
+		for child in children:
 			if child is CollisionShape3D and child.shape is BoxShape3D:
 				return (child.shape as BoxShape3D).size
 	return Vector3.ZERO
@@ -126,7 +133,7 @@ func _ready() -> void:
 	add_child(chunk)
 	chunk.position = Vector3.ZERO
 	_check(chunk._built, "chunk sync build xong")
-	_check(chunk._shaped_block_instances.is_empty() and chunk._shaped_colliders.is_empty(),
+	_check(chunk._shaped_block_instances.is_empty() and chunk._shaped_collider == null,
 		"chunk mới chưa có block shape")
 
 	# Tìm cột cao nguyên (4 ô lân cận cùng độ cao, không sát biên chunk)
@@ -233,7 +240,7 @@ func _ready() -> void:
 	_check(chunk.break_block_at(wx0, wy3, wz0) == _Data.BlockID.STONE_QTR, "đào đá tư")
 	_check(chunk.break_block_at(wx0, wy2, wz0) == _Data.BlockID.STONE, "đào đá thường")
 	await _wait_frames(3)
-	_check(chunk._shaped_block_instances.is_empty() and chunk._shaped_colliders.is_empty(),
+	_check(chunk._shaped_block_instances.is_empty() and chunk._shaped_collider == null,
 		"đào sạch → không còn mesh/collision shape")
 	_check(chunk._top_ly_cache[gx * cols + gz] == ground_ly, "heightmap về mặt đất ban đầu")
 	await _wait_frames(3)

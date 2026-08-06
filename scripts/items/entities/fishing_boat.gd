@@ -195,23 +195,13 @@ func _chunk_at(wx: float, wz: float) -> Node:
 	_last_chunk = null
 	_last_cx = cx
 	_last_cz = cz
-	var root := get_tree().current_scene if get_tree() != null else null
-	if root == null:
-		return null
-	var found := _find_chunk_recursive(root, cx, cz)
+	# Tra cứu O(1) qua registry của WorldChunk — thay cho _find_chunk_recursive
+	# (đệ quy quét cả scene tree gây lag mỗi lần thuyền đổi chunk).
+	var found := WorldChunk.get_chunk(cx, cz, _Data._Dim.DimensionID.REAL_WORLD)
 	if found == null:
 		return null
 	_last_chunk = found
 	return found
-
-func _find_chunk_recursive(node: Node, cx: int, cz: int) -> Node:
-	if node is WorldChunk and "_cx" in node and node._cx == cx and node._cz == cz:
-		return node
-	for ch in node.get_children():
-		var r := _find_chunk_recursive(ch, cx, cz)
-		if r != null:
-			return r
-	return null
 
 # ── Vật lý ───────────────────────────────────────────────────────────────────
 func _physics_process(delta: float) -> void:

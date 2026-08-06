@@ -510,8 +510,8 @@ func _physics_process(delta: float) -> void:
 			submerged.emit(_underwater)
 			_spawn_splash(!_underwater)
 
-	# Đang lái thuyền: bỏ qua điều khiển di chuyển — vị trí do thuyền đồng bộ
-	if _is_player and has_meta("driving_boat"):
+	# Đang lái thuyền/máy kéo: bỏ qua điều khiển di chuyển — vị trí do xe đồng bộ
+	if _is_player and (has_meta("driving_boat") or has_meta("driving_vehicle")):
 		if _attack_timer > 0.0 and not _melee_hit_once and (1.0 - _attack_timer / attack_duration) >= _melee_hit_progress:
 			_do_melee_hit()
 		_animate(delta)

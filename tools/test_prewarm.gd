@@ -7,6 +7,7 @@ const _River = preload("res://scripts/world/chunk/chunk_river.gd")
 var _stage: int = 0
 var _t0: int = 0
 var _async_road_count: int = 0
+var _async_fp: int = 0
 var _async_river_count: int = 0
 var _async_samples: Array = []
 var _async_prewarm_ms: int = 0
@@ -40,6 +41,7 @@ func _process(_delta: float) -> void:
 		_check("no rebuild on warm", rebuild_ms < 50)
 		_async_road_count = _Road._road_curves.size()
 		_async_river_count = _River._river_curves.size()
+		_async_fp = _network_fp()
 		for x in range(-480, 481, int(SAMPLE_STEP)):
 			for z in range(-480, 481, int(SAMPLE_STEP)):
 				var wxf := float(x)
@@ -92,7 +94,7 @@ func _process(_delta: float) -> void:
 	elif _stage == 4:
 		if _W._networks_ready and _W._networks_seed == WorldSeed.seed_value:
 			_seed2_road_count = _Road._road_curves.size()
-			_check("seed change rebuilt roads", _seed2_road_count != _async_road_count)
+			_check("seed change rebuilt roads", _network_fp() != _async_fp)
 			_check("networks_seed updated", _W._networks_seed == WorldSeed.seed_value)
 			# Queries trên seed mới phải khác ít nhất 1 mẫu so với seed cũ
 			var diff: int = 0
@@ -116,3 +118,19 @@ func _check(name: String, ok: bool) -> void:
 	if not ok:
 		_fails += 1
 	print(("PASS | " if ok else "FAIL | ") + name)
+
+## Fingerprint mạng đường/sông (số curve + kích thước + vị trí đầu/cuối) —
+## xác định network có được rebuild không, bền hơn so sánh số lượng curve
+## (2 seed khác nhau có thể cho đúng 11656 curve nhưng vị trí khác).
+func _network_fp() -> int:
+	var h: int = 0
+	for c in _Road._road_curves:
+		h = h * 31 + c.size()
+		if c.size() > 0:
+			var p0: Vector2 = c[0]
+			var p1: Vector2 = c[c.size() - 1]
+			h = h * 31 + int(p0.x * 100.0) + int(p0.y * 100.0) * 7 \
+				+ int(p1.x * 100.0) * 13 + int(p1.y * 100.0) * 17
+	for c in _River._river_curves:
+		h = h * 31 + c.size()
+	return h

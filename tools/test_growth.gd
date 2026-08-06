@@ -1,6 +1,7 @@
 extends Node
 
-## Headless verification: cây có vòng đời MẦM → NON → TRƯỞNG THÀNH theo thời gian game.
+## Headless verification: vòng đời theo thời gian game — cây cỏ MẦM → NON → TRƯỞNG THÀNH,
+## cây thân gỗ MẦM → TRƯỞNG THÀNH (bỏ hẳn giai đoạn vị thành niên).
 ## Chạy qua tools/test_growth.tscn (không chạy trực tiếp file .gd).
 
 const _Growing = preload("res://scripts/world/props/growing_prop.gd")
@@ -43,13 +44,13 @@ func _ready() -> void:
 	_check(taro._stage == _Growing.Stage.SPROUT, "taro 1 ngày = cây mầm")
 	_check(palm._stage == _Growing.Stage.SPROUT, "palm 3 ngày = cây mầm")
 
-	# ── Cây non ──
+	# ── Cây non (cây thân gỗ bỏ vị thành niên — palm qua ngưỡng mầm là trưởng thành) ──
 	weed.set_birth_age_days(3.0)
 	taro.set_birth_age_days(5.0)
 	palm.set_birth_age_days(15.0)
 	_check(weed._stage == _Growing.Stage.YOUNG, "weed 3 ngày = cây non")
 	_check(taro._stage == _Growing.Stage.YOUNG, "taro 5 ngày = cây non")
-	_check(palm._stage == _Growing.Stage.YOUNG, "palm 15 ngày = cây non")
+	_check(palm._stage == _Growing.Stage.MATURE, "palm 15 ngày = trưởng thành (không có non)")
 
 	# ── Trưởng thành ──
 	weed.set_birth_age_days(10.0)

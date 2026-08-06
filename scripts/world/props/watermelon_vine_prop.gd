@@ -262,8 +262,8 @@ func _build_young_fruits() -> void:
 		var center := Vector3(cos(fa) * r, 0.075, sin(fa) * r)
 		_build_ball(center, 0.090 + randf() * 0.015, col_skin, col_skin_d, false, 0.0, Color.WHITE)
 
-## Quả chín: nền xanh ngọc bích + vằn zíc-zắc xanh đen nhô cao 1 lớp + vệt
-## đất vàng ngà ở đáy + cuống uốn xoắn.
+## Quả chín: mỗi trái dưa to đặt LỆCH khỏi gốc dây (gần đó) + sợi dây bò nối
+## từ gốc đến trái — dưa hấu mọc gần nguồn nước, dây vươn ra đặt trái bên cạnh.
 func _build_ripe_fruits() -> void:
 	var col_skin := Color(0.50, 0.76, 0.40)
 	var col_skin_d := Color(0.40, 0.64, 0.32)
@@ -272,14 +272,30 @@ func _build_ripe_fruits() -> void:
 	var col_stalk := Color(0.30, 0.38, 0.16)
 	for fi in range(_fruit_count):
 		var fa: float = randf() * TAU
-		var r: float = 0.12 + randf() * 0.08
-		var center := Vector3(cos(fa) * r, 0.085, sin(fa) * r)
+		var dist: float = 0.55 + randf() * 0.45
+		var fruit_pos := Vector3(cos(fa) * dist, 0.085, sin(fa) * dist)
+		_build_fruit_strand(fruit_pos, fa)
 		var rx: float = 0.145 + randf() * 0.025
 		var ry: float = rx * (0.88 if _oval else 0.98)
-		_build_ball(center, rx, col_skin, col_skin_d, true, ry, col_stripe)
-		_build_soil_spot(center, rx, col_soil)
-		_build_stalk(center, col_stalk)
-		_build_sparkles(center, col_skin.lightened(0.3))
+		_build_ball(fruit_pos, rx, col_skin, col_skin_d, true, ry, col_stripe)
+		_build_soil_spot(fruit_pos, rx, col_soil)
+		_build_stalk(fruit_pos, col_stalk)
+		_build_sparkles(fruit_pos, col_skin.lightened(0.3))
+
+## Sợi dây bò từ gốc ra đến quả — uốn lượn sát mặt đất, khớp đúng 2 đầu.
+func _build_fruit_strand(target: Vector3, ang: float) -> void:
+	var col := Color(0.30, 0.54, 0.24)
+	var steps: int = 5 + randi() % 3
+	var perp := Vector3(-sin(ang), 0.0, cos(ang))
+	var prev := Vector3.ZERO
+	for si in range(1, steps + 1):
+		var t := float(si) / float(steps)
+		var wob := sin(t * 5.0 + ang) * 0.05 * sin(t * PI)
+		var cur := target * t + perp * wob
+		_fill(prev.x, 0.045, prev.z, col)
+		_fill(cur.x, 0.05, cur.z, col)
+		_vox_vine += 1
+		prev = cur
 
 ## Khối cầu (bầu dục) vỏ dưa + vằn zíc-zắc nhô cao 1 lớp voxel (bám sát mặt quả).
 func _build_ball(center: Vector3, rx: float, skin: Color, skin_d: Color,

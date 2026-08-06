@@ -68,8 +68,8 @@ func _ready() -> void:
 	# ── 1. Recipe chế tạo thuyền ───────────────────────────────────────────
 	print("-- 1. Recipe chế tạo --")
 	_Recipe.ensure()
-	_check(_Recipe.recipes.size() == 13, "có 13 recipe (thuyền, cần câu, xô nước + 3 đá hình dạng + 2 cà tím + 2 dưa hấu + 3 bí đỏ)")
-	_check(_Recipe.recipes[0].id == "fishing_boat", "recipe[0] = fishing_boat")
+	_check(_Recipe.recipes.size() == 15, "có 15 recipe (thuyền, máy kéo, cần câu, xô nước + 3 đá + 2 cà tím + 2 dưa hấu + 3 bí đỏ + hạt cam)")
+	_check(_Recipe.recipes[0].id == "tractor", "recipe[0] = tractor")
 	var rb: Dictionary = _Recipe.match_counts({"palm_wood": 6, "coconut": 2, "tropical_seaweed": 2})
 	_check(rb.get("id", "") == "fishing_boat", "đủ nguyên liệu → chế được thuyền")
 	_check(_Recipe.match_counts({"palm_wood": 5, "coconut": 2, "tropical_seaweed": 1}).is_empty(),

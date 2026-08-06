@@ -231,3 +231,63 @@ static func fishing_boat(p: Node3D) -> void:
 	# Hai mái chèo
 	ItemMeshShared.add_cube(p, W * 0.5 + 0.35, H * 0.25, -0.5, 0.12, 0.12, L * 0.7, paddle)
 	ItemMeshShared.add_cube(p, -W * 0.5 - 0.35, H * 0.25, -0.5, 0.12, 0.12, L * 0.7, paddle)
+
+
+# ── TRACTOR (mini model: máy kéo đỏ + rơ-moọc chở nông sản) ───────────────────
+static func tractor(p: Node3D) -> void:
+	var red       := Color(0.72, 0.10, 0.08)
+	var red_d     := Color(0.48, 0.06, 0.05)
+	var red_l     := Color(0.80, 0.20, 0.13)
+	var steel     := Color(0.30, 0.31, 0.34)
+	var steel_d   := Color(0.16, 0.17, 0.19)
+	var tire      := Color(0.07, 0.07, 0.08)
+	var cream     := Color(0.84, 0.78, 0.58)
+	var wood      := Color(0.60, 0.40, 0.18)
+	var wood_d    := Color(0.44, 0.29, 0.13)
+	var straw     := Color(0.86, 0.74, 0.34)
+	var burlap    := Color(0.66, 0.55, 0.40)
+	var pump      := Color(0.88, 0.45, 0.10)
+
+	# Khung gầm
+	ItemMeshShared.add_cube(p, 0, -0.15, 0, 2.5, 0.4, 4.6, steel_d)
+	# Bánh sau to (2 Bánh)
+	for s in [1.0, -1.0]:
+		ItemMeshShared.add_cube(p, 1.25 * s, -0.85, 1.2, 0.75, 1.7, 0.6, tire)
+		ItemMeshShared.add_cube(p, 1.25 * s, -0.85, 1.2, 0.3, 0.7, 0.5, cream)
+	# Bánh trước nhỏ
+	for s in [1.0, -1.0]:
+		ItemMeshShared.add_cube(p, 1.05 * s, -0.6, -1.7, 0.6, 1.0, 0.45, tire)
+	# Nắp capo đỏ + hẻm
+	ItemMeshShared.add_cube(p, 0, 0.55, -0.9, 1.9, 0.9, 1.8, red_l)
+	ItemMeshShared.add_cube(p, 0, 0.85, -1.8, 1.7, 0.5, 0.2, red_d)
+	ItemMeshShared.add_cube(p, 0, 0.45, -1.8, 1.6, 0.4, 0.15, steel_d)
+	# Đèn pha
+	ItemMeshShared.add_cube(p, 0.6, 0.7, -1.9, 0.3, 0.25, 0.12, Color(1.0, 0.88, 0.5))
+	ItemMeshShared.add_cube(p, -0.6, 0.7, -1.9, 0.3, 0.25, 0.12, Color(1.0, 0.88, 0.5))
+	# Ca-bin (lồng bảo vệ) + lưng đỏ
+	ItemMeshShared.add_cube(p, 0, 1.35, 1.05, 1.8, 0.5, 1.1, red_d)
+	ItemMeshShared.add_cube(p, 0, 1.75, 1.05, 0.3, 0.3, 1.1, steel)
+	ItemMeshShared.add_cube(p, 0, 1.75, 1.05, 1.8, 0.3, 0.2, steel)
+	# Ống xả
+	ItemMeshShared.add_cube(p, 1.05, 1.4, 1.6, 0.18, 1.4, 0.18, steel_d)
+
+	# ── Rơ-moọc (đuôi về +z) ──
+	ItemMeshShared.add_cube(p, 0, -0.2, 3.6, 0.3, 0.4, 1.2, steel)
+	# Sàn ván gỗ
+	ItemMeshShared.add_cube(p, 0, 0.55, 5.1, 2.4, 0.3, 3.6, wood)
+	# Vách 2 bên + trước
+	for s in [1.0, -1.0]:
+		ItemMeshShared.add_cube(p, 1.25 * s, 0.95, 5.1, 0.25, 0.7, 3.6, wood_d)
+	ItemMeshShared.add_cube(p, 0, 0.95, 3.45, 2.5, 0.7, 0.2, wood_d)
+	# Bánh rơ-moọc
+	for s in [1.0, -1.0]:
+		ItemMeshShared.add_cube(p, 1.15 * s, -0.5, 5.2, 0.7, 1.2, 0.55, tire)
+	# Hàng hoá: bí cam + rơm + bao đay
+	ItemMeshShared.add_cube(p, -0.55, 1.05, 4.6, 0.8, 0.8, 0.8, pump)
+	ItemMeshShared.add_cube(p, -0.55, 1.45, 4.6, 0.65, 0.2, 0.65, Color(0.44, 0.55, 0.2))
+	ItemMeshShared.add_cube(p, 0.65, 1.05, 5.4, 0.85, 0.85, 0.85, pump)
+	ItemMeshShared.add_cube(p, 0.0, 1.05, 6.2, 0.8, 0.8, 0.8, pump)
+	ItemMeshShared.add_cube(p, -0.5, 1.25, 6.4, 0.7, 0.5, 0.9, burlap)
+	ItemMeshShared.add_cube(p, 0.55, 0.75, 4.5, 0.8, 0.3, 0.5, straw)
+	ItemMeshShared.add_cube(p, -0.9, 0.75, 5.6, 0.6, 0.25, 0.4, straw)
+	ItemMeshShared.add_cube(p, 0.6, 0.75, 6.0, 0.6, 0.25, 0.4, wood)

@@ -22,6 +22,10 @@ const GAP: float = 5.0
 const COLS: int = 9
 const PAD: float = 20.0
 const GRID_W: float = COLS * (SLOT_SIZE + GAP) - GAP
+const LIST_W: float = 244.0
+const REC_X: float = PAD
+const RIGHT_X: float = PAD + LIST_W + GAP * 2
+const PANEL_W: float = RIGHT_X + GRID_W + PAD
 
 var _furnace = null
 var _player_ref: PlayerCharacter = null
@@ -31,6 +35,10 @@ var _input_faces: Array[ColorRect] = []
 var _input_icons: Array[TextureRect] = []
 var _input_counts: Array[Label] = []
 var _input_panels: Array[Panel] = []
+var _fuel_faces: Array[ColorRect] = []
+var _fuel_icons: Array[TextureRect] = []
+var _fuel_counts: Array[Label] = []
+var _fuel_panels: Array[Panel] = []
 var _output_faces: Array[ColorRect] = []
 var _output_icons: Array[TextureRect] = []
 var _output_counts: Array[Label] = []
@@ -50,7 +58,15 @@ var _slot_hover_style: StyleBoxFlat
 var _slot_drop_style: StyleBoxFlat
 var _slot_script: GDScript
 
+var _recipes: Array = []
+var _recipe_cards: Array[Panel] = []
+var _recipe_list: VBoxContainer
+var _selected_recipe: int = -1
+var _recipe_card_style: StyleBoxFlat
+var _recipe_sel_style: StyleBoxFlat
+
 var _smelting_items: Dictionary = {}
+var _fuels: Dictionary = {}
 var _smelt_active: bool = false
 var _tween: Tween
 var _smelt_progress: float = 0.0
@@ -59,11 +75,11 @@ var _progress_bar: ColorRect
 var _progress_fill: ColorRect
 
 func _init() -> void:
-	_furnace_inv = Inventory.new(2)
+	_furnace_inv = Inventory.new(3)
 
 func _ready() -> void:
 	_content_h = _build_layout()
-	size = Vector2(GRID_W + PAD * 2, _content_h)
+	size = Vector2(PANEL_W, _content_h)
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
@@ -77,7 +93,7 @@ func _ready() -> void:
 	_slot_style.border_width_right = 2
 	_slot_style.border_width_top = 2
 	_slot_style.border_width_bottom = 2
-	_slot_style.border_color = Color(0.85, 0.80, 0.95, 0.10)
+	_slot_style.border_color = Color(0.12, 0.08, 0.20, 0.35)
 
 	_slot_hover_style = _slot_style.duplicate()
 	_slot_hover_style.bg_color = Color(0.22, 0.18, 0.35, 0.80)
@@ -86,6 +102,26 @@ func _ready() -> void:
 	_slot_drop_style = _slot_style.duplicate()
 	_slot_drop_style.bg_color = Color(0.18, 0.35, 0.22, 0.75)
 	_slot_drop_style.border_color = Color(0.22, 0.62, 0.28, 0.60)
+
+	_recipe_card_style = StyleBoxFlat.new()
+	_recipe_card_style.bg_color = BG_CARD
+	_recipe_card_style.corner_radius_top_left = 8
+	_recipe_card_style.corner_radius_top_right = 8
+	_recipe_card_style.corner_radius_bottom_left = 8
+	_recipe_card_style.corner_radius_bottom_right = 8
+	_recipe_card_style.border_width_left = 1
+	_recipe_card_style.border_width_right = 1
+	_recipe_card_style.border_width_top = 1
+	_recipe_card_style.border_width_bottom = 1
+	_recipe_card_style.border_color = Color(0.55, 0.57, 0.62, 0.15)
+
+	_recipe_sel_style = _recipe_card_style.duplicate()
+	_recipe_sel_style.bg_color = Color(0.18, 0.30, 0.22, 0.95)
+	_recipe_sel_style.border_color = Color(0.22, 0.72, 0.38, 0.75)
+	_recipe_sel_style.border_width_left = 2
+	_recipe_sel_style.border_width_right = 2
+	_recipe_sel_style.border_width_top = 2
+	_recipe_sel_style.border_width_bottom = 2
 
 	_slot_script = GDScript.new()
 	_slot_script.source_code = """
@@ -107,16 +143,18 @@ func _drop_data(position, data):
 	_init_smelting_items()
 	_setup_background()
 	_setup_title()
+	_setup_recipe_bar()
 	_setup_furnace_slots()
 	_setup_player_grid()
 	visible = false
 
 func _build_layout() -> float:
-	var top: float = PAD + 24
-	top += 1 * (SLOT_SIZE + GAP) + 8
-	top += 3 * (SLOT_SIZE + GAP) + 6
-	top += 1 * (SLOT_SIZE + GAP)
-	return top + PAD
+	var furnace_bottom: float = PAD + 22 + 64 + SLOT_SIZE
+	var inv_label: float = furnace_bottom + 12
+	var inv_start: float = inv_label + 24
+	var grid_bottom: float = inv_start + 3 * (SLOT_SIZE + GAP)
+	var hotbar_bottom: float = grid_bottom + GAP + SLOT_SIZE
+	return hotbar_bottom + PAD
 
 func _init_smelting_items() -> void:
 	_smelting_items = {
@@ -127,7 +165,17 @@ func _init_smelting_items() -> void:
 		"gold_ore": "gold_ingot",
 		"titan_ore": "titan_ingot",
 		"platinum_ore": "platinum_ingot",
+		"coal_ore": "coal",
 	}
+	# Chất đốt: than, than củi, gỗ dừa. 1 đơn vị = 1 mẻ nung.
+	_fuels = {
+		"coal": true,
+		"charcoal": true,
+		"palm_wood": true,
+		"block_oak_wood": true,
+	}
+	for ore in _smelting_items:
+		_recipes.append({ "input": ore, "output": _smelting_items[ore] })
 
 func _setup_background() -> void:
 	var bg_style := StyleBoxFlat.new()
@@ -143,7 +191,7 @@ func _setup_background() -> void:
 	bg_style.border_color = Color(0.85, 0.80, 0.95, 0.12)
 
 	var bg := Panel.new()
-	bg.size = Vector2(GRID_W + PAD * 2, _content_h)
+	bg.size = Vector2(PANEL_W, _content_h)
 	bg.add_theme_stylebox_override("panel", bg_style)
 	bg.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(bg)
@@ -157,9 +205,20 @@ func _setup_title() -> void:
 	title.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.6))
 	title.add_theme_constant_override("shadow_offset_x", 1)
 	title.add_theme_constant_override("shadow_offset_y", 1)
-	title.position = Vector2(PAD, PAD - 4)
+	title.position = Vector2(RIGHT_X + PAD, PAD - 4)
 	title.size = Vector2(GRID_W, 30)
 	add_child(title)
+
+	var rec_lbl := Label.new()
+	rec_lbl.text = tr("FURNACE_RECIPES")
+	rec_lbl.add_theme_font_size_override("font_size", int(S * 13))
+	rec_lbl.add_theme_color_override("font_color", TEXT_BRIGHT)
+	rec_lbl.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.6))
+	rec_lbl.add_theme_constant_override("shadow_offset_x", 1)
+	rec_lbl.add_theme_constant_override("shadow_offset_y", 1)
+	rec_lbl.position = Vector2(REC_X, PAD - 4)
+	rec_lbl.size = Vector2(LIST_W, 30)
+	add_child(rec_lbl)
 
 func _make_slot(px: float, py: float, faces: Array, icons: Array, counts: Array, panels: Array, slot_type: String, slot_idx: int) -> Panel:
 	var panel := Panel.new()
@@ -177,16 +236,16 @@ func _make_slot(px: float, py: float, faces: Array, icons: Array, counts: Array,
 	add_child(panel)
 
 	var face := ColorRect.new()
-	face.position = Vector2(3, 3)
-	face.size = Vector2(SLOT_SIZE - 6, SLOT_SIZE - 6)
+	face.position = Vector2(2, 2)
+	face.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
 	face.color = Color(0.20, 0.15, 0.30, 0.4)
 	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(face)
 	faces.append(face)
 
 	var slot_icon := TextureRect.new()
-	slot_icon.position = Vector2(3, 3)
-	slot_icon.size = Vector2(SLOT_SIZE - 6, SLOT_SIZE - 6)
+	slot_icon.position = Vector2(2, 2)
+	slot_icon.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
 	slot_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	slot_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	slot_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -195,11 +254,11 @@ func _make_slot(px: float, py: float, faces: Array, icons: Array, counts: Array,
 	icons.append(slot_icon)
 
 	var cnt := Label.new()
-	cnt.position = Vector2(3, SLOT_SIZE - 22)
-	cnt.size = Vector2(SLOT_SIZE - 6, 18)
+	cnt.position = Vector2(2, SLOT_SIZE - 24)
+	cnt.size = Vector2(SLOT_SIZE - 4, 18)
 	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	cnt.add_theme_font_size_override("font_size", int(S * 10))
-	cnt.add_theme_color_override("font_color", TEXT_DIM)
+	cnt.add_theme_font_size_override("font_size", 18)
+	cnt.add_theme_color_override("font_color", Color(0.55, 0.50, 0.72, 0.70))
 	cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(cnt)
 	counts.append(cnt)
@@ -207,25 +266,168 @@ func _make_slot(px: float, py: float, faces: Array, icons: Array, counts: Array,
 	panels.append(panel)
 	return panel
 
-func _setup_furnace_slots() -> void:
-	var sx: float = GRID_W * 0.5 - 80
-	var sy: float = PAD + 22
+func _recipe_card(input_id: String, output_id: String) -> void:
+	var card := Panel.new()
+	card.custom_minimum_size = Vector2(LIST_W - 14, 76)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.add_theme_stylebox_override("panel", _recipe_card_style)
+	var idx: int = _recipe_cards.size()
+	card.gui_input.connect(_on_recipe_input.bind(idx))
+	_recipe_list.add_child(card)
+	_recipe_cards.append(card)
 
-	# Input label
-	var in_lbl := Label.new()
-	in_lbl.text = tr("FURNACE_INPUT")
-	in_lbl.position = Vector2(sx, sy - 24)
-	in_lbl.add_theme_font_size_override("font_size", int(S * 12))
-	in_lbl.add_theme_color_override("font_color", TEXT_DIM)
-	add_child(in_lbl)
+	ItemDatabase.ensure_db()
+	var rin := ItemDatabase.load_icon_2d(input_id)
+	var rout := ItemDatabase.load_icon_2d(output_id)
+	var in_def: ItemDef = ItemDatabase.items_db.get(input_id) as ItemDef
+	var out_def: ItemDef = ItemDatabase.items_db.get(output_id) as ItemDef
+	var out_name: String = out_def.name if out_def != null else output_id
+
+	var in_slot := Panel.new()
+	in_slot.position = Vector2(8, 14)
+	in_slot.size = Vector2(48, 48)
+	in_slot.clip_contents = true
+	in_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	in_slot.add_theme_stylebox_override("panel", _slot_style)
+	card.add_child(in_slot)
+	if rin:
+		var t := TextureRect.new()
+		t.position = Vector2(2, 2)
+		t.size = Vector2(44, 44)
+		t.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		t.texture = rin
+		in_slot.add_child(t)
+
+	var arr := Label.new()
+	arr.text = "→"
+	arr.position = Vector2(64, 26)
+	arr.add_theme_font_size_override("font_size", int(S * 14))
+	arr.add_theme_color_override("font_color", TEXT_MUTED)
+	card.add_child(arr)
+
+	var out_slot := Panel.new()
+	out_slot.position = Vector2(90, 14)
+	out_slot.size = Vector2(48, 48)
+	out_slot.clip_contents = true
+	out_slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	out_slot.add_theme_stylebox_override("panel", _slot_style)
+	card.add_child(out_slot)
+	if rout:
+		var t2 := TextureRect.new()
+		t2.position = Vector2(2, 2)
+		t2.size = Vector2(44, 44)
+		t2.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		t2.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		t2.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		t2.texture = rout
+		out_slot.add_child(t2)
+
+	var nm := Label.new()
+	nm.text = out_name
+	nm.position = Vector2(146, 27)
+	nm.size = Vector2(LIST_W - 158, 24)
+	nm.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	nm.add_theme_font_size_override("font_size", int(S * 10))
+	nm.add_theme_color_override("font_color", TEXT_BRIGHT)
+	card.add_child(nm)
+
+func _on_recipe_input(event: InputEvent, idx: int) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb := event as InputEventMouseButton
+	if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed and idx >= 0 and idx < _recipes.size():
+		_select_recipe(idx)
+		_try_fill_input(idx)
+
+func _select_recipe(idx: int) -> void:
+	_selected_recipe = idx
+	for i in range(_recipe_cards.size()):
+		_recipe_cards[i].add_theme_stylebox_override("panel", _recipe_sel_style if i == idx else _recipe_card_style)
+
+func _try_fill_input(idx: int) -> void:
+	if _player_ref == null:
+		return
+	var pi = _player_ref.inventory
+	var fi = _furnace_inv
+	if pi == null or fi == null:
+		return
+	var input: String = _recipes[idx].input
+	var inslot: ItemSlot = fi.slots[0]
+	if not inslot.is_empty() and inslot.item.id != input:
+		return
+	var def: ItemDef = ItemDatabase.items_db.get(input) as ItemDef
+	if def == null:
+		return
+	for s in range(pi.slots.size()):
+		var slot: ItemSlot = pi.slots[s]
+		if slot.is_empty() or slot.item.id != input:
+			continue
+		pi.remove_item(s, 1)
+		fi.add_item(def, 1)
+		return
+
+func _setup_recipe_bar() -> void:
+	var rec_panel := Panel.new()
+	rec_panel.position = Vector2(REC_X, 50)
+	rec_panel.size = Vector2(LIST_W, _content_h - 50 - PAD)
+	var rec_style := StyleBoxFlat.new()
+	rec_style.bg_color = BG_CARD
+	rec_style.corner_radius_top_left = 10
+	rec_style.corner_radius_top_right = 10
+	rec_style.corner_radius_bottom_left = 10
+	rec_style.corner_radius_bottom_right = 10
+	rec_style.border_width_left = 1
+	rec_style.border_width_right = 1
+	rec_style.border_width_top = 1
+	rec_style.border_width_bottom = 1
+	rec_style.border_color = Color(0.55, 0.57, 0.62, 0.15)
+	rec_panel.add_theme_stylebox_override("panel", rec_style)
+	rec_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(rec_panel)
+
+	var scroll := ScrollContainer.new()
+	scroll.position = Vector2(6, 8)
+	scroll.size = Vector2(LIST_W - 12, _content_h - 50 - PAD - 16)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rec_panel.add_child(scroll)
+	_recipe_list = VBoxContainer.new()
+	_recipe_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_recipe_list.add_theme_constant_override("separation", 6)
+	scroll.add_child(_recipe_list)
+
+	for r in _recipes:
+		_recipe_card(r.input, r.output)
+
+func _label(pos: Vector2, text: String, color: Color, isize: int = 12) -> void:
+	var lbl := Label.new()
+	lbl.text = text
+	lbl.position = pos
+	lbl.add_theme_font_size_override("font_size", int(S * isize))
+	lbl.add_theme_color_override("font_color", color)
+	add_child(lbl)
+
+func _setup_furnace_slots() -> void:
+	var base_x: float = RIGHT_X + GRID_W * 0.5 - 120
+	var sy: float = PAD + 22
+	var in_y := sy
+	var fuel_y := sy + 64
+	var out_y := sy
 
 	# Input slot (idx 0)
-	var inp := _make_slot(sx, sy, _input_faces, _input_icons, _input_counts, _input_panels, "furnace", 0)
+	_label(Vector2(base_x, in_y - 24), tr("FURNACE_INPUT"), TEXT_DIM)
+	var inp := _make_slot(base_x, in_y, _input_faces, _input_icons, _input_counts, _input_panels, "furnace", 0)
 	inp.gui_input.connect(_on_slot_gui_input.bind("furnace", 0))
 
-	# Arrow + progress bar
-	var arrow_x: float = sx + SLOT_SIZE + GAP * 3
-	var arrow_y: float = sy + SLOT_SIZE * 0.5 - 10
+	# Fuel slot (idx 1)
+	_label(Vector2(base_x + SLOT_SIZE + GAP, fuel_y - 24), tr("FURNACE_FUEL"), TEXT_DIM)
+	var fuel := _make_slot(base_x + SLOT_SIZE + GAP, fuel_y, _fuel_faces, _fuel_icons, _fuel_counts, _fuel_panels, "furnace", 1)
+	fuel.gui_input.connect(_on_slot_gui_input.bind("furnace", 1))
+
+	# Arrow + progress between input and output
+	var arrow_x: float = base_x + 2 * (SLOT_SIZE + GAP) + 4
+	var arrow_y: float = sy + SLOT_SIZE * 0.5 - 6
 
 	_progress_bar = ColorRect.new()
 	_progress_bar.position = Vector2(arrow_x - 4, arrow_y - 4)
@@ -240,31 +442,30 @@ func _setup_furnace_slots() -> void:
 	add_child(_progress_fill)
 
 	var arrow := Label.new()
-	arrow.text = " → "
-	arrow.position = Vector2(arrow_x + 8, arrow_y - 8)
-	arrow.add_theme_font_size_override("font_size", int(S * 14))
+	arrow.text = "→"
+	arrow.position = Vector2(arrow_x + 12, arrow_y - 8)
+	arrow.add_theme_font_size_override("font_size", int(S * 16))
 	arrow.add_theme_color_override("font_color", TEXT_DIM)
 	add_child(arrow)
 
-	# Output label (right of arrow)
+	# Output label + slot (idx 2)
 	var out_lbl := Label.new()
 	out_lbl.text = tr("FURNACE_OUTPUT")
-	out_lbl.position = Vector2(arrow_x + 70, sy - 24)
+	out_lbl.position = Vector2(arrow_x + 66, sy - 26)
 	out_lbl.add_theme_font_size_override("font_size", int(S * 12))
 	out_lbl.add_theme_color_override("font_color", TEXT_DIM)
 	add_child(out_lbl)
-
-	# Output slot (idx 1)
-	var outp := _make_slot(arrow_x + 66, sy, _output_faces, _output_icons, _output_counts, _output_panels, "furnace", 1)
-	outp.gui_input.connect(_on_slot_gui_input.bind("furnace", 1))
+	var outp := _make_slot(arrow_x + 70, out_y, _output_faces, _output_icons, _output_counts, _output_panels, "furnace", 2)
+	outp.gui_input.connect(_on_slot_gui_input.bind("furnace", 2))
 
 func _setup_player_grid() -> void:
-	var sx: float = PAD
-	var sy: float = PAD + 22 + 1 * (SLOT_SIZE + GAP) + 10
+	var sx: float = RIGHT_X + PAD
+	var inv_label_y: float = PAD + 22 + 64 + SLOT_SIZE + 12
+	var sy: float = inv_label_y + 24
 
 	var lbl := Label.new()
 	lbl.text = tr("INVENTORY_TITLE")
-	lbl.position = Vector2(sx, sy - 24)
+	lbl.position = Vector2(sx, inv_label_y)
 	lbl.add_theme_font_size_override("font_size", int(S * 12))
 	lbl.add_theme_color_override("font_color", TEXT_DIM)
 	add_child(lbl)
@@ -277,7 +478,7 @@ func _setup_player_grid() -> void:
 			var panel := _make_slot(px, py2, _player_faces, _player_icons, _player_counts, _player_panels, "player", i)
 			panel.gui_input.connect(_on_slot_gui_input.bind("player", i))
 
-	var hot_y: float = sy + 3 * (SLOT_SIZE + GAP) + 6
+	var hot_y: float = sy + 3 * (SLOT_SIZE + GAP) + GAP
 	for col in range(COLS):
 		var i: int = col
 		var px: float = sx + col * (SLOT_SIZE + GAP)
@@ -288,7 +489,11 @@ func _get_panel(_type: String, idx: int) -> Panel:
 	match _type:
 		"player": return _player_panels[idx] if idx >= 0 and idx < _player_panels.size() else null
 		"hotbar": return _hotbar_panels[idx] if idx >= 0 and idx < _hotbar_panels.size() else null
-		"furnace": return (_input_panels[0] if idx == 0 else _output_panels[0])
+		"furnace":
+			match idx:
+				0: return _input_panels[0] if not _input_panels.is_empty() else null
+				1: return _fuel_panels[0] if not _fuel_panels.is_empty() else null
+				_: return _output_panels[0] if not _output_panels.is_empty() else null
 	return null
 
 func _on_slot_gui_input(event: InputEvent, _type: String, idx: int) -> void:
@@ -389,13 +594,13 @@ func _slot_get_drag_data(_type: String, idx: int, _at_position: Vector2):
 	ps.border_color = Color(0.22, 0.62, 0.28, 0.70)
 	preview.add_theme_stylebox_override("panel", ps)
 	var face := ColorRect.new()
-	face.position = Vector2(3, 3)
-	face.size = Vector2(ss - 6, ss - 6)
+	face.position = Vector2(2, 2)
+	face.size = Vector2(ss - 4, ss - 4)
 	face.color = slot.item.icon_color
 	preview.add_child(face)
 	var cnt := Label.new()
-	cnt.position = Vector2(3, ss - 22)
-	cnt.size = Vector2(ss - 6, 18)
+	cnt.position = Vector2(2, ss - 24)
+	cnt.size = Vector2(ss - 4, 18)
 	cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	cnt.add_theme_font_size_override("font_size", int(S * 10))
 	cnt.add_theme_color_override("font_color", TEXT_BRIGHT)
@@ -453,31 +658,19 @@ func _slot_drop_data(_type: String, idx: int, _position: Vector2, data) -> void:
 			from_inv.remove_item(from_idx, count - remaining)
 
 func _highlight_drop(_type: String, idx: int, on: bool) -> void:
-	var panels: Array = []
-	match _type:
-		"furnace":
-			panels = _input_panels if idx == 0 else _output_panels
-			if not panels.is_empty():
-				panels[0].add_theme_stylebox_override("panel", _slot_drop_style if on else _slot_style)
-			return
-		"player": panels = _player_panels
-		"hotbar": panels = _hotbar_panels
-	if idx >= 0 and idx < panels.size():
-		panels[idx].add_theme_stylebox_override("panel", _slot_drop_style if on else _slot_style)
+	var panel: Panel = _get_panel(_type, idx)
+	if panel:
+		panel.add_theme_stylebox_override("panel", _slot_drop_style if on else _slot_style)
 
 func _clear_drop_highlights() -> void:
-	for p in _input_panels:
-		p.add_theme_stylebox_override("panel", _slot_style)
-	for p in _output_panels:
-		p.add_theme_stylebox_override("panel", _slot_style)
-	for p in _player_panels:
-		p.add_theme_stylebox_override("panel", _slot_style)
-	for p in _hotbar_panels:
+	for p in _input_panels + _fuel_panels + _output_panels + _player_panels + _hotbar_panels:
 		p.add_theme_stylebox_override("panel", _slot_style)
 
 func open(furnace, player: PlayerCharacter) -> void:
 	_furnace = furnace
 	_player_ref = player
+	if _selected_recipe < 0 and not _recipes.is_empty():
+		_select_recipe(0)
 	_play_appear()
 
 func close() -> void:
@@ -512,80 +705,57 @@ func _cleanup() -> void:
 	var pi = _player_ref.inventory
 	if pi == null:
 		return
-	for i in _furnace_inv.slots.size():
+	for i in range(_furnace_inv.slots.size()):
 		var slot: ItemSlot = _furnace_inv.slots[i]
 		if not slot.is_empty():
 			pi.add_item(slot.item, slot.count)
-	_furnace_inv = Inventory.new(2)
+	_furnace_inv = Inventory.new(3)
 
 func _process(_delta: float) -> void:
-	if _furnace == null or _player_ref == null:
+	if not visible or _player_ref == null:
 		return
 	var fi = _furnace_inv
 	var pi = _player_ref.inventory
 	if fi == null or pi == null:
 		return
 
-	# Update furnace slots
-	for i in range(min(fi.slots.size(), 1)):
-		var slot: ItemSlot = fi.slots[0]
-		if _input_faces.size() > 0:
-			if slot.is_empty():
-				_input_faces[0].color = Color(0.20, 0.15, 0.30, 0.4)
-				_input_icons[0].texture = null; _input_icons[0].visible = false
-				_input_counts[0].text = ""
-			else:
-				var tex := ItemDatabase.load_icon_2d(slot.item.id)
-				_input_faces[0].color = Color(0.20, 0.15, 0.30, 0.4) if tex != null else slot.item.icon_color
-				_input_icons[0].texture = tex; _input_icons[0].visible = tex != null
-				_input_counts[0].text = str(slot.count) if slot.count > 1 else ""
+	var i0: ItemSlot = fi.slots[0]
+	var i1: ItemSlot = fi.slots[1]
+	var i2: ItemSlot = fi.slots[2]
+	if _input_faces.size() > 0:
+		_refresh_slot(i0, _input_faces[0], _input_icons[0], _input_counts[0])
+	if _fuel_faces.size() > 0:
+		_refresh_slot(i1, _fuel_faces[0], _fuel_icons[0], _fuel_counts[0])
+	if _output_faces.size() > 0:
+		_refresh_slot(i2, _output_faces[0], _output_icons[0], _output_counts[0])
 
-		var out_slot: ItemSlot = fi.slots[1]
-		if _output_faces.size() > 0:
-			if out_slot.is_empty():
-				_output_faces[0].color = Color(0.20, 0.15, 0.30, 0.4)
-				_output_icons[0].texture = null; _output_icons[0].visible = false
-				_output_counts[0].text = ""
-			else:
-				var tex2 := ItemDatabase.load_icon_2d(out_slot.item.id)
-				_output_faces[0].color = Color(0.20, 0.15, 0.30, 0.4) if tex2 != null else out_slot.item.icon_color
-				_output_icons[0].texture = tex2; _output_icons[0].visible = tex2 != null
-				_output_counts[0].text = str(out_slot.count) if out_slot.count > 1 else ""
-
-	# Update player inventory
 	for i in range(27):
 		var pidx: int = 9 + i
 		if pidx < pi.slots.size() and i < _player_faces.size():
-			var slot: ItemSlot = pi.slots[pidx]
-			if slot.is_empty():
-				_player_faces[i].color = Color(0.20, 0.15, 0.30, 0.4)
-				_player_icons[i].texture = null; _player_icons[i].visible = false
-				_player_counts[i].text = ""
-			else:
-				var tex := ItemDatabase.load_icon_2d(slot.item.id)
-				_player_faces[i].color = Color(0.20, 0.15, 0.30, 0.4) if tex != null else slot.item.icon_color
-				_player_icons[i].texture = tex; _player_icons[i].visible = tex != null
-				_player_counts[i].text = str(slot.count) if slot.count > 1 else ""
-
+			_refresh_slot(pi.slots[pidx], _player_faces[i], _player_icons[i], _player_counts[i])
 	for i in range(9):
 		if i < pi.slots.size() and i < _hotbar_faces.size():
-			var slot: ItemSlot = pi.slots[i]
-			if slot.is_empty():
-				_hotbar_faces[i].color = Color(0.20, 0.15, 0.30, 0.4)
-				_hotbar_icons[i].texture = null; _hotbar_icons[i].visible = false
-				_hotbar_counts[i].text = ""
-			else:
-				var tex := ItemDatabase.load_icon_2d(slot.item.id)
-				_hotbar_faces[i].color = Color(0.20, 0.15, 0.30, 0.4) if tex != null else slot.item.icon_color
-				_hotbar_icons[i].texture = tex; _hotbar_icons[i].visible = tex != null
-				_hotbar_counts[i].text = str(slot.count) if slot.count > 1 else ""
+			_refresh_slot(pi.slots[i], _hotbar_faces[i], _hotbar_icons[i], _hotbar_counts[i])
 
-	# Smelting logic
 	_update_smelting(_delta)
+
+func _refresh_slot(slot: ItemSlot, face: ColorRect, icon: TextureRect, cnt: Label) -> void:
+	if slot.is_empty():
+		face.color = Color(0.20, 0.15, 0.30, 0.4)
+		icon.texture = null
+		icon.visible = false
+		cnt.text = ""
+		return
+	var tex := ItemDatabase.load_icon_2d(slot.item.id)
+	face.color = Color(0.20, 0.15, 0.30, 0.4) if tex != null else slot.item.icon_color
+	icon.texture = tex
+	icon.visible = tex != null
+	cnt.text = str(slot.count) if slot.count > 1 else ""
 
 func _update_smelting(delta: float) -> void:
 	var input_slot: ItemSlot = _furnace_inv.slots[0]
-	var output_slot: ItemSlot = _furnace_inv.slots[1]
+	var fuel_slot: ItemSlot = _furnace_inv.slots[1]
+	var output_slot: ItemSlot = _furnace_inv.slots[2]
 
 	if input_slot.is_empty() or input_slot.item.id not in _smelting_items:
 		_smelt_active = false
@@ -605,23 +775,31 @@ func _update_smelting(delta: float) -> void:
 		_progress_fill.size.x = 0
 		return
 
+	if fuel_slot.is_empty() or fuel_slot.item.id not in _fuels:
+		_smelt_active = false
+		_smelt_progress = 0.0
+		_progress_fill.size.x = 0
+		return
+
 	if not _smelt_active:
 		_smelt_active = true
 		_smelt_progress = 0.0
 
 	_smelt_progress += delta / _smelt_time
-	_progress_fill.size.x = (_smelt_progress * 32) if _smelt_progress <= 1.0 else 32
+	_progress_fill.size.x = clampf(_smelt_progress * 32, 0, 32)
 
 	if _smelt_progress >= 1.0:
 		_complete_smelt(output_id)
 
 func _complete_smelt(output_id: String) -> void:
 	var input_slot: ItemSlot = _furnace_inv.slots[0]
-	var output_slot: ItemSlot = _furnace_inv.slots[1]
+	var output_slot: ItemSlot = _furnace_inv.slots[2]
 
 	if not _furnace_inv.remove_item(0, 1):
 		_smelt_active = false
 		return
+	# Tiêu hao 1 chất đốt / mẻ nung
+	_furnace_inv.remove_item(1, 1)
 
 	var out_def: ItemDef = ItemDatabase.items_db.get(output_id) as ItemDef
 	if out_def == null:
@@ -629,13 +807,12 @@ func _complete_smelt(output_id: String) -> void:
 		return
 
 	if output_slot.is_empty():
-		_furnace_inv.slots[1].item = out_def
-		_furnace_inv.slots[1].count = 1
+		_furnace_inv.slots[2].item = out_def
+		_furnace_inv.slots[2].count = 1
 	else:
 		output_slot.count += 1
 
 	_smelt_progress = 0.0
 
-	# Check if input still has smeltable ore
 	if input_slot.is_empty() or input_slot.item.id not in _smelting_items:
 		_smelt_active = false

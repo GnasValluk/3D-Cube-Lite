@@ -184,12 +184,6 @@ func _setup_fire_vfx() -> void:
 	_smoke_particles.explosiveness = 0.0
 	_smoke_particles.randomness = 0.55
 	_smoke_particles.position = Vector3(0, 0.92, -0.30)
-	_smoke_particles.scale_amount_min = 0.22
-	_smoke_particles.scale_amount_max = 0.38
-	var smoke_grow := Curve.new()
-	smoke_grow.add_point(Vector2(0, 1.0))
-	smoke_grow.add_point(Vector2(1, 2.8))
-	_smoke_particles.scale_amount_curve = smoke_grow
 
 	var smoke_mat := ParticleProcessMaterial.new()
 	smoke_mat.direction = Vector3(0, 1, 0)
@@ -199,6 +193,12 @@ func _setup_fire_vfx() -> void:
 	smoke_mat.initial_velocity_max = 0.65
 	smoke_mat.scale_min = 0.7
 	smoke_mat.scale_max = 1.3
+	var smoke_grow := Curve.new()
+	smoke_grow.add_point(Vector2(0, 1.0))
+	smoke_grow.add_point(Vector2(1, 2.8))
+	var smoke_curve_tex := CurveTexture.new()
+	smoke_curve_tex.curve = smoke_grow
+	smoke_mat.scale_curve = smoke_curve_tex
 	var smoke_grad := Gradient.new()
 	smoke_grad.set_color(0, Color(0.45, 0.45, 0.45, 0.50))
 	smoke_grad.set_color(1, Color(0.30, 0.30, 0.30, 0.0))

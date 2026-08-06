@@ -77,7 +77,10 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 			var water_top_slab: int = floori((_Data.WATER_Y - SLAB) / SLAB) - Y_MIN
 
 			var i: int = x * layer_size + z
-			for ly in range(CHUNK_H):
+			# Chỉ fill tới max(top_slab, water_top_slab): trên đó là AIR (buffer
+			# đã zero = AIR) — trước đây quét đủ CHUNK_H (69 layer) mỗi cột.
+			var ly_max: int = mini(maxi(top_slab, water_top_slab), CHUNK_H - 1)
+			for ly in range(ly_max + 1):
 				var blk: int = B.AIR
 				if ly == 0:
 					blk = top_block if top_slab == 0 else B.BEDROCK

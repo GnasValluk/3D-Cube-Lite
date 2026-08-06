@@ -25,6 +25,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"arrow": ToolsMesh.arrow_drop(parent)
 		"twilight_gate": StructuresMesh.gate(parent)
 		"fishing_boat": StructuresMesh.fishing_boat(parent)
+		"tractor": StructuresMesh.tractor(parent)
 		"palm_wood": MaterialMeshes.palm_wood(parent)
 		"eggplant_fruit": _build_eggplant_fruit_icon(parent)
 		"eggplant_slice": _build_eggplant_slice_icon(parent)
@@ -48,6 +49,8 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"taro_seed": _build_seed_icon(parent, 1)
 		"seaweed_seed": _build_seed_icon(parent, 2)
 		"seagrass_seed": _build_seed_icon(parent, 3)
+		"orange": _build_orange_icon(parent)
+		"orange_seed": _build_orange_seed_icon(parent)
 		"egg_carp": _build_egg_icon(parent, "egg_carp")
 		"egg_perch": _build_egg_icon(parent, "egg_perch")
 		"egg_tilapia": _build_egg_icon(parent, "egg_tilapia")
@@ -693,3 +696,60 @@ static func _build_seed_icon(p: Node3D, variant: int) -> void:
 	ItemMeshShared.add_cube(p, 0.22, 0.35, 0, 0.5, 0.14, 0.26, leaf_c)
 	ItemMeshShared.add_cube(p, -0.22, 0.35, 0, 0.5, 0.14, 0.26, leaf2_c)
 	ItemMeshShared.add_cube(p, 0, 0.68, 0, 0.12, 0.18, 0.12, stem_c.lightened(0.1))
+
+## ── Quả cam chín: cầu cam rực vân lõm + núm xanh, vệt sáng bóng ────────────
+static func _build_orange_icon(p: Node3D) -> void:
+	var orange := Color(0.95, 0.55, 0.12)
+	var orange_l := Color(1.00, 0.70, 0.22)
+	var orange_d := Color(0.78, 0.38, 0.08)
+	var groove := Color(0.88, 0.46, 0.08)
+	var hl := Color(1.00, 0.90, 0.60)
+	var stem := Color(0.30, 0.42, 0.14)
+	# Thân quả cầu
+	ItemMeshShared.add_cube(p, 0.00, 0.00, 0.00, 1.10, 1.06, 1.06, orange)
+	ItemMeshShared.add_cube(p, 0.00, 0.26, 0.00, 0.96, 0.24, 0.94, orange_l)
+	ItemMeshShared.add_cube(p, 0.00, -0.34, 0.00, 0.98, 0.22, 0.98, orange_d)
+	# Vân lõm nhẹ chạy dọc
+	ItemMeshShared.add_cube(p, 0.34, 0.00, 0.00, 0.10, 0.92, 1.00, groove)
+	ItemMeshShared.add_cube(p, -0.34, 0.00, 0.00, 0.10, 0.92, 1.00, groove)
+	ItemMeshShared.add_cube(p, 0.00, 0.00, 0.36, 0.98, 0.88, 0.10, groove)
+	ItemMeshShared.add_cube(p, 0.00, 0.00, -0.36, 0.98, 0.88, 0.10, groove)
+	ItemMeshShared.add_cube(p, 0.17, 0.00, 0.00, 0.08, 0.90, 0.92, orange_l.darkened(0.03))
+	ItemMeshShared.add_cube(p, -0.17, 0.00, 0.00, 0.08, 0.90, 0.92, orange_l.darkened(0.03))
+	# Vệt sáng bóng
+	ItemMeshShared.add_cube(p, 0.30, 0.18, 0.32, 0.12, 0.22, 0.10, hl)
+	ItemMeshShared.add_cube(p, 0.26, -0.02, 0.30, 0.10, 0.12, 0.08, hl.darkened(0.05))
+	# Núm quả + vệt đất ở đáy
+	ItemMeshShared.add_cube(p, 0.00, 0.58, 0.00, 0.16, 0.12, 0.16, stem)
+	ItemMeshShared.add_cube(p, -0.02, 0.68, 0.02, 0.10, 0.08, 0.10, stem.darkened(0.08))
+	ItemMeshShared.add_cube(p, 0.10, -0.54, 0.10, 0.30, 0.06, 0.30, orange_d.darkened(0.10))
+
+## ── Túi hạt giống cam: kraft + logo quả cam in mặt trước + hạt cam vãi ──────
+static func _build_orange_seed_icon(p: Node3D) -> void:
+	var kraft := Color(0.64, 0.50, 0.32)
+	var kraft_d := Color(0.54, 0.40, 0.24)
+	var kraft_l := Color(0.70, 0.56, 0.38)
+	var rope := Color(0.78, 0.16, 0.12)
+	var logo_orange := Color(0.95, 0.55, 0.12)
+	var logo_groove := Color(0.80, 0.42, 0.08)
+	var logo_stem := Color(0.30, 0.42, 0.14)
+	var seed_c := Color(0.92, 0.66, 0.30)
+	# Thân túi vải đay
+	ItemMeshShared.add_cube(p, 0, -0.25, 0, 1.5, 1.5, 0.9, kraft)
+	ItemMeshShared.add_cube(p, 0, -0.10, 0, 1.34, 1.34, 0.8, kraft_l)
+	ItemMeshShared.add_cube(p, 0, -0.42, 0, 1.34, 0.2, 0.8, kraft_d)
+	# Miệng túi gập lại + dây thừng đỏ
+	ItemMeshShared.add_cube(p, 0, 0.62, 0, 1.30, 0.34, 0.8, kraft_d)
+	ItemMeshShared.add_cube(p, 0, 0.82, 0, 1.10, 0.18, 0.7, kraft.darkened(0.12))
+	ItemMeshShared.add_cube(p, 0, 0.50, 0, 1.44, 0.12, 0.16, rope)
+	# Logo quả cam in mặt trước
+	ItemMeshShared.add_cube(p, 0, -0.06, 0.46, 0.34, 0.36, 0.12, logo_orange)
+	ItemMeshShared.add_cube(p, 0, 0.08, 0.49, 0.26, 0.10, 0.08, logo_orange.lightened(0.08))
+	ItemMeshShared.add_cube(p, 0.12, -0.06, 0.49, 0.05, 0.30, 0.08, logo_groove)
+	ItemMeshShared.add_cube(p, -0.12, -0.06, 0.49, 0.05, 0.30, 0.08, logo_groove)
+	ItemMeshShared.add_cube(p, 0, 0.20, 0.48, 0.08, 0.08, 0.08, logo_stem)
+	# Hạt cam vãi quanh túi
+	ItemMeshShared.add_cube(p, -0.64, -0.76, 0.30, 0.10, 0.08, 0.10, seed_c)
+	ItemMeshShared.add_cube(p, -0.32, -0.84, 0.18, 0.10, 0.08, 0.10, seed_c.darkened(0.08))
+	ItemMeshShared.add_cube(p, 0.12, -0.82, 0.34, 0.10, 0.08, 0.10, seed_c.lightened(0.06))
+	ItemMeshShared.add_cube(p, 0.54, -0.76, 0.24, 0.10, 0.08, 0.10, seed_c.darkened(0.05))
