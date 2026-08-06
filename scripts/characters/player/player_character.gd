@@ -21,6 +21,10 @@ var _food_timer: float = 0.0
 var _food_action_timer: float = 0.0
 var _starve_timer: float = 0.0
 
+## ── Trọng lượng / quá tải ────────────────────────────────────────────────────
+## Ngưỡng tải tối đa: vượt ngưỡng → làm chậm 2 (30%); vượt >25% → làm chậm 5 (95%).
+var max_weight: float = 100.0
+
 ## Slot hotbar đang chọn — HUD cập nhật khi đổi ô
 var _selected_slot: int = 0
 
@@ -120,6 +124,8 @@ func _build_character() -> void:
 	stamina_cost_r = 0
 	character_name = "Player"
 	element = 0
+	crit_rate = 0.0
+	crit_dmg = 1.0
 
 	var col := CollisionShape3D.new()
 	var cs := CapsuleShape3D.new()
@@ -171,6 +177,8 @@ func _on_pickup_area_entered(area: Area3D) -> void:
 			item.item_count = remaining
 
 func interact_with_nearby() -> void:
+	if not can_interact():
+		return
 	var world := get_tree().current_scene
 	if world == null:
 		return
@@ -280,7 +288,7 @@ func _is_egg_aiming() -> bool:
 # ── Ăn: cầm đồ ăn ở slot hotbar + giữ chuột phải ────────────────────────────
 
 func _start_eating() -> void:
-	if _eating or not _active or not is_alive:
+	if _eating or not _active or not is_alive or not can_interact():
 		return
 	var item := get_selected_item()
 	if item == null or item.type != ItemDef.Type.FOOD or item.heal_amount <= 0:
@@ -585,6 +593,27 @@ func get_total_def() -> int:
 			base += slot.def_bonus
 	return base
 
+# ── Trọng lượng kho đồ & quá tải ──────────────────────────────────────────────
+func get_total_weight() -> float:
+	if inventory == null:
+		return 0.0
+	return inventory.get_total_weight()
+
+## Cập nhật hiệu ứng quá tải theo trọng lượng hiện tại (gọi mỗi frame).
+##   - vượt ngưỡng        → làm chậm 2 (30%)
+##   - vượt quá 25% ngưỡng → làm chậm 5 (95%, không nhảy, không tương tác)
+func update_overload_effects() -> void:
+	if effects == null:
+		return
+	var w := get_total_weight()
+	var limit := maxf(max_weight, 0.0)
+	if w > limit * 1.25:
+		effects.set_persistent_slow(5)
+	elif w > limit:
+		effects.set_persistent_slow(2)
+	else:
+		effects.set_persistent_slow(0)
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if _is_building_placing():
 		return
@@ -608,7 +637,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					or k.is_action_pressed("controls/build") or k.is_action_pressed("ui_cancel")):
 				_Halberd.cancel_aim(self)
 				return
-			if k.is_action_pressed("jump") and _freeze_timer <= 0.0:
+			if k.is_action_pressed("jump") and _freeze_timer <= 0.0 and can_jump():
 				_jbuf = JUMP_BUFFER
 			if k.is_action_pressed("camera_toggle"):
 				_toggle_camera()
@@ -697,7 +726,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			var holding_heavy: bool = equipped_weapon != null and \
 				(equipped_weapon.id == "axe" or equipped_weapon.id == "pickaxe" or equipped_weapon.id == "hoe")
-			if not holding_heavy:
+			if not holding_heavy and can_interact():
 				var world := get_tree().current_scene
 				if world:
 					for ch in world.get_children():
@@ -785,6 +814,8 @@ func _is_soft_block(bx: float, by: float, bz: float) -> bool:
 # ── Đào nhấn-giữ ────────────────────────────────────────────────────────────
 ## Bắt đầu đào: xác thực block/công cụ rồi bật trạng thái giữ chuột.
 func _start_mining(target: Vector3) -> void:
+	if not can_interact():
+		return
 	if equipped_weapon == null:
 		return
 	var owm := _open_world_manager()
@@ -999,6 +1030,7 @@ func _process(delta: float) -> void:
 		move_speed = 3.6
 		sprint_speed = 6.8
 	super._process(delta)
+	update_overload_effects()
 	if _active and is_alive:
 		_tick_food(delta)
 		if _eating:

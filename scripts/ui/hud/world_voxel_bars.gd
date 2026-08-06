@@ -26,6 +26,8 @@ var _food_vbar: VoxelBar
 var _oxygen_vbar: VoxelBar
 var _shield_box: ColorRect
 var _def_label: Label
+var _effects_label: Label
+var _effects_icon: ColorRect
 
 func _get_def_tier(def_val: int) -> Color:
 	for t in DEF_TIERS:
@@ -131,6 +133,25 @@ func _build() -> void:
 	root.add_child(fb)
 	_food_vbar = fb
 
+	# ── Hiệu ứng trạng thái (icon + cấp độ) bên dưới thanh thức ăn ──
+	_effects_icon = ColorRect.new()
+	_effects_icon.color = Color(0.35, 0.70, 0.95, 0.22)
+	_effects_icon.size = Vector2(44, 40)
+	_effects_icon.position = Vector2(92, 258)
+	_effects_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_effects_icon.visible = false
+	root.add_child(_effects_icon)
+
+	_effects_label = Label.new()
+	_effects_label.add_theme_font_size_override("font_size", 26)
+	_effects_label.add_theme_color_override("font_color", Color(0.55, 0.85, 1.0, 0.95))
+	_effects_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_effects_label.size = Vector2(44, 34)
+	_effects_label.position = Vector2(92, 258)
+	_effects_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_effects_label.visible = false
+	root.add_child(_effects_label)
+
 	# ── 3D mesh ──
 	var quad := QuadMesh.new()
 	quad.size = Vector2(WORLD_W, WORLD_H)
@@ -166,3 +187,15 @@ func _on_oxygen_changed(current: int, max_oxy: int) -> void:
 		return
 	_oxygen_vbar.value = current
 	_oxygen_vbar.visible = current < max_oxy
+
+func _process(_delta: float) -> void:
+	if not is_instance_valid(_player):
+		return
+	var lvl: int = 0
+	if _player.effects != null:
+		lvl = _player.effects.get_slow_level()
+	var has_slow: bool = lvl > 0
+	_effects_icon.visible = has_slow
+	_effects_label.visible = has_slow
+	if has_slow:
+		_effects_label.text = "\u2744 " + str(lvl)

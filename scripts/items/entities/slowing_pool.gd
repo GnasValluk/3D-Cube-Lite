@@ -8,7 +8,6 @@ var _mesh_instance: MeshInstance3D
 var _area: Area3D
 var _slowed_entries: Dictionary = {}
 var _shooter: Node = null
-
 func setup(pos: Vector3, duration: float = 3.0, radius: float = 2.5, shooter: Node = null) -> void:
 	_shooter = shooter
 	_duration = duration
@@ -66,36 +65,37 @@ func setup(pos: Vector3, duration: float = 3.0, radius: float = 2.5, shooter: No
 	add_child(timer)
 	timer.start()
 
+func _process(delta: float) -> void:
+	_age += delta
+
 func _on_body_entered(body: Node) -> void:
 	if body is CharacterBase and body != _get_shooter():
 		if _slowed_entries.has(body):
 			return
-		_slowed_entries[body] = {
-			"move_speed": body.move_speed,
-			"sprint_speed": body.sprint_speed,
-		}
-		body.move_speed *= 0.4
-		body.sprint_speed *= 0.4
+		_slowed_entries[body] = true
+		if body.effects != null:
+			# Làm chậm cấp 3 (giảm 50%) trong thời gian còn lại của hồ
+			body.effects.apply_slow(3, maxf(_duration - _age, 0.5))
 
 func _on_body_exited(body: Node) -> void:
 	if body is CharacterBase:
-		_restore_speed(body)
+		_restore_slow(body)
 
 func _get_shooter() -> Node:
 	return _shooter
 
-func _restore_speed(body: Node) -> void:
+func _restore_slow(body: Node) -> void:
 	if not _slowed_entries.has(body):
 		return
-	var entry = _slowed_entries[body]
-	body.move_speed = entry["move_speed"]
-	body.sprint_speed = entry["sprint_speed"]
 	_slowed_entries.erase(body)
+	if body is CharacterBase and body.effects != null:
+		body.effects.clear_slow()
 
 func _on_expire() -> void:
 	for body in _slowed_entries.keys():
 		if is_instance_valid(body):
-			_restore_speed(body)
+			_restore_slow(body)
+	_slowed_entries.clear()
 
 	var tw := create_tween()
 	tw.set_parallel(true)

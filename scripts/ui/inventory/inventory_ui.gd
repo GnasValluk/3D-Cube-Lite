@@ -22,7 +22,8 @@ const _Detail := preload("item_detail_panel.gd")
 
 const EQUIP_H: float = 270.0
 const DETAIL_H: float = 140.0
-const CONTENT_H: float = PAD + 40 + 4 * (SLOT_SIZE + GAP) + 10 + DETAIL_H + PAD
+const STAT_PANEL_H: float = 296.0
+const CONTENT_H: float = PAD + 40 + STAT_PANEL_H + 10 + EQUIP_H + PAD
 # Tổng chiều rộng = thư viện + khoảng cách + inventory gốc
 const LIB_MARGIN: float = 16.0
 const CONTENT_W: float = LIB_W + LIB_MARGIN + PAD + GRID_W + 12 + STAT_W + PAD
@@ -55,6 +56,10 @@ var _tooltip_bg: ColorRect
 var _hp_label: Label
 var _atk_label: Label
 var _def_label: Label
+var _weight_label: Label
+var _crit_rate_label: Label
+var _crit_dmg_label: Label
+var _speed_label: Label
 var _count_label: Label
 var _equip_faces: Array[ColorRect] = []
 var _equip_labels: Array[Label] = []
@@ -307,7 +312,7 @@ func _setup_status_panel() -> void:
 
 	var stat := Panel.new()
 	stat.position = Vector2(sx, sy)
-	stat.size = Vector2(STAT_W, 178)
+	stat.size = Vector2(STAT_W, STAT_PANEL_H)
 	var st_style := _glass_style.duplicate() as StyleBoxFlat
 	st_style.bg_color = Color(0.10, 0.07, 0.18, 0.65)
 	st_style.corner_radius_top_left = 12; st_style.corner_radius_top_right = 12
@@ -340,9 +345,33 @@ func _setup_status_panel() -> void:
 	_def_label.add_theme_color_override("font_color", ORANGE)
 	add_child(_def_label)
 
+	_weight_label = Label.new()
+	_weight_label.position = Vector2(sx + 16, sy + 136)
+	_weight_label.add_theme_font_size_override("font_size", 22)
+	_weight_label.add_theme_color_override("font_color", Color(0.72, 0.56, 0.30))
+	add_child(_weight_label)
+
+	_crit_rate_label = Label.new()
+	_crit_rate_label.position = Vector2(sx + 16, sy + 166)
+	_crit_rate_label.add_theme_font_size_override("font_size", 22)
+	_crit_rate_label.add_theme_color_override("font_color", Color(0.88, 0.22, 0.55))
+	add_child(_crit_rate_label)
+
+	_crit_dmg_label = Label.new()
+	_crit_dmg_label.position = Vector2(sx + 16, sy + 196)
+	_crit_dmg_label.add_theme_font_size_override("font_size", 22)
+	_crit_dmg_label.add_theme_color_override("font_color", Color(0.95, 0.30, 0.30))
+	add_child(_crit_dmg_label)
+
+	_speed_label = Label.new()
+	_speed_label.position = Vector2(sx + 16, sy + 226)
+	_speed_label.add_theme_font_size_override("font_size", 22)
+	_speed_label.add_theme_color_override("font_color", CYAN)
+	add_child(_speed_label)
+
 	_drop_hint_label = Label.new()
 	_drop_hint_label.text = tr("DROP_HINT")
-	_drop_hint_label.position = Vector2(sx + 16, sy + 144)
+	_drop_hint_label.position = Vector2(sx + 16, sy + 260)
 	_drop_hint_label.add_theme_font_size_override("font_size", 15)
 	_drop_hint_label.add_theme_color_override("font_color", TEXT_MUTED)
 	add_child(_drop_hint_label)
@@ -350,7 +379,7 @@ func _setup_status_panel() -> void:
 func _setup_equipment_panel() -> void:
 	var ox: float = LIB_W + LIB_MARGIN
 	var sx: float = ox + PAD + GRID_W + 12
-	var sy: float = PAD + 40 + 178 + 10
+	var sy: float = PAD + 40 + STAT_PANEL_H + 10
 
 	var eq := Panel.new()
 	eq.position = Vector2(sx, sy)
@@ -721,6 +750,11 @@ func _process(delta: float) -> void:
 		_hp_label.text  = "\u2665  %d / %d"   % [_player_ref.hp, _player_ref.max_hp]
 		_atk_label.text = "\u2694  %d"        % _player_ref.get_total_atk()
 		_def_label.text = "\u2741  %d"        % _player_ref.get_total_def()
+		_weight_label.text = "\u2696  %.0f / %.0f" % [_player_ref.get_total_weight(), _player_ref.max_weight]
+		_crit_rate_label.text = "\u2620  %.0f%%" % (_player_ref.crit_rate * 100.0)
+		_crit_dmg_label.text = "\u2694\u2726  %.0f%%" % (_player_ref.crit_dmg * 100.0)
+		var eff_speed: float = _player_ref.move_speed * _player_ref.get_speed_multiplier()
+		_speed_label.text = "\u26A1  %.1f m/s" % eff_speed
 		_update_equipment_display(_player_ref)
 
 	_Detail.update_detail_panel(self)

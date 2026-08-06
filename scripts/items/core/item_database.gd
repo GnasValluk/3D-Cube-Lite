@@ -200,6 +200,34 @@ static func _add(db: Dictionary, id: String, name: String, type: int, color: Col
 				durability: int = 0) -> void:
 	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot, durability)
 	db[id].eat_time = EAT_TIMES.get(id, 3.0)
+	db[id].weight = WEIGHTS.get(id, _default_weight(type))
+
+## Trọng lượng riêng theo từng item (override mặc định theo loại).
+const WEIGHTS: Dictionary = {
+	"chest": 8.0, "crafting_table": 6.0, "furnace": 10.0, "twilight_gate": 20.0,
+	"pickaxe": 4.0, "shovel": 4.0, "axe": 5.0, "hoe": 3.0,
+	"iron_sword": 4.0, "iron_greatsword": 8.0, "iron_halberd": 9.0,
+	"crossbow": 6.0, "fishing_rod": 2.0, "watermelon_cannon": 14.0,
+	"pumpkin_mortar": 12.0, "leather_gloves": 1.5,
+	"watermelon": 6.0, "pumpkin": 5.0, "jack_o_lantern": 5.0,
+	"coconut": 2.0, "orange": 0.3, "eggplant_fruit": 0.8,
+	"eggplant_slice": 0.3, "watermelon_slice": 0.4, "pumpkin_slice": 0.3,
+	"eggplant_seed": 0.1, "watermelon_seed": 0.1, "pumpkin_seed": 0.1, "orange_seed": 0.1,
+	"coconut_seed": 0.2, "taro_seed": 0.2, "seaweed_seed": 0.1, "seagrass_seed": 0.1,
+	"carp": 1.0, "climbing_perch": 0.8, "red_tilapia": 1.2, "snakehead": 1.5,
+	"flowerhorn": 1.4, "shrimp": 0.4, "raw_pork": 3.0, "taro": 0.6,
+	"tractor": 40.0, "fishing_boat": 50.0,
+}
+
+static func _default_weight(type: int) -> float:
+	match type:
+		ItemDef.Type.BLOCK:    return 2.0
+		ItemDef.Type.TOOL:     return 3.0
+		ItemDef.Type.WEAPON:   return 4.0
+		ItemDef.Type.ARMOR:    return 3.0
+		ItemDef.Type.FOOD:     return 0.5
+		ItemDef.Type.MATERIAL: return 1.0
+	return 1.0
 
 static func load_icon_2d(item_id: String) -> Texture2D:
 	var path := "res://assets/icon_items/%s.png" % item_id

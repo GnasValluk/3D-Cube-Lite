@@ -18,6 +18,8 @@ var armor_slot: int = ArmorSlot.BODY
 var max_durability: int = 0  # 0 = không có độ bền (vĩnh cửu); >0 = hao mòn khi dùng
 ## Thời gian ăn (giây) — giữ chuột phải đủ lâu mới ăn xong 1 lần
 var eat_time: float = 3.0
+## Trọng lượng (weight) quy ra đơn vị tải — cộng dồn theo kho đồ cho cơ chế quá tải
+var weight: float = 0.0
 
 func _init(p_id: String, p_name: String, p_type: int, p_color: Color, p_char: String,
 		   p_desc: String = "", p_stackable: bool = true, p_max: int = 64,

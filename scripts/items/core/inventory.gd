@@ -132,6 +132,14 @@ func count_filled_slots() -> int:
 			n += 1
 	return n
 
+## Tổng trọng lượng toàn bộ vật phẩm trong kho (item.weight × count).
+func get_total_weight() -> float:
+	var total: float = 0.0
+	for slot in slots:
+		if not slot.is_empty() and slot.item != null:
+			total += slot.item.weight * slot.count
+	return total
+
 func is_full() -> bool:
 	for slot in slots:
 		if slot.is_empty():

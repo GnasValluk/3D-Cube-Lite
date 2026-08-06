@@ -7,6 +7,7 @@ class_name CharacterBase
 
 const _Damage = preload("res://scripts/core/damage_system.gd")
 const _Swim  = preload("res://scripts/core/swim_system.gd")
+const _Effects = preload("res://scripts/core/status_effects.gd")
 
 signal damage_taken(amount: int, attacker: Node3D)
 signal died(attacker: Node3D)
@@ -84,6 +85,8 @@ var is_alive: bool = true
 var character_name: String = ""
 var element: int = 0
 var shield: int = 0
+## Hệ thống hiệu ứng trạng thái (làm chậm, ...) — khởi tạo trong _ready
+var effects: StatusEffects = null
 var _melee_hit_once: bool = false
 var _melee_hit_progress: float = 0.25
 
@@ -157,6 +160,7 @@ var _water_mgr: OpenWorldManager = null
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _ready() -> void:
+	effects = _Effects.new(self)
 	_jump_v    = (2.0 * jump_height) / jump_time_rise
 	_grav_rise = (2.0 * jump_height) / (jump_time_rise * jump_time_rise)
 	_grav_fall = (2.0 * jump_height) / (jump_time_fall * jump_time_fall)
@@ -189,6 +193,8 @@ func _process(delta: float) -> void:
 		_hit_timer = max(_hit_timer - delta, 0.0)
 	_freeze_timer = max(_freeze_timer - delta, 0.0)
 	_han_bang_buff = max(_han_bang_buff - delta, 0.0)
+	if effects:
+		effects.tick(delta)
 
 	# Stamina regen
 	_stamina_regen_acc += stamina_regen * delta
@@ -248,6 +254,22 @@ func is_han_bang_buffed() -> bool:
 
 func is_frozen() -> bool:
 	return _freeze_timer > 0.0
+
+# ── Status effects (làm chậm) ─────────────────────────────────────────────────
+func get_speed_multiplier() -> float:
+	if effects == null:
+		return 1.0
+	return effects.get_move_multiplier()
+
+func can_jump() -> bool:
+	if effects == null:
+		return true
+	return effects.can_jump()
+
+func can_interact() -> bool:
+	if effects == null:
+		return true
+	return effects.can_interact()
 
 func _spawn_freeze_vfx() -> void:
 	if _rig == null:
@@ -402,7 +424,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
-			if k.is_action_pressed("jump") and _freeze_timer <= 0.0:
+			if k.is_action_pressed("jump") and _freeze_timer <= 0.0 and can_jump():
 				_jbuf = JUMP_BUFFER
 			if k.is_action_pressed("camera_toggle"):
 				_toggle_camera()
@@ -553,7 +575,7 @@ func _physics_process(delta: float) -> void:
 		velocity.y = -0.5
 
 	# Jump
-	if _jbuf > 0.0 and _coyote > 0.0:
+	if _jbuf > 0.0 and _coyote > 0.0 and can_jump():
 		velocity.y = _jump_v
 		_jbuf = 0.0
 		_coyote = 0.0
@@ -606,6 +628,7 @@ func _physics_process(delta: float) -> void:
 		sprinting = false
 
 	var spd: float = crouch_speed if crouching else (sprint_speed if sprinting else move_speed)
+	spd *= get_speed_multiplier()
 
 	if dir.length_squared() > 0.001 and not attacking and not devouring:
 		dir = dir.normalized()

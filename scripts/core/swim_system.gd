@@ -5,11 +5,11 @@ const SURFACE_FLOAT_SPEED: float = 1.0
 
 static func swim_physics(character: CharacterBase, delta: float) -> void:
 	var dir := character._read_input()
-	var spd: float = character.move_speed * 0.55
+	var spd: float = character.move_speed * 0.55 * character.get_speed_multiplier()
 	var accel: float = character.acceleration * 0.6
 	var frict: float = character.friction * 0.5
 
-	var wants_jump: bool = character._jbuf > 0.0 and character._swim_jump_cd <= 0.0
+	var wants_jump: bool = character._jbuf > 0.0 and character._swim_jump_cd <= 0.0 and character.can_jump()
 	character._jbuf = 0.0
 	character._swim_jump_cd = max(character._swim_jump_cd - delta, 0.0)
 
