@@ -112,13 +112,19 @@ func _ready() -> void:
 	_check(eg._vox_flower == 0 and eg._vox_fruit == 0, "cây lớn chưa hoa nở/quả")
 	_check(eg.find_child("EggplantFruitVisual", false, false) == null, "cây lớn không có quả")
 
-	# Trưởng thành: hoa nở + quả tím chín + highlight + hạt lấp lánh + glow
+	# Trưởng thành: hoa nở + quả tím chín treo model thật + hạt lấp lánh + glow
 	eg.set_birth_age_days(20.0)
 	_check(eg._stage == _Growing.Stage.MATURE, "20 ngày = trưởng thành (chín thu hoạch)")
 	_check(eg._vox_flower >= 8, "hoa nở 5 cánh + nhị vàng chanh (≥8, có %d)" % eg._vox_flower)
-	_check(eg._vox_fruit >= 30, "quả căng mộng to (≥30 micro-voxel, có %d)" % eg._vox_fruit)
-	_check(eg._vox_highlight >= 2, "vệt highlight trắng xanh chạy dọc quả (≥2, có %d)" % eg._vox_highlight)
 	_check(eg._vox_sparkle >= 3, "hạt lấp lánh tỏa quanh quả chín (≥3, có %d)" % eg._vox_sparkle)
+	_check(eg._real_fruit_nodes.size() >= 2, "quả cà tím treo model thật dưới nhánh lá (≥2, có %d)" % eg._real_fruit_nodes.size())
+	var eg_fruit_ok := eg._real_fruit_nodes.size() > 0
+	for rf in eg._real_fruit_nodes:
+		if is_instance_valid(rf) and rf.get_child_count() == 0:
+			eg_fruit_ok = false
+	_check(eg_fruit_ok, "mỗi trái cà tím có đủ mesh model (cuống + thân quả)")
+	_check(eg._bush_h >= 0.85, "cây cà tím cao hơn (bụi ≥0.85, có %.2f)" % eg._bush_h)
+	_check(eg._vox_leaf >= 40, "cây lớn nhiều tầng lá (≥40 micro-voxel, có %d)" % eg._vox_leaf)
 	_check(eg.find_child("EggplantFruitVisual", false, false) != null, "có quả cà tím (visual riêng)")
 	_check(eg.find_child("EggplantGlow", false, false) != null, "có ánh sáng tím báo quả chín")
 

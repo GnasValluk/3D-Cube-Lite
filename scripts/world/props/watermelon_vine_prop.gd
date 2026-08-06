@@ -22,6 +22,7 @@ const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 var _oval: bool = false
 var _fruit_count: int = 1
 var _glow_light: OmniLight3D = null
+var _real_fruit_nodes: Array[Node3D] = []
 
 var _sway_phase: float = 0.0
 var _sway_freq: float = 0.0
@@ -264,23 +265,20 @@ func _build_young_fruits() -> void:
 
 ## Quả chín: mỗi trái dưa to đặt LỆCH khỏi gốc dây (gần đó) + sợi dây bò nối
 ## từ gốc đến trái — dưa hấu mọc gần nguồn nước, dây vươn ra đặt trái bên cạnh.
+## Trái dùng chính model trái dưa hấu khi cầm/drop (to 1 block).
 func _build_ripe_fruits() -> void:
-	var col_skin := Color(0.50, 0.76, 0.40)
-	var col_skin_d := Color(0.40, 0.64, 0.32)
+	var col_sparkle := Color(0.80, 0.95, 0.65)
 	var col_stripe := Color(0.08, 0.32, 0.18)
-	var col_soil := Color(0.93, 0.84, 0.42)
-	var col_stalk := Color(0.30, 0.38, 0.16)
 	for fi in range(_fruit_count):
 		var fa: float = randf() * TAU
 		var dist: float = 0.55 + randf() * 0.45
 		var fruit_pos := Vector3(cos(fa) * dist, 0.085, sin(fa) * dist)
 		_build_fruit_strand(fruit_pos, fa)
-		var rx: float = 0.145 + randf() * 0.025
-		var ry: float = rx * (0.88 if _oval else 0.98)
-		_build_ball(fruit_pos, rx, col_skin, col_skin_d, true, ry, col_stripe)
-		_build_soil_spot(fruit_pos, rx, col_soil)
-		_build_stalk(fruit_pos, col_stalk)
-		_build_sparkles(fruit_pos, col_skin.lightened(0.3))
+		_add_ground(ItemMesh.add_fruit_on_ground(
+			self, "watermelon", 1.0,
+			Vector3(fruit_pos.x, 0.05, fruit_pos.z), randf() * TAU))
+		_build_sparkles(fruit_pos, col_sparkle)
+		_build_stalk(fruit_pos, col_stripe.darkened(0.4))
 
 ## Sợi dây bò từ gốc ra đến quả — uốn lượn sát mặt đất, khớp đúng 2 đầu.
 func _build_fruit_strand(target: Vector3, ang: float) -> void:
@@ -445,6 +443,11 @@ func _apply_stage(_from: int, _to: int) -> void:
 	_rebuild()
 
 func _rebuild() -> void:
+	for rf in _real_fruit_nodes:
+		if is_instance_valid(rf):
+			remove_child(rf)
+			rf.queue_free()
+	_real_fruit_nodes.clear()
 	for i in range(get_child_count() - 1, -1, -1):
 		var ch := get_child(i)
 		if ch is MultiMeshInstance3D or ch is StaticBody3D or ch is OmniLight3D:
@@ -519,6 +522,15 @@ func _hit_flash() -> void:
 			if is_instance_valid(mmi):
 				mmi.material_override = orig
 		)
+	super._hit_flash()
 
 func _get_mesh_instances() -> Array[MeshInstance3D]:
-	return []
+	var result: Array[MeshInstance3D] = []
+	for rf in _real_fruit_nodes:
+		if is_instance_valid(rf):
+			_collect_mi(rf, result)
+	return result
+
+func _add_ground(n: Node3D) -> void:
+	if n != null:
+		_real_fruit_nodes.append(n)

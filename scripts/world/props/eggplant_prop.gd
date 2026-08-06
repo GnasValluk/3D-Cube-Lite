@@ -22,9 +22,11 @@ const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 
 var _shape: int = FruitShape.SLENDER
-var _bush_h: float = 0.80
+var _bush_h: float = 1.0
 var _fruit_count: int = 3
 var _glow_light: OmniLight3D = null
+
+var _real_fruit_nodes: Array[Node3D] = []
 
 var _sway_phase: float = 0.0
 var _sway_freq: float = 0.0
@@ -40,7 +42,7 @@ var _vox_sparkle: int = 0
 
 func setup() -> void:
 	_shape = FruitShape.ROUND if randf() < 0.40 else FruitShape.SLENDER
-	_bush_h = 0.62 + randf() * 0.28
+	_bush_h = 0.85 + randf() * 0.35
 	_fruit_count = 2 + randi() % 3
 
 func _birth_span_days() -> float:
@@ -184,15 +186,16 @@ func _build_leaves(h: float) -> void:
 	var col_vein := Color(0.24, 0.14, 0.36)
 	var is_young := _stage == GrowingProp.Stage.YOUNG
 
-	var leaf_count: int = (4 + randi() % 3) if is_young else (6 + randi() % 3)
+	var leaf_count: int = (5 + randi() % 3) if is_young else (10 + randi() % 3)
 	var seed_a: float = randf() * TAU
+	var tier: int = 4
 	for li in range(leaf_count):
 		var la: float = seed_a + float(li) / float(leaf_count) * TAU + (randf() - 0.5) * 0.6
 		var dir := Vector3(cos(la), 0.10 + randf() * 0.12, sin(la)).normalized()
 		var perp := Vector3(-sin(la), 0.0, cos(la)).normalized()
-		var len: int = (5 + randi() % 3) if is_young else (7 + randi() % 3)
+		var len: int = (6 + randi() % 3) if is_young else (8 + randi() % 3)
 		var wid: int = 3 + randi() % 2
-		var attach_y: float = h * (0.30 + float(li % 3) * 0.10)
+		var attach_y: float = h * (0.22 + float(li % tier) * (0.66 / float(tier - 1)))
 		var base := Vector3(cos(la) * 0.07, attach_y, sin(la) * 0.07)
 		for i in range(1, len):
 			for j in range(-wid, wid + 1):
@@ -256,122 +259,30 @@ func _build_flowers(h: float) -> void:
 		_fill(center.x, center.y + 0.09, center.z, col_stamen.lightened(0.1))
 		_vox_flower += 2
 
-## Quả cà tím: thuôn cong (hoặc tròn béo), highlight dọc, đài hoa + cuống, hạt lấp lánh.
+## Quả cà tím: model trái thật (item drop) treo lủng lẳng dưới các tầng lá,
+## cuống áp vào mặt dưới nhánh, quả rủ xuống — mỗi trái xoay nhẹ khác nhau.
 func _build_fruits(h: float) -> void:
-	var col_skin := Color(0.42, 0.14, 0.50)
-	var col_skin_dark := Color(0.33, 0.10, 0.40)
-	var col_skin_light := Color(0.50, 0.20, 0.58)
-	var col_highlight := Color(0.80, 0.88, 0.98)
-	var col_calix := Color(0.30, 0.48, 0.24)
-	var col_calix_dark := Color(0.22, 0.36, 0.18)
-	var col_stalk := Color(0.12, 0.34, 0.10)
-	var col_sparkle := Color(0.95, 0.90, 0.55)
-
+	var bounty: int = _fruit_count
 	var seed_a: float = randf() * TAU
-	for fi in range(_fruit_count):
-		var fa: float = seed_a + float(fi) / float(_fruit_count) * TAU * 0.8 + randf() * 0.6
-		var r: float = 0.10 + randf() * 0.08
-		var top_y: float = h * (0.45 + randf() * 0.20)
-		var hang := Vector3(cos(fa) * r, top_y, sin(fa) * r)
-		var hl_side := Vector3(cos(fa + PI * 0.5), 0.0, sin(fa + PI * 0.5))
-		if _shape == FruitShape.ROUND:
-			_build_fruit_round(hang, hl_side, col_skin, col_skin_dark, col_skin_light,
-				col_highlight, col_calix, col_calix_dark, col_stalk, col_sparkle)
-		else:
-			_build_fruit_slender(hang, hl_side, col_skin, col_skin_dark, col_skin_light,
-				col_highlight, col_calix, col_calix_dark, col_stalk, col_sparkle)
-
-## Quả thuôn dài, đầu nhỏ, phình to về đuôi, đít cong nhẹ.
-func _build_fruit_slender(origin: Vector3, hl_side: Vector3, skin: Color, skin_d: Color,
-		skin_l: Color, hl: Color, calix: Color, calix_d: Color, stalk: Color, sparkle: Color) -> void:
-	var len_v: int = 5 + randi() % 2
-	var curve: float = (randf() - 0.5) * 0.12
-	var n := Vector3(cos(randf() * TAU) * 0.5, 1.0, sin(randf() * TAU) * 0.5).normalized()
-	var right := n.cross(Vector3.UP).normalized()
-	if right.length() < 0.01:
-		right = Vector3.RIGHT
-	for vi in range(len_v):
-		var t := float(vi) / float(len_v - 1)
-		var radius: float = (0.06 + t * 0.035) if t < 0.75 else (0.092 - (t - 0.75) * 0.25)
-		var bend: float = curve * maxf(0.0, t - 0.55) / 0.45
-		var pos := origin + Vector3(0.0, -float(vi) * VOXEL * 2.1, 0.0)
-		pos += right * bend * 0.12
-		var b := ceili(radius / VOXEL)
-		for vx in range(-b, b + 1):
-			for vz in range(-b, b + 1):
-				var d_sq := (vx * VOXEL) * (vx * VOXEL) + (vz * VOXEL) * (vz * VOXEL)
-				if d_sq > radius * radius:
-					continue
-				var col := skin
-				if vi == 0 or vi == len_v - 1:
-					col = skin_d
-				elif (vi % 2) == 1:
-					col = skin_l
-				col = _jitter(col)
-				_fill(pos.x + vx * VOXEL, pos.y, pos.z + vz * VOXEL, col)
-				_vox_fruit += 1
-		# Vệt highlight trắng xanh chạy dọc một bên quả (specular)
-		if vi > 0 and vi < len_v - 1:
-			var hpos := pos + hl_side * (radius * 0.55)
-			_fill(hpos.x, hpos.y + 0.01, hpos.z, hl)
-			_vox_highlight += 1
-	# Đầu quả (đuôi) hơi nhọn cong
-	var tip := origin + Vector3(0.0, -float(len_v - 1) * VOXEL * 2.1, 0.0) + right * curve * 0.12
-	_fill(tip.x + right.x * 0.04, tip.y - 0.035, tip.z + right.z * 0.04, skin_d)
-	_vox_fruit += 1
-	_build_fruit_top(origin, calix, calix_d, stalk)
-	_build_sparkles(origin, len_v, sparkle)
-
-## Quả tròn béo, hơi dẹt, đáy căng mọng.
-func _build_fruit_round(origin: Vector3, hl_side: Vector3, skin: Color, skin_d: Color,
-		skin_l: Color, hl: Color, calix: Color, calix_d: Color, stalk: Color, sparkle: Color) -> void:
-	var rx: float = 0.075 + randf() * 0.02
-	var ry: float = 0.09 + randf() * 0.025
-	var b := ceili(ry / VOXEL)
-	for vx in range(-b, b + 1):
-		for vy in range(-b, b + 1):
-			for vz in range(-b, b + 1):
-				var px := vx * VOXEL; var py := vy * VOXEL; var pz := vz * VOXEL
-				var dx := px / rx; var dy := py / ry; var dz := pz / rx
-				if dx * dx + dy * dy + dz * dz > 1.0:
-					continue
-				var col := skin
-				if py < -ry * 0.55:
-					col = skin_d
-				elif py > -ry * 0.1:
-					col = skin_l
-				col = _jitter(col)
-				_fill(origin.x + px, origin.y + py, origin.z + pz, col)
-				_vox_fruit += 1
-	if randf() < 0.9:
-		var hpos := origin + hl_side * (rx * 0.5)
-		for vy in range(3):
-			_fill(hpos.x, origin.y + 0.02 + vy * 0.02, hpos.z, hl)
-			_vox_highlight += 1
-	_build_fruit_top(origin, calix, calix_d, stalk)
-	_build_sparkles(origin, 4, sparkle)
-
-## Đài hoa 4-5 cánh nhọn bo tròn xanh ngả tím + gờ gai + cuống cong lên.
-func _build_fruit_top(origin: Vector3, calix: Color, calix_d: Color, stalk: Color) -> void:
-	var petal_count: int = 4 + randi() % 2
-	var seed_a: float = randf() * TAU
-	for p in range(petal_count):
-		var pa: float = seed_a + float(p) / float(petal_count) * TAU
-		var d := Vector3(cos(pa), 0.0, sin(pa))
-		_fill(origin.x + d.x * 0.075, origin.y + 0.012, origin.z + d.z * 0.075, calix)
-		_fill(origin.x + d.x * 0.11, origin.y + 0.03, origin.z + d.z * 0.11, calix_d)
-	# Cuống gỗ cứng xanh đậm cong lên
-	for sy in range(3):
-		_fill(origin.x - 0.012 + sy * 0.012, origin.y + 0.05 + sy * 0.03, origin.z + 0.01, stalk)
+	for fi in range(bounty):
+		var fa: float = seed_a + float(fi) / float(bounty) * TAU + (randf() - 0.5) * 0.6
+		var r: float = 0.12 + randf() * 0.08
+		var attach_y: float = h * (0.55 + randf() * 0.30) - 0.10
+		var target_len: float = 0.34 + randf() * 0.12
+		_add_hanging(ItemMesh.add_fruit_hanging(
+			self, "eggplant_fruit", target_len,
+			Vector3(cos(fa) * r, attach_y, sin(fa) * r), randf() * TAU))
+		_build_sparkles(Vector3(cos(fa) * r, attach_y - target_len * 0.5, sin(fa) * r))
 
 ## Hạt lấp lánh tỏa quanh quả chín.
-func _build_sparkles(origin: Vector3, len_v: int, sparkle: Color) -> void:
+func _build_sparkles(center: Vector3) -> void:
+	var col := Color(0.95, 0.90, 0.55)
 	var n: int = 3 + randi() % 2
 	for si in range(n):
 		var sa: float = randf() * TAU
 		var sr: float = 0.09 + randf() * 0.07
-		var sy: float = origin.y - 0.06 - randf() * 0.10
-		_fill(origin.x + cos(sa) * sr, sy, origin.z + sin(sa) * sr, sparkle)
+		var sy: float = center.y - 0.06 - randf() * 0.10
+		_fill(center.x + cos(sa) * sr, sy, center.z + sin(sa) * sr, col)
 		_vox_sparkle += 1
 
 ## Ánh sáng tím nhạt báo hiệu quả chín.
@@ -442,6 +353,11 @@ func _apply_stage(_from: int, _to: int) -> void:
 	_rebuild()
 
 func _rebuild() -> void:
+	for rf in _real_fruit_nodes:
+		if is_instance_valid(rf):
+			remove_child(rf)
+			rf.queue_free()
+	_real_fruit_nodes.clear()
 	for i in range(get_child_count() - 1, -1, -1):
 		var ch := get_child(i)
 		if ch is MultiMeshInstance3D or ch is StaticBody3D or ch is OmniLight3D:
@@ -521,6 +437,15 @@ func _hit_flash() -> void:
 			if is_instance_valid(mmi):
 				mmi.material_override = orig
 		)
+	super._hit_flash()
 
 func _get_mesh_instances() -> Array[MeshInstance3D]:
-	return []
+	var result: Array[MeshInstance3D] = []
+	for rf in _real_fruit_nodes:
+		if is_instance_valid(rf):
+			_collect_mi(rf, result)
+	return result
+
+func _add_hanging(n: Node3D) -> void:
+	if n != null:
+		_real_fruit_nodes.append(n)

@@ -753,3 +753,50 @@ static func _build_orange_seed_icon(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, -0.32, -0.84, 0.18, 0.10, 0.08, 0.10, seed_c.darkened(0.08))
 	ItemMeshShared.add_cube(p, 0.12, -0.82, 0.34, 0.10, 0.08, 0.10, seed_c.lightened(0.06))
 	ItemMeshShared.add_cube(p, 0.54, -0.76, 0.24, 0.10, 0.08, 0.10, seed_c.darkened(0.05))
+
+## Dựng model trái thật (item drop model) theo bề rộng mục tiêu, đáy quả
+## áp sát mặt đất (ground_pos.y) — dùng cho quả dưa hấu/bí đỏ 1 block.
+static func add_fruit_on_ground(parent: Node3D, item_id: String, target_width: float,
+		ground_pos: Vector3, rot_y: float = 0.0) -> Node3D:
+	var pivot := Node3D.new()
+	pivot.name = "RealFruitOnGround"
+	parent.add_child(pivot)
+	build(pivot, item_id)
+	var aabb := _mesh_boxes_aabb(pivot)
+	var s := target_width / maxf(maxf(aabb.size.x, aabb.size.z), 0.0001)
+	pivot.scale = Vector3(s, s, s)
+	pivot.position = Vector3(ground_pos.x, ground_pos.y - aabb.position.y * s, ground_pos.z)
+	pivot.rotation.y = rot_y
+	return pivot
+
+## Dựng model trái thật treo lủng lẳng theo chiều dài mục tiêu, đỉnh quả
+## (cuống) áp vào attach_pos — dùng cho cà tím treo dưới nhánh lá.
+static func add_fruit_hanging(parent: Node3D, item_id: String, target_len: float,
+		attach_pos: Vector3, rot_y: float = 0.0) -> Node3D:
+	var pivot := Node3D.new()
+	pivot.name = "RealFruitHanging"
+	parent.add_child(pivot)
+	build(pivot, item_id)
+	var aabb := _mesh_boxes_aabb(pivot)
+	var s := target_len / maxf(aabb.size.y, 0.0001)
+	pivot.scale = Vector3(s, s, s)
+	var top_y := (aabb.position.y + aabb.size.y) * s
+	pivot.position = Vector3(attach_pos.x, attach_pos.y - top_y, attach_pos.z)
+	pivot.rotation.y = rot_y
+	return pivot
+
+## Gộp AABB của các MeshInstance3D con của pivot (các cube đặt trực tiếp,
+## vị trí trong không gian của pivot).
+static func _mesh_boxes_aabb(pivot: Node3D) -> AABB:
+	var result := AABB()
+	var first := true
+	for child in pivot.get_children():
+		if child is MeshInstance3D:
+			var box: AABB = child.get_aabb()
+			box.position += child.position
+			if first:
+				result = box
+				first = false
+			else:
+				result = result.merge(box)
+	return result

@@ -137,11 +137,15 @@ func _ready() -> void:
 	_check(vine.find_child("WatermelonFruitVisual", false, false) != null, "quả non có visual riêng")
 	_check(vine.find_child("WatermelonGlow", false, false) == null, "quả non không có ánh sáng chín")
 
-	# Chín: quả to căng tròn + vằn nhô cao + vệt đất + hạt sao lấp lánh + glow
+	# Chín: trái dưa to dùng model thật 1 block + hạt sao lấp lánh + glow
 	vine.set_birth_age_days(16.0)
 	_check(vine._stage == _Growing.Stage.RIPE, "16 ngày = chín thu hoạch")
-	_check(vine._vox_fruit >= 40, "quả phình to căng tròn (≥40 micro-voxel, có %d)" % vine._vox_fruit)
-	_check(vine._vox_stripe >= 8, "vằn zíc-zắc xanh đen nhô cao (≥8, có %d)" % vine._vox_stripe)
+	_check(vine._real_fruit_nodes.size() >= 1, "trái dưa model thật đặt lệch khỏi gốc (≥1, có %d)" % vine._real_fruit_nodes.size())
+	var wm_ok := vine._real_fruit_nodes.size() > 0
+	for rf in vine._real_fruit_nodes:
+		if is_instance_valid(rf) and rf.get_child_count() == 0:
+			wm_ok = false
+	_check(wm_ok, "mỗi trái dưa có đủ mesh model (vỏ + vằn + cuống)")
 	_check(vine._vox_sparkle >= 3, "hạt sao vàng lấp lánh quanh quả chín (≥3, có %d)" % vine._vox_sparkle)
 	_check(vine.find_child("WatermelonGlow", false, false) != null, "có ánh sáng vàng dịu báo chín")
 	var fmmi := vine.find_child("WatermelonFruitVisual", false, false) as MultiMeshInstance3D

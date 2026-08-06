@@ -148,11 +148,15 @@ func _ready() -> void:
 	_check(vine.find_child("PumpkinFruitVisual", false, false) != null, "quả non có visual riêng")
 	_check(vine.find_child("PumpkinGlow", false, false) == null, "quả non không có ánh sáng chín")
 
-	# Thu hoạch: quả cam cháy căng mộng + múi khía sâu + hạt sao lấp lánh + glow
+	# Thu hoạch: quả cam cháy model thật 1 block + hạt sao lấp lánh + glow
 	vine.set_birth_age_days(16.0)
 	_check(vine._stage == _Growing.Stage.RIPE, "16 ngày = chín thu hoạch")
-	_check(vine._vox_fruit >= 45, "quả cam cháy căng mộng (≥45 micro-voxel, có %d)" % vine._vox_fruit)
-	_check(vine._vox_rib >= 8, "múi khía dọc rãnh sâu (≥8, có %d)" % vine._vox_rib)
+	_check(vine._real_fruit_nodes.size() >= 1, "trái bí model thật đặt lệch khỏi gốc (≥1, có %d)" % vine._real_fruit_nodes.size())
+	var pk_ok := vine._real_fruit_nodes.size() > 0
+	for rf in vine._real_fruit_nodes:
+		if is_instance_valid(rf) and rf.get_child_count() == 0:
+			pk_ok = false
+	_check(pk_ok, "mỗi trái bí có đủ mesh model (múi + cuống gỗ)")
 	_check(vine._vox_sparkle >= 3, "hạt sao vàng lấp lánh quanh quả chín (≥3, có %d)" % vine._vox_sparkle)
 	_check(vine.find_child("PumpkinGlow", false, false) != null, "có ánh sáng vàng ấm báo chín")
 	var fmmi := vine.find_child("PumpkinFruitVisual", false, false) as MultiMeshInstance3D
