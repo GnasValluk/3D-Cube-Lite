@@ -175,7 +175,20 @@ func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 		if dv > 0.55:
 			if _is_river(wx, wz):
 				return Color(0.08, 0.38, 0.72, 0.70)
+			# Cao nguyên sa mạc — đảo cát cao trong sa mạc (khớp _biome_at)
+			var n_dp: FastNoiseLite = nd.get("desert_plateau") as FastNoiseLite
+			if n_dp:
+				var dpv: float = (n_dp.get_noise_2d(wx, wz) + 1.0) * 0.5
+				if dpv > 0.60 and (wx * wx + wz * wz) > 1500000.0:
+					return Color(0.90, 0.82, 0.55)
 			return Color(0.92, 0.78, 0.32)
+
+	# Cao nguyên (đồng bằng cao) — khớp _biome_at: xa spawn, mask > 0.55
+	var n_highland: FastNoiseLite = nd.get("highland") as FastNoiseLite
+	if n_highland:
+		var hv: float = (n_highland.get_noise_2d(wx, wz) + 1.0) * 0.5
+		if hv > 0.55 and (wx * wx + wz * wz) > 1500000.0:
+			return Color(0.16, 0.54, 0.10)
 
 	# Sông
 	if _is_river(wx, wz):

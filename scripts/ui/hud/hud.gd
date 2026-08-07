@@ -77,6 +77,9 @@ var _last_tp_zoom: float = -1.0
 var _hud_throttle: float = 0.0
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
+const _Village = preload("res://scripts/world/chunk/village.gd")
+const _Road = preload("res://scripts/world/chunk/chunk_road.gd")
+const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const _ChestUI = preload("res://scripts/items/ui/chest_ui.gd")
 const _CraftingUI = preload("res://scripts/items/ui/crafting_ui.gd")
 const _RecipeLibrary = preload("res://scripts/items/ui/recipe_library_panel.gd")
@@ -880,8 +883,8 @@ func _setup_debug_menu() -> void:
 	_debug_panel.add_theme_stylebox_override("panel", bg)
 
 	var vp := get_viewport().get_visible_rect().size
-	_debug_panel.position = Vector2(vp.x * 0.5 - 228, vp.y * 0.5 - 208)
-	_debug_panel.size = Vector2(455, 416)
+	_debug_panel.position = Vector2(vp.x * 0.5 - 228, vp.y * 0.5 - 262)
+	_debug_panel.size = Vector2(455, 524)
 
 	var title := Label.new()
 	title.position = Vector2(17, 11)
@@ -1010,6 +1013,42 @@ func _setup_debug_menu() -> void:
 	tp_desert_btn.pressed.connect(_on_teleport_biome.bind("desert"))
 	_debug_panel.add_child(tp_desert_btn)
 
+	var tp_highland_btn := Button.new()
+	tp_highland_btn.position = Vector2(234, y - 2)
+	tp_highland_btn.size = Vector2(202, 34)
+	tp_highland_btn.add_theme_font_size_override("font_size", 20)
+	tp_highland_btn.text = "⛰️ Cao Nguyên"
+	tp_highland_btn.pressed.connect(_on_teleport_biome.bind("highland"))
+	_debug_panel.add_child(tp_highland_btn)
+
+	y += 34
+	var tp_dp_btn := Button.new()
+	tp_dp_btn.position = Vector2(17, y - 2)
+	tp_dp_btn.size = Vector2(202, 34)
+	tp_dp_btn.add_theme_font_size_override("font_size", 20)
+	tp_dp_btn.text = "🏜️ Cao Nguyên Sa Mạc"
+	tp_dp_btn.pressed.connect(_on_teleport_biome.bind("desert_plateau"))
+	_debug_panel.add_child(tp_dp_btn)
+
+	# ── Teleport to Công Trình ───────────────────────────────────────────────
+	y += 34
+	var tp_c_lbl := Label.new()
+	tp_c_lbl.position = Vector2(17, y)
+	tp_c_lbl.size = Vector2(424, 26)
+	tp_c_lbl.add_theme_font_size_override("font_size", 20)
+	tp_c_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.85))
+	tp_c_lbl.text = "Teleport to Công Trình:"
+	_debug_panel.add_child(tp_c_lbl)
+	y += 34
+
+	var tp_tavern_btn := Button.new()
+	tp_tavern_btn.position = Vector2(17, y - 2)
+	tp_tavern_btn.size = Vector2(202, 34)
+	tp_tavern_btn.add_theme_font_size_override("font_size", 20)
+	tp_tavern_btn.text = "🍺 Quán Rượu (gần nhất)"
+	tp_tavern_btn.pressed.connect(_on_teleport_tavern)
+	_debug_panel.add_child(tp_tavern_btn)
+
 	add_child(_debug_panel)
 
 func _toggle_debug() -> void:
@@ -1050,7 +1089,10 @@ func _on_teleport_biome(biome_type: String) -> void:
 	var found: Vector2 = Vector2.ZERO
 	var found_ok: bool = false
 	var nd: Dictionary = WorldChunk._noise_for_dim(1)
+	var n_lake: FastNoiseLite = nd.get("lake")
 
+	# Dùng ĐÚNG nguồn sự thật với địa hình: biome theo _biome_at (có spawn-bias),
+	# ocean theo _ocean_mask_at, hồ theo n_lake ngưỡng thật (GRASS 0.70).
 	var r: float = STEP
 	while r <= MAX_R and not found_ok:
 		var samples: int = max(8, int(r / STEP * TAU))
@@ -1058,45 +1100,100 @@ func _on_teleport_biome(biome_type: String) -> void:
 			var angle: float = float(i) / float(samples) * TAU
 			var wx: float = origin.x + cos(angle) * r
 			var wz: float = origin.y + sin(angle) * r
+			var is_oc: bool = WorldChunk._ocean_mask_at(nd, wx, wz)
+			var bio: int = WorldChunk.biome_at(wx, wz, 1)
 
 			match biome_type:
 				"plains":
-					var n_lake: FastNoiseLite  = nd.get("lake")
-					var n_bio: FastNoiseLite   = nd.get("biome")
-					var n_warp: FastNoiseLite  = nd.get("warp")
-					var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0 if n_warp else 0.0
-					var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0 if n_warp else 0.0
-					var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5 if n_bio else 0.0
-					var is_oc: bool = WorldChunk._ocean_mask_at(nd, wx, wz)
+					# GRASS thật (không phải rừng) + không biển + không hồ
 					var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5 if n_lake else 0.0
-					# GRASS, không phải biển, không phải hồ
-					if bio_n < 0.40 and not is_oc and lv <= 0.45:
+					if bio == _Data.TileType.GRASS and not is_oc and lv <= 0.70:
 						found = Vector2(wx, wz); found_ok = true; break
 				"ocean":
-					var n_bio: FastNoiseLite   = nd.get("biome")
-					var n_warp: FastNoiseLite  = nd.get("warp")
-					if n_bio and n_warp:
-						var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0
-						var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0
-						var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
-						var is_oc: bool = WorldChunk._ocean_mask_at(nd, wx, wz)
-						# GRASS + ocean mask — đây mới thực sự là biển
-						if bio_n < 0.40 and is_oc:
-							found = Vector2(wx, wz); found_ok = true; break
+					# Biển thật = ocean mask; thả trên nước, không cần biome
+					if is_oc:
+						found = Vector2(wx, wz); found_ok = true; break
 				"desert":
-					var n_desert: FastNoiseLite = nd.get("desert")
-					if n_desert:
-						var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
-						if dv > 0.55 and not WorldChunk._ocean_mask_at(nd, wx, wz):
-							found = Vector2(wx, wz); found_ok = true; break
+					# _biome_at đã ưu tiên DESERT_PLATEAU — DESERT là sa mạc đúng
+					if bio == _Data.TileType.DESERT:
+						found = Vector2(wx, wz); found_ok = true; break
+				"highland":
+					if bio == _Data.TileType.HIGHLAND_GRASS:
+						found = Vector2(wx, wz); found_ok = true; break
+				"desert_plateau":
+					if bio == _Data.TileType.DESERT_PLATEAU:
+						found = Vector2(wx, wz); found_ok = true; break
 		r += STEP
 
 	if found_ok:
-		var biome_name: String = "Đồng Bằng" if biome_type == "plains" else ("Biển Khơi" if biome_type == "ocean" else "Sa Mạc")
-		player.global_position = Vector3(found.x, 5.0, found.y)
+		var biome_name: String = "Đồng Bằng"
+		if biome_type == "ocean":
+			biome_name = "Biển Khơi"
+		elif biome_type == "desert":
+			biome_name = "Sa Mạc"
+		elif biome_type == "highland":
+			biome_name = "Cao Nguyên"
+		elif biome_type == "desert_plateau":
+			biome_name = "Cao Nguyên Sa Mạc"
+		# Build chunk chứa điểm đích đồng bộ → lấy đúng cao độ mặt đất, tránh
+		# thả rơi từ cao hoặc chui xuống đất khi vùng chưa được stream.
+		WorldChunk.ensure_chunk_built(found.x, found.y)
+		# Hạ cánh cao (rơi xuống) — cao nguyên / cao nguyên sa mạc nền cao 3-11.5m
+		# nên không hạ ở y=5 kẻo chui vào lòng đất. Chỉ dùng cao độ thật nếu mặt
+		# đất TRÊN mặt nước (WATER_Y=0.5) — chỗ biển sâu thì thả từ trên cao.
+		var gy: float = WorldChunk.sample_ground_height(found.x, found.y)
+		var spawn_y: float = 60.0 if (biome_type == "highland" or biome_type == "desert_plateau") else 5.0
+		if gy != -INF and gy > 0.5:
+			spawn_y = gy + 3.0
+		player.global_position = Vector3(found.x, spawn_y, found.y)
 		player._scroll_inventory_message("Teleport → " + biome_name)
 	else:
 		player._scroll_inventory_message("Không tìm thấy " + biome_type + " trong bán kính 6km!")
+
+## Teleport tới quán rượu gần nhất (tính định danh qua mạng đường, không cần chunk).
+func _on_teleport_tavern() -> void:
+	var player := _find_player_character()
+	if player == null:
+		return
+	var origin: Vector2 = Vector2(player.global_position.x, player.global_position.z)
+	const RADIUS: float = 3000.0
+	var taverns: Array = _Village.scan_taverns(origin, RADIUS)
+	if taverns.is_empty():
+		player._scroll_inventory_message("Không tìm thấy quán rượu trong bán kính 3km!")
+		return
+	# Sắp gần→xa rồi duyệt: với mỗi ứng viên build chunk chứa nó để biết quán có
+	# THẬT được dựng hay chỉ nằm trong scan (footprint đất fail → không có nhà).
+	# Lấy quán gần nhất đã thật sự dựng — không bao giờ tele vào khoảng trống.
+	taverns.sort_custom(func(a, b):
+		return origin.distance_squared_to(Vector2(a.x, a.z)) < origin.distance_squared_to(Vector2(b.x, b.z)))
+	var best: Dictionary = {}
+	for t in taverns:
+		var tx: float = float(t.x)
+		var tz: float = float(t.z)
+		WorldChunk.ensure_chunk_built(tx, tz)
+		if WorldChunk.is_tavern_built_at(tx, tz):
+			best = t
+			break
+	if best.is_empty():
+		player._scroll_inventory_message("Quán gần nhất chưa sẵn sàng — di chuyển gần hơn rồi thử lại!")
+		return
+	var bx: float = float(best.x)
+	var bz: float = float(best.z)
+	# Hạ cánh phía trước hiên (về phía con đường), cao hơn mặt đất để rơi xuống
+	var node_pt: Vector2 = _Road.intersection_point(int(best.gx), int(best.gz))
+	var toward := (node_pt - Vector2(bx, bz))
+	if toward.length() < 0.1:
+		toward = Vector2(0, 1)
+	toward = toward.normalized()
+	var land := Vector2(bx, bz) + toward * 8.0
+	# Build chunk chứa điểm hạ cánh đồng bộ → lấy đúng cao độ, không thả từ cao.
+	WorldChunk.ensure_chunk_built(land.x, land.y)
+	var gy: float = WorldChunk.sample_ground_height(land.x, land.y)
+	if gy == -INF:
+		gy = 50.0
+	player.global_position = Vector3(land.x, gy + 3.0, land.y)
+	var best_d2: float = origin.distance_squared_to(Vector2(bx, bz))
+	player._scroll_inventory_message("Teleport → 🍺 Quán Rượu (cách %.0fm)" % sqrt(best_d2))
 
 ## Trả về tên biome tại world pos — dùng đúng logic giống compute_chunk
 func _get_biome_name_at(wx: float, wz: float) -> String:
@@ -1123,7 +1220,20 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 		if dv > 0.55:
 			if WorldChunk._ocean_mask_at(nd, wx, wz):
 				return "🌊 " + tr("BIOME_OCEAN")
+			# Cao nguyên sa mạc — đảo cát cao trong sa mạc (khớp _biome_at)
+			var n_dp: FastNoiseLite = nd.get("desert_plateau")
+			if n_dp:
+				var dpv: float = (n_dp.get_noise_2d(wx, wz) + 1.0) * 0.5
+				if dpv > 0.60 and (wx * wx + wz * wz) > 1500000.0:
+					return "🏜️ " + tr("BIOME_DESERT_PLATEAU")
 			return "🏜️ " + tr("BIOME_DESERT")
+
+	# Cao nguyên (đồng bằng cao) — khớp _biome_at: xa spawn, mask > 0.55
+	var n_highland: FastNoiseLite = nd.get("highland")
+	if n_highland:
+		var hv: float = (n_highland.get_noise_2d(wx, wz) + 1.0) * 0.5
+		if hv > 0.55 and (wx * wx + wz * wz) > 1500000.0:
+			return "⛰️ " + tr("BIOME_HIGHLANDS")
 
 	# DARK_GRASS (threshold = 0.40) → đồi, không thể là biển/hồ
 	if bio_n >= 0.40:

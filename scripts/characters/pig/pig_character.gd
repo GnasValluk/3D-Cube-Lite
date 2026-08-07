@@ -348,7 +348,13 @@ func _move(delta: float) -> void:
 	if _turn_smooth.length_squared() < 0.01:
 		_turn_smooth = dir
 	else:
-		_turn_smooth = _turn_smooth.normalized().slerp(dir, delta * 4.0).normalized()
+		var cur: Vector3 = _turn_smooth.normalized()
+		# slerp giữa 2 hướng gần như ngược nhau sinh vector trục (cross) suy biến
+		# → set_axis_angle báo "must be normalized". Nhảy thẳng nếu gần đối diện.
+		if cur.dot(dir) < -0.9995:
+			_turn_smooth = dir
+		else:
+			_turn_smooth = cur.slerp(dir, delta * 4.0).normalized()
 	var final_dir := _turn_smooth
 	var spd: float = sprint_speed if _ai_state == AIState.FLEE else _speed_target
 	velocity.x = final_dir.x * spd

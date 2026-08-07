@@ -53,9 +53,9 @@ EQUIPMENT_TITLE,Equipment,TRANG BỊ
 EQUIP_HEAD,Head,Đầu
 EQUIP_BODY,Body,Thân
 EQUIP_LEGS,Legs,Chân
-EQUIP_HANDS,Hands,Tay
 EQUIP_BACK,Back,Lưng
 EQUIP_SUB,Sub,Phụ
+EQUIP_FEET,Feet,Bàn chân
 STAT_ATK_BONUS,ATK: +%d,ATK: +%d
 STAT_DEF_BONUS,DEF: +%d,DEF: +%d
 STAT_HEAL,"Food: +%d","Hồi: +%d thức ăn"
@@ -63,6 +63,11 @@ DROP_HINT,"Right-click = Split  |  Drag to move","Chuột phải = Chia đồ  |
 SORT_BUTTON,Sort,Sắp xếp
 USE_ITEM,Use,Sử dụng
 EQUIP_ITEM,Equip,Trang bị
+UNEQUIP_ITEM,Unequip,Tháo ra
+HIDE_MODEL,Hide model,Ẩn model
+SHOW_MODEL,Show model,Hiện model
+UNEQUIP_MSG,Unequipped {s},Đã tháo {s}
+INV_FULL_MSG,Inventory full!,Kho đã đầy!
 DROP_ITEM,Drop,Vứt
 HEAL_VN,Heal: +{d} HP,"Hồi: +{d} HP"
 DIM_TWILIGHT,Twilight,Chạng Vạng
@@ -79,6 +84,8 @@ SLOT_HEAD,Head,Đầu
 SLOT_BODY,Body,Thân
 SLOT_LEGS,Legs,Chân
 SLOT_FEET,Feet,Bàn chân
+SLOT_BACK,Back,Lưng
+SLOT_SUB,Sub,Phụ
 ITEM_COCONUT_NAME,Coconut,Trái Dừa
 ITEM_COCONUT_DESC,"Fresh coconut — nutritious, refreshing","Trái dừa tươi — bổ dưỡng, giải khát"
 ITEM_PALM_WOOD_NAME,Palm Wood,Gỗ Dừa
@@ -232,6 +239,8 @@ BIOME_HILLS,Hills,Đồng Bằng (đồi)
 BIOME_OCEAN,Ocean,Biển
 BIOME_LAKE_RIVER,Lake / River,Hồ / Sông
 BIOME_PLAINS,Plains,Đồng Bằng
+BIOME_HIGHLANDS,High Plains,Cao Nguyên
+BIOME_DESERT_PLATEAU,Desert Plateau,Cao Nguyên Sa Mạc
 SEASON_SPRING,Spring,Xuân
 SEASON_SUMMER,Summer,Hạ
 SEASON_AUTUMN,Autumn,Thu

@@ -34,12 +34,15 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 			match biome:
 				_Data.TileType.DARK_GRASS:
 					top_block = B.DARK_GRASS
+				_Data.TileType.HIGHLAND_GRASS:
+					top_block = B.HIGHLAND_GRASS
 				_Data.TileType.YOUNG_GRASS:
 					top_block = B.YOUNG_GRASS  # bãi cỏ non (cơ chế bãi đất)
 				_Data.TileType.SAND:       top_block = B.SAND
 				_Data.TileType.SAND_WHITE: top_block = B.OCEAN_SAND
 				_Data.TileType.DIRT:       top_block = B.DIRT
 				_Data.TileType.DESERT:     top_block = B.SAND
+				_Data.TileType.DESERT_PLATEAU: top_block = B.DESERT_PLATEAU
 				_Data.TileType.SILT:       top_block = B.SILT
 				_Data.TileType.MUDDY_SAND: top_block = B.MUDDY_SAND
 				_Data.TileType.OCEAN_DEEP:
@@ -87,7 +90,8 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 				elif ly <= top_slab - 2:
 					blk = B.STONE
 				elif ly == top_slab - 1 and top_slab > 1:
-					if top_block == B.DARK_GRASS or top_block == B.YOUNG_GRASS or top_block == B.DIRT:
+					if top_block == B.DARK_GRASS or top_block == B.YOUNG_GRASS or top_block == B.DIRT \
+							or top_block == B.HIGHLAND_GRASS:
 						blk = B.DARK_DIRT
 					else:
 						blk = B.SAND_DEEP
@@ -149,7 +153,8 @@ static func spawn_ore_hills(bd: _BlockData, biome_grid: Array, height_grid: Arra
 
 	# Đồng bằng (DARK_GRASS): tỷ lệ thấp hơn, chủ yếu than + sắt hiếm
 	var is_plains: bool = biome_grid[hx][hz] == _Data.TileType.DARK_GRASS \
-		or biome_grid[hx][hz] == _Data.TileType.GRASS
+		or biome_grid[hx][hz] == _Data.TileType.GRASS \
+		or biome_grid[hx][hz] == _Data.TileType.HIGHLAND_GRASS
 	var chance: int = ORE_HILL_PLAINS_CHANCE if is_plains else ORE_HILL_CHANCE
 	if _oh_hash(seed_v, 1) % 100 >= chance:
 		return { "cx": -1, "cz": -1 }
@@ -239,7 +244,7 @@ static func spawn_ore_hills(bd: _BlockData, biome_grid: Array, height_grid: Arra
 		# Đồi quặng không mọc cỏ
 		var bg: int = biome_grid[p.x][p.z]
 		if bg == _Data.TileType.GRASS or bg == _Data.TileType.DARK_GRASS \
-				or bg == _Data.TileType.YOUNG_GRASS:
+				or bg == _Data.TileType.YOUNG_GRASS or bg == _Data.TileType.HIGHLAND_GRASS:
 			biome_grid[p.x][p.z] = _Data.TileType.DIRT
 
 	return { "cx": hx, "cz": hz, "plains": is_plains }

@@ -124,8 +124,8 @@ func _build_tree() -> void:
 
 ## Mầm: 2 lá mầm TO xanh nõn nhú thẳng lên từ lòng đất.
 func _build_sprout() -> void:
-	var col_stem := Color(0.18, 0.50, 0.22)
-	var col_leaf := Color(0.30, 0.68, 0.28)
+	var col_stem := Color(0.42, 0.60, 0.16)
+	var col_leaf := Color(0.50, 0.70, 0.20)
 	for vy in range(3):
 		_fill(0.0, 0.02 + vy * VOXEL, 0.0, col_stem)
 	for side in [-1.0, 1.0]:
@@ -139,10 +139,10 @@ func _build_sprout() -> void:
 ## Dây leo 5 cạnh thô mộc uốn lượn bò sát đất + gai nhám xám ngà dọc cạnh +
 ## tua cuốn xoắn ốc xanh chuối nõn.
 func _build_vines() -> void:
-	var col_vine := Color(0.30, 0.55, 0.20)
-	var col_tip := Color(0.50, 0.64, 0.28)
+	var col_vine := Color(0.46, 0.60, 0.16)
+	var col_tip := Color(0.62, 0.72, 0.22)
 	var col_prickle := Color(0.82, 0.82, 0.78)
-	var col_tendril := Color(0.62, 0.78, 0.30)
+	var col_tendril := Color(0.68, 0.78, 0.26)
 
 	var arm_count: int = 3 + randi() % 2
 	var seed_a: float = randf() * TAU
@@ -190,9 +190,9 @@ func _build_tendril(at: Vector2, ang: float, col: Color) -> void:
 ## Lá to bản hình tim (chân vịt chẻ nông) vươn cao khỏi mặt đất che mát gốc:
 ## mặt trên xanh lục thẫm, gân chính xanh lá mạ nhô nổi.
 func _build_leaves() -> void:
-	var col_leaf := Color(0.13, 0.38, 0.12)
-	var col_leaf_l := Color(0.18, 0.48, 0.16)
-	var col_vein := Color(0.40, 0.66, 0.26)
+	var col_leaf := Color(0.40, 0.58, 0.14)
+	var col_leaf_l := Color(0.54, 0.68, 0.18)
+	var col_vein := Color(0.72, 0.78, 0.26)
 	var is_young := _stage == GrowingProp.Stage.YOUNG
 
 	var leaf_count: int = (4 + randi() % 2) if is_young else (5 + randi() % 2)
@@ -304,22 +304,31 @@ func _build_ripe_pumpkins() -> void:
 		var fruit_pos := Vector3(cos(fa) * dist, 0.075, sin(fa) * dist)
 		_build_fruit_strand(fruit_pos, fa)
 		_add_ground(ItemMesh.add_fruit_on_ground(
-			self, "pumpkin", 1.0,
+			self, "pumpkin", 0.8,
 			Vector3(fruit_pos.x, 0.05, fruit_pos.z), randf() * TAU))
 
 ## Sợi dây bò từ gốc ra đến quả — uốn lượn sát mặt đất, khớp đúng 2 đầu.
+## Dây nối vẽ LIÊN TỤC (không đứt khúc) + dày 3 micro-voxel + màu vàng xanh
+## tương phản để nhìn rõ dây dẫn từ cây ra trái.
 func _build_fruit_strand(target: Vector3, ang: float) -> void:
-	var col := Color(0.30, 0.55, 0.20)
-	var steps: int = 5 + randi() % 3
+	var col := Color(0.62, 0.72, 0.20)
+	var col_edge := Color(0.44, 0.56, 0.14)
+	var dist := target.length()
+	var steps: int = maxi(6, int(dist / (VOXEL * 1.5)))
 	var perp := Vector3(-sin(ang), 0.0, cos(ang))
 	var prev := Vector3.ZERO
 	for si in range(1, steps + 1):
 		var t := float(si) / float(steps)
 		var wob := sin(t * 5.0 + ang) * 0.05 * sin(t * PI)
 		var cur := target * t + perp * wob
-		_fill(prev.x, 0.045, prev.z, col)
-		_fill(cur.x, 0.05, cur.z, col)
-		_vox_vine += 1
+		var mid := (prev + cur) * 0.5
+		# Lõi dây liên tục — mỗi đoạn đều có voxel nên không bị hụt
+		_fill(mid.x, 0.055, mid.z, col)
+		_fill(cur.x, 0.058, cur.z, col)
+		# Hai mép dây sẫm hơn tạo bề dày rõ nét
+		_fill(mid.x + perp.x * 0.03, 0.050, mid.z + perp.z * 0.03, col_edge)
+		_fill(mid.x - perp.x * 0.03, 0.050, mid.z - perp.z * 0.03, col_edge)
+		_vox_vine += 4
 		prev = cur
 
 func _build_pumpkins(green: bool) -> void:

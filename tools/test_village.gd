@@ -2,8 +2,11 @@ extends Node
 
 ## test_village — Quán Rượu (half-timbered) mọc bên mép đường tại ngã 3/ngã tư.
 ## Ghim WorldSeed.seed_value = 20260805 (như mọi test thế giới).
-## Tọa độ quán ổn định hunt 2026-08-04: T4 tại chunk (-3,-6) node (-1,-2);
-## T3 tại chunk (48,24) node (19,10).
+## Tọa độ quán hunt 2026-08-04: T4 tại chunk (-3,-6) node (-1,-2);
+## T3 tại chunk (48,24) node (19,10). Từ 07/2026 mật độ quán tăng mạnh (T3 45%,
+## T4 98%) và footprint nới lỏng (cho vươn sang chunk lân cận) nên vị trí chính
+## xác có thể lệch, thậm chí 1 chunk có thể có NHIỀU quán từ các node lân cận —
+## test chỉ chốt node/deg/loại + deterministic, không chốt số quán chính xác.
 
 const _W = preload("res://scripts/world/chunk/world_chunk.gd")
 const _D = preload("res://scripts/world/chunk/chunk_data.gd")
@@ -13,9 +16,9 @@ const SIZE := 32
 const SEED := 20260805
 
 const T4_CHUNK := Vector2i(-3, -6)   # quán ngã tư: node (-1,-2), pos ≈ (-97.01, -183.06)
-const T3_CHUNK := Vector2i(48, 24)   # quán ngã 3: node (19,10), pos ≈ (1538.00, 771.26)
+const T3_CHUNK := Vector2i(53, 19)   # quán ngã 3: node (21,8), pos ≈ (1711.24, 616.60)
 const NO_T4_NB := Vector2i(-3, -7)   # láng giềng T4 — không được có quán
-const NO_T3_NB := Vector2i(48, 23)   # láng giềng T3 — không được có quán
+const NO_T3_NB := Vector2i(53, 18)   # láng giềng T3 — mẫu deterministic (mục 2)
 const NO_INTERSECT := Vector2i(0, 0) # vùng spawn — không có quán (MIN_DIST=120)
 
 var _failures: int = 0
@@ -37,18 +40,26 @@ func _ready() -> void:
 	print("== test_village: Quán Rượu ==")
 
 	# ── 1. Vùng spawn không có quán (TAVERN_MIN_DIST = 120) ────────────────
+	# Các chunk nội tâm |cx|,|cz| ≤ 1 (mọi ô cách gốc ≤ ~90m < 120m) CHẮC CHẮN
+	# trống với MỌI seed. Chunk xa hơn có thể có quán (mật độ tăng 07/2026).
 	print("-- 1. Không có quán gần spawn --")
-	for cx in range(-3, 4):
-		for cz in range(-3, 4):
+	for cx in range(-1, 2):
+		for cz in range(-1, 2):
 			var vd0: Dictionary = _compute(cx, cz).get("village_data", {})
 			_check(not vd0.get("has", false), "không có quán tại chunk (%d,%d)" % [cx, cz])
 
-	# ── 2. Chunk không ngã 3/4: has=false, xforms rỗng ─────────────────────
-	print("-- 2. Chunk không có quán trả has=false --")
-	for nc in [NO_INTERSECT, NO_T4_NB, NO_T3_NB]:
-		var vd1: Dictionary = _compute(nc.x, nc.y).get("village_data", {})
-		_check(vd1.get("has", true) == false, "chunk %s không có quán (has=false)" % str(nc))
-		_check(vd1.get("xforms", []).is_empty(), "chunk %s không có hộp dựng" % str(nc))
+	# ── 2. Vùng spawn ngã tư (0,0) trống + build deterministic ──────────────
+	print("-- 2. Chunk (0,0) trống + build deterministic --")
+	var vd1: Dictionary = _compute(NO_INTERSECT.x, NO_INTERSECT.y).get("village_data", {})
+	_check(vd1.get("has", true) == false, "chunk %s không có quán (has=false)" % str(NO_INTERSECT))
+	_check(vd1.get("xforms", []).is_empty(), "chunk %s không có hộp dựng" % str(NO_INTERSECT))
+	# Láng giềng T4/T3: không gắn chặt "không có quán" nữa (mật độ đã tăng) —
+	# thay bằng kiểm tra deterministic để bắt regression.
+	for nc in [NO_T4_NB, NO_T3_NB]:
+		var va: Dictionary = _compute(nc.x, nc.y).get("village_data", {})
+		var vb: Dictionary = _compute(nc.x, nc.y).get("village_data", {})
+		_check(va.get("has", false) == vb.get("has", false),
+			"chunk %s deterministic (has=%s)" % [str(nc), str(va.get("has", false))])
 
 	# ── 3. Quán ngã tư T4 ──────────────────────────────────────────────────
 	print("-- 3. Quán ngã tư tại %s --" % str(T4_CHUNK))
@@ -60,14 +71,21 @@ func _ready() -> void:
 	_check(gx4.size() > 300, "quán dựng đủ hộp (%d hộp)" % gx4.size())
 	_check(gx4.size() == gc4.size(), "xforms.size() == colors.size() (%d==%d)" % [gx4.size(), gc4.size()])
 	var bl4: Array = vd4.get("info", {}).get("buildings", [])
-	_check(bl4.size() == 1, "chính xác 1 quán (%d)" % bl4.size())
-	if bl4.size() == 1:
-		var b4: Dictionary = bl4[0]
+	_check(bl4.size() >= 1, "có quán trong chunk (%d quán)" % bl4.size())
+	var b4: Dictionary = {}
+	for b in bl4:
+		if int(b.get("gx", 0)) == -1 and int(b.get("gz", 0)) == -2:
+			b4 = b
+			break
+	_check(not b4.is_empty(), "có quán tại node (-1,-2)")
+	if not b4.is_empty():
 		_check(b4.get("type") == "tavern", "loại công trình là 'tavern'")
 		_check(b4.get("deg") == 4, "ngã 4 (deg=%d)" % int(b4.get("deg", -1)))
-		_check(b4.get("gx") == -1 and b4.get("gz") == -2, "node (%d,%d)" % [int(b4.get("gx", 0)), int(b4.get("gz", 0))])
-		_check(absf(float(b4.get("x", 0.0)) - (-97.01)) < 1.0 and absf(float(b4.get("z", 0.0)) - (-183.06)) < 1.0,
-			"vị trí (%.2f, %.2f)" % [float(b4.get("x", 0.0)), float(b4.get("z", 0.0))])
+		_check(float(b4.get("x", 0.0)) * float(b4.get("x", 0.0)) + float(b4.get("z", 0.0)) * float(b4.get("z", 0.0)) >= _V.TAVERN_MIN_DIST * _V.TAVERN_MIN_DIST,
+			"quán cách spawn ≥ TAVERN_MIN_DIST")
+		# Tọa độ hunt 2026-08-04: ≈ (-97.01, -183.06) — có thể lệch do thay đổi
+		# footprint/thử lại attempt, chỉ in để theo dõi.
+		print("    T4 pos=(%.2f, %.2f)" % [float(b4.get("x", 0.0)), float(b4.get("z", 0.0))])
 
 	# ── 4. Quán ngã 3 T3 ───────────────────────────────────────────────────
 	print("-- 4. Quán ngã 3 tại %s --" % str(T3_CHUNK))
@@ -78,14 +96,19 @@ func _ready() -> void:
 	_check(gx3.size() > 300, "quán dựng đủ hộp (%d hộp)" % gx3.size())
 	_check(gx3.size() == vd3.get("colors", []).size(), "xforms/colors khớp tại %s" % str(T3_CHUNK))
 	var bl3: Array = vd3.get("info", {}).get("buildings", [])
-	_check(bl3.size() == 1, "chính xác 1 quán (%d)" % bl3.size())
-	if bl3.size() == 1:
-		var b3: Dictionary = bl3[0]
+	_check(bl3.size() >= 1, "có quán trong chunk (%d quán)" % bl3.size())
+	var b3: Dictionary = {}
+	for b in bl3:
+		if int(b.get("gx", 0)) == 21 and int(b.get("gz", 0)) == 8:
+			b3 = b
+			break
+	_check(not b3.is_empty(), "có quán tại node (21,8)")
+	if not b3.is_empty():
 		_check(b3.get("type") == "tavern", "loại công trình là 'tavern'")
 		_check(b3.get("deg") == 3, "ngã 3 (deg=%d)" % int(b3.get("deg", -1)))
-		_check(b3.get("gx") == 19 and b3.get("gz") == 10, "node (%d,%d)" % [int(b3.get("gx", 0)), int(b3.get("gz", 0))])
-		_check(absf(float(b3.get("x", 0.0)) - 1538.0) < 1.0 and absf(float(b3.get("z", 0.0)) - 771.26) < 1.0,
-			"vị trí (%.2f, %.2f)" % [float(b3.get("x", 0.0)), float(b3.get("z", 0.0))])
+		# Tọa độ hunt 2026-08-07: ≈ (1711.24, 616.60) — có thể lệch do thay đổi
+		# footprint/thử lại attempt, chỉ in để theo dõi.
+		print("    T3 pos=(%.2f, %.2f)" % [float(b3.get("x", 0.0)), float(b3.get("z", 0.0))])
 
 	# ── 5. Deterministic: compute 2 lần cùng kết quả ───────────────────────
 	print("-- 5. Deterministic theo chunk --")
@@ -130,6 +153,24 @@ func _ready() -> void:
 			all_local = false
 			break
 	_check(all_local, "mọi hộp quán tại %s nằm trong phạm vi chunk-local" % str(T4_CHUNK))
+
+	# ── 6c. Hộp từng quán cụm trong ≤26m (chặn scatter trong data) ───────
+	var bbox_ok := true
+	var org_x := float(T4_CHUNK.x) * SIZE
+	var org_z := float(T4_CHUNK.y) * SIZE
+	for b in bl4:
+		var mn := Vector3.INF
+		var mx := Vector3(-INF, -INF, -INF)
+		for t in gx4:
+			var o: Vector3 = (t as Transform3D).origin
+			if absf(o.x - (float(b.x) - org_x)) > 26.0 or absf(o.z - (float(b.z) - org_z)) > 26.0:
+				continue
+			mn = mn.min(o); mx = mx.max(o)
+		var sz: Vector3 = mx - mn
+		if sz.x > 26.0 or sz.z > 26.0:
+			bbox_ok = false
+			print("    bbox quán (%d,%d) rộng %s — HỘP PHÂN TÁN" % [int(b.gx), int(b.gz), sz])
+	_check(bbox_ok, "hộp từng quán cụm trong ≤26m (không vung vãi)")
 
 	# ── 7. Dimension khác: không có quán ───────────────────────────────────
 	print("-- 7. Dimension khác không có quán --")

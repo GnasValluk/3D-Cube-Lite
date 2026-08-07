@@ -6,12 +6,25 @@ class_name PlayerMesh
 var rig:     Node3D
 var head:    Node3D
 var body:    Node3D
+var torso:   Node3D    # nhóm thân áo + váy (ẩn khi mặc giáp thân)
 var backpack: Node3D
 var arm_l:   Node3D
 var arm_r:   Node3D
 var leg_l:   Node3D
 var leg_r:   Node3D
 var weapon_pivot: Node3D   # điểm gắn weapon vào tay phải
+var helmet_pivot: Node3D   # điểm gắn mũ sắt (đặt giữa đầu để bọc kín toàn đầu)
+var hair_pivot: Node3D     # nhóm tóc trên đỉnh (ẩn khi đội mũ kín đầu)
+var tails_pivot: Node3D    # nhóm hai đuôi tóc (ẩn khi đội mũ kín đầu)
+var chestplate_pivot: Node3D   # điểm gắn giáp thân lên ngực
+var gauntlet_l_pivot: Node3D   # điểm gắn găng tay trái
+var gauntlet_r_pivot: Node3D   # điểm gắn găng tay phải
+var leg_armor_l_pivot: Node3D  # điểm gắn quần sắt chân trái
+var leg_armor_r_pivot: Node3D  # điểm gắn quần sắt chân phải
+var boot_l_pivot: Node3D       # điểm gắn giày sắt chân trái
+var boot_r_pivot: Node3D       # điểm gắn giày sắt chân phải
+var ring_pivot: Node3D         # điểm gắn nhẫn lên tay phải
+var back_gear_pivot: Node3D    # điểm gắn balo trang bị sau lưng
 
 # ── Materials ─────────────────────────────────────────────────────────────────
 ## Skin
@@ -93,6 +106,17 @@ func _build_head() -> void:
 	# Cằm nhỏ nhô ra
 	MeshBuilder.box(head, Vector3(0, -0.18, 0.06), Vector3(0.24, 0.06, 0.22), _sk)
 
+	# Điểm gắn mũ (helmet) — đặt giữa đầu để model mũ kiểu Corinthian bọc kín toàn đầu.
+	# Mũ hiện build quanh gốc (rộng ~0.5m, cao ~0.6m), head rộng 0.46 nên bọc lọt.
+	helmet_pivot = MeshBuilder.pivot(head, Vector3(0, 0.02, 0))
+	helmet_pivot.name = "HelmetPivot"
+	helmet_pivot.scale = Vector3(1.0, 1.0, 1.0)
+
+	# Điểm gắn giáp thân — nằm trên thân (body), xoay theo thân
+	chestplate_pivot = MeshBuilder.pivot(body, Vector3(0, 0.05, 0))
+	chestplate_pivot.name = "ChestplatePivot"
+	chestplate_pivot.scale = Vector3(1.0, 1.0, 1.0)
+
 # ── Face ──────────────────────────────────────────────────────────────────────
 func _build_face() -> void:
 	var ez: float = 0.21  # mặt trước
@@ -127,26 +151,33 @@ func _build_face() -> void:
 
 # ── Hair – phần chính phủ đỉnh đầu ──────────────────────────────────────────
 func _build_hair() -> void:
+	# Pivot gom tóc trên đỉnh — ẩn nhóm này khi đội mũ kín đầu (mũ Corinthian).
+	hair_pivot = MeshBuilder.pivot(head, Vector3.ZERO)
+	hair_pivot.name = "HairPivot"
+
 	# Tầng tóc trên đỉnh (to + rộng voxel-style)
-	MeshBuilder.box(head, Vector3(0,  0.22, -0.02), Vector3(0.48, 0.08, 0.36), _hr)
-	MeshBuilder.box(head, Vector3(0,  0.28,  0.00), Vector3(0.44, 0.06, 0.32), _hr)
-	MeshBuilder.box(head, Vector3(0,  0.34,  0.02), Vector3(0.38, 0.06, 0.26), _hr)
-	MeshBuilder.box(head, Vector3(0,  0.38,  0.04), Vector3(0.28, 0.06, 0.18), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(0,  0.22, -0.02), Vector3(0.48, 0.08, 0.36), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(0,  0.28,  0.00), Vector3(0.44, 0.06, 0.32), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(0,  0.34,  0.02), Vector3(0.38, 0.06, 0.26), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(0,  0.38,  0.04), Vector3(0.28, 0.06, 0.18), _hr)
 	# Tóc phủ hai bên đầu
-	MeshBuilder.box(head, Vector3(-0.24, 0.18, 0.02), Vector3(0.06, 0.10, 0.30), _hr)
-	MeshBuilder.box(head, Vector3( 0.24, 0.18, 0.02), Vector3(0.06, 0.10, 0.30), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(-0.24, 0.18, 0.02), Vector3(0.06, 0.10, 0.30), _hr)
+	MeshBuilder.box(hair_pivot, Vector3( 0.24, 0.18, 0.02), Vector3(0.06, 0.10, 0.30), _hr)
 	# Tóc phủ trán (mái) – lệch nhẹ sang trái
-	MeshBuilder.box(head, Vector3(-0.06, 0.16, 0.20), Vector3(0.20, 0.08, 0.06), _hr)
-	MeshBuilder.box(head, Vector3(-0.10, 0.10, 0.22), Vector3(0.14, 0.06, 0.04), _hr)
-	MeshBuilder.box(head, Vector3( 0.08, 0.16, 0.20), Vector3(0.10, 0.06, 0.06), _hd)
+	MeshBuilder.box(hair_pivot, Vector3(-0.06, 0.16, 0.20), Vector3(0.20, 0.08, 0.06), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(-0.10, 0.10, 0.22), Vector3(0.14, 0.06, 0.04), _hr)
+	MeshBuilder.box(hair_pivot, Vector3( 0.08, 0.16, 0.20), Vector3(0.10, 0.06, 0.06), _hd)
 	# Tóc phủ sau đầu
-	MeshBuilder.box(head, Vector3(0, 0.04, -0.21),  Vector3(0.40, 0.28, 0.04), _hr)
-	MeshBuilder.box(head, Vector3(0, -0.06, -0.21), Vector3(0.36, 0.18, 0.04), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(0, 0.04, -0.21),  Vector3(0.40, 0.28, 0.04), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(0, -0.06, -0.21), Vector3(0.36, 0.18, 0.04), _hr)
 
 # ── Twin Tails – hai đuôi tóc buộc cao ───────────────────────────────────────
 func _build_twin_tails() -> void:
+	tails_pivot = MeshBuilder.pivot(head, Vector3.ZERO)
+	tails_pivot.name = "TailsPivot"
+
 	# Buộc tóc trái (gần đỉnh)
-	var tie_l := MeshBuilder.pivot(head, Vector3(-0.22, 0.28, 0.02))
+	var tie_l := MeshBuilder.pivot(tails_pivot, Vector3(-0.22, 0.28, 0.02))
 	MeshBuilder.box(tie_l, Vector3(0, 0, 0), Vector3(0.07, 0.07, 0.07), _htr)
 
 	# Đuôi tóc trái – thả xuống theo bậc voxel
@@ -158,7 +189,7 @@ func _build_twin_tails() -> void:
 	MeshBuilder.box(tie_l, Vector3(0, -0.56, -0.04), Vector3(0.06, 0.08, 0.06), _hr)
 
 	# Buộc tóc phải
-	var tie_r := MeshBuilder.pivot(head, Vector3( 0.22, 0.28, 0.02))
+	var tie_r := MeshBuilder.pivot(tails_pivot, Vector3( 0.22, 0.28, 0.02))
 	MeshBuilder.box(tie_r, Vector3(0, 0, 0), Vector3(0.07, 0.07, 0.07), _htr)
 
 	# Đuôi tóc phải
@@ -176,29 +207,34 @@ func _build_body() -> void:
 	# Cổ da
 	MeshBuilder.box(body, Vector3(0,  0.20, 0.00), Vector3(0.14, 0.08, 0.14), _sk)
 
+	# Pivot gom toàn bộ thân áo + váy — ẩn nhóm này khi mặc giáp thân để thay
+	# bằng model thân mang giáp (tránh chồng mesh giữa áo và giáp).
+	torso = MeshBuilder.pivot(body, Vector3.ZERO)
+	torso.name = "Torso"
+
 	# Thân áo trắng (ngắn chibi)
-	MeshBuilder.box(body, Vector3(0,  0.08,  0.00), Vector3(0.32, 0.20, 0.22), _wh)
-	MeshBuilder.box(body, Vector3(0, -0.06,  0.00), Vector3(0.30, 0.14, 0.20), _wh)
+	MeshBuilder.box(torso, Vector3(0,  0.08,  0.00), Vector3(0.32, 0.20, 0.22), _wh)
+	MeshBuilder.box(torso, Vector3(0, -0.06,  0.00), Vector3(0.30, 0.14, 0.20), _wh)
 
 	# Cổ áo sailor (V-shape navy)
-	MeshBuilder.box(body, Vector3( 0.00, 0.14,  0.10), Vector3(0.24, 0.06, 0.04), _col)
-	MeshBuilder.box(body, Vector3(-0.08, 0.10,  0.08), Vector3(0.06, 0.10, 0.04), _col)
-	MeshBuilder.box(body, Vector3( 0.08, 0.10,  0.08), Vector3(0.06, 0.10, 0.04), _col)
+	MeshBuilder.box(torso, Vector3( 0.00, 0.14,  0.10), Vector3(0.24, 0.06, 0.04), _col)
+	MeshBuilder.box(torso, Vector3(-0.08, 0.10,  0.08), Vector3(0.06, 0.10, 0.04), _col)
+	MeshBuilder.box(torso, Vector3( 0.08, 0.10,  0.08), Vector3(0.06, 0.10, 0.04), _col)
 	# Viền cổ dưới (stripe trắng)
-	MeshBuilder.box(body, Vector3( 0.00, 0.18,  0.09), Vector3(0.22, 0.02, 0.03), _wh)
+	MeshBuilder.box(torso, Vector3( 0.00, 0.18,  0.09), Vector3(0.22, 0.02, 0.03), _wh)
 
 	# Nơ đỏ chính giữa ngực
-	MeshBuilder.box(body, Vector3( 0.00, 0.06,  0.11), Vector3(0.08, 0.06, 0.02), _rb)  # nút nơ
-	MeshBuilder.box(body, Vector3(-0.06, 0.06,  0.11), Vector3(0.06, 0.04, 0.02), _rb)  # cánh trái
-	MeshBuilder.box(body, Vector3( 0.06, 0.06,  0.11), Vector3(0.06, 0.04, 0.02), _rb)  # cánh phải
-	MeshBuilder.box(body, Vector3( 0.00, 0.02,  0.11), Vector3(0.02, 0.04, 0.02), _rb)  # đuôi nơ
+	MeshBuilder.box(torso, Vector3( 0.00, 0.06,  0.11), Vector3(0.08, 0.06, 0.02), _rb)  # nút nơ
+	MeshBuilder.box(torso, Vector3(-0.06, 0.06,  0.11), Vector3(0.06, 0.04, 0.02), _rb)  # cánh trái
+	MeshBuilder.box(torso, Vector3( 0.06, 0.06,  0.11), Vector3(0.06, 0.04, 0.02), _rb)  # cánh phải
+	MeshBuilder.box(torso, Vector3( 0.00, 0.02,  0.11), Vector3(0.02, 0.04, 0.02), _rb)  # đuôi nơ
 
 	# Váy hồng (flare nhẹ)
-	MeshBuilder.box(body, Vector3(0, -0.14, 0.00), Vector3(0.34, 0.10, 0.24), _sk2)
-	MeshBuilder.box(body, Vector3(0, -0.20, 0.00), Vector3(0.36, 0.06, 0.26), _sk2)
-	MeshBuilder.box(body, Vector3(0, -0.26, 0.00), Vector3(0.38, 0.06, 0.28), _sk2)
+	MeshBuilder.box(torso, Vector3(0, -0.14, 0.00), Vector3(0.34, 0.10, 0.24), _sk2)
+	MeshBuilder.box(torso, Vector3(0, -0.20, 0.00), Vector3(0.36, 0.06, 0.26), _sk2)
+	MeshBuilder.box(torso, Vector3(0, -0.26, 0.00), Vector3(0.38, 0.06, 0.28), _sk2)
 	# Viền váy tối
-	MeshBuilder.box(body, Vector3(0, -0.30, 0.00), Vector3(0.38, 0.02, 0.28), _sk3)
+	MeshBuilder.box(torso, Vector3(0, -0.30, 0.00), Vector3(0.38, 0.02, 0.28), _sk3)
 
 # ── Arms – tay nhỏ chibi ──────────────────────────────────────────────────────
 func _build_arms() -> void:
@@ -222,6 +258,19 @@ func _build_arms() -> void:
 	weapon_pivot.rotation_degrees = Vector3(90, 0, 0)
 	weapon_pivot.scale = Vector3(1.8, 1.8, 1.8)
 
+	# Găng tay sắt — đặt phủ cổ tay + bàn tay, scale nhỏ khớp tay chibi
+	gauntlet_l_pivot = MeshBuilder.pivot(arm_l, Vector3(0, -0.16, 0))
+	gauntlet_l_pivot.name = "GauntletLPivot"
+	gauntlet_l_pivot.scale = Vector3(0.5, 0.5, 0.5)
+	gauntlet_r_pivot = MeshBuilder.pivot(arm_r, Vector3(0, -0.16, 0))
+	gauntlet_r_pivot.name = "GauntletRPivot"
+	gauntlet_r_pivot.scale = Vector3(0.5, 0.5, 0.5)
+
+	# Nhẫn — đặt trên tay phải, xoay để vòng nhẫn hướng lên ngón
+	ring_pivot = MeshBuilder.pivot(arm_r, Vector3(0, -0.25, 0))
+	ring_pivot.name = "RingPivot"
+	ring_pivot.scale = Vector3(0.45, 0.45, 0.45)
+
 # ── Legs – chân ngắn chibi + tất trắng + giày ────────────────────────────────
 func _build_legs() -> void:
 	leg_l = MeshBuilder.pivot(rig, Vector3(-0.09, 0.16, 0))
@@ -237,6 +286,22 @@ func _build_legs() -> void:
 		MeshBuilder.box(leg, Vector3(0, -0.22,  0.02), Vector3(0.13, 0.06, 0.16), _sho)
 		MeshBuilder.box(leg, Vector3(0, -0.24,  0.06), Vector3(0.11, 0.04, 0.12), _sho)
 
+	# Điểm gắn giày sắt — phủ lên phần chân dưới / giày
+	boot_l_pivot = MeshBuilder.pivot(leg_l, Vector3(0, -0.22, 0))
+	boot_l_pivot.name = "BootLPivot"
+	boot_l_pivot.scale = Vector3(1.0, 1.0, 1.0)
+	boot_r_pivot = MeshBuilder.pivot(leg_r, Vector3(0, -0.22, 0))
+	boot_r_pivot.name = "BootRPivot"
+	boot_r_pivot.scale = Vector3(1.0, 1.0, 1.0)
+
+	# Điểm gắn quần sắt — phủ đùi + ống chân, nằm trên giày sắt
+	leg_armor_l_pivot = MeshBuilder.pivot(leg_l, Vector3(0, -0.06, 0))
+	leg_armor_l_pivot.name = "LegArmorLPivot"
+	leg_armor_l_pivot.scale = Vector3(0.7, 0.7, 0.7)
+	leg_armor_r_pivot = MeshBuilder.pivot(leg_r, Vector3(0, -0.06, 0))
+	leg_armor_r_pivot.name = "LegArmorRPivot"
+	leg_armor_r_pivot.scale = Vector3(0.7, 0.7, 0.7)
+
 # ── Backpack (nhỏ gọn, hình túi học sinh) ────────────────────────────────────
 func _build_backpack() -> void:
 	backpack = MeshBuilder.pivot(rig, Vector3(0, 0.54, -0.02))
@@ -250,3 +315,9 @@ func _build_backpack() -> void:
 	# Dây đeo
 	MeshBuilder.box(backpack, Vector3(-0.09, 0.06, -0.08), Vector3(0.03, 0.18, 0.03), _sk3)
 	MeshBuilder.box(backpack, Vector3( 0.09, 0.06, -0.08), Vector3(0.03, 0.18, 0.03), _sk3)
+
+	# Điểm gắn balo trang bị (ví dụ leather_backpack) — sau lưng. Lùi ra ngoài thân
+	# (thân người từ z -0.11..0.11) để balo nhô ra sau lưng, không chìm trong người.
+	back_gear_pivot = MeshBuilder.pivot(rig, Vector3(0, 0.53, -0.18))
+	back_gear_pivot.name = "BackGearPivot"
+	back_gear_pivot.scale = Vector3(0.85, 0.85, 0.85)

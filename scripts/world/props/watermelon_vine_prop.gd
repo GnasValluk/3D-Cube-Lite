@@ -275,24 +275,31 @@ func _build_ripe_fruits() -> void:
 		var fruit_pos := Vector3(cos(fa) * dist, 0.085, sin(fa) * dist)
 		_build_fruit_strand(fruit_pos, fa)
 		_add_ground(ItemMesh.add_fruit_on_ground(
-			self, "watermelon", 1.0,
+			self, "watermelon", 0.8,
 			Vector3(fruit_pos.x, 0.05, fruit_pos.z), randf() * TAU))
 		_build_sparkles(fruit_pos, col_sparkle)
 		_build_stalk(fruit_pos, col_stripe.darkened(0.4))
 
 ## Sợi dây bò từ gốc ra đến quả — uốn lượn sát mặt đất, khớp đúng 2 đầu.
+## Dây nối vẽ LIÊN TỤC (không đứt khúc) + dày 3 micro-voxel + màu sáng
+## tương phản để nhìn rõ dây dẫn từ cây ra trái.
 func _build_fruit_strand(target: Vector3, ang: float) -> void:
-	var col := Color(0.30, 0.54, 0.24)
-	var steps: int = 5 + randi() % 3
+	var col := Color(0.58, 0.70, 0.20)
+	var col_edge := Color(0.40, 0.54, 0.14)
+	var dist := target.length()
+	var steps: int = maxi(6, int(dist / (VOXEL * 1.5)))
 	var perp := Vector3(-sin(ang), 0.0, cos(ang))
 	var prev := Vector3.ZERO
 	for si in range(1, steps + 1):
 		var t := float(si) / float(steps)
 		var wob := sin(t * 5.0 + ang) * 0.05 * sin(t * PI)
 		var cur := target * t + perp * wob
-		_fill(prev.x, 0.045, prev.z, col)
-		_fill(cur.x, 0.05, cur.z, col)
-		_vox_vine += 1
+		var mid := (prev + cur) * 0.5
+		_fill(mid.x, 0.055, mid.z, col)
+		_fill(cur.x, 0.058, cur.z, col)
+		_fill(mid.x + perp.x * 0.03, 0.050, mid.z + perp.z * 0.03, col_edge)
+		_fill(mid.x - perp.x * 0.03, 0.050, mid.z - perp.z * 0.03, col_edge)
+		_vox_vine += 4
 		prev = cur
 
 ## Khối cầu (bầu dục) vỏ dưa + vằn zíc-zắc nhô cao 1 lớp voxel (bám sát mặt quả).

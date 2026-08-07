@@ -154,6 +154,8 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_grass",       "Cỏ",        ItemDef.Type.BLOCK, Color(0.22, 0.58, 0.14), "🧱", "Khối cỏ",           true, 64)
 	_add(db, "block_dark_grass",  "Cỏ Tối",    ItemDef.Type.BLOCK, Color(0.14, 0.40, 0.08), "🧱", "Khối cỏ tối",       true, 64)
 	_add(db, "block_young_grass", "Cỏ Non",    ItemDef.Type.BLOCK, Color(0.44, 0.38, 0.13), "🧱", "Khối cỏ non — bãi đất pha cỏ mới mọc ở đồng bằng", true, 64)
+	_add(db, "block_highland_grass", "Cỏ Cao Nguyên", ItemDef.Type.BLOCK, Color(0.16, 0.54, 0.10), "🧱", "Khối cỏ cao nguyên — đồng bằng cao, địa hình gồ ghề", true, 64)
+	_add(db, "block_desert_plateau", "Cát Cao Nguyên Sa Mạc", ItemDef.Type.BLOCK, Color(0.90, 0.82, 0.55), "🧱", "Khối cát cao nguyên sa mạc — sa mạc nâng cao, địa hình gồ ghề (mesa)", true, 64)
 	_add(db, "block_sand",        "Cát",       ItemDef.Type.BLOCK, Color(0.92, 0.78, 0.32), "🧱", "Khối cát",          true, 64)
 	_add(db, "block_dirt",        "Đất",       ItemDef.Type.BLOCK, Color(0.42, 0.22, 0.08), "🧱", "Khối đất",          true, 64)
 	_add(db, "block_silt",        "Phù Sa",    ItemDef.Type.BLOCK, Color(0.16, 0.15, 0.13), "🧱", "Khối phù sa",       true, 64)
@@ -190,15 +192,26 @@ static func create_item_db() -> Dictionary:
 	_add(db, "orange", "Quả Cam", ItemDef.Type.FOOD, Color(0.95, 0.55, 0.12), "🍊", "Quả cam chín — căng mọng vỏ cam rực vân lõm nhẹ, núm xanh ngả vàng; mọng nước, giàu vitamin, ăn trực tiếp hoặc lấy hạt trồng", true, 16, 8)
 	_add(db, "orange_seed", "Hạt Giống Cam", ItemDef.Type.MATERIAL, Color(0.92, 0.58, 0.18), "🌱", "Túi hạt giống cam — gieo trên đất tơi xốp, lớn thành cây cam cho trái vàng rực", true, 16)
 
+	# ── Bộ giáp sắt ───────────────────────────────────────────────────────────
+	_add(db, "iron_helmet",     "Nón Sắt",     ItemDef.Type.ARMOR, Color(0.60, 0.62, 0.72), "⛑", "Nón sắt vững chắc — +1.5 giáp, +1 kháng sát thương chí mạng", false, 1, 0, 0, 1.5, ItemDef.ArmorSlot.HEAD, 200, 0.0, 1.0)
+	_add(db, "iron_chestplate", "Giáp Sắt",    ItemDef.Type.ARMOR, Color(0.55, 0.57, 0.66), "⛨", "Áo giáp sắt — +4.5 giáp, găng tay sắt đã hợp vào thân", false, 1, 0, 0, 4.5, ItemDef.ArmorSlot.BODY, 260)
+	_add(db, "iron_boots",      "Giày Sắt",    ItemDef.Type.ARMOR, Color(0.54, 0.56, 0.64), "👢", "Giày sắt — +1 giáp", false, 1, 0, 0, 1.0, ItemDef.ArmorSlot.FEET, 160)
+	_add(db, "iron_leggings",   "Quần Sắt",    ItemDef.Type.ARMOR, Color(0.57, 0.59, 0.67), "🩳", "Quần sắt bảo vệ đôi chân — +1.5 giáp", false, 1, 0, 0, 1.5, ItemDef.ArmorSlot.LEGS, 170)
+
+	# ── Trang sức & phụ kiện ─────────────────────────────────────────────────
+	_add(db, "golden_ring",     "Nhẫn Vàng",   ItemDef.Type.ARMOR, Color(0.90, 0.72, 0.12), "💍", "Nhẫn vàng — tăng vận may ẩn (+2 luck), câu được đồ hiếm hơn", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.SUB, 0, 2.0)
+	_add(db, "leather_backpack", "Balo Da Thú", ItemDef.Type.ARMOR, Color(0.45, 0.30, 0.18), "🎒", "Balo da thú chắc chắn — +4 slot kho đồ và +5% giới hạn tải", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.BACK, 0, 0.0, 0.0, 4, 1.05)
+
 	# ── Cây dầu ───────────────────────────────────────────────────────────────
 
 	return db
 
 static func _add(db: Dictionary, id: String, name: String, type: int, color: Color, char: String,
 				desc: String = "", stackable: bool = true, max_stack: int = 64,
-				heal: int = 0, atk: int = 0, def_val: int = 0, armor_slot: int = -1,
-				durability: int = 0) -> void:
-	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot, durability)
+				heal: int = 0, atk: int = 0, def_val: float = 0.0, armor_slot: int = -1,
+				durability: int = 0, luck: float = 0.0, crit_resist: float = 0.0,
+				slots_bonus: int = 0, weight_mult: float = 1.0) -> void:
+	db[id] = ItemDef.new(id, name, type, color, char, desc, stackable, max_stack, heal, atk, def_val, armor_slot, durability, luck, crit_resist, slots_bonus, weight_mult)
 	db[id].eat_time = EAT_TIMES.get(id, 3.0)
 	db[id].weight = WEIGHTS.get(id, _default_weight(type))
 
@@ -217,6 +230,9 @@ const WEIGHTS: Dictionary = {
 	"carp": 1.0, "climbing_perch": 0.8, "red_tilapia": 1.2, "snakehead": 1.5,
 	"flowerhorn": 1.4, "shrimp": 0.4, "raw_pork": 3.0, "taro": 0.6,
 	"tractor": 40.0, "fishing_boat": 50.0,
+	"iron_helmet": 1.5, "iron_chestplate": 4.5, "iron_boots": 1.0,
+	"iron_leggings": 1.8,
+	"golden_ring": 0.1, "leather_backpack": 2.0,
 }
 
 static func _default_weight(type: int) -> float:

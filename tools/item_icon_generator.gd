@@ -68,23 +68,31 @@ func _snap_item(item_id: String) -> void:
 
 	var img: Image = vp.get_texture().get_image()
 	if img:
+		# get_image() của SubViewport có thể trả về định dạng float/HDR mà PNG
+		# writer không ghi được → ép về RGBA8 trước khi lưu.
+		img.convert(Image.FORMAT_RGBA8)
 		var d := DirAccess.open("res://")
 		if d:
 			d.make_dir_recursive("assets/icon_items")
 		var out := OUT.path_join(item_id + ".png")
-		var r := img.save_png(out)
+		var abs := ProjectSettings.globalize_path(out)
+		var r := img.save_png(abs)
 		if r == OK:
 			print("Saved: ", out)
 		else:
-			await _retry_save(img, out, r)
+			await _retry_save(img, abs, out, r)
 	vp.queue_free()
 	await get_tree().process_frame
 
-func _retry_save(img: Image, out: String, r: Error) -> void:
-	var attempts := 5
+func _retry_save(img: Image, abs: String, out: String, r: Error) -> void:
+	var attempts := 6
 	for i in attempts:
-		await get_tree().create_timer(0.2).timeout
-		r = img.save_png(out)
+		await get_tree().create_timer(0.5).timeout
+		# Ghi đè một file đã có .import có thể bị editor giữ khóa trong lúc scan
+		# → nếu ghi lỗi, thử xoá file cũ rồi ghi lại.
+		if r != OK:
+			DirAccess.remove_absolute(abs)
+		r = img.save_png(abs)
 		if r == OK:
 			print("Saved (retry ", i + 1, "): ", out)
 			return

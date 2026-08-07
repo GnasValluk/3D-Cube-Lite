@@ -9,6 +9,7 @@ const _Mortar := preload("player_mortar.gd")
 const _EggThrow := preload("player_egg_throw.gd")
 const _Halberd := preload("player_halberd.gd")
 const _Fishing := preload("player_fishing.gd")
+const _TavernDoor := preload("res://scripts/world/chunk/tavern_door.gd")
 
 var _mesh: PlayerMesh
 var _anim: PlayerAnimator
@@ -24,6 +25,10 @@ var _starve_timer: float = 0.0
 ## ── Trọng lượng / quá tải ────────────────────────────────────────────────────
 ## Ngưỡng tải tối đa: vượt ngưỡng → làm chậm 2 (30%); vượt >25% → làm chậm 5 (95%).
 var max_weight: float = 100.0
+## May mắn cơ bản (chỉ số ẩn, không hiện UI) — cộng thêm từ trang bị (nhẫn vàng +2).
+var luck: float = 0.0
+## Số slot ba lô đang áp dụng lên inventory (theo dõi để mở rộng/thu hồi đúng).
+var _backpack_slots_applied: int = 0
 
 ## Slot hotbar đang chọn — HUD cập nhật khi đổi ô
 var _selected_slot: int = 0
@@ -43,12 +48,14 @@ const FOOD_IDLE_INTERVAL: float = 60.0
 
 signal food_changed(current: int, max_food: int)
 
+## Cờ ẩn/hiện model trang bị bên ngoài theo slot (0=head 1=body 2=legs 3=feet 4=back 5=sub)
+var armor_visible: Dictionary = {}
+
 var equipped_weapon: ItemDef = null
 var equipped_head: ItemDef = null
 var equipped_body: ItemDef = null
 var equipped_legs: ItemDef = null
 var equipped_feet: ItemDef = null
-var equipped_hands: ItemDef = null
 var equipped_back: ItemDef = null
 var equipped_sub: ItemDef = null
 
@@ -207,6 +214,11 @@ func interact_with_nearby() -> void:
 			return
 		if child is Furnace and child.is_player_nearby():
 			child.open_ui()
+			return
+	for d in get_tree().get_nodes_in_group("tavern_doors"):
+		var door := d as _TavernDoor
+		if door != null and door.is_player_nearby():
+			door.toggle()
 			return
 
 func pickup_item(item_def: ItemDef, count: int) -> int:
@@ -395,8 +407,8 @@ func _spawn_death_chest() -> void:
 		for slot in inventory.slots:
 			if not slot.is_empty() and slot.item != null:
 				chest_inv.add_item(slot.item, slot.count)
-	var equipped: Array = [equipped_weapon, equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_hands, equipped_back, equipped_sub]
-	var eq_dur: Array = [_equipped_durability, -1, -1, -1, -1, -1, -1, -1]
+	var equipped: Array = [equipped_weapon, equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_back, equipped_sub]
+	var eq_dur: Array = [_equipped_durability, -1, -1, -1, -1, -1, -1]
 	for i in equipped.size():
 		var it: ItemDef = equipped[i]
 		if it == null:
@@ -415,12 +427,13 @@ func _spawn_death_chest() -> void:
 	equipped_body = null
 	equipped_legs = null
 	equipped_feet = null
-	equipped_hands = null
 	equipped_back = null
 	equipped_sub = null
+	_refresh_backpack_state()
 	_equipped_slot_idx = -1
 	_equipped_durability = -1
 	_update_weapon_mesh()
+	_update_armor_mesh()
 
 func _do_respawn() -> void:
 	_stop_mining()
@@ -489,12 +502,13 @@ func use_item_from_inventory(idx: int) -> void:
 				ItemDef.ArmorSlot.BODY: old = equipped_body; equipped_body = item
 				ItemDef.ArmorSlot.LEGS: old = equipped_legs; equipped_legs = item
 				ItemDef.ArmorSlot.FEET: old = equipped_feet; equipped_feet = item
-				ItemDef.ArmorSlot.HANDS: old = equipped_hands; equipped_hands = item
 				ItemDef.ArmorSlot.BACK: old = equipped_back; equipped_back = item
 				ItemDef.ArmorSlot.SUB: old = equipped_sub; equipped_sub = item
 			inventory.remove_item(idx, 1)
 			if old != null:
 				inventory.add_item(old, 1)
+			_refresh_backpack_state()
+			_update_armor_mesh()
 			_scroll_inventory_message(tr("WEAR_MSG").format({"s": item.name}))
 		ItemDef.Type.TOOL:
 			var old_t: ItemDef = equipped_weapon
@@ -550,6 +564,90 @@ func drop_item(idx: int) -> void:
 	DroppedItem.spawn(world, item_def, drop_pos, count, vel, drop_pos.y)
 	_scroll_inventory_message(tr("DROP_MSG").format({"s": item_def.name, "n": count}))
 
+## Cập nhật mesh trang bị trên người cho mọi slot.
+## Slot: 0=head 1=body 2=legs 3=feet 4=back 5=sub.
+func _update_armor_mesh() -> void:
+	if _mesh == null:
+		return
+	_clear_armor_pivot(_mesh.helmet_pivot)
+	_clear_armor_pivot(_mesh.chestplate_pivot)
+	_clear_armor_pivot(_mesh.gauntlet_l_pivot)
+	_clear_armor_pivot(_mesh.gauntlet_r_pivot)
+	_clear_armor_pivot(_mesh.leg_armor_l_pivot)
+	_clear_armor_pivot(_mesh.leg_armor_r_pivot)
+	_clear_armor_pivot(_mesh.boot_l_pivot)
+	_clear_armor_pivot(_mesh.boot_r_pivot)
+	_clear_armor_pivot(_mesh.ring_pivot)
+	_clear_armor_pivot(_mesh.back_gear_pivot)
+	if _mesh.backpack != null:
+		_mesh.backpack.visible = not (equipped_back != null and _is_armor_visible(4))
+	if _mesh.torso != null:
+		_mesh.torso.visible = not (equipped_body != null and _is_armor_visible(1))
+	if _mesh.hair_pivot != null:
+		_mesh.hair_pivot.visible = not (equipped_head != null and _is_armor_visible(0))
+	if _mesh.tails_pivot != null:
+		_mesh.tails_pivot.visible = not (equipped_head != null and _is_armor_visible(0))
+	if equipped_head != null and _is_armor_visible(0):
+		_build_armor(_mesh.helmet_pivot, equipped_head.id)
+	if equipped_body != null and _is_armor_visible(1):
+		_build_armor(_mesh.chestplate_pivot, equipped_body.id)
+		ItemMesh.build_gauntlet(_mesh.gauntlet_l_pivot)
+		ItemMesh.build_gauntlet(_mesh.gauntlet_r_pivot)
+	if equipped_legs != null and _is_armor_visible(2):
+		_build_armor(_mesh.leg_armor_l_pivot, equipped_legs.id)
+		_build_armor(_mesh.leg_armor_r_pivot, equipped_legs.id)
+	if equipped_feet != null and _is_armor_visible(3):
+		_build_armor(_mesh.boot_l_pivot, equipped_feet.id)
+		_build_armor(_mesh.boot_r_pivot, equipped_feet.id)
+	if equipped_sub != null and _is_armor_visible(5):
+		_build_armor(_mesh.ring_pivot, equipped_sub.id)
+	if equipped_back != null and _is_armor_visible(4):
+		_build_armor(_mesh.back_gear_pivot, equipped_back.id)
+
+func _clear_armor_pivot(pivot: Node3D) -> void:
+	if pivot == null:
+		return
+	for ch in pivot.get_children():
+		ch.queue_free()
+
+func _build_armor(pivot: Node3D, item_id: String) -> void:
+	if pivot == null:
+		return
+	var shell := Node3D.new()
+	pivot.add_child(shell)
+	ItemMesh.build(shell, item_id)
+
+func _is_armor_visible(slot_idx: int) -> bool:
+	return armor_visible.get(slot_idx, true)
+
+## Bật/tắt hiển thị model trang bị theo slot, sau đó refresh mesh ngay.
+func set_armor_visible(slot_idx: int, visible: bool) -> void:
+	armor_visible[slot_idx] = visible
+	_update_armor_mesh()
+
+func get_armor_visible(slot_idx: int) -> bool:
+	return armor_visible.get(slot_idx, true)
+
+## Truy cập trang bị theo thứ tự slot UI: 0=head 1=body 2=legs 3=feet 4=back 5=sub
+func get_equipped_by_slot(idx: int) -> ItemDef:
+	var arr := [equipped_head, equipped_body, equipped_legs, equipped_feet,
+		equipped_back, equipped_sub]
+	if idx < 0 or idx >= arr.size():
+		return null
+	return arr[idx] as ItemDef
+
+func set_equipped_by_slot(idx: int, item: ItemDef) -> void:
+	match idx:
+		0: equipped_head = item
+		1: equipped_body = item
+		2: equipped_legs = item
+		3: equipped_feet = item
+		4: equipped_back = item
+		5: equipped_sub = item
+	_update_armor_mesh()
+	if idx == 4:
+		_refresh_backpack_state()
+
 func _update_weapon_mesh() -> void:
 	if _mesh == null or _mesh.weapon_pivot == null:
 		return
@@ -586,18 +684,50 @@ func get_total_atk() -> int:
 		base += equipped_weapon.atk_bonus
 	return base
 
-func get_total_def() -> int:
-	var base: int = defense
-	for slot in [equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_hands, equipped_back, equipped_sub]:
+func get_total_def() -> float:
+	var base: float = defense
+	for slot in [equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_back, equipped_sub]:
 		if slot != null:
 			base += slot.def_bonus
 	return base
+
+## Kháng sát thương chí mạng — cộng dồn từ trang bị (nón sắt +1).
+func get_total_crit_resist() -> float:
+	var r: float = 0.0
+	for slot in [equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_back, equipped_sub]:
+		if slot != null:
+			r += slot.crit_resist_bonus
+	return r
+
+## May mắn tổng (chỉ số ẩn) — ảnh hưởng tỷ lệ đồ hiếm khi câu cá.
+func get_total_luck() -> float:
+	var n: float = luck
+	if equipped_sub != null:
+		n += equipped_sub.luck_bonus
+	return n
 
 # ── Trọng lượng kho đồ & quá tải ──────────────────────────────────────────────
 func get_total_weight() -> float:
 	if inventory == null:
 		return 0.0
 	return inventory.get_total_weight()
+
+## Giới hạn tải hiệu dụng — nhân với hệ số từ ba lô (+5%).
+func get_max_weight() -> float:
+	var mult: float = 1.0
+	if equipped_back != null and equipped_back.weight_multiplier > 0.0:
+		mult = equipped_back.weight_multiplier
+	return maxf(max_weight, 0.0) * mult
+
+## Đồng bộ kích thước kho đồ theo ba lô đang đeo (gọi khi trang bị/tháo ba lô).
+func _refresh_backpack_state() -> void:
+	if inventory == null:
+		return
+	var bonus: int = equipped_back.inv_slots_bonus if equipped_back != null else 0
+	var target: int = Inventory.DEFAULT_SIZE + bonus
+	var base_ok: bool = target <= inventory.slots.size() or bonus <= 0
+	inventory.resize_slots(target)
+	_backpack_slots_applied = maxi(0, inventory.slots.size() - Inventory.DEFAULT_SIZE) if base_ok else bonus
 
 ## Cập nhật hiệu ứng quá tải theo trọng lượng hiện tại (gọi mỗi frame).
 ##   - vượt ngưỡng        → làm chậm 2 (30%)
@@ -606,7 +736,7 @@ func update_overload_effects() -> void:
 	if effects == null:
 		return
 	var w := get_total_weight()
-	var limit := maxf(max_weight, 0.0)
+	var limit := get_max_weight()
 	if w > limit * 1.25:
 		effects.set_persistent_slow(5)
 	elif w > limit:
@@ -1073,6 +1203,7 @@ func _on_dash() -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
+	_update_tavern_fade()
 	if _eating and is_alive and _active and not _underwater:
 		_state = State.EAT
 		velocity.x *= 0.5
@@ -1087,6 +1218,59 @@ func _physics_process(delta: float) -> void:
 			_Halberd.check_dash_hit(self)
 		else:
 			_halberd_dashing = false
+
+## ── Làm mờ vỏ quán khi đứng bên trong → nhìn thấy nội thất ──────────────────
+var _current_tavern_shell: MultiMeshInstance3D = null
+var _shell_tweens: Dictionary = {}
+const _TAVERN_FADE_TIME: float = 0.45
+const _TAVERN_FADE_A: float = 0.10
+
+func _update_tavern_fade() -> void:
+	var p := global_position
+	var target: MultiMeshInstance3D = null
+	for s in get_tree().get_nodes_in_group("tavern_shells"):
+		var mmi := s as MultiMeshInstance3D
+		if mmi == null or not is_instance_valid(mmi):
+			continue
+		for ab in mmi.get_meta("tavern_aabbs", []) as Array:
+			var a0: Vector3 = ab[0]
+			var a1: Vector3 = ab[1]
+			if p.x >= a0.x and p.x <= a1.x and p.z >= a0.z and p.z <= a1.z \
+					and p.y > a0.y and p.y < a1.y:
+				target = mmi
+				break
+		if target != null:
+			break
+	if target == _current_tavern_shell:
+		return
+	_fade_tavern_shell(_current_tavern_shell, 1.0)
+	_current_tavern_shell = target
+	_fade_tavern_shell(target, _TAVERN_FADE_A)
+
+## Crossfade alpha lượng mờ — mượt vào/ra.
+func _fade_tavern_shell(mmi: MultiMeshInstance3D, target_a: float) -> void:
+	if mmi == null or not is_instance_valid(mmi):
+		return
+	var mat := mmi.material_override as StandardMaterial3D
+	if mat == null:
+		return
+	if _shell_tweens.has(mmi):
+		var old: Tween = _shell_tweens[mmi]
+		if old.is_valid():
+			old.kill()
+		_shell_tweens.erase(mmi)
+	var t := mmi.create_tween()
+	t.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_shell_tweens[mmi] = t
+	if target_a >= 1.0:
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		t.tween_property(mat, "albedo_color:a", 1.0, _TAVERN_FADE_TIME)
+		t.tween_callback(func():
+			if is_instance_valid(mat) and mat.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA:
+				mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED)
+	else:
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		t.tween_property(mat, "albedo_color:a", target_a, _TAVERN_FADE_TIME)
 
 func _raycast_target_block() -> Vector3:
 	var cam := get_viewport().get_camera_3d()

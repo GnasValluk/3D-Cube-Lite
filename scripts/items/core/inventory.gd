@@ -164,6 +164,32 @@ func has_item(item_id: String) -> bool:
 			return true
 	return false
 
+## Thay đổi số lượng slot trong kho (mở rộng hoặc thu hẹp). Khi thu hẹp,
+## đồ ở các slot cuối được dời vào slot trống phía trước; nếu kho đang đầy
+## thì giữ lại slot cuối (không thả mất đồ).
+func resize_slots(new_size: int) -> void:
+	new_size = maxi(HOTBAR_SIZE, new_size)
+	var cur: int = slots.size()
+	if new_size == cur:
+		return
+	if new_size > cur:
+		while slots.size() < new_size:
+			slots.append(ItemSlot.new())
+		return
+	var removed: Array[ItemSlot] = []
+	while slots.size() > new_size:
+		removed.append(slots.pop_back())
+	for rs in removed:
+		if rs.is_empty():
+			continue
+		var target := find_empty_slot()
+		if target == -1:
+			slots.append(rs)
+		else:
+			slots[target].item = rs.item
+			slots[target].count = rs.count
+			slots[target].durability = rs.durability
+
 func to_dict() -> Array:
 	var arr: Array = []
 	for slot in slots:

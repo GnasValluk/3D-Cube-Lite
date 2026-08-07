@@ -20,9 +20,9 @@ const LIB_SEARCH_H: float = 38.0
 const _Library := preload("item_library_panel.gd")
 const _Detail := preload("item_detail_panel.gd")
 
-const EQUIP_H: float = 270.0
+const EQUIP_H: float = 292.0
 const DETAIL_H: float = 140.0
-const STAT_PANEL_H: float = 296.0
+const STAT_PANEL_H: float = 326.0
 const CONTENT_H: float = PAD + 40 + STAT_PANEL_H + 10 + EQUIP_H + PAD
 # Tổng chiều rộng = thư viện + khoảng cách + inventory gốc
 const LIB_MARGIN: float = 16.0
@@ -49,11 +49,13 @@ var _slot_faces: Array[ColorRect] = []
 var _slot_icons: Array[TextureRect] = []
 var _slot_count_labels: Array[Label] = []
 var _selected_slot: int = -1
+var _grid_rows: int = 4
 
 # ── Stats / equip labels ───────────────────────────────────────────────────────
 var _tooltip: Label
 var _tooltip_bg: ColorRect
 var _hp_label: Label
+var _food_label: Label
 var _atk_label: Label
 var _def_label: Label
 var _weight_label: Label
@@ -61,17 +63,19 @@ var _crit_rate_label: Label
 var _crit_dmg_label: Label
 var _speed_label: Label
 var _count_label: Label
-var _equip_faces: Array[ColorRect] = []
 var _equip_labels: Array[Label] = []
-var _equip_item_labels: Array[Label] = []
+var _equip_item_icons: Array[TextureRect] = []
 var _equip_centers: Array[Vector2] = []
 var _equip_line_pairs: Array[Array] = []
 var _equip_line_time: float = 0.0
 var _line_layer: Control
 var _opening: bool = false
 var _tween: Tween
-var _equip_name_keys: Array[String] = ["EQUIP_HEAD", "EQUIP_BODY", "EQUIP_LEGS", "EQUIP_HANDS", "EQUIP_BACK", "EQUIP_SUB"]
+var _equip_name_keys: Array[String] = ["EQUIP_HEAD", "EQUIP_BODY", "EQUIP_LEGS", "EQUIP_FEET", "EQUIP_BACK", "EQUIP_SUB"]
 var _equip_name_labels: Array[Label] = []
+var _equip_slot_panels: Array[Panel] = []
+var _selected_equip: int = -1
+var _equip_empty_style: StyleBoxFlat
 var _title_label: Label
 var _stat_title_label: Label
 var _drop_hint_label: Label
@@ -86,6 +90,7 @@ var _detail_desc: Label
 var _detail_stats: Label
 var _detail_use_btn: Button
 var _detail_drop_btn: Button
+var _detail_vis_btn: Button
 
 # ── Item Library categories ────────────────────────────────────────────────────
 # ── Item Library ───────────────────────────────────────────────────────────────
@@ -252,58 +257,96 @@ func _setup_title() -> void:
 func _setup_grid() -> void:
 	var ox: float = LIB_W + LIB_MARGIN
 	var grid_y: float = PAD + 40
-	var rows: int = 4
+	var rows: int = _grid_rows
 	var slot_scr := _make_slot_script()
+	var total: int = _inventory.slots.size() if _inventory != null else rows * COLS
 
-	for row in range(rows):
-		for col in range(COLS):
-			var i: int = row * COLS + col
-			var px: float = ox + PAD + col * (SLOT_SIZE + GAP)
-			var py: float = grid_y + row * (SLOT_SIZE + GAP)
+	for i in range(total):
+		var row: int = int(i / COLS)
+		var col: int = i % COLS
+		var px: float = ox + PAD + col * (SLOT_SIZE + GAP)
+		var py: float = grid_y + row * (SLOT_SIZE + GAP)
 
-			var panel := Panel.new()
-			panel.size = Vector2(SLOT_SIZE, SLOT_SIZE)
-			panel.position = Vector2(px, py)
-			panel.clip_contents = true
-			panel.add_theme_stylebox_override("panel", _slot_style)
-			panel.mouse_filter = Control.MOUSE_FILTER_STOP
-			panel.set_script(slot_scr)
-			panel._inv_ui = self
-			panel._slot_idx = i
-			panel.gui_input.connect(_on_slot_gui_input.bind(i))
-			panel.mouse_entered.connect(_on_slot_mouse_entered.bind(i))
-			panel.mouse_exited.connect(_on_slot_mouse_exited)
-			add_child(panel)
+		var panel := Panel.new()
+		panel.size = Vector2(SLOT_SIZE, SLOT_SIZE)
+		panel.position = Vector2(px, py)
+		panel.clip_contents = true
+		panel.add_theme_stylebox_override("panel", _slot_style)
+		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		panel.set_script(slot_scr)
+		panel._inv_ui = self
+		panel._slot_idx = i
+		panel.gui_input.connect(_on_slot_gui_input.bind(i))
+		panel.mouse_entered.connect(_on_slot_mouse_entered.bind(i))
+		panel.mouse_exited.connect(_on_slot_mouse_exited)
+		add_child(panel)
 
-			var face := ColorRect.new()
-			face.position = Vector2(2, 2)
-			face.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
-			face.color = Color(0.20, 0.15, 0.30, 0.4)
-			face.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			panel.add_child(face)
-			_slot_faces.append(face)
+		var face := ColorRect.new()
+		face.position = Vector2(2, 2)
+		face.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
+		face.color = Color(0.20, 0.15, 0.30, 0.4)
+		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(face)
+		_slot_faces.append(face)
 
-			var slot_icon := TextureRect.new()
-			slot_icon.position = Vector2(2, 2)
-			slot_icon.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
-			slot_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-			slot_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			slot_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			slot_icon.visible = false
-			panel.add_child(slot_icon)
-			_slot_icons.append(slot_icon)
+		var slot_icon := TextureRect.new()
+		slot_icon.position = Vector2(2, 2)
+		slot_icon.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
+		slot_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		slot_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		slot_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot_icon.visible = false
+		panel.add_child(slot_icon)
+		_slot_icons.append(slot_icon)
 
-			var cnt := Label.new()
-			cnt.position = Vector2(2, SLOT_SIZE - 24)
-			cnt.size = Vector2(SLOT_SIZE - 4, 18)
-			cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-			cnt.add_theme_font_size_override("font_size", 18)
-			cnt.add_theme_color_override("font_color", Color(0.55, 0.50, 0.72, 0.70))
-			cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			panel.add_child(cnt)
-			_slot_count_labels.append(cnt)
+		var cnt := Label.new()
+		cnt.position = Vector2(2, SLOT_SIZE - 24)
+		cnt.size = Vector2(SLOT_SIZE - 4, 18)
+		cnt.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		cnt.add_theme_font_size_override("font_size", 18)
+		cnt.add_theme_color_override("font_color", Color(0.55, 0.50, 0.72, 0.70))
+		cnt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(cnt)
+		_slot_count_labels.append(cnt)
 
-			_slots.append(panel)
+		_slots.append(panel)
+
+## Dựng lại lưới khi kho đồ đổi kích thước (vd: đeo balo +4 ô) — tránh
+## vượt chỉ mục lưới cố định 4 hàng. Không làm gì nếu số hàng không đổi.
+func _rebuild_grid() -> void:
+	if _inventory == null:
+		return
+	var want_rows: int = int((_inventory.slots.size() + COLS - 1) / COLS)
+	if want_rows == _grid_rows:
+		return
+	# Xoá mảng TRƯỚC khi free — free() có thể kích hoạt mouse_exited của panel
+	# đang hover (→ _reset_slot_styles duyệt _slots) nên tránh trỏ tới instance đã free.
+	var old_panels: Array[Panel] = _slots.duplicate()
+	_slots.clear()
+	_slot_faces.clear()
+	_slot_icons.clear()
+	_slot_count_labels.clear()
+	for p in old_panels:
+		p.free()
+	_grid_rows = want_rows
+	_selected_slot = -1
+	_setup_grid()
+	_reposition_detail_panel()
+	_reset_slot_styles()
+
+## Dời panel chi tiết xuống theo số hàng lưới thực tế (gốc: 4 hàng).
+func _reposition_detail_panel() -> void:
+	if _detail_bg == null:
+		return
+	var dy: float = PAD + 40 + _grid_rows * (SLOT_SIZE + GAP) + 10
+	var btn_y: float = dy + DETAIL_H - 40
+	_detail_bg.position.y = dy
+	_detail_item_name.position.y = dy + 6
+	_detail_desc.position.y = dy + 38
+	_detail_stats.position.y = dy + 80
+	_detail_use_btn.position.y = btn_y
+	_detail_drop_btn.position.y = btn_y
+	_detail_vis_btn.position.y = btn_y
 
 func _setup_status_panel() -> void:
 	var ox: float = LIB_W + LIB_MARGIN
@@ -333,45 +376,51 @@ func _setup_status_panel() -> void:
 	_hp_label.add_theme_color_override("font_color", TEAL)
 	add_child(_hp_label)
 
+	_food_label = Label.new()
+	_food_label.position = Vector2(sx + 16, sy + 76)
+	_food_label.add_theme_font_size_override("font_size", 22)
+	_food_label.add_theme_color_override("font_color", Color(0.85, 0.65, 0.25))
+	add_child(_food_label)
+
 	_atk_label = Label.new()
-	_atk_label.position = Vector2(sx + 16, sy + 76)
+	_atk_label.position = Vector2(sx + 16, sy + 106)
 	_atk_label.add_theme_font_size_override("font_size", 22)
 	_atk_label.add_theme_color_override("font_color", PINK)
 	add_child(_atk_label)
 
 	_def_label = Label.new()
-	_def_label.position = Vector2(sx + 16, sy + 106)
+	_def_label.position = Vector2(sx + 16, sy + 136)
 	_def_label.add_theme_font_size_override("font_size", 22)
 	_def_label.add_theme_color_override("font_color", ORANGE)
 	add_child(_def_label)
 
 	_weight_label = Label.new()
-	_weight_label.position = Vector2(sx + 16, sy + 136)
+	_weight_label.position = Vector2(sx + 16, sy + 166)
 	_weight_label.add_theme_font_size_override("font_size", 22)
 	_weight_label.add_theme_color_override("font_color", Color(0.72, 0.56, 0.30))
 	add_child(_weight_label)
 
 	_crit_rate_label = Label.new()
-	_crit_rate_label.position = Vector2(sx + 16, sy + 166)
+	_crit_rate_label.position = Vector2(sx + 16, sy + 196)
 	_crit_rate_label.add_theme_font_size_override("font_size", 22)
 	_crit_rate_label.add_theme_color_override("font_color", Color(0.88, 0.22, 0.55))
 	add_child(_crit_rate_label)
 
 	_crit_dmg_label = Label.new()
-	_crit_dmg_label.position = Vector2(sx + 16, sy + 196)
+	_crit_dmg_label.position = Vector2(sx + 16, sy + 226)
 	_crit_dmg_label.add_theme_font_size_override("font_size", 22)
 	_crit_dmg_label.add_theme_color_override("font_color", Color(0.95, 0.30, 0.30))
 	add_child(_crit_dmg_label)
 
 	_speed_label = Label.new()
-	_speed_label.position = Vector2(sx + 16, sy + 226)
+	_speed_label.position = Vector2(sx + 16, sy + 256)
 	_speed_label.add_theme_font_size_override("font_size", 22)
 	_speed_label.add_theme_color_override("font_color", CYAN)
 	add_child(_speed_label)
 
 	_drop_hint_label = Label.new()
 	_drop_hint_label.text = tr("DROP_HINT")
-	_drop_hint_label.position = Vector2(sx + 16, sy + 260)
+	_drop_hint_label.position = Vector2(sx + 16, sy + 290)
 	_drop_hint_label.add_theme_font_size_override("font_size", 15)
 	_drop_hint_label.add_theme_color_override("font_color", TEXT_MUTED)
 	add_child(_drop_hint_label)
@@ -403,26 +452,16 @@ func _setup_equipment_panel() -> void:
 	var egap: float = 6.0
 	var slot_w: float = esize + egap
 	var row_h: float = esize + 18
-	var gx: float = (STAT_W - slot_w * 2) * 0.5
+	var ncols: int = 3
+	var gx: float = (STAT_W - slot_w * ncols) * 0.5
 	var gy: float = 34.0
+	var slot_scr := _make_slot_script()
 
-	var hex_colors: Array[Color] = [
-		PURPLE,
-		TEAL,
-		PINK,
-		ORANGE,
-		Color(0.70, 0.50, 0.90),
-		CYAN,
-	]
-
-	var slot_positions: Array[Vector2] = [
-		Vector2(gx, gy),
-		Vector2(gx + slot_w, gy),
-		Vector2(gx, gy + row_h),
-		Vector2(gx + slot_w, gy + row_h),
-		Vector2(gx, gy + row_h * 2),
-		Vector2(gx + slot_w, gy + row_h * 2),
-	]
+	var slot_positions: Array[Vector2] = []
+	for i in range(6):
+		var col: int = i % ncols
+		var row: int = i / ncols
+		slot_positions.append(Vector2(gx + col * slot_w, gy + row * row_h))
 
 	var face_style := StyleBoxFlat.new()
 	face_style.bg_color = Color(0.14, 0.10, 0.22, 0.7)
@@ -435,8 +474,10 @@ func _setup_equipment_panel() -> void:
 	face_style.border_width_top = 2
 	face_style.border_width_bottom = 2
 	face_style.border_color = Color(0.40, 0.32, 0.55, 0.25)
+	_equip_empty_style = face_style
 
-	_equip_item_labels.clear()
+	_equip_item_icons.clear()
+	_equip_slot_panels.clear()
 	for i in range(6):
 		var px: float = slot_positions[i].x
 		var py: float = slot_positions[i].y
@@ -445,29 +486,27 @@ func _setup_equipment_panel() -> void:
 		panel.position = Vector2(px, py)
 		panel.size = Vector2(esize, esize)
 		panel.add_theme_stylebox_override("panel", face_style)
-		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.mouse_filter = Control.MOUSE_FILTER_STOP
+		panel.set_script(slot_scr)
+		panel._inv_ui = self
+		# Số slot âm để phân biệt với ô kho (>=0). -(i+1) => -1..-6.
+		panel._slot_idx = -(i + 1)
+		panel.set_meta("equip_slot", i)
+		panel.gui_input.connect(_on_equip_slot_gui_input.bind(i))
+		panel.mouse_entered.connect(_on_equip_slot_hover.bind(i, true))
+		panel.mouse_exited.connect(_on_equip_slot_hover.bind(i, false))
 		eq.add_child(panel)
+		_equip_slot_panels.append(panel)
 
-		var face := ColorRect.new()
-		face.position = Vector2(2, 2)
-		face.size = Vector2(esize - 4, esize - 4)
-		face.color = Color(0.25, 0.18, 0.35, 0.6)
-		face.pivot_offset = Vector2((esize - 4) * 0.5, (esize - 4) * 0.5)
-		face.rotation = deg_to_rad(45)
-		face.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(face)
-		_equip_faces.append(face)
-
-		var item_lbl := Label.new()
-		item_lbl.position = Vector2.ZERO
-		item_lbl.size = Vector2(esize, esize)
-		item_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		item_lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		item_lbl.add_theme_font_size_override("font_size", 14)
-		item_lbl.add_theme_color_override("font_color", Color(0.95, 0.92, 1.0, 0.90))
-		item_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		panel.add_child(item_lbl)
-		_equip_item_labels.append(item_lbl)
+		var item_icon := TextureRect.new()
+		item_icon.position = Vector2(2, 2)
+		item_icon.size = Vector2(esize - 4, esize - 4)
+		item_icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		item_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		item_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		item_icon.visible = false
+		panel.add_child(item_icon)
+		_equip_item_icons.append(item_icon)
 
 		var name_lbl := Label.new()
 		name_lbl.text = tr(_equip_name_keys[i])
@@ -491,8 +530,8 @@ func _setup_equipment_panel() -> void:
 	for sp in slot_positions:
 		_equip_centers.append(sp + Vector2(esize * 0.5, esize * 0.5))
 	_equip_line_pairs = [
-		[0, 1], [2, 3], [4, 5],
-		[0, 2], [2, 4], [1, 3], [3, 5],
+		[0, 1], [1, 2], [3, 4], [4, 5],
+		[0, 3], [1, 4], [2, 5],
 	]
 
 	line_layer.draw.connect(func():
@@ -548,6 +587,9 @@ func _on_slot_gui_input(event: InputEvent, idx: int) -> void:
 			_on_slot_right_click(idx); accept_event()
 
 func _on_slot_left_click(idx: int) -> void:
+	if _selected_equip >= 0:
+		_selected_equip = -1
+		_reset_equip_slot_styles()
 	if _inventory.slots[idx].is_empty():
 		_selected_slot = -1; _reset_slot_styles(); return
 	if _selected_slot != idx:
@@ -595,12 +637,194 @@ func _on_slot_mouse_exited() -> void:
 
 func _reset_slot_styles() -> void:
 	for i in range(_slots.size()):
-		_slots[i].add_theme_stylebox_override("panel", _slot_style)
-	if _selected_slot >= 0 and _selected_slot < _slots.size():
+		if is_instance_valid(_slots[i]):
+			_slots[i].add_theme_stylebox_override("panel", _slot_style)
+	if _selected_slot >= 0 and _selected_slot < _slots.size() and is_instance_valid(_slots[_selected_slot]):
 		_slots[_selected_slot].add_theme_stylebox_override("panel", _slot_hl_style)
 
 # ── Drag & Drop ────────────────────────────────────────────────────────────────
+func _equip_armor_slot(i: int) -> int:
+	var arr := [ItemDef.ArmorSlot.HEAD, ItemDef.ArmorSlot.BODY, ItemDef.ArmorSlot.LEGS,
+		ItemDef.ArmorSlot.FEET, ItemDef.ArmorSlot.BACK, ItemDef.ArmorSlot.SUB]
+	if i < 0 or i >= arr.size():
+		return -1
+	return arr[i]
+
+func _equip_slot_style(item: ItemDef, selected: bool) -> StyleBoxFlat:
+	var s := _equip_empty_style.duplicate() as StyleBoxFlat
+	s.border_width_left = 2; s.border_width_right = 2; s.border_width_top = 2; s.border_width_bottom = 2
+	if item != null:
+		s.border_color = item.icon_color.lightened(0.25)
+	if selected:
+		s.bg_color = Color(0.28, 0.22, 0.45, 0.85)
+		s.border_color = Color(0.55, 0.82, 1.0, 0.95)
+		s.border_width_left = 3; s.border_width_right = 3; s.border_width_top = 3; s.border_width_bottom = 3
+	return s
+
+func _reset_equip_slot_styles() -> void:
+	if _player_ref == null:
+		return
+	for i in range(_equip_slot_panels.size()):
+		var item: ItemDef = _player_ref.get_equipped_by_slot(i)
+		_equip_slot_panels[i].add_theme_stylebox_override("panel", _equip_slot_style(item, i == _selected_equip))
+
+func _equip_get_drag_data(i: int, _at_position: Vector2):
+	if _player_ref == null:
+		return null
+	var item: ItemDef = _player_ref.get_equipped_by_slot(i)
+	if item == null:
+		return null
+	var data := { "from_equip": i, "item_id": item.id, "count": 1 }
+	var preview := Panel.new()
+	preview.size = Vector2(SLOT_SIZE, SLOT_SIZE)
+	var preview_style := _slot_style.duplicate()
+	preview_style.bg_color = Color(0.14, 0.10, 0.22, 0.90)
+	preview_style.border_color = item.icon_color.lightened(0.2)
+	preview.add_theme_stylebox_override("panel", preview_style)
+	var face := ColorRect.new()
+	face.position = Vector2(2, 2)
+	face.size = Vector2(SLOT_SIZE - 4, SLOT_SIZE - 4)
+	face.color = item.icon_color
+	preview.add_child(face)
+	var lbl := Label.new()
+	lbl.position = Vector2(2, SLOT_SIZE - 24)
+	lbl.size = Vector2(SLOT_SIZE - 4, 18)
+	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	lbl.add_theme_font_size_override("font_size", 18)
+	lbl.add_theme_color_override("font_color", Color(0.95, 0.92, 1.0, 0.90))
+	lbl.text = item.name.substr(0, 4)
+	preview.add_child(lbl)
+	set_drag_preview(preview)
+	return data
+
+func _equip_can_drop(i: int, data) -> bool:
+	if data == null or not (data is Dictionary):
+		return false
+	if data.has("from_equip"):
+		return int(data["from_equip"]) != i
+	if not data.has("from_idx") or not data.has("from_inv"):
+		return false
+	var from_inv: Inventory = data["from_inv"]
+	var from_idx: int = data["from_idx"]
+	var src_slot: ItemSlot = from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
+	if src_slot == null or src_slot.is_empty():
+		return false
+	return src_slot.item.type == ItemDef.Type.ARMOR and src_slot.item.armor_slot == _equip_armor_slot(i)
+
+func _equip_drop_data(i: int, data) -> void:
+	if _player_ref == null:
+		return
+	if data == null or not (data is Dictionary):
+		return
+	if data.has("from_equip"):
+		var fe: int = int(data["from_equip"])
+		if fe == i:
+			return
+		var a: ItemDef = _player_ref.get_equipped_by_slot(fe)
+		var b: ItemDef = _player_ref.get_equipped_by_slot(i)
+		if b != null and a != null and b.armor_slot != a.armor_slot:
+			return
+		_player_ref.set_equipped_by_slot(fe, b)
+		_player_ref.set_equipped_by_slot(i, a)
+		_player_ref._refresh_backpack_state()
+		_player_ref._update_armor_mesh()
+		_selected_equip = -1
+		_selected_slot = -1
+		_reset_slot_styles()
+		_reset_equip_slot_styles()
+		_Detail.update_detail_panel(self)
+		return
+	if not data.has("from_idx") or not data.has("from_inv"):
+		return
+	var from_inv: Inventory = data["from_inv"]
+	var from_idx: int = data["from_idx"]
+	var src_slot: ItemSlot = from_inv.slots[from_idx] if from_idx >= 0 and from_idx < from_inv.slots.size() else null
+	if src_slot == null or src_slot.is_empty():
+		return
+	var item: ItemDef = src_slot.item
+	if item.type != ItemDef.Type.ARMOR or item.armor_slot != _equip_armor_slot(i):
+		return
+	var old: ItemDef = _player_ref.get_equipped_by_slot(i)
+	from_inv.remove_item(from_idx, 1)
+	if old != null:
+		from_inv.add_item(old, 1)
+	_player_ref.set_equipped_by_slot(i, item)
+	_player_ref._refresh_backpack_state()
+	_player_ref._update_armor_mesh()
+	_selected_equip = i
+	_selected_slot = -1
+	_reset_slot_styles()
+	_reset_equip_slot_styles()
+	_Detail.update_detail_panel(self)
+
+func _unequip_to_inventory(i: int) -> void:
+	if _player_ref == null:
+		return
+	var item: ItemDef = _player_ref.get_equipped_by_slot(i)
+	if item == null:
+		return
+	var remaining: int = _player_ref.inventory.add_item(item, 1)
+	if remaining == 0:
+		_player_ref.set_equipped_by_slot(i, null)
+		_player_ref._refresh_backpack_state()
+		_player_ref._update_armor_mesh()
+		_selected_equip = -1
+		_reset_equip_slot_styles()
+		_Detail.update_detail_panel(self)
+		_player_ref._scroll_inventory_message(tr("UNEQUIP_MSG").format({"s": item.name}))
+	else:
+		_player_ref._scroll_inventory_message(tr("INV_FULL_MSG"))
+
+func _on_equip_slot_gui_input(event: InputEvent, i: int) -> void:
+	if _player_ref == null:
+		return
+	if event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			_selected_slot = -1
+			_reset_slot_styles()
+			if _selected_equip == i:
+				_selected_equip = -1
+			else:
+				_selected_equip = i
+			_reset_equip_slot_styles()
+			_Detail.update_detail_panel(self)
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			_unequip_to_inventory(i)
+
+func _drop_equipped(i: int) -> void:
+	if _player_ref == null:
+		return
+	var item: ItemDef = _player_ref.get_equipped_by_slot(i)
+	if item == null:
+		return
+	var world := _player_ref.get_tree().current_scene
+	if world == null or not (world is Node3D):
+		return
+	_player_ref.set_equipped_by_slot(i, null)
+	_player_ref._refresh_backpack_state()
+	_player_ref._update_armor_mesh()
+	var fwd: Vector3 = -_player_ref.get_global_transform().basis.z
+	var drop_pos: Vector3 = _player_ref.global_position + Vector3(0, 1.5, 0)
+	DroppedItem.spawn(world, item, drop_pos, 1, fwd * 2.0 + Vector3(0, 3.0, 0), drop_pos.y)
+	_selected_equip = -1
+	_reset_equip_slot_styles()
+	_Detail.update_detail_panel(self)
+
+func _on_equip_slot_hover(i: int, entered: bool) -> void:
+	if _player_ref == null:
+		return
+	var item: ItemDef = _player_ref.get_equipped_by_slot(i)
+	if item == null:
+		_Detail.hide_tooltip(self)
+		return
+	if entered:
+		_Detail.show_tooltip(self, item)
+	else:
+		_Detail.hide_tooltip(self)
+
 func _slot_get_drag_data(idx: int, _at_position: Vector2):
+	if idx < 0:
+		return _equip_get_drag_data(-(idx + 1), _at_position)
 	var slot: ItemSlot = _inventory.slots[idx]
 	if slot.is_empty():
 		return null
@@ -630,8 +854,13 @@ func _slot_get_drag_data(idx: int, _at_position: Vector2):
 
 func _slot_can_drop_data(idx: int, _position: Vector2, data) -> bool:
 	_reset_slot_styles()
+	if idx < 0:
+		return _equip_can_drop(-(idx + 1), data)
 	if data == null or not (data is Dictionary):
 		return false
+	if data.has("from_equip"):
+		_slots[idx].add_theme_stylebox_override("panel", _slot_drop_style)
+		return true
 	if not data.has("from_idx") or not data.has("from_inv"):
 		return false
 	var from_inv: Inventory = data["from_inv"]
@@ -657,6 +886,12 @@ func _slot_can_drop_data(idx: int, _position: Vector2, data) -> bool:
 func _slot_drop_data(idx: int, _position: Vector2, data) -> void:
 	_reset_slot_styles()
 	if data == null or not (data is Dictionary):
+		return
+	if idx < 0:
+		_equip_drop_data(-(idx + 1), data)
+		return
+	if data.has("from_equip"):
+		_unequip_to_inventory(int(data["from_equip"]))
 		return
 	if not data.has("from_idx") or not data.has("from_inv"):
 		return
@@ -728,6 +963,8 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if _inventory == null: return
+	if int((_inventory.slots.size() + COLS - 1) / COLS) != _grid_rows:
+		_rebuild_grid()
 	for i in range(_inventory.slots.size()):
 		var slot: ItemSlot = _inventory.slots[i]
 		if slot.is_empty():
@@ -748,6 +985,7 @@ func _process(delta: float) -> void:
 
 	if _player_ref:
 		_hp_label.text  = "\u2665  %d / %d"   % [_player_ref.hp, _player_ref.max_hp]
+		_food_label.text = "🍖  %d / %d"      % [_player_ref.food, _player_ref.max_food]
 		_atk_label.text = "\u2694  %d"        % _player_ref.get_total_atk()
 		_def_label.text = "\u2741  %d"        % _player_ref.get_total_def()
 		_weight_label.text = "\u2696  %.0f / %.0f" % [_player_ref.get_total_weight(), _player_ref.max_weight]
@@ -772,12 +1010,18 @@ func _process(delta: float) -> void:
 		_tooltip_bg.position = mp + Vector2(14, 14)
 
 func _update_equipment_display(player: PlayerCharacter) -> void:
-	var equipped: Array = [player.equipped_head, player.equipped_body, player.equipped_legs, player.equipped_hands, player.equipped_back, player.equipped_sub]
+	var equipped: Array = [player.equipped_head, player.equipped_body, player.equipped_legs, player.equipped_feet, player.equipped_back, player.equipped_sub]
 	for i in range(6):
 		var item: ItemDef = equipped[i] as ItemDef
 		if item != null:
-			_equip_faces[i].color = item.icon_color
-			_equip_item_labels[i].text = item.name.substr(0, 6)
+			var tex: Texture2D = ItemDatabase.load_icon_2d(item.id)
+			if tex != null:
+				_equip_item_icons[i].texture = tex
+				_equip_item_icons[i].visible = true
+			else:
+				_equip_item_icons[i].texture = null
+				_equip_item_icons[i].visible = false
 		else:
-			_equip_faces[i].color = Color(0.25, 0.18, 0.35, 0.6)
-			_equip_item_labels[i].text = ""
+			_equip_item_icons[i].texture = null
+			_equip_item_icons[i].visible = false
+		_equip_slot_panels[i].add_theme_stylebox_override("panel", _equip_slot_style(item, i == _selected_equip))

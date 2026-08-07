@@ -55,8 +55,12 @@ func _setup_mesh():
 	elif item_id in ["chest", "twilight_gate", "crafting_table", "furnace"]:
 		ItemMesh.build(root, item_id)
 	else:
+		var item_scale: float = 1.5
+		# Trái cây to bản — nhỏ bớt để không vượt 1 block khi rơi xuống đất
+		if item_id == "watermelon" or item_id == "pumpkin":
+			item_scale = 1.1
 		var scale_pivot := Node3D.new()
-		scale_pivot.scale = Vector3(1.5, 1.5, 1.5)
+		scale_pivot.scale = Vector3(item_scale, item_scale, item_scale)
 		root.add_child(scale_pivot)
 		ItemMesh.build(scale_pivot, item_id)
 
