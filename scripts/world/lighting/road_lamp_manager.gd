@@ -32,6 +32,7 @@ var _crystals: Array[MeshInstance3D] = []
 var _update_timer:  float = 0.0
 var _cleanup_timer: float = 0.0
 var _last_night_t:  float = -1.0
+var _last_cam_cell: Vector3i = Vector3i(-1, 0, 0)
 
 static var _instance: RoadLampManager = null
 
@@ -43,11 +44,6 @@ static func register_light(light: OmniLight3D) -> void:
 	if _instance == null:
 		return
 	if light in _instance._lights:
-		return
-	if _instance._lights.size() >= MAX_LIGHTS:
-		# Đèn vượt giới hạn: tắt hẳn, không đưa vào update loop
-		light.light_energy = 0.0
-		light.hide()
 		return
 	_instance._lights.append(light)
 
@@ -86,30 +82,61 @@ func _process(delta: float) -> void:
 
 	var night_t: float = _night_factor(_get_hour())
 
-	# Skip nếu không đổi đáng kể — nhưng dùng threshold nhỏ hơn
-	# vì mưa có thể thay đổi nhanh hơn chu kỳ ngày/đêm
-	if absf(night_t - _last_night_t) < 0.003:
+	# Skip chỉ khi CẢ hai không đổi: độ sáng đêm lẫn vị trí camera (bộ đèn gần
+	# phải đổi theo người chơi, nếu không đèn cố định cứng gây cắt sáng).
+	var cam := get_viewport().get_camera_3d() if is_inside_tree() else null
+	var cell: Vector3i = _last_cam_cell
+	if cam != null:
+		cell = Vector3i(int(cam.global_position.x / 8.0), 0, int(cam.global_position.z / 8.0))
+	var night_changed: bool = absf(night_t - _last_night_t) >= 0.003
+	if not night_changed and cell == _last_cam_cell:
 		return
 	_last_night_t = night_t
+	_last_cam_cell = cell
 
 	var speed: float = UPDATE_INTERVAL * 0.8
 
-	for i in range(min(_lights.size(), MAX_LIGHTS)):
-		var light: OmniLight3D = _lights[i]
+	# Chọn đèn GẦN camera nhất để sáng (bù light budget), đèn xa dần tắt —
+	# không treo cứng ở ranh giới chunk: khi camera di chuyển thì bộ đèn gần
+	# đổi theo, ánh sáng liền mạch thay vì bị cắt bởi đường biên chunk.
+	var ref: Vector3 = Vector3.INF
+	if cam != null:
+		ref = cam.global_position
+
+	var active: Array = []
+	for light in _lights:
 		if not is_instance_valid(light):
 			continue
-		light.light_energy = lerp(light.light_energy, night_t * LIGHT_MAX_ENERGY, speed)
+		var d2: float = (light.global_position - ref).length_squared() if cam != null else 0.0
+		active.append([d2, light])
+	if cam != null:
+		active.sort_custom(func(a, b): return a[0] < b[0])
 
-	for i in range(min(_crystals.size(), MAX_LIGHTS)):
-		var mi: MeshInstance3D = _crystals[i]
+	for i in range(active.size()):
+		var light: OmniLight3D = active[i][1]
+		var lit: bool = i < MAX_LIGHTS
+		light.visible = lit
+		light.light_energy = lerp(light.light_energy, night_t * LIGHT_MAX_ENERGY if lit else 0.0, speed)
+
+	var crys: Array = []
+	for mi in _crystals:
 		if not is_instance_valid(mi):
 			continue
+		var d2: float = (mi.global_position - ref).length_squared() if cam != null else 0.0
+		crys.append([d2, mi])
+	if cam != null:
+		crys.sort_custom(func(a, b): return a[0] < b[0])
+
+	for i in range(crys.size()):
+		var mi: MeshInstance3D = crys[i][1]
 		var mat := mi.material_override as ShaderMaterial
 		if mat == null:
 			continue
+		var lit: bool = i < MAX_LIGHTS
 		var raw = mat.get_shader_parameter("emit_energy")
 		var cur_e: float = float(raw) if raw != null else 0.0
-		mat.set_shader_parameter("emit_energy", lerp(cur_e, night_t * CRYSTAL_MAX_EMIT, speed))
+		mat.set_shader_parameter("emit_energy",
+			lerp(cur_e, night_t * CRYSTAL_MAX_EMIT if lit else 0.0, speed))
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 func _get_hour() -> float:

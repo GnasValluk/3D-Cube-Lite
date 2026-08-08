@@ -220,7 +220,7 @@ func _ready() -> void:
 			if _W._ocean_mask_at(nd, wx, wz):
 				continue
 			var bb: int = _W._Noise._biome_at(wx, wz, RW)
-			if bb != _D.TileType.DARK_GRASS and bb != _D.TileType.GRASS:
+			if bb != _D.TileType.GRASS_DIRT:
 				continue
 			scans += 1
 			print("   (compute chunk %d,%d...)" % [int(floor(wx / SIZE)), int(floor(wz / SIZE))])

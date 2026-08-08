@@ -1013,23 +1013,6 @@ func _setup_debug_menu() -> void:
 	tp_desert_btn.pressed.connect(_on_teleport_biome.bind("desert"))
 	_debug_panel.add_child(tp_desert_btn)
 
-	var tp_highland_btn := Button.new()
-	tp_highland_btn.position = Vector2(234, y - 2)
-	tp_highland_btn.size = Vector2(202, 34)
-	tp_highland_btn.add_theme_font_size_override("font_size", 20)
-	tp_highland_btn.text = "⛰️ Cao Nguyên"
-	tp_highland_btn.pressed.connect(_on_teleport_biome.bind("highland"))
-	_debug_panel.add_child(tp_highland_btn)
-
-	y += 34
-	var tp_dp_btn := Button.new()
-	tp_dp_btn.position = Vector2(17, y - 2)
-	tp_dp_btn.size = Vector2(202, 34)
-	tp_dp_btn.add_theme_font_size_override("font_size", 20)
-	tp_dp_btn.text = "🏜️ Cao Nguyên Sa Mạc"
-	tp_dp_btn.pressed.connect(_on_teleport_biome.bind("desert_plateau"))
-	_debug_panel.add_child(tp_dp_btn)
-
 	# ── Teleport to Công Trình ───────────────────────────────────────────────
 	y += 34
 	var tp_c_lbl := Label.new()
@@ -1105,44 +1088,37 @@ func _on_teleport_biome(biome_type: String) -> void:
 
 			match biome_type:
 				"plains":
-					# GRASS thật (không phải rừng) + không biển + không hồ
+# Đồng bằng cỏ (đã hợp nhất đồng bằng + cao nguyên): toàn bộ
+					# đất cỏ là GRASS_DIRT, địa hình đồi thoải; không biển,
+					# không hồ.
 					var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5 if n_lake else 0.0
-					if bio == _Data.TileType.GRASS and not is_oc and lv <= 0.70:
+					if bio == _Data.TileType.GRASS_DIRT \
+							and not is_oc and lv <= 0.70:
 						found = Vector2(wx, wz); found_ok = true; break
 				"ocean":
 					# Biển thật = ocean mask; thả trên nước, không cần biome
 					if is_oc:
 						found = Vector2(wx, wz); found_ok = true; break
 				"desert":
-					# _biome_at đã ưu tiên DESERT_PLATEAU — DESERT là sa mạc đúng
+					# Sa mạc đúng — DESERT (đã bỏ cao nguyên sa mạc)
 					if bio == _Data.TileType.DESERT:
-						found = Vector2(wx, wz); found_ok = true; break
-				"highland":
-					if bio == _Data.TileType.HIGHLAND_GRASS:
-						found = Vector2(wx, wz); found_ok = true; break
-				"desert_plateau":
-					if bio == _Data.TileType.DESERT_PLATEAU:
 						found = Vector2(wx, wz); found_ok = true; break
 		r += STEP
 
 	if found_ok:
-		var biome_name: String = "Đồng Bằng"
+		var biome_name: String = "Đồng Bằng Cỏ"
 		if biome_type == "ocean":
 			biome_name = "Biển Khơi"
 		elif biome_type == "desert":
 			biome_name = "Sa Mạc"
-		elif biome_type == "highland":
-			biome_name = "Cao Nguyên"
-		elif biome_type == "desert_plateau":
-			biome_name = "Cao Nguyên Sa Mạc"
 		# Build chunk chứa điểm đích đồng bộ → lấy đúng cao độ mặt đất, tránh
 		# thả rơi từ cao hoặc chui xuống đất khi vùng chưa được stream.
 		WorldChunk.ensure_chunk_built(found.x, found.y)
-		# Hạ cánh cao (rơi xuống) — cao nguyên / cao nguyên sa mạc nền cao 3-11.5m
-		# nên không hạ ở y=5 kẻo chui vào lòng đất. Chỉ dùng cao độ thật nếu mặt
-		# đất TRÊN mặt nước (WATER_Y=0.5) — chỗ biển sâu thì thả từ trên cao.
+		# Hạ cánh cao (rơi xuống) — nền đồi thoải cao 3-11.5m nên không hạ ở
+		# y=5 kẻo chui vào lòng đất. Chỉ dùng cao độ thật nếu mặt đất TRÊN mặt
+		# nước (WATER_Y=0.5) — chỗ biển sâu thì thả từ trên cao.
 		var gy: float = WorldChunk.sample_ground_height(found.x, found.y)
-		var spawn_y: float = 60.0 if (biome_type == "highland" or biome_type == "desert_plateau") else 5.0
+		var spawn_y: float = 5.0
 		if gy != -INF and gy > 0.5:
 			spawn_y = gy + 3.0
 		player.global_position = Vector3(found.x, spawn_y, found.y)
@@ -1201,56 +1177,29 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 	if nd.is_empty():
 		return ""
 
-	# Phải check theo đúng thứ tự pipeline của compute_chunk:
-	# 1. biome_at → GRASS hay DARK_GRASS?
-	# 2. Nếu GRASS → check ocean, rồi lake
-	var n_bio: FastNoiseLite  = nd.get("biome")
-	var n_warp: FastNoiseLite = nd.get("warp")
-	if n_bio == null:
-		return ""
-
-	var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0 if n_warp else 0.0
-	var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0 if n_warp else 0.0
-	var bio_n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
-
-	# Check sa mạc trước (ghi đè grassland)
+	# Thứ tự khớp pipeline compute_chunk: sa mạc (DESERT) ghi đè trước;
+	# toàn bộ đất liền còn lại là ĐỒNG BẰNG CỎ (GRASS_DIRT/GRASS/DARK_GRASS/
+	# YOUNG_GRASS) — chỉ còn phân biệt biển/hồ.
 	var n_desert: FastNoiseLite = nd.get("desert")
 	if n_desert:
 		var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
 		if dv > 0.55:
 			if WorldChunk._ocean_mask_at(nd, wx, wz):
 				return "🌊 " + tr("BIOME_OCEAN")
-			# Cao nguyên sa mạc — đảo cát cao trong sa mạc (khớp _biome_at)
-			var n_dp: FastNoiseLite = nd.get("desert_plateau")
-			if n_dp:
-				var dpv: float = (n_dp.get_noise_2d(wx, wz) + 1.0) * 0.5
-				if dpv > 0.60 and (wx * wx + wz * wz) > 1500000.0:
-					return "🏜️ " + tr("BIOME_DESERT_PLATEAU")
 			return "🏜️ " + tr("BIOME_DESERT")
 
-	# Cao nguyên (đồng bằng cao) — khớp _biome_at: xa spawn, mask > 0.55
-	var n_highland: FastNoiseLite = nd.get("highland")
-	if n_highland:
-		var hv: float = (n_highland.get_noise_2d(wx, wz) + 1.0) * 0.5
-		if hv > 0.55 and (wx * wx + wz * wz) > 1500000.0:
-			return "⛰️ " + tr("BIOME_HIGHLANDS")
-
-	# DARK_GRASS (threshold = 0.40) → đồi, không thể là biển/hồ
-	if bio_n >= 0.40:
-		return "🌿 " + tr("BIOME_HILLS")
-
-	# GRASS — check ocean trước (patch to hơn hồ)
+	# Đồng bằng cỏ (đã hợp nhất cao nguyên): toàn bộ đất cỏ còn lại — chỉ phân
+	# biệt biển và hồ.
 	if WorldChunk._ocean_mask_at(nd, wx, wz):
 		return "🌊 " + tr("BIOME_OCEAN")
 
-	# GRASS — check lake
 	var n_lake: FastNoiseLite = nd.get("lake")
 	if n_lake:
 		var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
 		if lv > 0.70:
 			return "🏞 " + tr("BIOME_LAKE_RIVER")
 
-	return "🌿 " + tr("BIOME_PLAINS")
+	return "🌿 " + tr("BIOME_GRASSPLAINS")
 
 func _update_debug_menu() -> void:
 	if not _debug_open:

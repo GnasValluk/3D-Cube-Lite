@@ -4,7 +4,7 @@ extends Node
 ## 1. Trong bán kính ORE_HILL_MIN_DIST quanh (0,0): không có block quặng nào.
 ## 2. Chunk xa: nếu có đồi → tổng block 4~12, đá + quặng, quặng lộ trên mặt đồi.
 ## 3. Quặng chỉ thuộc 4 loại: than, sắt, đồng, nhôm.
-## 4. Đồng bằng (DARK_GRASS): đồi chỉ có than + sắt hiếm, sắt ≤ 30% quặng.
+## 4. Đồng bằng (GRASS_DIRT): đồi chỉ có than + sắt hiếm, sắt ≤ 30% quặng.
 ## 5. Đồng bằng tỷ lệ spawn thấp hơn (hằng số ORE_HILL_PLAINS_CHANCE < ORE_HILL_CHANCE).
 ## 6. hint == fullscan vẫn nhất quán khi có đồi.
 ## 7. Deterministic: compute 2 lần → block data giống hệt.
@@ -30,12 +30,15 @@ const ALLOWED_ORES: Dictionary = {
 ## Block nền tự nhiên của fill_blocks (top_block theo biome) — dùng để tách
 ## phần đồi ra khỏi mặt đất thật. STONE không nằm trong set: chỉ có rạn ngầm
 ## dùng STONE làm top nhưng rạn luôn ở dưới nước → cột dưới nước bị loại trước.
+## (Đã hợp nhất đồng bằng + cao nguyên: đất cỏ = GRASS_DIRT — "đồng bằng cỏ".)
 const NATURAL_TOPS: Dictionary = {
 	_D.BlockID.GRASS: true, _D.BlockID.DARK_GRASS: true, _D.BlockID.SAND: true,
 	_D.BlockID.DIRT: true, _D.BlockID.SILT: true, _D.BlockID.MUDDY_SAND: true,
 	_D.BlockID.OCEAN_SAND: true, _D.BlockID.TRAIL: true,
 	_D.BlockID.OCEAN_FLOOR: true, _D.BlockID.OCEAN_GRAVEL: true, _D.BlockID.OCEAN_MUD: true,
 	_D.BlockID.YOUNG_GRASS: true, _D.BlockID.DARK_DIRT: true, _D.BlockID.SAND_DEEP: true,
+	_D.BlockID.GRASS_DIRT: true, _D.BlockID.DESERT_PLATEAU: true,
+	_D.BlockID.DRY_GRASS: true, _D.BlockID.SPARSE_GRASS: true, _D.BlockID.PALE_SAND: true,
 }
 
 var _failures: int = 0
@@ -51,11 +54,14 @@ func _bd_from(data: Dictionary):
 	return bd
 
 ## Đếm block đồi quặng trong chunk: solid nằm trên block nền tự nhiên,
-## bỏ qua cột dưới nước (rạn STONE).
-func _hill_blocks(bd) -> int:
+## bỏ qua cột dưới nước (rạn STONE) và cột bãi đá (STONE_PATCH — đá lộ thiên
+## tự nhiên ở đồng bằng, không phải đồi quặng).
+func _hill_blocks(bd, mask: PackedByteArray = PackedByteArray()) -> int:
 	var count := 0
 	for x in range(COLS):
 		for z in range(COLS):
+			if mask.size() > 0 and mask[x * COLS + z] != 0:
+				continue  # bãi đá: đá tự nhiên, không tính là đồi quặng
 			var top_solid := -1
 			for ly in range(_BD.CHUNK_H - 1, -1, -1):
 				var b: int = bd.get_block(x, ly, z)
@@ -121,7 +127,7 @@ func _ready() -> void:
 	_check(near_ore == 0, "gần spawn: 0 quặng trong %d chunk (got %d)" % [25, near_ore])
 
 	# ── 2. Chunk xa spawn ──────────────────────────────────────────────────
-	# Danh sách ghim theo seed 20260805: đồng bằng (DARK_GRASS) + không-đồng-bằng
+	# Danh sách ghim theo seed 20260805: đồng bằng (GRASS_DIRT) + không-đồng-bằng
 	var far_coords := [
 		Vector2i(-3, 4), Vector2i(-3, 6), Vector2i(-5, 6), Vector2i(-6, 5),
 		Vector2i(-7, 6), Vector2i(0, 5), Vector2i(-5, -2), Vector2i(-2, 7),
@@ -146,7 +152,7 @@ func _ready() -> void:
 		var bd = _bd_from(data)
 		if not _hint_matches(bd, data["top_ly_hint"]):
 			hint_mismatch += 1
-		var hill := _hill_blocks(bd)
+		var hill := _hill_blocks(bd, data.get("stone_patch_mask", PackedByteArray()))
 		var stats := _ore_stats(bd)
 		if hill > 0:
 			hills_found += 1
@@ -154,7 +160,7 @@ func _ready() -> void:
 			total_ore_blocks += stats[0]
 			bad_type += stats[1]
 			buried += stats[2]
-			# ── Đồng bằng (DARK_GRASS) → chỉ than + sắt hiếm ──
+			# ── Đồng bằng (GRASS_DIRT) → chỉ than + sắt hiếm ──
 			var oi: Dictionary = data.get("ore_hill", {})
 			if oi.get("cx", -1) == -1:
 				_check(false, "chunk %s: có đồi nhưng thiếu ore_hill info" % c)

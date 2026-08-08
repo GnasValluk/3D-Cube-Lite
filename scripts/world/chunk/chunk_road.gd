@@ -8,6 +8,18 @@ static var _road_spatial: Dictionary = {}
 static var _road_ready: bool = false
 static var _int_cache: Dictionary = {}
 static var _node_has_cache: Dictionary = {}
+static var _road_lock := Mutex.new()
+
+## Chỉ dùng bởi tool test concurrency: xóa cache để worker rebuild lại từ đầu.
+static func _reset_for_test() -> void:
+	_road_lock.lock()
+	_road_ready = false
+	_road_curves.clear()
+	_road_curve_bboxes.clear()
+	_road_spatial.clear()
+	_int_cache.clear()
+	_node_has_cache.clear()
+	_road_lock.unlock()
 
 ## 4 hướng nối của node lưới (has[d]: d=0→E, 1→S, 2→W, 3→N), luôn ≥2.
 ## Deterministic theo SeedSnapshot — dùng chung với _ensure_roads().
@@ -135,7 +147,9 @@ static func _index_curves() -> void:
 					var arr: PackedInt32Array = _road_spatial[ck]
 					arr.append(skey)
 
-## Cache bounding box của từng curve — compute_positions gọi mỗi chunk
+## Cache bounding box của từng curve — compute_positions gọi mỗi chunk.
+## Các bbox được pre-fill toàn bộ trong _build_roads_locked() → chỉ đọc, an toàn
+## với mọi worker thread (trước đây lazy-fill += resize khi idle → race).
 static func curve_bbox(ci: int) -> Rect2:
 	if _road_curve_bboxes.size() > ci and _road_curve_bboxes[ci].size != Vector2.ZERO:
 		return _road_curve_bboxes[ci]
@@ -151,8 +165,15 @@ static func curve_bbox(ci: int) -> Rect2:
 static func _ensure_roads() -> void:
 	if _road_ready:
 		return
+	_road_lock.lock()
+	if _road_ready:
+		_road_lock.unlock()
+		return
+	_build_roads_locked()
 	_road_ready = true
+	_road_lock.unlock()
 
+static func _build_roads_locked() -> void:
 	var seed_base: int = SeedSnapshot.ensure() + 7777
 	var inters: Dictionary = {}
 	for gx in range(-_Data.ROAD_GRID_R, _Data.ROAD_GRID_R + 1):
@@ -197,6 +218,16 @@ static func _ensure_roads() -> void:
 
 	_index_curves()
 
+	# Pre-fill mọi bbox ngay sau build → curve_bbox chỉ đọc cache, không ghi
+	# trên worker thread (bỏ race resize khi nhiều worker hỏi cùng curve).
+	_road_curve_bboxes.resize(_road_curves.size())
+	for ci in range(_road_curves.size()):
+		var wp: PackedVector2Array = _road_curves[ci]
+		var rect := Rect2(wp[0], Vector2.ZERO)
+		for pt in wp:
+			rect = rect.expand(pt)
+		_road_curve_bboxes[ci] = rect
+
 static func is_on_road(wx: float, wz: float) -> bool:
 	_ensure_roads()
 	var cell_sz: float = 8.0
@@ -217,4 +248,134 @@ static func is_on_road(wx: float, wz: float) -> bool:
 					continue
 				if _point_to_seg_d2(pos, wp[i], wp[i + 1]) <= md2:
 					return true
+	return false
+
+## Gộp segment keys phủ bbox (margin = bán kính đường) — gather 1 lần/chunk.
+static func gather_segments(x0: float, z0: float, x1: float, z1: float) -> PackedInt32Array:
+	_ensure_roads()
+	var cell_sz: float = 8.0
+	var margin: float = _Data.ROAD_HALF_W
+	var cx0: int = floori((x0 - margin) / cell_sz)
+	var cx1: int = floori((x1 + margin) / cell_sz)
+	var cz0: int = floori((z0 - margin) / cell_sz)
+	var cz1: int = floori((z1 + margin) / cell_sz)
+	var out := PackedInt32Array()
+	var seen := {}
+	for cx in range(cx0, cx1 + 1):
+		for cz in range(cz0, cz1 + 1):
+			var segs: PackedInt32Array = _road_spatial.get(Vector2i(cx, cz), PackedInt32Array())
+			for skey in segs:
+				if not seen.has(skey):
+					seen[skey] = true
+					out.append(skey)
+	return out
+
+## Danh sách index curve có segment đi qua vùng [x0..x1]×[z0..z1] (+margin).
+## Dùng cho compute_positions: quét 11612 curve tìm 4 curve gần chunk là phí
+## hoàn toàn — dùng spatial index (8×8) lấy thẳng các curve lân cận.
+static func gather_curve_indices(x0: float, z0: float, x1: float, z1: float) -> PackedInt32Array:
+	_ensure_roads()
+	var cell_sz: float = 8.0
+	var margin: float = LAMP_QUERY_MARGIN
+	var cx0: int = floori((x0 - margin) / cell_sz)
+	var cx1: int = floori((x1 + margin) / cell_sz)
+	var cz0: int = floori((z0 - margin) / cell_sz)
+	var cz1: int = floori((z1 + margin) / cell_sz)
+	var out := PackedInt32Array()
+	var seen := {}
+	for cx in range(cx0, cx1 + 1):
+		for cz in range(cz0, cz1 + 1):
+			var segs: PackedInt32Array = _road_spatial.get(Vector2i(cx, cz), PackedInt32Array())
+			for skey in segs:
+				var ci: int = skey / 10000
+				if not seen.has(ci):
+					seen[ci] = true
+					out.append(ci)
+	return out
+
+const LAMP_QUERY_MARGIN: float = 40.0
+
+static func is_on_road_from_segs(wx: float, wz: float, segs: PackedInt32Array) -> bool:
+	var pos: Vector2 = Vector2(wx, wz)
+	var md2: float = _Data.ROAD_HALF_W * _Data.ROAD_HALF_W
+	for skey in segs:
+		var ci: int = skey / 10000
+		var i: int = skey % 10000
+		var wp: PackedVector2Array = _road_curves[ci]
+		if i >= wp.size() - 1:
+			continue
+		if _point_to_seg_d2(pos, wp[i], wp[i + 1]) <= md2:
+			return true
+	return false
+
+## Vẽ trực tiếp mask road vào road_grid (PackedByteArray cols×cols) từ các
+## segment gần chunk — thay vì 1024 cột × segment/ô (check distance từng ô),
+## chỉ duyệt segment gần chunk và paint các ô trong ROAD_HALF_W. Segment ít,
+## bbox nhỏ → số lần _point_to_seg_d2 giảm mạnh. Worker-safe (ghi vào mảng
+## local của caller).
+static func paint_road_grid(road_grid: PackedByteArray, cols: int,
+		size: int, cx: int, cz: int) -> void:
+	_ensure_roads()
+	var half: float = size * 0.5
+	var wx0: float = float(cx) * size - half
+	var wz0: float = float(cz) * size - half
+	var md2: float = _Data.ROAD_HALF_W * _Data.ROAD_HALF_W
+	var segs := gather_segments(wx0, wz0, wx0 + size, wz0 + size)
+	for skey in segs:
+		var ci: int = skey / 10000
+		var i: int = skey % 10000
+		var wp: PackedVector2Array = _road_curves[ci]
+		if i >= wp.size() - 1:
+			continue
+		var a: Vector2 = wp[i]
+		var b: Vector2 = wp[i + 1]
+		var mn_x: float = minf(a.x, b.x) - _Data.ROAD_HALF_W
+		var mx_x: float = maxf(a.x, b.x) + _Data.ROAD_HALF_W
+		var mn_z: float = minf(a.y, b.y) - _Data.ROAD_HALF_W
+		var mx_z: float = maxf(a.y, b.y) + _Data.ROAD_HALF_W
+		var gx0: int = clampi(int(floori((mn_x - wx0) / _Data.VOXEL)), 0, cols - 1)
+		var gx1: int = clampi(int(floori((mx_x - wx0) / _Data.VOXEL)), 0, cols - 1)
+		var gz0: int = clampi(int(floori((mn_z - wz0) / _Data.VOXEL)), 0, cols - 1)
+		var gz1: int = clampi(int(floori((mx_z - wz0) / _Data.VOXEL)), 0, cols - 1)
+		for gx in range(gx0, gx1 + 1):
+			for gz in range(gz0, gz1 + 1):
+				var idx: int = gx * cols + gz
+				if road_grid[idx] != 0:
+					continue
+				var pos := Vector2(wx0 + (float(gx) + 0.5) * _Data.VOXEL,
+					wz0 + (float(gz) + 0.5) * _Data.VOXEL)
+				if _point_to_seg_d2(pos, a, b) <= md2:
+					road_grid[idx] = 1
+
+## Tra cứu theo ô 8×8 với cache local (truyền vào từ caller — worker-safe vì
+## cache là biến local mỗi chunk). Mỗi cột 1 lookup thay vì 9 lookup Dictionary.
+static func is_on_road_cell_cached(wx: float, wz: float, cache: Dictionary) -> bool:
+	var cell_sz: float = 8.0
+	var c0: int = floori(wx / cell_sz)
+	var d0: int = floori(wz / cell_sz)
+	var pos: Vector2 = Vector2(wx, wz)
+	var md2: float = _Data.ROAD_HALF_W * _Data.ROAD_HALF_W
+	var key: Vector2i = Vector2i(c0, d0)
+	var segs: PackedInt32Array
+	if cache.has(key):
+		segs = cache[key]
+	else:
+		segs = PackedInt32Array()
+		var seen := {}
+		for dx in range(-1, 2):
+			for dz in range(-1, 2):
+				var cseg: PackedInt32Array = _road_spatial.get(Vector2i(c0 + dx, d0 + dz), PackedInt32Array())
+				for skey in cseg:
+					if not seen.has(skey):
+						seen[skey] = true
+						segs.append(skey)
+		cache[key] = segs
+	for skey in segs:
+		var ci: int = skey / 10000
+		var i: int = skey % 10000
+		var wp: PackedVector2Array = _road_curves[ci]
+		if i >= wp.size() - 1:
+			continue
+		if _point_to_seg_d2(pos, wp[i], wp[i + 1]) <= md2:
+			return true
 	return false

@@ -79,6 +79,7 @@ func _has_bottom_vert(chunk: Node, cx: float, y: float, cz: float) -> bool:
 
 func _ready() -> void:
 	seed(20260804)
+	WorldSeed.seed_value = 20260804
 	print("== test_diag_side: mặt bên + mặt dưới block chồng lệch ==")
 
 	# ── 1. Dựng chunk REAL_WORLD đồng bộ ───────────────────────────────────
@@ -137,18 +138,20 @@ func _ready() -> void:
 	# ── 4. Mặt bên block dưới phải còn (không thấy void) ────────────────────
 	var bx: float = cx_a + _Data.VOXEL * 0.5   # mặt phân cách cột A | B
 	var bz: float = cz + _Data.VOXEL * 0.5     # mặt phân cách cột A | E
-	var span_lo: float = cz - _Data.VOXEL * 0.5
-	var span_hi: float = cz + _Data.VOXEL * 0.5
-	_check(_has_wall_vert(chunk, 0, bx, span_lo, span_hi,
+	var x_lo: float = cx_a - _Data.VOXEL * 0.5
+	var x_hi: float = cx_a + _Data.VOXEL * 0.5
+	var z_lo: float = cz - _Data.VOXEL * 0.5
+	var z_hi: float = cz + _Data.VOXEL * 0.5
+	_check(_has_wall_vert(chunk, 0, bx, z_lo, z_hi,
 		_layer_bottom_y(ly_a), _layer_top_y(ly_a), Vector3(1, 0, 0)),
 		"mặt bên +x của block A vẫn còn (không thấy void)")
-	_check(_has_wall_vert(chunk, 2, bz, span_lo, span_hi,
+	_check(_has_wall_vert(chunk, 2, bz, x_lo, x_hi,
 		_layer_bottom_y(ly_a), _layer_top_y(ly_a), Vector3(0, 0, 1)),
 		"mặt bên +z của block A vẫn còn (hướng chéo khác)")
-	_check(_has_wall_vert(chunk, 0, bx, span_lo, span_hi,
+	_check(_has_wall_vert(chunk, 0, bx, z_lo, z_hi,
 		_layer_bottom_y(ly_b), _layer_top_y(ly_b), Vector3(-1, 0, 0)),
 		"mặt bên -x của block B vẫn còn")
-	_check(_has_wall_vert(chunk, 2, bz, span_lo, span_hi,
+	_check(_has_wall_vert(chunk, 2, bz, x_lo, x_hi,
 		_layer_bottom_y(ly_b), _layer_top_y(ly_b), Vector3(0, 0, -1)),
 		"mặt bên -z của block E vẫn còn")
 
@@ -163,10 +166,10 @@ func _ready() -> void:
 
 	# ── 6. Đào block chồng lệch → mặt lân cận không sập, mặt B biến mất ─────
 	_check(chunk.break_block_at(cx_b, wy_b, cz) == _Data.BlockID.STONE, "đào block B")
-	_check(_has_wall_vert(chunk, 0, bx, span_lo, span_hi,
+	_check(_has_wall_vert(chunk, 0, bx, z_lo, z_hi,
 		_layer_bottom_y(ly_a), _layer_top_y(ly_a), Vector3(1, 0, 0)),
 		"sau đào B: mặt bên +x của block A vẫn còn")
-	_check(not _has_wall_vert(chunk, 0, bx, span_lo, span_hi,
+	_check(not _has_wall_vert(chunk, 0, bx, z_lo, z_hi,
 		_layer_bottom_y(ly_b), _layer_top_y(ly_b), Vector3(-1, 0, 0)),
 		"sau đào B: mặt -x của B biến mất (không còn block)")
 

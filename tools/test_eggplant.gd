@@ -12,6 +12,7 @@ const _Placement = preload("res://scripts/building/placement_system.gd")
 const _Recipe = preload("res://scripts/items/core/recipe_database.gd")
 const _Eggplant = preload("res://scripts/world/props/eggplant_prop.gd")
 const _Growing = preload("res://scripts/world/props/growing_prop.gd")
+const _Road = preload("res://scripts/world/chunk/chunk_road.gd")
 
 const SIZE := 32
 const RW := _D._Dim.DimensionID.REAL_WORLD
@@ -148,6 +149,7 @@ func _ready() -> void:
 		icon.queue_free()
 
 	# ── 7. Cây dại trên đồng cỏ ────────────────────────────────────────────
+	# Cà tím dại cần đường cách ≤2 ô (rdist<=2). Chỉ quét chunk gần road.
 	print("-- 7. Cây cà tím dại: spawn trong chunk thật --")
 	WorldSeed.seed_value = 20260807
 	_W._Noise.clear_cache()
@@ -157,14 +159,23 @@ func _ready() -> void:
 	var scans := 0
 	for x in range(-1600, 1601, SIZE * 8):
 		for z in range(-1600, 1601, SIZE * 8):
-			if found > 0 or scans >= 6:
+			if found > 0 or scans >= 12:
 				break
 			var wx := float(x) + 0.5
 			var wz := float(z) + 0.5
 			if _W._ocean_mask_at(nd, wx, wz):
 				continue
+			if not _Road.is_on_road(wx, wz):
+				var near_road := false
+				for off in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1),
+						Vector2(-2, 0), Vector2(2, 0), Vector2(0, -2), Vector2(0, 2)]:
+					if _Road.is_on_road(wx + off.x * 2.0, wz + off.y * 2.0):
+						near_road = true
+						break
+				if not near_road:
+					continue
 			var bb: int = _W._Noise._biome_at(wx, wz, RW)
-			if bb != _D.TileType.DARK_GRASS and bb != _D.TileType.GRASS:
+			if bb != _D.TileType.GRASS_DIRT:
 				continue
 			scans += 1
 			print("   (compute chunk %d,%d...)" % [int(floor(wx / SIZE)), int(floor(wz / SIZE))])

@@ -1,0 +1,38 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+PASS | hint size dim=1 chunk=(0, 0)
+PASS | hint==fullscan dim=1 chunk=(0, 0) non_empty=1024/1024
+PASS | terrain mesh hint==nohint dim=1 chunk=(0, 0) verts=8526
+PASS | water bounded==full dim=1 chunk=(0, 0) verts=1938
+PASS | hint size dim=1 chunk=(1, 0)
+PASS | hint==fullscan dim=1 chunk=(1, 0) non_empty=1024/1024
+PASS | terrain mesh hint==nohint dim=1 chunk=(1, 0) verts=8178
+PASS | water bounded==full dim=1 chunk=(1, 0) verts=588
+PASS | hint size dim=0 chunk=(0, 0)
+PASS | hint==fullscan dim=0 chunk=(0, 0) non_empty=1024/1024
+PASS | terrain mesh hint==nohint dim=0 chunk=(0, 0) verts=2496
+PASS | water bounded==full dim=0 chunk=(0, 0) verts=6912
+PASS | hint size dim=0 chunk=(1, 0)
+PASS | hint==fullscan dim=0 chunk=(1, 0) non_empty=1024/1024
+PASS | terrain mesh hint==nohint dim=0 chunk=(1, 0) verts=2496
+PASS | water bounded==full dim=0 chunk=(1, 0) verts=6912
+PASS | break below top -> unchanged
+PASS | break top -> decreased
+PASS | break stack through hole -> top follows (got=3 want=3)
+PASS | place above top -> raised
+PASS | place water above top -> unchanged
+PASS | break water above top -> unchanged
+PASS | replace at top -> unchanged
+PASS | setup sync -> block_data + cache ready
+PASS | dig at (0,20,0) -> removed 11
+PASS | dig -> cache decremented (20->19)
+PASS | re-place solid -> ok
+PASS | re-place -> cache restored
+PASS | place water above -> ok
+PASS | water above -> cache unchanged
+TOTAL | PASS | 0 failures
+TEST_TIME_MS=2282
+WARNING: 6 ObjectDB instances were leaked at exit (run with `--verbose` for details).
+   at: cleanup (core/object/object.cpp:2535)
+ERROR: 2 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:822)

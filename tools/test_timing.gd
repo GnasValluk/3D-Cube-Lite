@@ -9,6 +9,7 @@ const TW: int = _D._Dim.DimensionID.TWILIGHT
 var _stage: int = 0
 
 func _ready() -> void:
+	WorldSeed.seed_value = 20260804
 	_W.prewarm_async()
 	_stage = 1
 

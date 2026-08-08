@@ -1,6 +1,14 @@
 extends RefCounted
 
-enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE, MUDDY_SAND, DESERT, YOUNG_GRASS, HIGHLAND_GRASS, DESERT_PLATEAU }
+enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE, MUDDY_SAND, DESERT, YOUNG_GRASS, GRASS_DIRT, SAND_DEEP, TWILIGHT_GRASS, TWILIGHT_DIRT, DRY_GRASS, SPARSE_GRASS, PALE_SAND, STONE_PATCH }
+
+## Tile "đồng cỏ" hợp nhất: đều mọc cỏ/được props/được coi là cỏ nền.
+## (Đồ BẰNG = GRASS_DIRT/GRASS/DARK_GRASS/YOUNG_GRASS — nhiều loại khối cỏ.
+##  DRY_GRASS/SPARSE_GRASS KHÔNG nằm ở đây: là đốm khô/thưa — cố tình để trống
+##  không mọc cỏ blade xanh lòe lên trên, tạo điểm nhấn đa dạng.)
+static func is_grass_tile(t: int) -> bool:
+	return t == TileType.GRASS or t == TileType.DARK_GRASS \
+		or t == TileType.YOUNG_GRASS or t == TileType.GRASS_DIRT
 
 ## ── Block IDs cho hệ thống voxel Minecraft-style ────────────────────────────
 ## 0 = AIR luôn luôn, giá trị khớp với TileType để map dễ dàng
@@ -45,8 +53,13 @@ enum BlockID {
 	OAK_WOOD     = 37,  # Gỗ sồi — texture vân gỗ riêng, chặt từ cây sồi cổ thụ
 	YOUNG_GRASS  = 38,  # Cỏ non — bãi đất pha cỏ mới mọc, đám rải rác trên đồng bằng
 	HARD_WOOD    = 39,  # Gỗ cứng — vân gỗ nâu sẫm, chặt từ cây rừng rậm
-	HIGHLAND_GRASS = 40,  # Cỏ cao nguyên — đồng bằng cao, địa hình gồ ghề (đồi/gò/lòng chảo)
+	GRASS_DIRT = 40,  # Cỏ đồng bằng cỏ (đã hợp nhất cỏ thường + cao nguyên) — đất hỗn cỏ, địa hình đồi thoải chung cho mọi biome
 	DESERT_PLATEAU = 41,  # Cát cao nguyên sa mạc — sa mạc nâng cao, địa hình gồ ghề (mesa)
+	TWILIGHT_GRASS = 42,  # Cỏ Twilight — bề mặt thế giới Twilight (thay GRASS ở dim TW)
+	TWILIGHT_DIRT = 43,  # Đất Twilight — đất nền bên dưới cỏ Twilight
+	DRY_GRASS = 44,   # Cỏ già/khô — đốm vàng rạ trên đồng bằng (lẫn GRASS thường)
+	SPARSE_GRASS = 45,  # Cỏ thưa — cỏ lẫn đất, đốm thưa giữa dải GRASS_DIRT
+	PALE_SAND = 46,   # Cát phai — đốm cát nhạt hơn DESERT (đồi mòn / cồn già)
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -80,8 +93,13 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.OAK_WOOD:     "block_oak_wood",
 	BlockID.YOUNG_GRASS:  "block_young_grass",
 	BlockID.HARD_WOOD:    "block_hard_wood",
-	BlockID.HIGHLAND_GRASS: "block_highland_grass",
+	BlockID.GRASS_DIRT: "block_grass_dirt",
 	BlockID.DESERT_PLATEAU: "block_desert_plateau",
+	BlockID.TWILIGHT_GRASS: "block_twilight_grass",
+	BlockID.TWILIGHT_DIRT: "block_twilight_dirt",
+	BlockID.DRY_GRASS: "block_dry_grass",
+	BlockID.SPARSE_GRASS: "block_sparse_grass",
+	BlockID.PALE_SAND: "block_pale_sand",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -116,8 +134,13 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"block_oak_wood":     BlockID.OAK_WOOD,
 	"block_young_grass":  BlockID.YOUNG_GRASS,
 	"block_hard_wood":    BlockID.HARD_WOOD,
-	"block_highland_grass": BlockID.HIGHLAND_GRASS,
+	"block_grass_dirt": BlockID.GRASS_DIRT,
 	"block_desert_plateau": BlockID.DESERT_PLATEAU,
+	"block_twilight_grass": BlockID.TWILIGHT_GRASS,
+	"block_twilight_dirt": BlockID.TWILIGHT_DIRT,
+	"block_dry_grass": BlockID.DRY_GRASS,
+	"block_sparse_grass": BlockID.SPARSE_GRASS,
+	"block_pale_sand": BlockID.PALE_SAND,
 }
 
 const VOXEL: float = 1.0
@@ -141,7 +164,7 @@ const CONST_INF: int = 999
 
 const ROAD_GRID: float = 80.0
 const ROAD_OFFSET: float = 22.0
-const ROAD_HALF_W: float = 1.5
+const ROAD_HALF_W: float = 2.0
 const ROAD_GRID_R: int = 40
 
 const RIVER_GRID: float = 220.0
@@ -194,8 +217,13 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.54, 0.46, 0.38),           # 37 OAK_WOOD — gỗ sồi (nâu xám)
 	Color(0.44, 0.38, 0.13),           # 38 YOUNG_GRASS — bãi cỏ non (đất pha cỏ vàng xanh)
 	Color(0.38, 0.29, 0.17),           # 39 HARD_WOOD — gỗ cứng (nâu sẫm)
-	Color(0.16, 0.54, 0.10),           # 40 HIGHLAND_GRASS — cỏ cao nguyên (xanh tươi, sáng hơn đồng bằng)
+	Color(0.16, 0.54, 0.10),           # 40 GRASS_DIRT — cỏ đồng bằng cỏ (xanh tươi, hợp nhất cao nguyên)
 	Color(0.90, 0.82, 0.55),           # 41 DESERT_PLATEAU — cát cao nguyên sa mạc (cát khô nhạt, phân biệt với SAND)
+	Color(0.12, 0.28, 0.20),           # 42 TWILIGHT_GRASS — cỏ Twilight (xanh tối rêu)
+	Color(0.09, 0.12, 0.10),           # 43 TWILIGHT_DIRT — đất Twilight (nâu tối xanh)
+	Color(0.55, 0.48, 0.14),           # 44 DRY_GRASS — cỏ già khô (vàng rạ)
+	Color(0.28, 0.42, 0.10),           # 45 SPARSE_GRASS — cỏ thưa lẫn đất (xanh nhạt pha đất)
+	Color(0.94, 0.88, 0.62),           # 46 PALE_SAND — cát phai (nhạt hơn DESERT)
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -239,8 +267,13 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.07, 0.10, 0.08),           # 37 OAK_WOOD
 	Color(0.06, 0.09, 0.05),           # 38 YOUNG_GRASS
 	Color(0.06, 0.08, 0.06),           # 39 HARD_WOOD
-	Color(0.05, 0.16, 0.04),           # 40 HIGHLAND_GRASS
+	Color(0.05, 0.16, 0.04),           # 40 GRASS_DIRT (TW palette placeholder)
 	Color(0.06, 0.14, 0.09),           # 41 DESERT_PLATEAU
+	Color(0.08, 0.20, 0.15),           # 42 TWILIGHT_GRASS — cỏ Twilight (xanh tối rêu)
+	Color(0.05, 0.08, 0.06),           # 43 TWILIGHT_DIRT — đất Twilight (nâu tối xanh)
+	Color(0.09, 0.08, 0.04),           # 44 DRY_GRASS (TW palette placeholder)
+	Color(0.05, 0.07, 0.03),           # 45 SPARSE_GRASS (TW palette placeholder)
+	Color(0.10, 0.09, 0.06),           # 46 PALE_SAND (TW palette placeholder)
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -250,6 +283,22 @@ const TRAIL_SINK: float = 0.0
 ## Side màu tối hơn top — unshaded cần chênh lệch rõ để tạo cảm giác 3D
 static func block_side_color(top_col: Color) -> Color:
 	return Color(top_col.r * 0.50, top_col.g * 0.50, top_col.b * 0.50, top_col.a)
+
+## ── Khối cỏ Minecraft-style: mặt trên xanh cỏ, nửa dưới mặt bên + đáy = đất ──
+## Trả về BlockID đất tương ứng (-1 nếu không phải khối cỏ kiểu này).
+static func grass_dirt_id(block_id: int) -> int:
+	match block_id:
+		BlockID.GRASS:        return BlockID.DIRT
+		BlockID.DARK_GRASS:   return BlockID.DARK_DIRT
+		BlockID.YOUNG_GRASS:  return BlockID.DIRT
+		BlockID.GRASS_DIRT:   return BlockID.DIRT
+		BlockID.DRY_GRASS:    return BlockID.DIRT
+		BlockID.SPARSE_GRASS: return BlockID.DIRT
+		BlockID.TWILIGHT_GRASS: return BlockID.TWILIGHT_DIRT
+		_: return -1
+
+static func is_grass_top_block(block_id: int) -> bool:
+	return grass_dirt_id(block_id) >= 0
 
 ## ── Block có hình dạng riêng (không phải voxel đầy) ─────────────────────────
 ## Kích thước hộp tính theo đơn vị block (slab chuẩn = 1×0.5×1).
@@ -312,7 +361,8 @@ static func is_soil(bid: int) -> bool:
 static func is_tillable(bid: int) -> bool:
 	return bid == BlockID.GRASS or bid == BlockID.DARK_GRASS \
 		or bid == BlockID.DIRT or bid == BlockID.DARK_DIRT \
-		or bid == BlockID.YOUNG_GRASS or bid == BlockID.HIGHLAND_GRASS
+		or bid == BlockID.YOUNG_GRASS or bid == BlockID.GRASS_DIRT \
+		or bid == BlockID.DRY_GRASS or bid == BlockID.SPARSE_GRASS
 
 ## ── Độ cứng block (giây đào với công cụ sắt đúng loại) ─────────────────────
 ## -1 = không thể phá vỡ. Không có trong bảng (0) = không đào được.
@@ -351,10 +401,18 @@ const BLOCK_HARDNESS: Dictionary = {
 	BlockID.HARD_WOOD:    1.6,
 	# Cỏ non — như cỏ thường
 	BlockID.YOUNG_GRASS:  1.2,
-	# Cỏ cao nguyên — như cỏ thường
-	BlockID.HIGHLAND_GRASS: 1.2,
+	# Cỏ già / cỏ thưa — như cỏ thường
+	BlockID.DRY_GRASS:    1.2,
+	BlockID.SPARSE_GRASS: 1.2,
+	# Cát phai — như cát
+	BlockID.PALE_SAND:    1.2,
+	# Cỏ đồng bằng cỏ — như cỏ thường
+	BlockID.GRASS_DIRT: 1.2,
 	# Cát cao nguyên sa mạc — như cát
 	BlockID.DESERT_PLATEAU: 1.2,
+	# Đất Twilight — như cỏ/đất
+	BlockID.TWILIGHT_GRASS: 1.2,
+	BlockID.TWILIGHT_DIRT: 1.2,
 	# Không thể phá
 	BlockID.BEDROCK:      -1.0,
 }
@@ -374,7 +432,9 @@ static func is_pickaxable(bid: int) -> bool:
 static func is_shovelable(bid: int) -> bool:
 	return bid == BlockID.GRASS or bid == BlockID.DARK_GRASS or bid == BlockID.DIRT \
 		or bid == BlockID.DARK_DIRT or bid == BlockID.TILLED_SOIL \
-		or bid == BlockID.YOUNG_GRASS or bid == BlockID.HIGHLAND_GRASS \
+		or bid == BlockID.YOUNG_GRASS or bid == BlockID.GRASS_DIRT \
+		or bid == BlockID.DRY_GRASS or bid == BlockID.SPARSE_GRASS or bid == BlockID.PALE_SAND \
+		or bid == BlockID.TWILIGHT_GRASS or bid == BlockID.TWILIGHT_DIRT \
 		or bid == BlockID.SAND or bid == BlockID.SAND_DEEP or bid == BlockID.OCEAN_SAND \
 		or bid == BlockID.MUDDY_SAND or bid == BlockID.OCEAN_GRAVEL or bid == BlockID.OCEAN_MUD \
 		or bid == BlockID.SILT or bid == BlockID.TRAIL or bid == BlockID.OCEAN_FLOOR \

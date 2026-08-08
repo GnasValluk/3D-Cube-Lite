@@ -40,7 +40,7 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 		var weed_chance: float = 0.04 if is_river else (0.10 if has_silt else 0.04)
 		if r1 < weed_chance:
 			plant_props.append({ "type": "weed", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
-	if is_shore and not is_desert and not is_ocean and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND):
+	if is_shore and not is_desert and not is_ocean and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND or biome == _Data.TileType.SILT or biome == _Data.TileType.DIRT):
 		if r1 < 0.03:
 			plant_props.append({ "type": "taro", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
 

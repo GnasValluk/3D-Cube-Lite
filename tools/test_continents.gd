@@ -48,7 +48,7 @@ func _scan_dir(dx: int, dz: int) -> Array:
 func _ready() -> void:
 	print("== test_continents: Lục địa + spawn trên đất ==")
 
-	# ── 1. Spawn (0,0): không biển + biome DARK_GRASS/DESERT (đất khô) ─────
+	# ── 1. Spawn (0,0): không biển + biome GRASS_DIRT/DESERT (đất khô) ─────
 	print("-- 1. Spawn luôn trên đất liền (nhiều seed) --")
 	for s in SEEDS:
 		WorldSeed.seed_value = s
@@ -56,8 +56,8 @@ func _ready() -> void:
 		_nd = _W._Noise._noise_for_dim(RW)
 		_check(not _ocean(0.0, 0.0), "seed %d: spawn (0,0) không phải biển" % s)
 		var bio: int = _W._Noise._biome_at(0.0, 0.0, RW)
-		_check(bio == _D.TileType.DARK_GRASS or bio == _D.TileType.DESERT,
-			"seed %d: spawn là đất cao 1.0 (DARK_GRASS/DESERT, được %d)" % [s, bio])
+		_check(bio == _D.TileType.GRASS_DIRT or bio == _D.TileType.DESERT,
+			"seed %d: spawn là đất cao 1.0 (GRASS_DIRT/DESERT, được %d)" % [s, bio])
 
 	# ── 2. Đi biển không quá ~3500 block là gặp lục địa mới ────────────────
 	print("-- 2. Lục địa mới sau biển (4 hướng, tối đa %d block) --" % int(MAX_RUN))

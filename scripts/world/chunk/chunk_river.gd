@@ -6,6 +6,17 @@ static var _river_curves: Array[PackedVector2Array] = []
 static var _river_spatial: Dictionary = {}
 static var _river_ready: bool = false
 static var _int_cache: Dictionary = {}
+static var _river_lock := Mutex.new()
+
+## Chỉ dùng bởi tool test concurrency: xóa cache để worker rebuild lại từ đầu.
+static func _reset_for_test() -> void:
+	_river_lock.lock()
+	_river_ready = false
+	_river_curves.clear()
+	_river_spatial.clear()
+	_int_cache.clear()
+	_noise_river = null
+	_river_lock.unlock()
 
 static func _intersection(gx: int, gz: int) -> Vector2:
 	var key: Vector2i = Vector2i(gx, gz)
@@ -106,8 +117,15 @@ static func _index_curves() -> void:
 static func _ensure_rivers() -> void:
 	if _river_ready:
 		return
+	_river_lock.lock()
+	if _river_ready:
+		_river_lock.unlock()
+		return
+	_build_rivers_locked()
 	_river_ready = true
+	_river_lock.unlock()
 
+static func _build_rivers_locked() -> void:
 	var seed_base: int = SeedSnapshot.ensure() + 8888
 	var inters: Dictionary = {}
 	for gx in range(-_Data.RIVER_GRID_R, _Data.RIVER_GRID_R + 1):

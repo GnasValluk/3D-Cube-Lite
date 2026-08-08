@@ -160,13 +160,6 @@ func _sample_color_rw(wx: float, wz: float) -> Color:
 func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 	var nd: Dictionary = _Noise._noise_for_dim(_dimension_id)
 	var n_biome: FastNoiseLite = nd["biome"]
-	var n_warp: FastNoiseLite = nd["warp"]
-
-	var wx_off: float = n_warp.get_noise_2d(wx, wz + 100.0) * 18.0
-	var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0
-	var n: float = (n_biome.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
-	var threshold: float = 0.40
-	var is_dark: bool = n >= threshold
 
 	# Sa mạc
 	var n_desert: FastNoiseLite = nd.get("desert") as FastNoiseLite
@@ -175,12 +168,10 @@ func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 		if dv > 0.55:
 			if _is_river(wx, wz):
 				return Color(0.08, 0.38, 0.72, 0.70)
-			# Cao nguyên sa mạc — đảo cát cao trong sa mạc (khớp _biome_at)
-			var n_dp: FastNoiseLite = nd.get("desert_plateau") as FastNoiseLite
-			if n_dp:
-				var dpv: float = (n_dp.get_noise_2d(wx, wz) + 1.0) * 0.5
-				if dpv > 0.60 and (wx * wx + wz * wz) > 1500000.0:
-					return Color(0.90, 0.82, 0.55)
+			var pd: float = (nd.get("patch2") as FastNoiseLite).get_noise_2d(wx, wz) \
+					if nd.get("patch2") else 0.0
+			if pd > 0.72:
+				return Color(0.94, 0.88, 0.62)   # PALE_SAND
 			return Color(0.92, 0.78, 0.32)
 
 	# Cao nguyên (đồng bằng cao) — khớp _biome_at: xa spawn, mask > 0.55
@@ -207,27 +198,30 @@ func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 		var dist_to_shore: float = _ocean_shore_dist(wx, wz, nd)
 		if dist_to_shore < 5.0:
 			return Color(0.72, 0.82, 0.55)
-		var depth_t: float = clamp((dist_to_shore - 5.0) / 45.0, 0.0, 1.0)
-		return Color(0.04, lerp(0.35, 0.15, depth_t), lerp(0.60, 0.35, depth_t))
+		var ocean_depth_t: float = clamp((dist_to_shore - 5.0) / 45.0, 0.0, 1.0)
+		return Color(0.04, lerp(0.35, 0.15, ocean_depth_t), lerp(0.60, 0.35, ocean_depth_t))
 
-	if is_dark:
-		var dn: float = (n_biome.get_noise_2d(wx * 0.7 + 500.0, wz * 0.7 + 500.0) + 1.0) * 0.5
-		if dn > 0.70:
-			return Color(0.42, 0.22, 0.08)
-		return Color(0.14, 0.40, 0.08)
+# Đồng bằng cỏ (nhiều loại cỏ) — bãi đất/bãi cỏ non như compute_chunk
+	var dn: float = (n_biome.get_noise_2d(wx * 0.7 + 500.0, wz * 0.7 + 500.0) + 1.0) * 0.5
+	if dn > 0.74:
+		return Color(0.42, 0.22, 0.08)                # DIRT
+	if dn > 0.71:
+		return Color(0.55, 0.48, 0.14)                # DRY_GRASS (cỏ già)
+	if dn > 0.68:
+		return Color(0.44, 0.38, 0.13)                # YOUNG_GRASS
+	if dn > 0.65:
+		return Color(0.28, 0.42, 0.10)                # SPARSE_GRASS (cỏ thưa)
+	if dn > 0.61:
+		return Color(0.11, 0.46, 0.07)                # DARK_GRASS
+	if dn > 0.56:
+		return Color(0.22, 0.58, 0.14)                # GRASS
 
 	var n_lake: FastNoiseLite = nd["lake"]
 	var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-	if lake_val > 0.70:
+	if lake_val > 0.68:
 		return Color(0.08, 0.36, 0.68, 0.70)
 
-	var dist_to_dark: float = _dist_to_dark_grass(wx, wz, n_biome, n_warp, threshold)
-	if dist_to_dark < 2.0:
-		return Color(0.90, 0.80, 0.42)
-	if dist_to_dark > 10.0:
-		return Color(0.06, 0.32, 0.55)
-	var t: float = (dist_to_dark - 2.0) / 8.0
-	return Color(lerp(0.90, 0.06, t), lerp(0.80, 0.32, t), lerp(0.42, 0.55, t))
+	return Color(0.16, 0.54, 0.10)                    # GRASS_DIRT
 
 func _sample_color_tw(wx: float, wz: float) -> Color:
 	var nd: Dictionary = _Noise._noise_for_dim(_dimension_id)
@@ -239,20 +233,6 @@ func _sample_color_tw(wx: float, wz: float) -> Color:
 	if n >= 0.50:
 		return Color(0.03, 0.12, 0.08)
 	return Color(0.06, 0.22, 0.16)
-
-func _dist_to_dark_grass(wx: float, wz: float, n_biome: FastNoiseLite, n_warp: FastNoiseLite, threshold: float) -> float:
-	var rings: Array[int] = [2, 4, 6, 8, 10, 12, 14]
-	for ri in range(rings.size()):
-		var r: int = rings[ri]
-		for off in [Vector2(r, 0), Vector2(-r, 0), Vector2(0, r), Vector2(0, -r)]:
-			var ox: float = wx + off.x
-			var oz: float = wz + off.y
-			var ox_off: float = n_warp.get_noise_2d(ox, oz + 100.0) * 18.0
-			var oz_off: float = n_warp.get_noise_2d(ox + 100.0, oz) * 18.0
-			var nn: float = (n_biome.get_noise_2d(ox + ox_off, oz + oz_off) + 1.0) * 0.5
-			if nn >= threshold:
-				return float(r)
-	return 999.0
 
 func _ocean_shore_dist(wx: float, wz: float, nd: Dictionary) -> float:
 	var n_ocean: FastNoiseLite = nd["ocean"]

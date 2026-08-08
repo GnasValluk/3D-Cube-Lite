@@ -146,17 +146,49 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_highland_terr.fractal_lacunarity = 2.0
 	n_highland_terr.fractal_gain = 0.5
 
-	## n_desert_plateau: MASK cao nguyên sa mạc (đảo cát cao TRONG sa mạc) —
-	## tần số cao như cao nguyên thường → patch nhỏ hơn đồng bằng.
-	var n_desert_plateau := FastNoiseLite.new()
-	n_desert_plateau.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
-	n_desert_plateau.seed = base_seed + 77772
-	n_desert_plateau.frequency = 0.018
-	n_desert_plateau.fractal_type = FastNoiseLite.FRACTAL_FBM
-	n_desert_plateau.fractal_octaves = 3
-	n_desert_plateau.fractal_lacunarity = 2.0
-	n_desert_plateau.fractal_gain = 0.5
+	## n_patch_var: biến thể block dạng CỤM (sa mạc: cồn cát/đất khô; đồng
+	## bằng: đám đất trống/bãi cỏ rậm) — tần số vừa cho cụm rải rác có logic.
+	var n_patch_var := FastNoiseLite.new()
+	n_patch_var.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_patch_var.seed = base_seed + 77773
+	n_patch_var.frequency = 0.03
+	n_patch_var.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_patch_var.fractal_octaves = 2
+	n_patch_var.fractal_lacunarity = 2.0
+	n_patch_var.fractal_gain = 0.5
 
+	## n_patch2: đốm NHỎ tần số cao hơn patch_var — rải cỏ già (đồng bằng),
+	## cỏ thưa và cát phai (sa mạc) dạng điểm loang, không cắt thành mảng to.
+	var n_patch2 := FastNoiseLite.new()
+	n_patch2.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_patch2.seed = base_seed + 77774
+	n_patch2.frequency = 0.07
+	n_patch2.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_patch2.fractal_octaves = 2
+	n_patch2.fractal_lacunarity = 2.0
+	n_patch2.fractal_gain = 0.5
+
+	## n_patch_stone: BÃI ĐÁ rải rác — đốm đá lộ thiên ở vùng đất phẳng thấp,
+	## đất bùn ven sông/đầm. Tần số thấp hơn patch_var để cụm đá rộng hơn.
+	var n_patch_stone := FastNoiseLite.new()
+	n_patch_stone.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_patch_stone.seed = base_seed + 77776
+	n_patch_stone.frequency = 0.02
+	n_patch_stone.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_patch_stone.fractal_octaves = 2
+	n_patch_stone.fractal_lacunarity = 2.0
+	n_patch_stone.fractal_gain = 0.5
+
+	## n_basin: địa hình VÙNG TRŨNG — lòng chảo hạ thấp cục bộ trong đất liền
+	## (dùng chung công thức địa hình, chỉ can thiệp cao độ trước khi biome vẽ).
+	var n_basin := FastNoiseLite.new()
+	n_basin.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_basin.seed = base_seed + 77775
+	n_basin.frequency = 0.004
+	n_basin.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_basin.fractal_octaves = 3
+	n_basin.fractal_lacunarity = 2.0
+	n_basin.fractal_gain = 0.5
 
 	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
 		"lake_type": n_lake_type, "ocean": n_ocean,
@@ -164,12 +196,24 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 		"ocean_warp": n_ocean_warp, "sea_mountain": n_sea_mountain,
 		"reef": n_reef, "desert": n_desert,
 		"highland": n_highland, "highland_terr": n_highland_terr,
-		"desert_plateau": n_desert_plateau }
+		"patch_var": n_patch_var,
+		"patch2": n_patch2,
+		"patch_stone": n_patch_stone,
+		"basin": n_basin }
 	_noise_cache[dim_id] = result
 	return result
 
 static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 	var nd: Dictionary = _noise_for_dim(dim_id)
+
+	# REAL_WORLD: chỉ desert noise quyết định — phần còn lại luôn GRASS_DIRT.
+	# Bỏ warp×2 + biome noise (3/4 số noise call) vốn không ảnh hưởng kết quả.
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5
+		if d > 0.55:
+			return _Data.TileType.DESERT
+		return _Data.TileType.GRASS_DIRT
+
 	var n_bio: FastNoiseLite = nd["biome"]
 	var n_warp: FastNoiseLite = nd["warp"]
 
@@ -177,32 +221,12 @@ static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 	var wz_off: float = n_warp.get_noise_2d(wx + 100.0, wz) * 18.0
 	var n: float = (n_bio.get_noise_2d(wx + wx_off, wz + wz_off) + 1.0) * 0.5
 
-	# Bias vùng spawn (gốc tọa độ): ép DARK_GRASS → người chơi luôn xuất
+	# Bias vùng spawn (gốc tọa độ): nâng cao biome noise → người chơi luôn xuất
 	# hiện trên đất cao khô ráo (khớp với bias ocean mask trong world_chunk).
 	var d2: float = wx * wx + wz * wz
 	if d2 < 2000000.0:
 		n += 0.8 * exp(-d2 / 500000.0)
 
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5
-		if d > 0.55:
-			# Cao nguyên sa mạc: đảo cát cao nằm TRONG sa mạc — mask tần số cao
-			# hơn đồng bằng (patch nhỏ hơn). Xa spawn như cao nguyên thường.
-			var dp: float = (nd["desert_plateau"].get_noise_2d(wx, wz) + 1.0) * 0.5
-			if dp > 0.60 and d2 > 1500000.0:
-				return _Data.TileType.DESERT_PLATEAU
-			return _Data.TileType.DESERT
-
-	# Cao nguyên (đồng bằng cao) — chỉ REAL_WORLD, xa spawn (giữ vùng khởi đầu
-	# phẳng là đồng bằng thường). Đứng trước threshold dark/grass.
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		var hl: float = (nd["highland"].get_noise_2d(wx, wz) + 1.0) * 0.5
-		if hl > 0.55 and d2 > 1500000.0:
-			return _Data.TileType.HIGHLAND_GRASS
-
 	var threshold: float = 0.50
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		threshold = 0.40
-
-	if n < threshold: return _Data.TileType.GRASS
-	return _Data.TileType.DARK_GRASS
+	if n < threshold: return _Data.TileType.TWILIGHT_GRASS
+	return _Data.TileType.TWILIGHT_DIRT

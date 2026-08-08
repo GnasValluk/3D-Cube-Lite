@@ -14,7 +14,7 @@ const HINGE_X:    float = -0.775                 # trục bản lh1 lề (trái,
 const PANEL_W:    float = 1.55
 const PANEL_H:    float = 2.05
 const PANEL_T:    float = 0.30
-const DOOR_Z:     float = -2.32
+const DOOR_Z:     float = -2.62
 
 var _hinge: Node3D
 var _panel: MeshInstance3D

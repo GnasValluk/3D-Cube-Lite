@@ -1,0 +1,9 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+FULL_REAL (0,0)=73ms
+FULL_TW   (0,0)=34ms
+FAST_REAL (0,0)=47ms
+FAST_TW   (0,0)=28ms
+FULL_REAL (1,0)=77ms
+FULL_REAL (0,1)=83ms
+DONE

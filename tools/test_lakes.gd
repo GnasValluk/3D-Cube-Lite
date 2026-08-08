@@ -1,8 +1,8 @@
 extends Node3D
 
-## test_lakes — Hồ nội địa (hồ spawn): đồng cỏ DARK_GRASS sâu trong lục địa
+## test_lakes — Hồ nội địa (hồ spawn): đồng cỏ GRASS_DIRT sâu trong lục địa
 ## phải có hồ nước thật, không chỉ đầm ngập ven biển / hồ cát sa mạc.
-## Quy tắc thật trong world_chunk._generate_base: DARK_GRASS + lake_val>0.68
+## Quy tắc thật trong world_chunk compute_chunk: GRASS_dir (land) + lake_val>0.68
 ## + cách biển >40 ô → SILT/MUDDY_SAND, đáy sâu hơn WATER_Y.
 ## Chạy qua tools/test_lakes.tscn (không chạy trực tiếp file .gd).
 
@@ -26,7 +26,21 @@ func _check(cond: bool, label: String) -> void:
 	if not cond:
 		_failures += 1
 
-## Quét lưới thô mô phỏng quy tắc hồ DARK_GRASS; trả
+## Kiểm tra ô (wx,wz) có biển trong bán kính `rad` block (đếm ô biển cách < rad).
+## Dùng để lọc "hồ đồng cỏ" phải nằm sâu trong lục địa (>40 ô cách biển).
+func _near_ocean(wx: float, wz: float, rad: float) -> bool:
+	var nd: Dictionary = _W._Noise._noise_for_dim(RW)
+	var step: float = 6.0
+	var n_steps: int = int(ceil(rad / step))
+	for i in range(n_steps + 1):
+		var a: float = float(i) / float(maxi(n_steps, 1)) * TAU
+		var px: float = wx + cos(a) * (rad + 6.0)
+		var pz: float = wz + sin(a) * (rad + 6.0)
+		if _W._ocean_mask_at(nd, px, pz):
+			return true
+	return false
+
+## Quét lưới thô mô phỏng quy tắc hồ GRASS: trả
 ## {"cells": int, "nearest": float (khoảng cách hồ gần gốc nhất, INF nếu thiếu),
 ##  "nearest_pos": Vector2 (vị trí hồ gần nhất)}
 func _scan_lakes(nd: Dictionary) -> Dictionary:
@@ -63,7 +77,7 @@ func _scan_lakes(nd: Dictionary) -> Dictionary:
 			var wz: float = -HALF + float(iz) * STEP + 0.5
 			var odv: int = od[ix * size + iz]
 			if odv >= 0 and odv <= 40: continue
-			if _W._Noise._biome_at(wx, wz, RW) != _D.TileType.DARK_GRASS: continue
+			if _W._Noise._biome_at(wx, wz, RW) != _D.TileType.GRASS_DIRT: continue
 			var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
 			if lake_val > LAKE_T:
 				cells += 1
@@ -78,17 +92,17 @@ func _scan_lakes(nd: Dictionary) -> Dictionary:
 			"nearest_core_pos": nearest_core_pos }
 
 func _ready() -> void:
-	print("== test_lakes: Hồ nước nội địa (DARK_GRASS) ==")
+	print("== test_lakes: Hồ nước nội địa (cỏ GRASS) ==")
 
-	# ── 1. Quy tắc thế giới: lục địa sâu phải có hồ DARK_GRASS ─────────────
-	print("-- 1. Quét %d seed: hồ DARK_GRASS trong bán kính %d block --" % [SEEDS.size(), int(HALF)])
+	# ── 1. Quy tắc thế giới: lục địa sâu phải có hồ GRASS ───────────────
+	print("-- 1. Quét %d seed: hồ GRASS trong bán kính %d block --" % [SEEDS.size(), int(HALF)])
 	for s in SEEDS:
 		WorldSeed.seed_value = s
 		_W._Noise.clear_cache()
 		var nd := _W._Noise._noise_for_dim(RW)
 		var res: Dictionary = _scan_lakes(nd)
 		_check(int(res["cells"]) >= MIN_LAKE_CELLS,
-			"seed %d: %d ô hồ DARK_GRASS nội địa (≥%d)" % [s, int(res["cells"]), MIN_LAKE_CELLS])
+			"seed %d: %d ô hồ GRASS nội địa (≥%d)" % [s, int(res["cells"]), MIN_LAKE_CELLS])
 		_check(float(res["nearest"]) <= NEAR_SPAWN,
 			"seed %d: có hồ gần spawn ≤ %.0f block (gần nhất %.0f)" % [s, NEAR_SPAWN, float(res["nearest"])])
 
@@ -115,13 +129,13 @@ func _ready() -> void:
 				var n_lake: FastNoiseLite = nd2["lake"]
 				var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
 				if lake_val <= 0.80: continue
-				if _W._Noise._biome_at(wx, wz, RW) != _D.TileType.DARK_GRASS: continue
+				if _W._Noise._biome_at(wx, wz, RW) != _D.TileType.GRASS_DIRT: continue
 				if _W._ocean_mask_at(nd2, wx, wz): continue
 				best_d2 = d2
 				fw = Vector2(wx, wz)
 	var cx := int(floor(fw.x / SIZE))
 	var cz := int(floor(fw.y / SIZE))
-	_check(fw != Vector2.ZERO, "tìm thấy ô hồ DARK_GRASS gần spawn")
+	_check(fw != Vector2.ZERO, "tìm thấy ô hồ GRASS gần spawn")
 	if fw == Vector2.ZERO:
 		get_tree().quit(1)
 		return
@@ -164,15 +178,17 @@ func _ready() -> void:
 	for nx in range(SIZE):
 		for nz in range(SIZE):
 			for ly in range(_BD.CHUNK_H - 1, -1, -1):
-				var b: int = bd.get_block(nx, ly, nz)
-				if b != _D.BlockID.AIR and not _D.is_water(b):
-					if b == _D.BlockID.DARK_GRASS or b == _D.BlockID.DIRT:
+				var block := bd.get_block(nx, ly, nz)
+				if block != _D.BlockID.AIR and not _D.is_water(block):
+					if block == _D.BlockID.GRASS or block == _D.BlockID.DARK_GRASS \
+							or block == _D.BlockID.YOUNG_GRASS \
+							or block == _D.BlockID.GRASS_DIRT or block == _D.BlockID.DIRT:
 						dry_land += 1
 					break
-	_check(dry_land >= 50, "hồ nằm giữa đất khô (chunk có %d cột DARK_GRASS/DIRT)" % dry_land)
+	_check(dry_land >= 50, "hồ nằm giữa đất khô (chunk có %d cột cỏ/DIRT)" % dry_land)
 
 	# ── 2.5. Đáy hồ thoải: bước chênh ≤ 1.0 block giữa 2 ô kề (bờ → đáy) ──────
-	# Regression: trước đây hồ DARK_GRASS đào đáy theo lake_val → bờ dựng
+	# Regression: trước đây hồ đào đáy theo lake_val → bờ dựng
 	# đứng ~1.5 block; giờ đáy thoải 0.5/ô theo khoảng cách từ bờ (BFS).
 	var is_lake_b: Callable = func(c: Vector2i) -> bool:
 		var b: int = int(bg[c.x][c.y])
@@ -226,12 +242,16 @@ func _ready() -> void:
 			var bb: int = _W._Noise._biome_at(wxc, wzc, RW)
 			var lv: float = (n_lake3.get_noise_2d(wxc, wzc) + 1.0) * 0.5
 			if lv <= 0.72: continue
+			# Hồ đồng cỏ chỉ tính ô cách biển >40 ô (khớp quy tắc carve trong
+			# compute_chunk) — gần biển là "đầm ven biển", không lướt taro đồng cỏ.
+			if _near_ocean(wxc, wzc, 44.0):
+				continue
 			var k := Vector2i(int(floor(wxc / SIZE)), int(floor(wzc / SIZE)))
 			if bb == _D.TileType.DESERT:
 				if not desert_chunks.has(k) and desert_chunks.size() < 3:
 					desert_chunks.append(k)
 			else:
-				if not grass_chunks.has(k) and grass_chunks.size() < 3:
+				if not grass_chunks.has(k) and grass_chunks.size() < 6:
 					grass_chunks.append(k)
 	_check(not desert_chunks.is_empty(), "tìm thấy chunk hồ sa mạc (r<1600): %s" % str(desert_chunks))
 	_check(not grass_chunks.is_empty(), "tìm thấy chunk hồ đồng cỏ (r<1600): %s" % str(grass_chunks))

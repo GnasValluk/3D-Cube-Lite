@@ -1,6 +1,0 @@
-[gd_scene format=3 uid="uid://ck58kndecvp7v"]
-
-[ext_resource type="Script" path="res://tools/test_tavern_visual.gd" id="1_test"]
-
-[node name="TestTavernVisual" type="Node3D" unique_id=1219746628]
-script = ExtResource("1_test")

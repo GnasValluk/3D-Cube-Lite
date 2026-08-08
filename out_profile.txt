@@ -1,0 +1,21 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+== tìm chunk nhiều cỏ ==
+best grass chunk=(0, -1) n=2868
+[GRASSY] grass=2868 village=0 props=6 lotus=4 lamps=0
+[GRASSY] GRASS_MM_LOOP=1.46ms
+[GRASSY] GRASS_MM_BULK=1.58ms
+[GRASSY] APPLY_TOTAL=2.86ms
+[GRASSY] TRIMESH=1.84ms tris=3110
+[GRASSY] SHAPED_SCAN=14.71ms boxes=0
+[GRASSY] SHAPED_APPLY=0.02ms colliders=0
+[GRASSY] WATER_BUILD=3.84ms
+== OCEAN chunk ==
+[OCEAN] grass=0 village=0 props=0 lotus=0 lamps=0
+[OCEAN] GRASS_MM_LOOP=0.62ms
+[OCEAN] GRASS_MM_BULK=0.06ms
+[OCEAN] APPLY_TOTAL=0.11ms
+[OCEAN] TRIMESH=1.22ms tris=2110
+[OCEAN] SHAPED_SCAN=14.45ms boxes=0
+[OCEAN] SHAPED_APPLY=0.03ms colliders=0
+[OCEAN] WATER_BUILD=8.90ms

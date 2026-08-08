@@ -186,6 +186,18 @@ static func _prop_cost(ptype: String) -> int:
 		"pumpkin", "watermelon", "eggplant": return 1
 		_: return 1
 
+## ── Profiler section timing (benchmark test bật; mặc định tắt) ─────────────
+static var _prof_enabled: bool = false
+static var _prof_last_usec: int = 0
+static func _prof_reset() -> void:
+	_prof_last_usec = Time.get_ticks_usec()
+static func _prof(tag: String) -> void:
+	if not _prof_enabled:
+		return
+	var now := Time.get_ticks_usec()
+	print("  [prof] %-22s %6.2fms" % [tag, (now - _prof_last_usec) * 0.001])
+	_prof_last_usec = now
+
 static var _mesh_cache: Dictionary = {}
 static var _pending_chunks: Dictionary = {}
 static var _pending_mutex := Mutex.new()
@@ -435,6 +447,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	var h_vox: float = _Data.VOXEL * 0.5
 
 	# ── 1. Biome sampling (với padding để stitch biên) ─────────────────────────
+	_prof_reset()
 	var total: int = cols + 2 * _Data.PAD
 	var bio: Array[Array] = []
 	bio.resize(total)
@@ -444,22 +457,32 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 			var wx: float = world_ox - half + (float(vx - _Data.PAD) + 0.5) * _Data.VOXEL
 			var wz: float = world_oz - half + (float(vz - _Data.PAD) + 0.5) * _Data.VOXEL
 			row[vz] = _Noise._biome_at(wx, wz, dim_id)
+	_prof("S1 biome_sample")
 
-	# ── 2. BFS distance map từ DARK_GRASS → tính gradient xuống nước ──────────
-	# Đa nguồn: ô DARK_GRASS=0, ô GRASS/DESERT kề DARK_GRASS=1 → BFS 4-láng giềng.
+	# ── 2. BFS distance map từ "đất nền" → tính gradient xuống nước ─────────
+	# Đa nguồn: ô đất nền=0, ô lân cận kề đất nền=1 → BFS 4-láng giềng.
+	# REAL: không còn DARK_GRASS/GRASS (đất liền = GRASS_DIRT dùng trong land-branch).
+	# TWILIGHT: đất nền = TWILIGHT_GRASS, còn lại (TWILIGHT_DIRT) là gradient nước.
+	var base_tile: int = _Data.TileType.TWILIGHT_GRASS
+	var edge_tile: int = _Data.TileType.TWILIGHT_DIRT
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		base_tile = _Data.TileType.GRASS_DIRT
+		edge_tile = _Data.TileType.GRASS_DIRT
 	var dst := PackedInt32Array()
 	dst.resize(total * total)
 	for i in range(total * total):
-		dst[i] = 0 if bio[i / total][i % total] == _Data.TileType.DARK_GRASS else _Data.CONST_INF
+		dst[i] = 0 if bio[i / total][i % total] == base_tile else _Data.CONST_INF
 	for vx in range(total):
 		for vz in range(total):
-			if bio[vx][vz] != _Data.TileType.GRASS and bio[vx][vz] != _Data.TileType.DESERT: continue
-			if (vx > 0 and bio[vx-1][vz] == _Data.TileType.DARK_GRASS) \
-			or (vx < total-1 and bio[vx+1][vz] == _Data.TileType.DARK_GRASS) \
-			or (vz > 0 and bio[vx][vz-1] == _Data.TileType.DARK_GRASS) \
-			or (vz < total-1 and bio[vx][vz+1] == _Data.TileType.DARK_GRASS):
+			if bio[vx][vz] != edge_tile: continue
+			if (vx > 0 and bio[vx-1][vz] == base_tile) \
+			or (vx < total-1 and bio[vx+1][vz] == base_tile) \
+			or (vz > 0 and bio[vx][vz-1] == base_tile) \
+			or (vz < total-1 and bio[vx][vz+1] == base_tile):
 				dst[vx * total + vz] = 1
-	_bfs_manhattan(dst, total)
+	if base_tile != edge_tile:
+		_bfs_manhattan(dst, total)
+	_prof("S2 bfs_dst")
 
 
 	# ── 3. biome_grid + height_grid: biển trước → lục địa → hồ ──────────────
@@ -491,7 +514,6 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		nd = _Noise._noise_for_dim(dim_id)
 		var n_lake: FastNoiseLite      = nd["lake"]
 		var n_lake_type: FastNoiseLite = nd["lake_type"]
-		var n_biome: FastNoiseLite     = nd["biome"]
 
 		# ── Ocean mask (BFS padded) — stride 2, ~75% fewer noise calls ─────────
 		const OCEAN_PAD: int = 26
@@ -546,6 +568,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				else:
 					shore_dst[pvx * total + pvz] = _Data.CONST_INF
 		_bfs_manhattan(shore_dst, total, oct_mask)
+		_prof("S3 ocean_mask+bfs")
 
 		# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────────
 		const MAX_OCEAN_DEPTH_DIST: int = 30
@@ -632,51 +655,69 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 						_Data.WATER_Y - 0.1, _Data.VOXEL - 0.08)
 					beach_mask[ivx * cols + ivz] = 1
 				else:
-					# ── LỤC ĐỊA ──
-					if base_bio == _Data.TileType.HIGHLAND_GRASS:
-						# ── CAO NGUYÊN (đồng bằng cao): giống đồng bằng nhưng địa
-						# hình gồ ghề — nền cao + đồi/gò/lòng chảo. Xa spawn nên
-						# không ảnh hưởng khu khởi đầu (đã ép ở _biome_at).
-						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-						biome_grid[ivx][ivz] = _Data.TileType.HIGHLAND_GRASS
-						var hb: float = (nd["highland"].get_noise_2d(wx, wz) + 1.0) * 0.5
-						var ht: float = (nd["highland_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
-						# Cao nguyên THOẢI: cao độ dựng theo MASK cao nguyên (hb) — mép
-						# (hb≈0.55) = 1.0 ngang đồng bằng, tăng dần vào sâu (smoothstep
-						# 0.55→0.90, ~20-30m) → hết "vách đứng" chênh 5-10m. Thấp hơn
-						# nhiều so với nền 3.5-8 cũ: tối đa 1.0 + 3.0 + 1.2 = 5.2.
-						var hb_rise: float = clamp((hb - 0.55) / 0.35, 0.0, 1.0)
-						hb_rise = hb_rise * hb_rise * (3.0 - 2.0 * hb_rise)
-						height_grid[ivx][ivz] = 1.0 + hb_rise * 3.0 + ht * hb_rise * 1.2
-						# Bãi đất + bãi cỏ non — cơ chế y hệt đồng bằng
-						var dn: float = (n_biome.get_noise_2d((wx + 500.0) * 0.7, (wz + 500.0) * 0.7) + 1.0) * 0.5
-						if dn > 0.70:
-							biome_grid[ivx][ivz] = _Data.TileType.DIRT
-						elif dn > 0.66:
-							biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
-					elif base_bio == _Data.TileType.DESERT_PLATEAU:
-						# ── CAO NGUYÊN SA MẠC: cát nâng cao + nhấp nhô (mesa) —
-						# tương tự cao nguyên nhưng không cỏ. Patch nhỏ hơn đồng
-						# bằng (mask tần số cao ở _biome_at).
-						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-						biome_grid[ivx][ivz] = _Data.TileType.DESERT_PLATEAU
-						# Cao nguyên sa mạc THOẢI: cao độ dựng theo MASK desert_plateau
-						# (dp) — mép (dp≈0.60) = 1.0 ngang sa mạc, tăng dần vào sâu
-						# (smoothstep 0.60→0.90) → hết "vách đứng". Tối đa 1.0+2.5+1.0=4.5.
-						var dp: float = (nd["desert_plateau"].get_noise_2d(wx, wz) + 1.0) * 0.5
-						var ht: float = (nd["highland_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
-						var dp_rise: float = clamp((dp - 0.60) / 0.30, 0.0, 1.0)
-						dp_rise = dp_rise * dp_rise * (3.0 - 2.0 * dp_rise)
-						height_grid[ivx][ivz] = 1.0 + dp_rise * 2.5 + ht * dp_rise * 1.0
-					elif base_bio == _Data.TileType.DARK_GRASS:
-						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+					# ── LỤC ĐỊA: ĐỊA HÌNH DÙNG CHUNG TRƯỚC, BIOME VẼ SAU ─────────
+					# Mọi biome đất liền dùng CHUNG một công thức địa hình đồi
+					# thoải (highland + highland_terr). Biome chỉ thay đổi "sơn bề
+					# mặt" (loại block) chứ không can thiệp chiều cao → không còn
+					# vết cắt cao độ tại ranh giới biome/biên chunk. (Biome nào
+					# cần địa hình đặc biệt sẽ được code riêng ở cập nhật sau.)
+					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+
+					# (1) Địa hình chung — đồi thoải rolling hills
+					var hb: float = (nd["highland"].get_noise_2d(wx, wz) + 1.0) * 0.5
+					var ht: float = (nd["highland_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
+					var hb_rise: float = clamp((hb - 0.55) / 0.35, 0.0, 1.0)
+					hb_rise = hb_rise * hb_rise * (3.0 - 2.0 * hb_rise)
+					height_grid[ivx][ivz] = 1.0 + hb_rise * 3.0 + ht * hb_rise * 1.2
+					# (1b) Vùng trũng (basin) — lòng chảo hạ thấp cục bộ trong đất
+					# liền: vùng bát nhỏ mềm, mép thoải (smoothstep). Đáy được giữ
+					# TRÊN mực nước để không tự sinh nước/phá đồng cỏ khô.
+					# Noise tần thấp nên trũng âm lan rộng; nhiều trũng nông.
+					var bsn: float = (nd["basin"].get_noise_2d(wx, wz) + 1.0) * 0.5
+					var bsn_t: float = clamp((bsn - 0.55) / 0.20, 0.0, 1.0)
+					bsn_t = bsn_t * bsn_t * (3.0 - 2.0 * bsn_t)
+					if bsn_t > 0.0:
+						height_grid[ivx][ivz] = maxf(height_grid[ivx][ivz] - bsn_t * 1.5, _Data.WATER_Y + 0.35)
+
+# (2) Vẽ biome SAU — chỉ đổi surface, không đổi height
+					if base_bio == _Data.TileType.DESERT:
+						# ── SA MẠC: chỉ toàn CÁT các loại (không đất nâu) ────────
+						#   - Mặt cát nền (DESERT) + cồn cát đậm (SAND_DEEP) rải theo
+						#     độ nhô; ranh giới giữa 2 loại UỐN CONG bởi noise + dải
+						#     loang (giống hiệu ứng cỏ non ở đồng):
+						#       hb_rise thấp    → DESERT (cát sáng nền)
+						#       hb_rise cao 	→ SAND_DEEP (cát đậm đỉnh cồn)
+						#     Khoảng 0.52→0.66: SAND_DEEP loang dần (noise nhanh,
+						#     đốm mật độ tăng theo độ cao) — không cắt thẳng.
+						var warp_d: float = (nd["patch_var"].get_noise_2d(wx, wz) - 0.5) * 0.10
+						var eff_d: float = hb_rise + warp_d
+						var sd_t: float = clamp((eff_d - 0.56) / 0.10, 0.0, 1.0)
+						if sd_t >= 1.0:
+							biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP
+						elif sd_t > 0.0:
+							var loang_d: float = (nd["highland_terr"].get_noise_2d(wx * 3.0 + 5.0, wz * 3.0 + 5.0) + 1.0) * 0.5
+							biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP if loang_d < sd_t else _Data.TileType.DESERT
+						else:
+							# Nền thấp sa mạc: đốm NHỎ — cồn cát đậm (SAND_DEEP) và cát
+							# phai mờ (PALE_SAND) lỏng nền cát sáng (DESERT). patch2 tần
+							# số cao → đốm rải rác vừa phải, không thành mảng gây rối.
+							var p2: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							if p2 > 0.82:
+								biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP
+							elif p2 > 0.72:
+								biome_grid[ivx][ivz] = _Data.TileType.PALE_SAND
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.DESERT
+					else:
+						# ── ĐỒNG BẰNG CỎ: block phân theo HÌNH THẾ địa hình ──
+						#   - Sát bãi biển (cách bờ ≤6) → cỏ ven biển (100% GRASS)
+						#   - Trũng thấp (hb_rise nhỏ)  → DARK_GRASS (ẩm mát)
+						#   - Đồi cao (hb_rise ≥ 0.52) → YOUNG_GRASS, ranh giới uốn cong theo noise
+#     + dải loang 0.56→0.68 (cỏ non loang xuống vài block, không cắt thẳng)
+						#   - Sườn thoải → GRASS; nền giữa → GRASS_DIRT
+						#   - Cụm đất trống/cỏ rậm theo noise "patch_var" (tần thấp)
 						var is_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
-						# Hồ đồng cỏ nội địa: DARK_GRASS không có hồ → lục địa sâu toàn
-						# đất khô. Dùng chung n_lake, ngưỡng cao hơn GRASS (0.74) để
-# mật độ vừa phải; đáy sâu theo lake_val (bờ nông, giữa sâu).
 						var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
 						if not is_ocean and lake_val > 0.68 and (od == _Data.CONST_INF or od > 40):
 							var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
@@ -684,58 +725,82 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 								biome_grid[ivx][ivz] = _Data.TileType.SILT
 							else:
 								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+							# Hồ carve — nước thấp hơn mặt đất đồng
 							height_grid[ivx][ivz] = _Data.WATER_Y - (1.0 + (lake_val - 0.68) * 8.0)
-						else:
-							biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
-							height_grid[ivx][ivz] = _Data.VOXEL
-							var dn: float = (n_biome.get_noise_2d((wx+500.0)*0.7, (wz+500.0)*0.7) + 1.0) * 0.5
-							if dn > 0.70:
-								biome_grid[ivx][ivz] = _Data.TileType.DIRT
-							elif dn > 0.66:
-								# Bãi cỏ non — cơ chế y hệt bãi đất (cùng noise, cell-level),
-								# dải ngưỡng ngay dưới bãi đất → mật độ ~ngang bãi đất (~6%),
-								# các bãi cỏ non nằm sát/vây quanh bãi đất.
+						elif od <= _Data.BEACH_WIDTH + 6:
+							# Dải bờ khô gần biển: đất cát pha ẩm chuyển dần ra cỏ
+							if od <= _Data.BEACH_WIDTH + 2:
+								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.GRASS
+						elif hb_rise < 0.20:
+							# Trũng ẩm nội địa — cỏ đậm, giữ hơi ẩm. Thêm bãi đất
+							# (DIRT) + bãi đá (STONE_PATCH) rải rác để vùng đất
+							# phẳng thấp (y≈0.5-1.0) có đốm trống/đá lộ thiên.
+							var st_p: float = (nd["patch_stone"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							var p2_t: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							if st_p > 0.82:
+								biome_grid[ivx][ivz] = _Data.TileType.STONE_PATCH
+							elif p2_t > 0.92:
 								biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
-					else:
-						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-						var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-						var d: int = dst[pvx * total + pvz]
-
-						var is_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
-						var lake_t: float = 0.60 if base_bio == _Data.TileType.DESERT else 0.70
-						if not is_ocean and lake_val > lake_t and (od == _Data.CONST_INF or od > 40):
-							var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
-							if lake_type_val > 0.50:
-								biome_grid[ivx][ivz] = _Data.TileType.SILT if d <= _Data.PAD else _Data.TileType.MUDDY_SAND
+							elif p2_t > 0.84:
+								biome_grid[ivx][ivz] = _Data.TileType.DIRT
 							else:
-								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND if d <= _Data.PAD else _Data.TileType.SAND
-							if base_bio == _Data.TileType.DESERT:
-								height_grid[ivx][ivz] = _Data.WATER_Y
+								biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
+						elif hb_rise >= 0.52:
+							# ── ĐỒI CỎ / ĐỈNH: YOUNG_GRASS nhưng KHÔNG cắt thẳng ──
+							# Ranh giới bị uốn cong bởi noise (warp) → mép đồi lượn
+							# theo địa hình chứ không chạy đúng theo một độ cao cố định.
+							# Từ chân đồi 0.56 lên đỉnh 0.68 có dải LOANG: cỏ non chỉ
+							# xuất hiện ở những chỗ "đủ cao" (noise < yg_t) → rìa đồi
+							# thưa đốm cỏ non, lên cao dày dần — chuyển mềm vài block.
+							var warp_v: float = (nd["patch_var"].get_noise_2d(wx, wz) - 0.5) * 0.10
+							var eff_h: float = hb_rise + warp_v
+							var yg_t: float = clamp((eff_h - 0.56) / 0.12, 0.0, 1.0)
+							if yg_t >= 1.0:
+								biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
+							elif yg_t > 0.0:
+								# Dải loang: noise tần nhanh làm đốm, mật độ theo độ cao
+								var loang: float = (nd["highland_terr"].get_noise_2d(wx * 3.0 + 5.0, wz * 3.0 + 5.0) + 1.0) * 0.5
+								biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS if loang < yg_t else _Data.TileType.GRASS
 							else:
-								height_grid[ivx][ivz] = _Data.WATER_Y if d <= 1 else _Data.WATER_Y - min(d, _Data.PAD) * _BlockData.SLAB_HEIGHT
-						elif base_bio == _Data.TileType.DESERT:
-							biome_grid[ivx][ivz] = _Data.TileType.DESERT
-							height_grid[ivx][ivz] = _Data.VOXEL
+								biome_grid[ivx][ivz] = _Data.TileType.GRASS
+						elif hb_rise < 0.45:
+							# Sườn thoải — cỏ xanh tươi mượt; vài đốm cỏ già (vàng rạ)
+							# loang theo patch2 (tần số cao) để không thành mảng lớn.
+							var p2_s: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							if p2_s > 0.84:
+								biome_grid[ivx][ivz] = _Data.TileType.DRY_GRASS
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.GRASS
 						else:
-							biome_grid[ivx][ivz] = _Data.TileType.SAND
-							if d <= 1:
-								height_grid[ivx][ivz] = _Data.WATER_Y
+							# Nền giữa — đồng cỏ hỗn; cụm đất/cỏ rậm theo noise đất
+							# patch_var; đốm cỏ già / cỏ thưa / cỏ non loạn theo patch2.
+							var dv2: float = (nd["patch_var"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							var p2_n: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							if dv2 > 0.62:
+								biome_grid[ivx][ivz] = _Data.TileType.DIRT
+							elif dv2 < 0.22:
+								biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
+							elif p2_n > 0.88:
+								biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
+							elif p2_n > 0.80:
+								biome_grid[ivx][ivz] = _Data.TileType.DRY_GRASS
+							elif p2_n < 0.16:
+								biome_grid[ivx][ivz] = _Data.TileType.SPARSE_GRASS
 							else:
-								if d == _Data.CONST_INF: d = _Data.PAD
-								height_grid[ivx][ivz] = _Data.WATER_Y - min(d, _Data.PAD) * _BlockData.SLAB_HEIGHT
+								biome_grid[ivx][ivz] = _Data.TileType.GRASS_DIRT
 
-		# ── 3a2. Hồ DARK_GRASS: đáy thoải theo khoảng cách từ bờ (BFS padded,
+		# ── 3a2. Hồ ĐỒNG CỎ: đáy thoải theo khoảng cách từ bờ (BFS padded,
 		# hàn liền qua biên chunk; ring 0 = WATER_Y như hồ cát dựa trên dst) ──
 		var lake_mask: PackedByteArray = PackedByteArray()
 		lake_mask.resize(total * total)
 		lake_mask.fill(0)
 		for pvx in range(total):
 			for pvz in range(total):
-				if bio[pvx][pvz] == _Data.TileType.DESERT \
-						or bio[pvx][pvz] == _Data.TileType.DESERT_PLATEAU:
+				if bio[pvx][pvz] == _Data.TileType.DESERT:
 					dmask[pvx * total + pvz] = 1
-				if bio[pvx][pvz] != _Data.TileType.DARK_GRASS: continue
+				if bio[pvx][pvz] != _Data.TileType.GRASS_DIRT: continue
 				if oct[pvx + OCEAN_PAD - _Data.PAD][pvz + OCEAN_PAD - _Data.PAD]: continue
 				var wx: float = world_ox - half + (float(pvx - _Data.PAD) + 0.5) * _Data.VOXEL
 				var wz: float = world_oz - half + (float(pvz - _Data.PAD) + 0.5) * _Data.VOXEL
@@ -792,12 +857,13 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 			for ivz in range(cols):
 				var pvz: int = ivz + _Data.PAD
 				biome_grid[ivx][ivz] = bio[pvx][pvz]
-				if bio[pvx][pvz] == _Data.TileType.DARK_GRASS:
+				if bio[pvx][pvz] == _Data.TileType.TWILIGHT_GRASS:
 					height_grid[ivx][ivz] = _Data.VOXEL
 				else:
 					var d: int = dst[pvx * total + pvz]
 					if d == _Data.CONST_INF: d = _Data.PAD
 					height_grid[ivx][ivz] = _Data.WATER_Y - min(d, _Data.PAD) * _Data.VOXEL
+	_prof("S4 biome_grid+height")
 
 
 	# ── 3b. River override ────────────────────────────────────────────────────
@@ -860,23 +926,21 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if adjacent_to_lake:
 					height_grid[ivx][ivz] = _Data.WATER_Y - 0.1
 					biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+	_prof("S5 river")
 
 
 	var road_grid: PackedByteArray
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		road_grid.resize(cols * cols)
+		road_grid.fill(0)
+		_Road.paint_road_grid(road_grid, cols, size, cx, cz)
 		for ivx in range(cols):
 			for ivz in range(cols):
-				var bg: int = biome_grid[ivx][ivz]
-				if bg == _Data.TileType.OCEAN_DEEP:
+				if biome_grid[ivx][ivz] == _Data.TileType.OCEAN_DEEP:
 					road_grid[ivx * cols + ivz] = 0
-					continue
-				if river_flag[ivx * cols + ivz] == 1:
+				elif river_flag[ivx * cols + ivz] == 1:
 					road_grid[ivx * cols + ivz] = 0
-				else:
-					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-					road_grid[ivx * cols + ivz] = 1 if _Road.is_on_road(wx, wz) else 0
+	_prof("S6a road_grid")
 
 	# ── 4b. BFS bán kính Chebyshev: nước / đường / đất sa mạc ────────────────
 	# Thay các cửa sổ quét 7×7 lặp lại cho cỏ, cây, môn ngọt bằng tra O(1).
@@ -896,8 +960,11 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 			if biome_grid[vx][vz] == _Data.TileType.DESERT and height_grid[vx][vz] > _Data.WATER_Y:
 				dland[i2] = 0
 	_bfs_chebyshev(wdist, cols)
+	_prof("S6b bfs_water")
 	_bfs_chebyshev(rdist, cols)
+	_prof("S6c bfs_road")
 	_bfs_chebyshev(dland, cols)
+	_prof("S6 road+bfs3x")
 
 
 	# ── 5. Tạo ChunkBlockData từ biome + height ────────────────────────────────
@@ -909,6 +976,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	var ore_hill_info: Dictionary = { "cx": -1, "cz": -1 }
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		ore_hill_info = _Terrain.spawn_ore_hills(bd, biome_grid, height_grid, road_grid, cols, cx, cz, size)
+	_prof("S7 fill_blocks+ore")
 
 	# ── 6. Build terrain mesh từ block data (greedy mesher) ───────────────────
 	# top_ly_hint tính từ height grid — tránh scan lại 69 layer/column trong build
@@ -921,7 +989,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				0, _BlockData.CHUNK_H - 1)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_Terrain.build_terrain_mesh(st, bd, cols, dim_id, top_ly_hint)
+	_Terrain.build_terrain_mesh(st, bd, cols, dim_id, top_ly_hint, true)
+	_prof("S8 terrain_mesh")
 
 
 	# ── 6b. Detail mesh — đường mòn, sỏi cát, hoạ tiết đất ──────────────────
@@ -936,17 +1005,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 			var pos := Vector3(px, h, pz)
 			var is_road: bool = road_grid.size() > 0 and road_grid[vx * cols + vz] != 0
 
-			if is_road and b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND:
-				_Detail.add_trail_detail(st, cx, cz, size, vx, vz, pos, 0.0)
+			# (đã bỏ hoạ tiết: đường mòn add_trail_detail, sỏi/cát rời add_sand_gravel,
+#  gò đất add_dirt_mounds — theo yêu cầu)
 
-			if b == _Data.TileType.SAND and h >= _Data.VOXEL * 0.9:
-				_Detail.add_sand_gravel(st, cx, cz, size, vx, vz, pos, 0.0)
-
-			if b == _Data.TileType.DIRT or b == _Data.TileType.YOUNG_GRASS:
-				_Detail.add_dirt_mounds(st, cx, cz, size, vx, vz, pos, 0.0)
-
-			if not fast_mode and (b == _Data.TileType.GRASS or b == _Data.TileType.DARK_GRASS \
-					or b == _Data.TileType.HIGHLAND_GRASS) and not is_road and h >= _Data.VOXEL * 0.9:
+			if not fast_mode and _Data.is_grass_tile(b) and not is_road and h >= _Data.VOXEL * 0.9:
 				_Grass.add_voxel_grass(vx, vz, pos, grass_xforms, grass_colors, cols, wdist)
 
 	# ── 6d. Quán rượu — bên mép đường tại ngã 3 / ngã tư (không trên đường) ──
@@ -954,6 +1016,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	if not fast_mode and dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		village_data = _Village.compute_village(cx, cz, size, dim_id,
 			biome_grid, height_grid, road_grid, river_flag, cols)
+	_prof("S9 grass+village")
 	var mesh := st.commit()
 	if mesh == null:
 		return { "mesh": null, "water_mesh": null, "biome_grid": biome_grid,
@@ -969,7 +1032,13 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		if has_water: break
 	var mesh_water: ArrayMesh = null
 	if has_water:
-		mesh_water = _build_water_mesh(bd, cols, dim_id, h_vox, half, {}, _gen_water_top_layer())
+		var water_skip := PackedByteArray()
+		water_skip.resize(cols * cols)
+		for wx_ in range(cols):
+			for wz_ in range(cols):
+				water_skip[wx_ * cols + wz_] = 1 if height_grid[wx_][wz_] > _Data.WATER_Y else 0
+		mesh_water = _build_water_mesh(bd, cols, dim_id, h_vox, half, {}, _gen_water_top_layer(), water_skip)
+	_prof("S10 water_mesh")
 
 	# ── 8. Aquatic mesh — hồ (SAND/SILT) + rong, cỏ biển ở biển nông ──────────
 	var mesh_aquatic = null
@@ -1004,23 +1073,22 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					var sea_wz: float = world_oz - half + (float(vz) + 0.5) * _Data.VOXEL
 					_Grass.add_voxel_seagrass(vx, vz, pos2, grass_xforms, grass_colors,
 						cols, _Data.WATER_Y - h, sea_wx, sea_wz)
-				_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
-					b == _Data.TileType.SILT, b, lotus_lights, plant_props, is_river, is_desert_water)
+					_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
+						b == _Data.TileType.SILT, b, lotus_lights, plant_props, is_river, is_desert_water)
 		mesh_aquatic = st_aq.commit()
+	_prof("S11 aquatic+plants")
 
-	# ── 8b. Palm trees — on GRASS/DARK_GRASS land, ≥2 cells from water ─────
+	# ── 8b. Palm trees — on grass land, ≥2 cells from water ─────
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		for vx in range(cols):
 			for vz in range(cols):
-				if biome_grid[vx][vz] != _Data.TileType.GRASS and biome_grid[vx][vz] != _Data.TileType.DARK_GRASS \
-						and biome_grid[vx][vz] != _Data.TileType.YOUNG_GRASS \
-						and biome_grid[vx][vz] != _Data.TileType.HIGHLAND_GRASS:
+				if not _Data.is_grass_tile(biome_grid[vx][vz]):
 					continue
 				var h: float = height_grid[vx][vz]
 				if h <= _Data.WATER_Y:
 					continue
 				var wd: int = wdist[vx * cols + vz]
-				if wd >= 2 and wd <= 3 and randf() < 0.004:
+				if wd >= 2 and wd <= 3 and randf() < 0.005:
 					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
 					# Cấm mọc trên đường đi
@@ -1030,21 +1098,18 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "palm", "pos": Vector3(px, y, pz), "variant": "river"})
 
-	# ── 8c. Cây sồi cổ thụ — đồng cỏ tối (plains) & bờ sông (river), xa nước ≥2 ──
+	# ── 8c. Cây sồi cổ thụ — đồng cỏ, xa nước ≥2 ──────────────────────────
 	for vx in range(cols):
 		for vz in range(cols):
 			var oak_bio: int = biome_grid[vx][vz]
-			if oak_bio != _Data.TileType.DARK_GRASS and oak_bio != _Data.TileType.GRASS \
-					and oak_bio != _Data.TileType.YOUNG_GRASS \
-					and oak_bio != _Data.TileType.HIGHLAND_GRASS:
+			if not _Data.is_grass_tile(oak_bio):
 				continue
 			var h: float = height_grid[vx][vz]
 			if h <= _Data.WATER_Y:
 				continue
 			if wdist[vx * cols + vz] <= 2:
 				continue
-			var chance: float = 0.0035 if (oak_bio == _Data.TileType.DARK_GRASS \
-					or oak_bio == _Data.TileType.HIGHLAND_GRASS) else 0.0012
+			var chance: float = 0.0035 if oak_bio == _Data.TileType.GRASS_DIRT else 0.0012
 			if randf() < chance:
 				var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 				var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
@@ -1052,8 +1117,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if _is_on_road(world_ox + px, world_oz + pz):
 					continue
 				var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
-				var variant := "plains" if (oak_bio == _Data.TileType.DARK_GRASS \
-						or oak_bio == _Data.TileType.HIGHLAND_GRASS) else "river"
+				var variant := "plains"
 				plant_props.append({"type": "oak", "pos": Vector3(px, y, pz), "variant": variant})
 
 	# ── 8e. Cây cà tím dại — SÁT ĐƯỜNG ĐI (cách đường ≤2 ô), KHÔNG mọc trên đường ──
@@ -1061,9 +1125,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		for vx in range(cols):
 			for vz in range(cols):
 				var eg_bio: int = biome_grid[vx][vz]
-				if eg_bio != _Data.TileType.DARK_GRASS and eg_bio != _Data.TileType.GRASS \
-						and eg_bio != _Data.TileType.YOUNG_GRASS \
-						and eg_bio != _Data.TileType.HIGHLAND_GRASS:
+				if not _Data.is_grass_tile(eg_bio):
 					continue
 				var h: float = height_grid[vx][vz]
 				if h <= _Data.WATER_Y:
@@ -1072,8 +1134,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					continue
 				if rdist[vx * cols + vz] > 2:
 					continue
-				var chance: float = 0.0024 if (eg_bio == _Data.TileType.DARK_GRASS \
-						or eg_bio == _Data.TileType.HIGHLAND_GRASS) else 0.0009
+				var chance: float = 0.0024 if eg_bio == _Data.TileType.GRASS_DIRT else 0.0009
 				if randf() < chance:
 					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
@@ -1085,17 +1146,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		for vx in range(cols):
 			for vz in range(cols):
 				var wm_bio: int = biome_grid[vx][vz]
-				if wm_bio != _Data.TileType.DARK_GRASS and wm_bio != _Data.TileType.GRASS \
-						and wm_bio != _Data.TileType.YOUNG_GRASS \
-						and wm_bio != _Data.TileType.HIGHLAND_GRASS:
+				if not _Data.is_grass_tile(wm_bio):
 					continue
 				var h: float = height_grid[vx][vz]
 				if h <= _Data.WATER_Y:
 					continue
 				if wdist[vx * cols + vz] > 2:
 					continue
-				var chance: float = 0.0016 if (wm_bio == _Data.TileType.DARK_GRASS \
-						or wm_bio == _Data.TileType.HIGHLAND_GRASS) else 0.0006
+				var chance: float = 0.0016 if wm_bio == _Data.TileType.GRASS_DIRT else 0.0006
 				if randf() < chance:
 					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
@@ -1107,9 +1165,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		for vx in range(cols):
 			for vz in range(cols):
 				var pk_bio: int = biome_grid[vx][vz]
-				if pk_bio != _Data.TileType.DARK_GRASS and pk_bio != _Data.TileType.GRASS \
-						and pk_bio != _Data.TileType.YOUNG_GRASS \
-						and pk_bio != _Data.TileType.HIGHLAND_GRASS:
+				if not _Data.is_grass_tile(pk_bio):
 					continue
 				var h: float = height_grid[vx][vz]
 				if h <= _Data.WATER_Y:
@@ -1117,8 +1173,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if wdist[vx * cols + vz] <= 3:
 					continue
 				# Bí đỏ hiếm hơn — spawn ít lại (≈40% so với trước)
-				var chance: float = 0.0010 if (pk_bio == _Data.TileType.DARK_GRASS \
-						or pk_bio == _Data.TileType.HIGHLAND_GRASS) else 0.0004
+				var chance: float = 0.0010 if pk_bio == _Data.TileType.GRASS_DIRT else 0.0004
 				if randf() < chance:
 					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
@@ -1130,9 +1185,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		for vx in range(cols):
 			for vz in range(cols):
 				var or_bio: int = biome_grid[vx][vz]
-				if or_bio != _Data.TileType.DARK_GRASS and or_bio != _Data.TileType.GRASS \
-						and or_bio != _Data.TileType.YOUNG_GRASS \
-						and or_bio != _Data.TileType.HIGHLAND_GRASS:
+				if not _Data.is_grass_tile(or_bio):
 					continue
 				var h: float = height_grid[vx][vz]
 				if h <= _Data.WATER_Y:
@@ -1150,9 +1203,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "orange_tree", "pos": Vector3(px, y, pz), "variant": "river"})
 					spawned = true
-				# Trung tâm đồng cỏ tối: xa nước ≥2
-				if not spawned and (or_bio == _Data.TileType.DARK_GRASS \
-						or or_bio == _Data.TileType.HIGHLAND_GRASS) and not near_close and randf() < 0.0016:
+				# Trung tâm đồng cỏ: xa nước ≥2
+				if not spawned and or_bio == _Data.TileType.GRASS_DIRT and not near_close and randf() < 0.0016:
 					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
 					if _is_on_road(world_ox + px, world_oz + pz):
@@ -1165,9 +1217,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		for vx in range(cols):
 			for vz in range(cols):
 				var dt_bio: int = biome_grid[vx][vz]
-				if dt_bio != _Data.TileType.DARK_GRASS and dt_bio != _Data.TileType.GRASS \
-						and dt_bio != _Data.TileType.YOUNG_GRASS \
-						and dt_bio != _Data.TileType.HIGHLAND_GRASS:
+				if not _Data.is_grass_tile(dt_bio):
 					continue
 				var h: float = height_grid[vx][vz]
 				if h <= _Data.WATER_Y:
@@ -1182,21 +1232,26 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "dense_tree", "pos": Vector3(px, y, pz), "variant": "plains"})
 
+	_prof("S12 plant_props")
+
 	# ── 9. Lamp positions ──────────────────────────────────────────────────────
 	var lamp_positions: Array = []
 	if not fast_mode and dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		lamp_positions = _RoadLamp.compute_positions(cx, cz, size, biome_grid, height_grid, cols)
+	_prof("S13a lamps")
 
 
 	# ── 10. Textured block (ore) overlays — bounded scan dưới bề mặt ─────────
-	# Ore không được generation sinh ra (feature chưa kích hoạt) → bỏ hẳn scan
+	# Ore chỉ được sinh qua đồi quặng (spawn_ore_hills). Chunk không có đồi
+	# (ore_hill_info.cx==-1) thì không có block quặng trong bd → bỏ hẳn scan.
 	var ore_meshes: Dictionary[int, ArrayMesh] = {}
-	if not fast_mode and _ORES_GENERATION_ENABLED:
+	if not fast_mode and _ORES_GENERATION_ENABLED and ore_hill_info.get("cx", -1) >= 0:
 		var max_top_ly: int = 0
 		for vx in range(cols):
 			for vz in range(cols):
 				max_top_ly = maxi(max_top_ly, top_ly_hint[vx * cols + vz])
 		ore_meshes = _build_textured_block_meshes(bd, cols, max_top_ly)
+	_prof("S13b ore")
 
 	# ── 10b. Shaped blocks (đá ¼/⅛/phiến) — BỎ SCAN ở generation ────────────
 	# Terrain generation KHÔNG BAO GIỜ ghi shaped block (chỉ check). Shaped block
@@ -1226,6 +1281,18 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if not hit:
 					kept.append(pd)
 			plant_props = kept
+	_prof("S13c tavern")
+
+	# ── Mask bãi đá (STONE_PATCH) — cho test/biết đâu là đá lộ thiên tự nhiên,
+	# không phải đồi quặng (test_ore_hills dùng để loại khi đếm đồi).
+	var stone_patch_mask := PackedByteArray()
+	stone_patch_mask.resize(cols * cols)
+	stone_patch_mask.fill(0)
+	for vx in range(cols):
+		for vz in range(cols):
+			if biome_grid[vx][vz] == _Data.TileType.STONE_PATCH:
+				stone_patch_mask[vx * cols + vz] = 1
+	_prof("S13d stone_mask")
 
 	return {
 		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
@@ -1239,6 +1306,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		"plant_props": plant_props, "has_water": has_water,
 		"has_ores": not ore_meshes.is_empty(),
 		"top_ly_hint": top_ly_hint,
+		"stone_patch_mask": stone_patch_mask,
 		"shaped_mesh": shaped_data["shaped_mesh"],
 		"shaped_pos": shaped_data["shaped_pos"],
 		"shaped_size": shaped_data["shaped_size"],
@@ -1310,6 +1378,30 @@ static func _tavern_aabb(b: Dictionary) -> Array:
 	var top: float = float(b.get("gy", 0.0)) + float(b.get("top_y", 11.5)) + 0.5
 	return [Vector3(c.x - shx, bot, c.z - shz), Vector3(c.x + shx, top, c.z + shz)]
 
+## ── AABB NỘI THẤT (KHẮT): dùng cho fade — chỉ mờ vỏ khi thật sự đứng TRONG
+## nhà (trong phạm vi 4 bức tường). Không dùng để lọc cây, không nhô ra hiên/
+## bậc như _tavern_aabb → hết cảnh "cả khối nhà nhì như nát khi đứng gần".
+static func _tavern_interior_aabb(b: Dictionary) -> Array:
+	var yaw: float = float(b.get("yaw", 0.0))
+	var cx: float = cos(yaw)
+	var sy: float = sin(yaw)
+	var c := Vector3(float(b.get("x", 0.0)), 0.0, float(b.get("z", 0.0)))
+	const LX: float = 5.0   # ±x tường trong (tường ±5.35)
+	const Z0: float = -2.4  # sát mặt sau tường trước
+	const Z1: float = 6.6   # sát mặt trong tường sau
+	var mn := Vector2(INF, INF)
+	var mx := Vector2(-INF, -INF)
+	for lz in [Z0, Z1]:
+		for s in [-1.0, 1.0]:
+			var lx: float = s * LX
+			var wx: float = c.x + lx * cx - lz * sy
+			var wz: float = c.z + lx * sy + lz * cx
+			mn = mn.min(Vector2(wx, wz))
+			mx = mx.max(Vector2(wx, wz))
+	var bot: float = float(b.get("gy", 0.0)) - 0.5
+	var top: float = float(b.get("gy", 0.0)) + float(b.get("top_y", 11.5)) + 0.5
+	return [Vector3(mn.x, bot, mn.y), Vector3(mx.x, top, mx.y)]
+
 ## ── Dựng MultiMesh quán (shell + nội thất) ────────────────────────────────────
 ## shell = vỏ công trình (nhìn thấy từ ngoài, đổ bóng); interior = nội thất.
 ## Trả [shell_mmi, interior_mmi|null]. Shell được gắn group "tavern_shells" +
@@ -1320,7 +1412,7 @@ static func _build_tavern_mesh(vbd: Dictionary) -> Array:
 	shell.material_override = smat
 	var aabbs: Array = []
 	for b in vbd.get("info", {}).get("buildings", []):
-		aabbs.append(_tavern_aabb(b))
+		aabbs.append(_tavern_interior_aabb(b))
 	shell.set_meta("tavern_aabbs", aabbs)
 	shell.set_meta("tavern_opaque", Color(1, 1, 1, 1))
 	shell.add_to_group("tavern_shells")
@@ -1623,7 +1715,8 @@ static func _build_soil_mesh(bd: _BlockData, cols: int, nb_data: Dictionary = {}
 
 ## ── _build_water_mesh: render exposed faces only (skip bottom, correct size) ─
 static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
-		h_vox: float, half: float, nb_data: Dictionary = {}, max_ly: int = -1) -> ArrayMesh:
+		h_vox: float, half: float, nb_data: Dictionary = {}, max_ly: int = -1,
+		skip_mask: PackedByteArray = PackedByteArray()) -> ArrayMesh:
 	const SLAB := _BlockData.SLAB_HEIGHT
 	const Y_MIN := _BlockData.Y_MIN
 	const CHUNK_H := _BlockData.CHUNK_H
@@ -1644,16 +1737,21 @@ static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
 	levs.resize(nc)
 	var stride_x := CHUNK_H * cols
 	var raw := bd._data
-	for y in range(max_ly + 1):
-		var yoff := y * cols
-		for x in range(cols):
-			var bbase := x * stride_x + yoff
-			for z in range(cols):
-				var bid: int = raw[bbase + z]
+	# Cột-major: quét từ max_ly xuống, break ngay khi thấy nước (đỉnh cao nhất).
+	# Cột không nước: bỏ hẳn (không quét đủ CHUNK_H như cũ). Với hồ nhỏ (chunk
+	# 0,0) chỉ ~vài chục cột có nước → cắt mạnh scan.
+	for x in range(cols):
+		var bbase := x * stride_x
+		for z in range(cols):
+			if skip_mask.size() > 0 and skip_mask[x * cols + z] != 0:
+				continue  # cột chắc chắn không nước (height > WATER_Y) — bỏ scan
+			for y in range(max_ly, -1, -1):
+				var bid: int = raw[bbase + y * cols + z]
 				if _is_water_bid(bid):
 					var ti := z * cols + x
 					tops[ti] = y
 					levs[ti] = _water_level_of(bid)
+					break
 
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://blfj1akmwtq41"
-path="res://.godot/imported/block_highland_grass.png-b16877784c6c776830415a6c082e277b.ctex"
+uid="uid://su3wnysiuelt"
+path="res://.godot/imported/block_grass_dirt.png-b19e2ce18d7c70f59aa16b990a3e00d3.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icon_items/block_highland_grass.png"
-dest_files=["res://.godot/imported/block_highland_grass.png-b16877784c6c776830415a6c082e277b.ctex"]
+source_file="res://assets/icon_items/block_grass_dirt.png"
+dest_files=["res://.godot/imported/block_grass_dirt.png-b19e2ce18d7c70f59aa16b990a3e00d3.ctex"]
 
 [params]
 

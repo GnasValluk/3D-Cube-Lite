@@ -1,0 +1,68 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+== test_continents: Lục địa + spawn trên đất ==
+-- 1. Spawn luôn trên đất liền (nhiều seed) --
+PASS | seed 20260805: spawn (0,0) không phải biển
+PASS | seed 20260805: spawn là đất cao 1.0 (GRASS_DIRT/DESERT, được 11)
+PASS | seed 123456789: spawn (0,0) không phải biển
+PASS | seed 123456789: spawn là đất cao 1.0 (GRASS_DIRT/DESERT, được 11)
+PASS | seed 777: spawn (0,0) không phải biển
+PASS | seed 777: spawn là đất cao 1.0 (GRASS_DIRT/DESERT, được 11)
+PASS | seed 20260806: spawn (0,0) không phải biển
+PASS | seed 20260806: spawn là đất cao 1.0 (GRASS_DIRT/DESERT, được 11)
+-- 2. Lục địa mới sau biển (4 hướng, tối đa 3500 block) --
+PASS | seed 20260805: hướng E có biển trong 6000 block
+PASS | seed 20260805: hướng E có lục địa MỚI sau biển
+PASS | seed 20260805: hướng E biển liên tục tối đa 1300 block (≤3500)
+PASS | seed 20260805: hướng S có biển trong 6000 block
+PASS | seed 20260805: hướng S có lục địa MỚI sau biển
+PASS | seed 20260805: hướng S biển liên tục tối đa 1200 block (≤3500)
+PASS | seed 20260805: hướng W có biển trong 6000 block
+PASS | seed 20260805: hướng W có lục địa MỚI sau biển
+PASS | seed 20260805: hướng W biển liên tục tối đa 3100 block (≤3500)
+PASS | seed 20260805: hướng N có biển trong 6000 block
+PASS | seed 20260805: hướng N có lục địa MỚI sau biển
+PASS | seed 20260805: hướng N biển liên tục tối đa 1400 block (≤3500)
+PASS | seed 123456789: hướng E có biển trong 6000 block
+PASS | seed 123456789: hướng E có lục địa MỚI sau biển
+PASS | seed 123456789: hướng E biển liên tục tối đa 1000 block (≤3500)
+PASS | seed 123456789: hướng S có biển trong 6000 block
+PASS | seed 123456789: hướng S có lục địa MỚI sau biển
+PASS | seed 123456789: hướng S biển liên tục tối đa 2200 block (≤3500)
+PASS | seed 123456789: hướng W có biển trong 6000 block
+PASS | seed 123456789: hướng W có lục địa MỚI sau biển
+PASS | seed 123456789: hướng W biển liên tục tối đa 1600 block (≤3500)
+PASS | seed 123456789: hướng N có biển trong 6000 block
+PASS | seed 123456789: hướng N có lục địa MỚI sau biển
+PASS | seed 123456789: hướng N biển liên tục tối đa 1000 block (≤3500)
+PASS | seed 777: hướng E có biển trong 6000 block
+PASS | seed 777: hướng E có lục địa MỚI sau biển
+PASS | seed 777: hướng E biển liên tục tối đa 3200 block (≤3500)
+PASS | seed 777: hướng S có biển trong 6000 block
+PASS | seed 777: hướng S có lục địa MỚI sau biển
+PASS | seed 777: hướng S biển liên tục tối đa 1200 block (≤3500)
+PASS | seed 777: hướng W có biển trong 6000 block
+PASS | seed 777: hướng W có lục địa MỚI sau biển
+PASS | seed 777: hướng W biển liên tục tối đa 1400 block (≤3500)
+PASS | seed 777: hướng N có biển trong 6000 block
+PASS | seed 777: hướng N có lục địa MỚI sau biển
+PASS | seed 777: hướng N biển liên tục tối đa 2300 block (≤3500)
+PASS | seed 20260806: hướng E có biển trong 6000 block
+PASS | seed 20260806: hướng E có lục địa MỚI sau biển
+PASS | seed 20260806: hướng E biển liên tục tối đa 1700 block (≤3500)
+PASS | seed 20260806: hướng S có biển trong 6000 block
+PASS | seed 20260806: hướng S có lục địa MỚI sau biển
+PASS | seed 20260806: hướng S biển liên tục tối đa 2500 block (≤3500)
+PASS | seed 20260806: hướng W có biển trong 6000 block
+PASS | seed 20260806: hướng W có lục địa MỚI sau biển
+PASS | seed 20260806: hướng W biển liên tục tối đa 900 block (≤3500)
+PASS | seed 20260806: hướng N có biển trong 6000 block
+PASS | seed 20260806: hướng N có lục địa MỚI sau biển
+PASS | seed 20260806: hướng N biển liên tục tối đa 1100 block (≤3500)
+-- 3. Pipeline thật khớp mask --
+PASS | chunk (0,0) có biome_grid
+PASS | chunk (0,0): ô spawn (16,16) không phải biển (bias qua pipeline thật)
+PASS | tìm thấy điểm biển ngoài vùng spawn (r<4000)
+PASS | chunk (-11,25) chứa điểm biển tại ô (24,31)
+PASS | ô biển mask = OCEAN_DEEP qua pipeline (được 6)
+TOTAL | PASS | 0 failures

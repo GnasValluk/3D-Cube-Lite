@@ -1,0 +1,20 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+== test_diag_side: mặt bên + mặt dưới block chồng lệch ==
+PASS | chunk sync build xong
+PASS | chunk có terrain mesh
+PASS | tìm thấy cột cao nguyên (top_ly=19 at 6,16)
+PASS | đặt block A (mặt đất)
+PASS | đặt block B chồng lệch +1 x, +1 layer
+PASS | đặt block E chồng lệch +1 z, +1 layer
+PASS | mặt bên +x của block A vẫn còn (không thấy void)
+FAIL | mặt bên +z của block A vẫn còn (hướng chéo khác)
+PASS | mặt bên -x của block B vẫn còn
+FAIL | mặt bên -z của block E vẫn còn
+PASS | mặt dưới block B được vẽ (không nhìn xuyên từ dưới lên)
+PASS | mặt dưới block E được vẽ
+PASS | mặt dưới block A không vẽ (đất đặc bên dưới)
+PASS | đào block B
+PASS | sau đào B: mặt bên +x của block A vẫn còn
+PASS | sau đào B: mặt -x của B biến mất (không còn block)
+TOTAL | FAIL | 2 failures

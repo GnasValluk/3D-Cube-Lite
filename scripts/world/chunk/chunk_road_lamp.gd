@@ -27,7 +27,7 @@ static func compute_positions(cx: int, cz: int, size: int,
 	var placed: Array[Vector2] = []
 	var result: Array = []
 
-	for ci in range(_Road._road_curves.size()):
+	for ci in _Road.gather_curve_indices(min_x, min_z, max_x, max_z):
 		var curve: PackedVector2Array = _Road._road_curves[ci]
 		if curve.size() < 2:
 			continue

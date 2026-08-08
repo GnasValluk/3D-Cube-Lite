@@ -72,6 +72,33 @@ static func _vh_hash(seed_v: int, salt: int) -> int:
 	h = h ^ (h >> 16)
 	return h & 0x7FFFFFFF
 
+## ── Hướng cửa (vector 2D, trục nằm ngang) quay ra — thiên về Z+ và X+ ──────
+## Deterministic theo node (seed h) để ổn định theo chunk. Đã build nhà rồi xoay
+## toàn bộ một lần (theo yaw) nên hướng không làm đảo lộn cấu trúc.
+static func _pick_facing(h: int) -> Vector2:
+	const DIRS := [
+		Vector2(1.0, 0.0),        # +X
+		Vector2(0.7071, 0.7071),  # +X +Z
+		Vector2(0.0, 1.0),        # +Z
+		Vector2(-0.7071, 0.7071), # -X +Z
+		Vector2(-1.0, 0.0),       # -X
+		Vector2(-0.7071, -0.7071),# -X -Z
+		Vector2(0.0, -1.0),       # -Z
+		Vector2(0.7071, -0.7071), # +X -Z
+	]
+	# trọng số: ưu tiên cao cho +X, +Z, +X+Z; thấp cho hướng âm
+	const W := [5, 6, 5, 3, 1, 1, 1, 3]
+	var total: int = 0
+	for w in W:
+		total += w
+	var r: int = _vh_hash(h ^ 0xBEEF, 17) % total
+	var acc: int = 0
+	for i in range(W.size()):
+		acc += W[i]
+		if r < acc:
+			return DIRS[i]
+	return DIRS[0]
+
 ## ── Tìm vị trí đặt quán của 1 node (không phụ thuộc chunk/địa hình) ─────────
 ## Tái hiện ĐÚNG vòng attempt — dùng CHUNG cho cả scan_taverns và _try_tavern
 ## để hai đường quyết định vị trí không bao giờ lệch nhau.
@@ -233,12 +260,9 @@ static func _try_tavern(xforms: Array, colors: Array, ixforms: Array, icolors: A
 	if DEBUG:
 		print("  PLACED center=(%.1f,%.1f) cc=%s" % [center.x, center.y, str(cc)])
 
-	var road_pt: Vector2 = plan.road
-	var toward: Vector2 = road_pt - center
-	if toward.length() < 0.1:
-		toward = Vector2(0, 1)
-	toward = toward.normalized()
-	var yaw: float = atan2(-toward.x, -toward.y)
+	# Hướng cửa: chọn ngẫu nhiên có trọng số, thiên về Z+ và X+ (deterministic theo node)
+	var fwd := _pick_facing(h)
+	var yaw: float = atan2(-fwd.x, -fwd.y)
 	var gy: float = height_grid[cc.x][cc.y] + 0.02
 	_add_tavern(xforms, colors, ixforms, icolors, center, yaw, gy)
 	buildings.append({
@@ -342,12 +366,12 @@ static func _roof(local: Array, ridge_y: float, half_w: float,
 	local.append([Vector3(cx_off, ridge_y + 0.08, z_mid), Vector3(0.5, 0.20, z_len), C_ROOF_HI])
 	local.append([Vector3(cx_off, ridge_y - 0.06, z_mid), Vector3(1.1, 0.14, z_len), C_ROOF_DK])
 
-## ── Cửa + khung cửa (mặt trước) ───────────────────────────────────────────────
+## ── Cửa + khung cửa (mặt trước) — đẩy ra TRƯỚC mặt tường (z←) để không bị che ──
 static func _door(local: Array) -> void:
 	# khung cửa (cánh cửa là mesh động — TavernDoor mở/đóng)
-	local.append([Vector3(-0.88, 1.25, -2.32), Vector3(0.18, 2.2, 0.34), C_TRIM])
-	local.append([Vector3(0.88, 1.25, -2.32), Vector3(0.18, 2.2, 0.34), C_TRIM])
-	local.append([Vector3(0.0, 2.62, -2.32), Vector3(1.9, 0.35, 0.30), C_TRIM])
+	local.append([Vector3(-0.88, 1.25, -2.62), Vector3(0.18, 2.2, 0.34), C_TRIM])
+	local.append([Vector3(0.88, 1.25, -2.62), Vector3(0.18, 2.2, 0.34), C_TRIM])
+	local.append([Vector3(0.0, 2.62, -2.62), Vector3(1.9, 0.35, 0.30), C_TRIM])
 
 ## ── Tường 2 tầng khối chính: nền móng đá + 4 vách mỗi tầng + đai gỗ ngăn ─────
 ## Mặt trước z=-2.52, sau z=6.70, trái/phải x=±5.52. Khối liền, không hở.
@@ -446,8 +470,8 @@ static func _tavern_top(local: Array) -> void:
 	local.append([Vector3(2.2, 9.05, -2.3), Vector3(0.85, 1.1, 0.85), C_STONE_DK])
 	local.append([Vector3(2.2, 10.15, -2.3), Vector3(1.15, 0.22, 1.15), C_STONE])
 	local.append([Vector3(2.2, 10.45, -2.3), Vector3(0.55, 0.30, 0.55), Color(0.28, 0.27, 0.30)])
-	# biển hiệu treo cạnh cửa: khung + chữ "TV" đen trên nền trắng
-	var bx: float = -0.85
+	# biển hiệu treo cạnh cửa: khung + chữ "TV" đen trên nền trắng (TRÁNH đè lên cửa)
+	var bx: float = -1.60
 	local.append([Vector3(bx, 3.1, -2.42), Vector3(0.08, 0.9, 0.08), C_TRIM])
 	local.append([Vector3(bx, 3.1, -2.5), Vector3(0.06, 1.3, 0.06), C_TRIM])
 	local.append([Vector3(bx, 2.5, -2.55), Vector3(1.45, 0.10, 0.10), C_TRIM])
@@ -520,20 +544,10 @@ static func _tavern_extra(local: Array) -> void:
 	# khung ôm cửa chính (architrav) + ô ghi rõ chữ nhà trên lintel
 	local.append([Vector3(0.0, 1.25, -2.44), Vector3(2.3, 2.5, 0.10), C_TRIM_W])
 	local.append([Vector3(0.0, 2.78, -2.46), Vector3(2.6, 0.22, 0.12), C_TRIM])
-	# chớp (shutter) cho cửa sổ trệt + tầng 2 mặt trước
-	for sx in [-3.55, -1.85, 1.85, 3.55]:
-		local.append([Vector3(sx, 1.55, -2.44), Vector3(0.18, 1.05, 0.10), C_TRIM_W])
-	for sx in [-3.4, -1.8, 1.8, 3.4]:
-		local.append([Vector3(sx, 1.55, -2.44), Vector3(0.18, 1.05, 0.10), C_TRIM_W])
-	for sx2 in [-3.4, -1.8, 1.8, 3.4]:
-		local.append([Vector3(sx2, 4.55, -2.44), Vector3(0.18, 0.98, 0.10), C_TRIM_W])
-	# tán (valance) nhỏ trên cửa sổ tầng 2
-	for sx2 in [-2.6, 0.0, 2.6]:
-		local.append([Vector3(sx2, 5.22, -2.48), Vector3(1.1, 0.10, 0.18), C_TRIM])
-	# nóc mái: đinh nhọn (finial) 2 đầu hồi + dải lợp viền
-	for px in [-6.95, 6.95]:
-		local.append([Vector3(px, 9.35, 2.1), Vector3(0.30, 0.45, 0.30), C_ROOF_HI])
-		local.append([Vector3(px, 9.68, 2.1), Vector3(0.14, 0.34, 0.14), C_TRIM])
+	# nóc mái: đinh nhọn (finial) 2 đầu hồi — đỉnh mái trên sống nóc, cả 2 đầu trước/sau
+	for pz in [-2.45, 6.60]:
+		local.append([Vector3(0.0, 9.42, pz), Vector3(0.30, 0.40, 0.30), C_ROOF_HI])
+		local.append([Vector3(0.0, 9.76, pz), Vector3(0.14, 0.34, 0.14), C_TRIM])
 	# dây thường xuân leo trên mặt trước
 	for vy in [0.8, 1.6, 2.4]:
 		local.append([Vector3(-4.9, vy, -2.38), Vector3(0.16, 0.20, 0.30), C_LEAF_B])
@@ -554,8 +568,6 @@ static func _tavern_extra(local: Array) -> void:
 ## ── Chi tiết: mành cửa + chậu hoa cửa trệt, đèn lồng cạnh cửa ────────────────
 static func _tavern_detail(local: Array) -> void:
 	for x in [-2.7, 2.7]:
-		local.append([Vector3(x - 0.59, 1.55, -2.48), Vector3(0.13, 0.95, 0.10), C_TRIM_W])
-		local.append([Vector3(x + 0.59, 1.55, -2.48), Vector3(0.13, 0.95, 0.10), C_TRIM_W])
 		# chậu hoa
 		local.append([Vector3(x, 0.78, -2.40), Vector3(1.05, 0.22, 0.30), C_DECK_DK])
 		local.append([Vector3(x, 0.94, -2.40), Vector3(0.95, 0.16, 0.24), C_LEAF_A])

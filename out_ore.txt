@@ -1,0 +1,25 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+PASS | gần spawn: 0 quặng trong 25 chunk (got 0)
+PASS | chunk (-3, 4): đồi 7 block (4~12)
+PASS | chunk (-3, 6): đồi 6 block (4~12)
+PASS | chunk (-5, 6): đồi 9 block (4~12)
+PASS | chunk (-6, 5): đồi 6 block (4~12)
+PASS | chunk (-7, 6): đồi 8 block (4~12)
+PASS | chunk (0, 5): đồi 6 block (4~12)
+PASS | chunk (-2, 7): đồi 6 block (4~12)
+PASS | chunk (4, 8): đồi 6 block (4~12)
+PASS | có ≥2 chunk xa có đồi (thực tế 8)
+PASS | có ≥1 đồi ở đồng bằng (thực tế 4)
+PASS | đồng bằng: không quặng ngoài than/sắt (vi phạm=0)
+PASS | đồng bằng: có quặng trong đồi (got 12)
+PASS | đồng bằng: sắt hiếm ≤30% quặng (1/12)
+PASS | có ≥1 đồi không-đồng-bằng có quặng khác than (got 4)
+PASS | hint == fullscan ở mọi chunk xa (mismatch=0)
+PASS | mọi quặng thuộc than/sắt/đồng/nhôm (bad=0)
+PASS | mọi quặng lộ trên mặt đồi (buried=0)
+PASS | tổng quặng trong đồi ≥ 2 (got 19)
+PASS | plains chance (14%) < thường (28%)
+PASS | compute 2 lần cùng chunk → block data giống hệt
+PASS | hint giống hệt giữa 2 lần compute
+TOTAL | PASS | 0 failures
