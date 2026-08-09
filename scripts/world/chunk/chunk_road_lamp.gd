@@ -60,9 +60,11 @@ static func compute_positions(cx: int, cz: int, size: int,
 						next_dist += LAMP_SPACING
 						continue
 
+					var vx: int = clampi(int((lx - min_x) / _Data.VOXEL), 0, cols - 1)
+					var vz: int = clampi(int((lz - min_z) / _Data.VOXEL), 0, cols - 1)
+					var lamp_y: float = height_grid[vx][vz] if height_grid.size() > 0 else 1.0
+
 					if cols > 0 and biome_grid.size() > 0:
-						var vx: int = clampi(int((lx - min_x) / _Data.VOXEL), 0, cols - 1)
-						var vz: int = clampi(int((lz - min_z) / _Data.VOXEL), 0, cols - 1)
 						var biome: int = biome_grid[vx][vz]
 						var h: float = height_grid[vx][vz] if height_grid.size() > 0 else 1.0
 						var skip: bool = false
@@ -100,6 +102,7 @@ static func compute_positions(cx: int, cz: int, size: int,
 						result.append({
 							"x": lx - cx_world,
 							"z": lz - cz_world,
+							"y": lamp_y,
 							"dx": seg_dir.x,
 							"dz": seg_dir.y
 						})
@@ -116,7 +119,7 @@ static func spawn_from_data(parent: Node, positions: Array) -> void:
 		var lamp: Node3D = _WoodLamp.new()
 		lamp.set_meta("road_dir_x", data["dx"])
 		lamp.set_meta("road_dir_y", data["dz"])
-		lamp.position = Vector3(data["x"], 1.0, data["z"])
+		lamp.position = Vector3(data["x"], data.get("y", 1.0), data["z"])
 		parent.add_child(lamp)
 		count += 1
 		if count >= PER_FRAME:

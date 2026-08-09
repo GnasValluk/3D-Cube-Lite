@@ -179,6 +179,29 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_patch_stone.fractal_lacunarity = 2.0
 	n_patch_stone.fractal_gain = 0.5
 
+	## n_patch_dirt: BÃI ĐẤT rộng ở đồng bằng — tần số RẤT thấp → vùng đất
+	## đất thổ lớn (hàng chục ô), bên trong trộn nhiều loại đất theo patch_var.
+	## Thay đốm dirt nhỏ tần cao (patch2 0.07) nhìn "kích thước quá bé".
+	var n_patch_dirt := FastNoiseLite.new()
+	n_patch_dirt.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_patch_dirt.seed = base_seed + 77777
+	n_patch_dirt.frequency = 0.012
+	n_patch_dirt.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_patch_dirt.fractal_octaves = 3
+	n_patch_dirt.fractal_lacunarity = 2.0
+	n_patch_dirt.fractal_gain = 0.4
+
+	## n_mountain: MASK vùng NÚI vừa (núi đôi / dải núi) — tần số RẤT thấp → cụm
+	## núi rộng, đắp cao 4..9 block so với đồi thường, tạo ranh núi mềm.
+	var n_mountain := FastNoiseLite.new()
+	n_mountain.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_mountain.seed = base_seed + 77778
+	n_mountain.frequency = 0.004
+	n_mountain.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_mountain.fractal_octaves = 3
+	n_mountain.fractal_lacunarity = 2.0
+	n_mountain.fractal_gain = 0.5
+
 	## n_basin: địa hình VÙNG TRŨNG — lòng chảo hạ thấp cục bộ trong đất liền
 	## (dùng chung công thức địa hình, chỉ can thiệp cao độ trước khi biome vẽ).
 	var n_basin := FastNoiseLite.new()
@@ -198,8 +221,8 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 		"highland": n_highland, "highland_terr": n_highland_terr,
 		"patch_var": n_patch_var,
 		"patch2": n_patch2,
-		"patch_stone": n_patch_stone,
-		"basin": n_basin }
+		"patch_stone": n_patch_stone, "patch_dirt": n_patch_dirt,
+		"basin": n_basin, "mountain": n_mountain }
 	_noise_cache[dim_id] = result
 	return result
 

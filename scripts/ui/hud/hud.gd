@@ -67,6 +67,7 @@ var _debug_ts_label: Label
 var _debug_hour_slider: HSlider
 var _debug_speed_slider: HSlider
 var _debug_weather_btn: Button
+var _debug_hint_btn: Button
 var _time_label: Label
 var _coords_label: Label
 var _temperature_label: Label  # hiển thị nhiệt độ góc phải
@@ -883,8 +884,8 @@ func _setup_debug_menu() -> void:
 	_debug_panel.add_theme_stylebox_override("panel", bg)
 
 	var vp := get_viewport().get_visible_rect().size
-	_debug_panel.position = Vector2(vp.x * 0.5 - 228, vp.y * 0.5 - 262)
-	_debug_panel.size = Vector2(455, 524)
+	_debug_panel.position = Vector2(vp.x * 0.5 - 228, vp.y * 0.5 - 296)
+	_debug_panel.size = Vector2(455, 590)
 
 	var title := Label.new()
 	title.position = Vector2(17, 11)
@@ -1032,7 +1033,49 @@ func _setup_debug_menu() -> void:
 	tp_tavern_btn.pressed.connect(_on_teleport_tavern)
 	_debug_panel.add_child(tp_tavern_btn)
 
+	var tp_mountain_btn := Button.new()
+	tp_mountain_btn.position = Vector2(234, y - 2)
+	tp_mountain_btn.size = Vector2(202, 34)
+	tp_mountain_btn.add_theme_font_size_override("font_size", 20)
+	tp_mountain_btn.text = "⛰️ Núi (gần nhất)"
+	tp_mountain_btn.pressed.connect(_on_teleport_mountain)
+	_debug_panel.add_child(tp_mountain_btn)
+
+	y += 34
+
+	# ── Bật/tắt info hint (góc trái trên: sinh vật gần nhất + block mục tiêu) ──
+	y += 47
+	var hint_lbl := Label.new()
+	hint_lbl.position = Vector2(17, y)
+	hint_lbl.size = Vector2(424, 26)
+	hint_lbl.add_theme_font_size_override("font_size", 20)
+	hint_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.85))
+	hint_lbl.text = "Info Hint:"
+	_debug_panel.add_child(hint_lbl)
+
+	_debug_hint_btn = Button.new()
+	_debug_hint_btn.toggle_mode = true
+	_debug_hint_btn.position = Vector2(126, y - 2)
+	_debug_hint_btn.size = Vector2(168, 34)
+	_debug_hint_btn.add_theme_font_size_override("font_size", 20)
+	_debug_hint_btn.toggled.connect(_on_debug_hint_toggled)
+	_debug_panel.add_child(_debug_hint_btn)
+
 	add_child(_debug_panel)
+
+func _on_debug_hint_toggled(pressed: bool) -> void:
+	if _nearest_hint and _nearest_hint.has_method("set_enabled"):
+		_nearest_hint.set_enabled(pressed)
+	_refresh_debug_hint_btn()
+
+func _refresh_debug_hint_btn() -> void:
+	if _debug_hint_btn == null:
+		return
+	var on := false
+	if _nearest_hint:
+		on = bool(_nearest_hint.hint_enabled)
+	_debug_hint_btn.button_pressed = on
+	_debug_hint_btn.text = "ON" if on else "OFF"
 
 func _toggle_debug() -> void:
 	_debug_open = _Debug.toggle_debug(_debug_open, _debug_panel)
@@ -1161,7 +1204,7 @@ func _on_teleport_tavern() -> void:
 	if toward.length() < 0.1:
 		toward = Vector2(0, 1)
 	toward = toward.normalized()
-	var land := Vector2(bx, bz) + toward * 8.0
+	var land := WorldChunk.tavern_landing_point(bx, bz, toward)
 	# Build chunk chứa điểm hạ cánh đồng bộ → lấy đúng cao độ, không thả từ cao.
 	WorldChunk.ensure_chunk_built(land.x, land.y)
 	var gy: float = WorldChunk.sample_ground_height(land.x, land.y)
@@ -1170,6 +1213,27 @@ func _on_teleport_tavern() -> void:
 	player.global_position = Vector3(land.x, gy + 3.0, land.y)
 	var best_d2: float = origin.distance_squared_to(Vector2(bx, bz))
 	player._scroll_inventory_message("Teleport → 🍺 Quán Rượu (cách %.0fm)" % sqrt(best_d2))
+
+## Teleport tới vùng NÚI CAO gần nhất (mountain noise), hạ cánh đúng cao độ.
+func _on_teleport_mountain() -> void:
+	var player := _find_player_character()
+	if player == null:
+		return
+	var origin: Vector2 = Vector2(player.global_position.x, player.global_position.z)
+	var hit: Dictionary = WorldChunk.find_mountain(origin.x, origin.y)
+	if not hit.get("ok", false):
+		player._scroll_inventory_message("Không tìm thấy núi trong bán kính 15km!")
+		return
+	var mx: float = float(hit["x"])
+	var mz: float = float(hit["z"])
+	WorldChunk.ensure_chunk_built(mx, mz)
+	var gy: float = WorldChunk.sample_ground_height(mx, mz)
+	var spawn_y: float = 5.0
+	if gy != -INF and gy > 0.5:
+		spawn_y = gy + 8.0  # thả từ trên đỉnh xuống (núi cao 4~12 block)
+	player.global_position = Vector3(mx, spawn_y, mz)
+	player._scroll_inventory_message("Teleport → ⛰️ Núi (cách %.0fm)" % (
+		Vector2(player.global_position.x, player.global_position.z).distance_to(origin)))
 
 ## Trả về tên biome tại world pos — dùng đúng logic giống compute_chunk
 func _get_biome_name_at(wx: float, wz: float) -> String:
@@ -1205,6 +1269,7 @@ func _update_debug_menu() -> void:
 	if not _debug_open:
 		return
 	_Debug.update_debug_menu(_debug_ts_label, _debug_hour_slider, _debug_speed_slider, _debug_weather_btn)
+	_refresh_debug_hint_btn()
 
 func _on_portal_click() -> void:
 	_load_state = LOAD_LOADING

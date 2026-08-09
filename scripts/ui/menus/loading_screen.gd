@@ -10,13 +10,13 @@ const VOXEL: float = 10.0
 const NUM_VOX: int = 24
 const TIPS: Array[String] = [
 	"TIP_BUILD_SHELTER", "TIP_CRAFT_TOOLS", "TIP_FIND_FOOD",
-	"TIP_EXPLORE_CAVES", "TIP_FISHING", "TIP_FARMING",
+	"TIP_MINE_ORES", "TIP_FISHING", "TIP_FARMING",
 ]
 const TIP_FALLBACK: Dictionary = {
 	"TIP_BUILD_SHELTER": "Build a shelter before nightfall!",
 	"TIP_CRAFT_TOOLS": "Craft better tools to mine faster.",
 	"TIP_FIND_FOOD": "Hungry? Fish or farm to stay fed.",
-	"TIP_EXPLORE_CAVES": "Caves hold rare ores — but danger too.",
+	"TIP_MINE_ORES": "Mountain tops and far orebeds hide rare ores.",
 	"TIP_FISHING": "Cast your line near water to catch fish.",
 	"TIP_FARMING": "Plant seeds near water for steady food.",
 }

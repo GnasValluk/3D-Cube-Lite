@@ -1,7 +1,9 @@
 ## ui/hud/nearest_creature_hint.gd
-## Helper UI: hiển thị thông tin sinh vật GẦN NHẤT với người chơi — mob HOẶC
-## cây/rau (plant). Panel nhỏ nằm giữa màn hình dưới tâm ngắm, tự ẩn khi không
-## có gì trong bán kính. Quét chậm (throttle) để không tốn CPU mỗi frame.
+## Helper UI: hiển thị thông tin lượt ngắm hiện tại của người chơi. Ưu tiên 1:
+## đang cầm công cụ khai thác (cuốc/cúp/cua/xẻng/rìu) nhìn vào block → hiện tên
+## block + độ cứng + công cụ phù hợp. Ưu tiên 2: sinh vật/cây gần nhất. Panel
+## nằm GÓC TRÁI TRÊN, có cờ bật/tắt riêng (tắt mặc định vì mang tính gợi ý).
+## Quét chậm (throttle) để không tốn CPU mỗi frame.
 
 extends CanvasLayer
 class_name NearestCreatureHint
@@ -10,19 +12,32 @@ const MAX_RADIUS: float = 12.0
 const PRUNE_PAD: float = 14.0
 const UPDATE_INTERVAL: float = 0.2
 
-const BG_PANEL := Color(0.10, 0.07, 0.18, 0.74)
+const BG_PANEL := Color(0.10, 0.07, 0.18, 0.84)
 const TEXT_MAIN := Color(0.95, 0.92, 1.0)
 const TEXT_DIM := Color(0.62, 0.58, 0.80)
 const COL_MOB := Color(0.95, 0.42, 0.36)
 const COL_PLANT := Color(0.42, 0.72, 0.30)
+const COL_BLOCK := Color(0.35, 0.72, 0.95)
+
+const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 
 ## Callable trả về Node3D của người chơi (do HUD gán).
 var player_getter: Callable
+
+## Cờ bật/tắt panel — mặc định TẮT (ẩn), HUD có nút bật/tắt trong menu debug.
+var hint_enabled: bool = false
 
 var _timer: float = 0.0
 var _panel: PanelContainer
 var _name_lbl: Label
 var _info_lbl: Label
+
+const MINE_TOOL_IDS: Array[String] = ["hoe", "cuoc", "pickaxe", "shovel", "axe"]
+
+func set_enabled(v: bool) -> void:
+	hint_enabled = v
+	if not v:
+		_panel.visible = false
 
 func _ready() -> void:
 	_build_ui()
@@ -55,6 +70,9 @@ func _build_ui() -> void:
 	add_child(_panel)
 
 func _process(delta: float) -> void:
+	if not hint_enabled:
+		_panel.visible = false
+		return
 	_timer -= delta
 	if _timer > 0.0:
 		return
@@ -75,6 +93,15 @@ func _update_hint() -> void:
 		_panel.visible = false
 		return
 	var p: Vector3 = player.global_position
+	# Ưu tiên 1: đang cầm công cụ khai thác + ngắm vào block → info block target
+	var binfo := _block_target_info(player)
+	if not binfo.is_empty():
+		_panel.visible = true
+		_name_lbl.text = binfo["label"]
+		_name_lbl.add_theme_color_override("font_color", COL_BLOCK)
+		_info_lbl.text = binfo["info"]
+		_move_to_top_left()
+		return
 	var best := _scan(tree.current_scene, p, player)
 	if best.is_empty():
 		_panel.visible = false
@@ -83,9 +110,57 @@ func _update_hint() -> void:
 	_name_lbl.text = best["label"]
 	_name_lbl.add_theme_color_override("font_color", best["color"])
 	_info_lbl.text = best["info"]
-	var vp: Vector2 = get_viewport().get_visible_rect().size
+	_move_to_top_left()
+
+## Đặt panel ở GÓC TRÁI TRÊN màn hình (không theo tâm ngắm nữa).
+func _move_to_top_left() -> void:
 	_panel.size = Vector2.ZERO
-	_panel.position = Vector2(vp.x * 0.5 - _panel.size.x * 0.5, vp.y * 0.5 + 46)
+	_panel.position = Vector2(12, 12)
+
+## Info block đang ngắm khi cầm công cụ khai thác. Trả {} nếu không có.
+func _block_target_info(player: Node) -> Dictionary:
+	if not (player is PlayerCharacter):
+		return {}
+	var pc := player as PlayerCharacter
+	var wep: ItemDef = pc.equipped_weapon
+	if wep == null or wep.id not in MINE_TOOL_IDS:
+		return {}
+	if not pc._has_target:
+		return {}
+	var owm := pc._open_world_manager()
+	if owm == null or not owm.has_method("get_block"):
+		return {}
+	var bid: int = owm.get_block(pc._target_block.x, pc._target_block.y, pc._target_block.z)
+	if bid == _Data.BlockID.AIR or _Data.is_water(bid):
+		return {}
+	var tool_hint: String
+	if _Data.is_pickaxable(bid):
+		tool_hint = tr("BLOCK_TARGET_TOOLSTONE")
+	elif _Data.is_axable(bid):
+		tool_hint = tr("BLOCK_TARGET_TOOLWOOD")
+	elif _Data.is_shovelable(bid):
+		tool_hint = tr("BLOCK_TARGET_TOOLSOIL")
+	elif _Data.is_tillable(bid):
+		tool_hint = tr("BLOCK_TARGET_TOOLTILL")
+	else:
+		tool_hint = ""
+	var info := "X%d Y%d Z%d  |  %s" % [
+		int(pc._target_block.x), int(pc._target_block.y), int(pc._target_block.z),
+		tool_hint if tool_hint != "" else tr("BLOCK_TARGET_NO_TOOL")]
+	return {
+		"label": "%s · %s" % [tr("BLOCK_TARGET_LABEL"), _block_display_name(bid)],
+		"color": COL_BLOCK,
+		"info": info,
+	}
+
+func _block_display_name(bid: int) -> String:
+	var item_id: String = _Data.BLOCK_TO_ITEM.get(bid, "")
+	if item_id == "":
+		return "Block #%d" % bid
+	var def := ItemDatabase.items_db.get(item_id) as ItemDef
+	if def:
+		return def.name
+	return item_id
 
 func _scan(root: Node, p: Vector3, player: Node) -> Dictionary:
 	var best: Dictionary = {}

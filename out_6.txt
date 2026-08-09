@@ -1,7 +1,0 @@
-Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
-
-== test_tavern_race: quán ổn định khi build song song ==
-baseline sẵn sàng (130 chunk)
-  worker xforms khớp baseline: 130/130
-PASS | worker vs baseline đồng nhất (0 mismatches)
-TOTAL | PASS | 0 failures

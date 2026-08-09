@@ -314,7 +314,7 @@ static func _emit_boxes(xforms: Array, colors: Array, local: Array,
 		var pos: Vector3 = item[0]
 		var sz: Vector3 = item[1]
 		var col: Color = item[2]
-		xforms.append(Transform3D(rot.scaled(sz), base + rot * pos))
+		xforms.append(Transform3D(rot * Basis().scaled(sz), base + rot * pos))
 		colors.append(col)
 
 ## ── Thanh vạch gạch (bước từng khối) giữa 2 điểm trong mặt phẳng ──────────────
@@ -656,8 +656,8 @@ static func _add_tavern(xforms: Array, colors: Array, ixforms: Array, icolors: A
 	var rot := Basis(Vector3.UP, yaw)
 	var base := Vector3(at.x, gy, at.y)
 	for item in _tavern_local():
-		xforms.append(Transform3D(rot.scaled(item[1]), base + rot * item[0]))
+		xforms.append(Transform3D(rot * Basis().scaled(item[1]), base + rot * item[0]))
 		colors.append(item[2])
 	for item in _tavern_interior_local():
-		ixforms.append(Transform3D(rot.scaled(item[1]), base + rot * item[0]))
+		ixforms.append(Transform3D(rot * Basis().scaled(item[1]), base + rot * item[0]))
 		icolors.append(item[2])

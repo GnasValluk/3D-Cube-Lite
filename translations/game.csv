@@ -263,6 +263,12 @@ CREATURE_STAGE_SPROUT,Sprout,Mầm
 CREATURE_STAGE_YOUNG,Young,Non
 CREATURE_STAGE_MATURE,Mature,Trưởng thành
 CREATURE_STAGE_RIPE,Ripe,Chín
+BLOCK_TARGET_LABEL,Target Block,Block Mục Tiêu
+BLOCK_TARGET_TOOLSTONE,⛏️ Pickaxe,⛏️ Cúp
+BLOCK_TARGET_TOOLWOOD,🪓 Axe,🪓 Rìu
+BLOCK_TARGET_TOOLSOIL,🫏 Shovel,🫏 Xẻng
+BLOCK_TARGET_TOOLTILL,🪢 Hoe,🪢 Cuốc
+BLOCK_TARGET_NO_TOOL,Pickaxe not available,Không có công cụ phù hợp
 PLANT_OAK,Oak Tree,Cây sồi
 PLANT_DENSE,Dense Tree,Cây rừng thẫm
 PLANT_ORANGE,Orange Tree,Cây cam

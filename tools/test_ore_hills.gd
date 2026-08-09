@@ -53,15 +53,20 @@ func _bd_from(data: Dictionary):
 	bd.from_bytes(data["block_data_bytes"], COLS, COLS)
 	return bd
 
-## Đếm block đồi quặng trong chunk: solid nằm trên block nền tự nhiên,
-## bỏ qua cột dưới nước (rạn STONE) và cột bãi đá (STONE_PATCH — đá lộ thiên
+## Đếm block đồng quặng trong chunk: solid nằm trên block nền tự nhiên,
+## bỏ qua cột dưới nước (rạn STONE), cột bãi đá (STONE_PATCH — đá lộ thiên
 ## tự nhiên ở đồng bằng, không phải đồi quặng).
-func _hill_blocks(bd, mask: PackedByteArray = PackedByteArray()) -> int:
+func _hill_blocks(bd, masks: Array = []) -> int:
 	var count := 0
 	for x in range(COLS):
 		for z in range(COLS):
-			if mask.size() > 0 and mask[x * COLS + z] != 0:
-				continue  # bãi đá: đá tự nhiên, không tính là đồi quặng
+			var skip := false
+			for m in masks:
+				if m.size() > 0 and m[x * COLS + z] != 0:
+					skip = true
+					break
+			if skip:
+				continue
 			var top_solid := -1
 			for ly in range(_BD.CHUNK_H - 1, -1, -1):
 				var b: int = bd.get_block(x, ly, z)
@@ -117,19 +122,34 @@ func _ready() -> void:
 	WorldSeed.seed_value = 20260805
 	seed(20260805)
 
-	# ── 1. Gần spawn (|dx|,|dz| ≤ 2 → dist ≤ 90.5 < 100): không quặng ──────
+	# ── 1. Gần spawn: không quặng nào nằm trong ORE_HILL_MIN_DIST (=100) ──
+	# Quét cửa sổ ±3 chunk (đủ phủ bán kính 100): quặng trên đỉnh núi đá
+	# (mountain STONE_PATCH) chỉ xuất hiện ở cột cách spawn ≥ 100 (seen qua
+	# _stone_patch_top), nên phải so theo từng cột theo bán kính thật.
 	var near_ore := 0
-	for dx in range(-2, 3):
-		for dz in range(-2, 3):
+	for dx in range(-3, 4):
+		for dz in range(-3, 4):
 			var data := _W.compute_chunk(dx, dz, SIZE, RW)
 			var bd = _bd_from(data)
-			near_ore += _ore_stats(bd)[0]
-	_check(near_ore == 0, "gần spawn: 0 quặng trong %d chunk (got %d)" % [25, near_ore])
+			for x in range(COLS):
+				for z in range(COLS):
+					var wx: float = float(dx * SIZE + x)
+					var wz: float = float(dz * SIZE + z)
+					if sqrt(wx * wx + wz * wz) >= 100.0:
+						continue  # ngoài vùng an toàn spawn
+					for ly in range(_BD.CHUNK_H - 1, -1, -1):
+						var b: int = bd.get_block(x, ly, z)
+						if b == _D.BlockID.AIR or _D.is_water(b):
+							break
+						if b >= _D.BlockID.COPPER_ORE and b <= _D.BlockID.COAL_ORE and _D.is_pickaxable(b):
+							near_ore += 1
+						break
+	_check(near_ore == 0, "gần spawn: 0 quặng trong bán kính %d (got %d)" % [100, near_ore])
 
 	# ── 2. Chunk xa spawn ──────────────────────────────────────────────────
 	# Danh sách ghim theo seed 20260805: đồng bằng (GRASS_DIRT) + không-đồng-bằng
 	var far_coords := [
-		Vector2i(-3, 4), Vector2i(-3, 6), Vector2i(-5, 6), Vector2i(-6, 5),
+		Vector2i(-3, 4), Vector2i(-3, 7), Vector2i(-5, 6), Vector2i(-6, 5),
 		Vector2i(-7, 6), Vector2i(0, 5), Vector2i(-5, -2), Vector2i(-2, 7),
 		Vector2i(4, 8), Vector2i(22, -9), Vector2i(31, 20), Vector2i(8, -4),
 		Vector2i(12, -8), Vector2i(10, 3), Vector2i(-9, 5), Vector2i(9, 9),
@@ -147,12 +167,28 @@ func _ready() -> void:
 	var bad_type := 0
 	var buried := 0
 	var hint_mismatch := 0
+	var surface_ore_missing := 0  # quặng lộ mặt (núi/đồng) nhưng thiếu overlay mesh
+	var surface_ore_total := 0  # tổng block quặng lộ mặt
 	for c in far_coords:
 		var data := _W.compute_chunk(c.x, c.y, SIZE, RW)
 		var bd = _bd_from(data)
 		if not _hint_matches(bd, data["top_ly_hint"]):
 			hint_mismatch += 1
-		var hill := _hill_blocks(bd, data.get("stone_patch_mask", PackedByteArray()))
+		# Mọi quặng LỘ MẶT (layer == top_ly_hint) phải có textured overlay mesh,
+		# kể cả khi chunk không có đồi (đỉnh núi STONE_PATCH sinh quặng trực tiếp).
+		for x in range(COLS):
+			for z in range(COLS):
+				var ly: int = data["top_ly_hint"][x * COLS + z]
+				if ly < 0:
+					continue
+				var b: int = bd.get_block(x, ly, z)
+				if b >= _D.BlockID.COPPER_ORE and b <= _D.BlockID.COAL_ORE and _D.is_pickaxable(b):
+					surface_ore_total += 1
+					if not (data["textured_block_meshes"] as Dictionary).has(b):
+						surface_ore_missing += 1
+		var hill := _hill_blocks(bd, [
+			data.get("stone_patch_mask", PackedByteArray()),
+		])
 		var stats := _ore_stats(bd)
 		if hill > 0:
 			hills_found += 1
@@ -216,6 +252,8 @@ func _ready() -> void:
 	_check(hint_mismatch == 0, "hint == fullscan ở mọi chunk xa (mismatch=%d)" % hint_mismatch)
 	_check(bad_type == 0, "mọi quặng thuộc than/sắt/đồng/nhôm (bad=%d)" % bad_type)
 	_check(buried == 0, "mọi quặng lộ trên mặt đồi (buried=%d)" % buried)
+	_check(surface_ore_missing == 0,
+		"quặng lộ mặt luôn có texture overlay (missing=%d/%d)" % [surface_ore_missing, surface_ore_total])
 	_check(total_ore_blocks >= 2, "tổng quặng trong đồi ≥ 2 (got %d)" % total_ore_blocks)
 	# ── Đồng bằng tỷ lệ thấp hơn — kiểm tra qua hằng số ─────────────────────
 	_check(_T.ORE_HILL_PLAINS_CHANCE < _T.ORE_HILL_CHANCE,

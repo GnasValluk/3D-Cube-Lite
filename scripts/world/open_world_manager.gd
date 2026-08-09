@@ -7,6 +7,8 @@ const PRELOAD_RADIUS: int = 3
 const MAX_LOADING_PER_FRAME: int = 1
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
+const _BlockData = preload("res://scripts/world/chunk/chunk_block_data.gd")
+const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 
 @export var dimension_id: int = _Dim.DimensionID.TWILIGHT
 
@@ -23,6 +25,9 @@ var _initial_generated: bool = false
 var _loading_ready: bool = false
 var _total_initial: int = 0
 var _loaded_initial: int = 0
+
+## ── Fade dưới lòng đất (x-ray) ─────────────────────────────────────────────
+var _fade_active: bool = false
 
 signal initial_chunks_ready
 
@@ -76,6 +81,30 @@ func _find_player() -> void:
 	else:
 		_player = get_node_or_null("Player")
 
+## ── X-ray khi xuống hang: kiểm tra player có "mái che" (solid phía trên) không
+## Ngưỡng: tìm block solid trong 2..12 lớp trên đầu. Có → đang dưới lòng đất →
+## bật fade cho mọi terrain chunk quanh (theo khoảng cách ngang trong shader).
+func _update_underground_fade(ppos: Vector3) -> void:
+	var chunk := get_chunk_at(ppos.x, ppos.z)
+	var underground := false
+	if chunk != null and chunk.block_data != null:
+		var blk := chunk.world_to_local_block(ppos.x, ppos.y, ppos.z)
+		for ly in range(blk.y + 2, blk.y + 12):
+			var bid: int = chunk.block_data.get_block(blk.x, ly, blk.z)
+			if bid != 0 and _Data.is_solid(bid):
+				underground = true
+				break
+	if underground != _fade_active:
+		_fade_active = underground
+		for key in _chunks:
+			_chunks[key].set_terrain_fade(underground)
+		for key in _loading.keys():
+			_loading[key].set_terrain_fade(underground)
+	if _fade_active:
+		# Ống mờ nhỏ quanh player: bán kính 2.5m, chỉ cắt lớp đất ngay trên đầu
+		WorldChunk.set_fade_uniforms(dimension_id, ppos, 2.5,
+			ppos.y - 0.5, ppos.y + 2.0)
+
 func _process(_delta: float) -> void:
 	if _player == null or not is_instance_valid(_player) or not _player.is_inside_tree():
 		_find_player()
@@ -85,6 +114,8 @@ func _process(_delta: float) -> void:
 	var cx: int = int(floor(ppos.x / CHUNK_SIZE))
 	var cz: int = int(floor(ppos.z / CHUNK_SIZE))
 	var cur := Vector2i(cx, cz)
+
+	_update_underground_fade(ppos)
 
 	# Promote completed async chunks — theo NGÂN SÁCH THỜI GIAN/frame thay vì
 	# cố định 1 chunk/frame. Chunk nào tính xong trên worker (cheap sau khi đưa

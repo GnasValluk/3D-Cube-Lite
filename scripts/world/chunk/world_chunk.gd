@@ -314,6 +314,25 @@ static func prewarm_async() -> void:
 static func _is_on_road(wx: float, wz: float) -> bool:
 	return _Road.is_on_road(wx, wz)
 
+## ── Bãi đất thổ lớn: 1 ô trong vùng đất — trộn nhiều loại đất theo noise ──
+## Đồng bằng (cả trũng ẩm lẫn nền giữa): vùng đất đã rộng (patch_dirt), từng
+## ô oanh loại đất: DIRT (đất thổ), GRASS_DIRT (đất cỏ cày), YOUNG_GRASS (đất
+## non), DARK_GRASS (đất ẩm) theo patch_var — đồng xu đều, không lởm chởm.
+static func _soil_field_block(ivx: int, ivz: int, wx: float, wz: float,
+		nd: Dictionary, biome_grid: Array) -> void:
+	var sv: float = (nd["patch_var"].get_noise_2d(wx, wz) + 1.0) * 0.5
+	var p2: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+	if sv > 0.82:
+		biome_grid[ivx][ivz] = _Data.TileType.DIRT
+	elif sv > 0.62:
+		biome_grid[ivx][ivz] = _Data.TileType.GRASS_DIRT
+	elif sv > 0.44:
+		biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
+	elif p2 > 0.55:
+		biome_grid[ivx][ivz] = _Data.TileType.DIRT
+	else:
+		biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
+
 static func _is_on_river(wx: float, wz: float) -> bool:
 	return _River.is_on_river(wx, wz)
 
@@ -360,6 +379,35 @@ static func ensure_chunk_built(wx: float, wz: float) -> void:
 static func biome_at(wx: float, wz: float, dim_id: int) -> int:
 	return _Noise._biome_at(wx, wz, dim_id)
 
+## Tìm world pos vùng NÚI CAO (mountain noise) gần (wx,wz), không nằm biển.
+## Dùng cho debug teleport "Núi". Núi vừa (đắp 4..9 block) → không cần quá khắt
+## khe: chọn tiêu chuẩn mtn_t > 0.50 (vừa khít vùng đắp cao thật).
+## Trả { "ok", "x", "z" }.
+static func find_mountain(wx: float, wz: float, max_radius: float = 15000.0) -> Dictionary:
+	const DIM: int = _Data._Dim.DimensionID.REAL_WORLD
+	var nd: Dictionary = _noise_for_dim(DIM)
+	var n_mt: FastNoiseLite = nd.get("mountain")
+	if n_mt == null:
+		return { "ok": false }
+	var origin := Vector2(wx, wz)
+	const STEP: float = 120.0
+	var r: float = STEP
+	while r <= max_radius:
+		var samples: int = max(8, int(r / STEP * TAU))
+		for i in range(samples):
+			var angle: float = float(i) / float(samples) * TAU
+			var sx: float = origin.x + cos(angle) * r
+			var sz: float = origin.y + sin(angle) * r
+			if _ocean_mask_at(nd, sx, sz):
+				continue
+			var mtn: float = (n_mt.get_noise_2d(sx, sz) + 1.0) * 0.5
+			var mtn_t: float = clamp((mtn - 0.58) / 0.14, 0.0, 1.0)
+			mtn_t = mtn_t * mtn_t * (3.0 - 2.0 * mtn_t)
+			if mtn_t > 0.50:
+				return { "ok": true, "x": sx, "z": sz }
+		r += STEP
+	return { "ok": false }
+
 ## Kiểm tra có quán rượu THẬT đã build tại world pos (chunk phải nằm trong cache).
 ## Dùng cho teleport "quán gần nhất" để chỉ nhắm vào quán đã được dựng.
 static func is_tavern_built_at(wx: float, wz: float) -> bool:
@@ -379,6 +427,53 @@ static func is_tavern_built_at(wx: float, wz: float) -> bool:
 				and absf(float(b.get("z", 0.0)) - wz) < 5.0:
 			return true
 	return false
+
+## Lấy các interior AABB (world space) của MỌI quán trong chunk chứa (wx,wz).
+## Dùng cho teleport: xác định vị trí hạ cánh VỀ PHÍA NGOÀI để không rơi vào
+## trong quán (shell bị fade 0.10 bởi _update_tavern_fade → chỉ còn nội thất
+## rời rạc = trông như "đống hỗn"). AABB lấy từ _mesh_cache — đảm bảo chính
+## xác dữ liệu quán thật đã được dựng.
+static func tavern_interior_aabbs(wx: float, wz: float) -> Array:
+	const SIZE: int = 32
+	var half: float = SIZE * 0.5
+	var cx: int = int(floor((wx + half) / SIZE))
+	var cz: int = int(floor((wz + half) / SIZE))
+	var ck: String = _cache_key(cx, cz, _Data._Dim.DimensionID.REAL_WORLD)
+	if not _mesh_cache.has(ck):
+		return []
+	var vbd: Dictionary = (_mesh_cache[ck] as Dictionary).get("village_data", {})
+	var out: Array = []
+	for b in vbd.get("info", {}).get("buildings", []):
+		out.append(_tavern_interior_aabb(b))
+	return out
+
+static func _point_in_aabb(p: Vector2, ab: Array) -> bool:
+	var a0: Vector3 = ab[0]
+	var a1: Vector3 = ab[1]
+	return p.x >= a0.x and p.x <= a1.x and p.y >= a0.z and p.y <= a1.z
+
+## Chọn điểm hạ cánh cho teleport quán: cách tâm quán 8m theo hướng `toward`
+## (về phía đường), nhưng nếu điểm đó nằm TRONG interior AABB (chunk phải
+## được build — gọi ensure_chunk_built trước) thì đẩy dần ra tới khi thoát.
+## Trả về Vector2 world coords — không bao giờ tele thành "đống hỗn" vì fade.
+static func tavern_landing_point(wx: float, wz: float, toward: Vector2) -> Vector2:
+	var dir := toward
+	if dir.length() < 0.1:
+		dir = Vector2(0, 1)
+	dir = dir.normalized()
+	var aabbs: Array = tavern_interior_aabbs(wx, wz)
+	var d: float = 8.0
+	while d <= 32.0:
+		var p := Vector2(wx, wz) + dir * d
+		var blocked := false
+		for ab in aabbs:
+			if _point_in_aabb(p, ab):
+				blocked = true
+				break
+		if not blocked:
+			return p
+		d += 2.0
+	return Vector2(wx, wz) + dir * 8.0
 
 # ── Registry chunk (tra cứu O(1)) ─────────────────────────────────────────────
 # Thay cho việc đệ quy quét toàn bộ scene tree từng lần (gây lag 400ms khi
@@ -680,6 +775,16 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					if bsn_t > 0.0:
 						height_grid[ivx][ivz] = maxf(height_grid[ivx][ivz] - bsn_t * 1.5, _Data.WATER_Y + 0.35)
 
+					# (1c) Vùng NÚI VỪA — đắp cao 4..9 block trên nền đồi, ranh mềm
+					# (smoothstep theo noise "mountain") để tạo dải núi rộng, đỉnh
+					# không cắt thẳng.
+					var mtn: float = (nd["mountain"].get_noise_2d(wx, wz) + 1.0) * 0.5
+					var mtn_t: float = clamp((mtn - 0.58) / 0.14, 0.0, 1.0)
+					mtn_t = mtn_t * mtn_t * (3.0 - 2.0 * mtn_t)
+					if mtn_t > 0.0:
+						var mtn_amp: float = 3.5 + ht * 5.5   # 3.5..9.0
+						height_grid[ivx][ivz] += mtn_t * mtn_amp
+
 # (2) Vẽ biome SAU — chỉ đổi surface, không đổi height
 					if base_bio == _Data.TileType.DESERT:
 						# ── SA MẠC: chỉ toàn CÁT các loại (không đất nâu) ────────
@@ -734,17 +839,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 							else:
 								biome_grid[ivx][ivz] = _Data.TileType.GRASS
 						elif hb_rise < 0.20:
-							# Trũng ẩm nội địa — cỏ đậm, giữ hơi ẩm. Thêm bãi đất
-							# (DIRT) + bãi đá (STONE_PATCH) rải rác để vùng đất
-							# phẳng thấp (y≈0.5-1.0) có đốm trống/đá lộ thiên.
-							var st_p: float = (nd["patch_stone"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							var p2_t: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							if st_p > 0.82:
-								biome_grid[ivx][ivz] = _Data.TileType.STONE_PATCH
-							elif p2_t > 0.92:
-								biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
-							elif p2_t > 0.84:
-								biome_grid[ivx][ivz] = _Data.TileType.DIRT
+							# Trũng ẩm nội địa — cỏ đậm, giữ hơi ẩm. Vùng đất THẤP
+							# có BÃI ĐẤT LỚN (đất thổ) theo noise tần rất thấp
+							# (n_patch_dirt): 1 vùng đất rộng hàng chục ô trộn NHIỀU
+							# loại đất như DIRT/GRASS_DIRT/YOUNG_GRASS/DARK_GRASS.
+							# Không còn bãi đá (STONE_PATCH) lởm chởm trên mặt đất.
+							var df_low: float = (nd["patch_dirt"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							if df_low > 0.55:
+								_soil_field_block(ivx, ivz, wx, wz, nd, biome_grid)
 							else:
 								biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
 						elif hb_rise >= 0.52:
@@ -774,8 +876,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 							else:
 								biome_grid[ivx][ivz] = _Data.TileType.GRASS
 						else:
-							# Nền giữa — đồng cỏ hỗn; cụm đất/cỏ rậm theo noise đất
-							# patch_var; đốm cỏ già / cỏ thưa / cỏ non loạn theo patch2.
+							# Nền giữa — đồng cỏ hỗn; BÃI ĐẤT LỚN theo n_patch_dirt
+							# (tần rất thấp → vùng đất thổ rộng hàng chục ô) trộn
+							# nhiều loại đất; ngoài bãi là cỏ già / cỏ thưa loang theo
+							# patch_var để vùng đồng bằng có những mảng đất thật.
+							var dv3: float = (nd["patch_dirt"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							if dv3 > 0.54:
+								_soil_field_block(ivx, ivz, wx, wz, nd, biome_grid)
+								continue
 							var dv2: float = (nd["patch_var"].get_noise_2d(wx, wz) + 1.0) * 0.5
 							var p2_n: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
 							if dv2 > 0.62:
@@ -790,6 +898,9 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 								biome_grid[ivx][ivz] = _Data.TileType.SPARSE_GRASS
 							else:
 								biome_grid[ivx][ivz] = _Data.TileType.GRASS_DIRT
+					# Đỉnh núi cao (sau khi biome paint xong) → bề mặt đá lộ thiên
+					if mtn_t > 0.62 and _Data.is_grass_tile(biome_grid[ivx][ivz]):
+						biome_grid[ivx][ivz] = _Data.TileType.STONE_PATCH
 
 		# ── 3a2. Hồ ĐỒNG CỎ: đáy thoải theo khoảng cách từ bờ (BFS padded,
 		# hàn liền qua biên chunk; ring 0 = WATER_Y như hồ cát dựa trên dst) ──
@@ -967,7 +1078,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	_prof("S6 road+bfs3x")
 
 
-	# ── 5. Tạo ChunkBlockData từ biome + height ────────────────────────────────
+# ── 5. Tạo ChunkBlockData từ biome + height ────────────────────────────────
 	var bd := _BlockData.new()
 	bd.init(cols, cols)
 	_Terrain.fill_blocks(bd, biome_grid, height_grid, road_grid, cols, dim_id, cx, cz, size, nd, reef_mask)
@@ -975,21 +1086,23 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	# ── 5b. Đồi quặng trên bề mặt — chỉ khu vực xa spawn (deterministic) ─────
 	var ore_hill_info: Dictionary = { "cx": -1, "cz": -1 }
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		ore_hill_info = _Terrain.spawn_ore_hills(bd, biome_grid, height_grid, road_grid, cols, cx, cz, size)
+		ore_hill_info = _Terrain.spawn_ore_hills(bd, biome_grid, height_grid, road_grid,
+				cols, cx, cz, size)
 	_prof("S7 fill_blocks+ore")
 
 	# ── 6. Build terrain mesh từ block data (greedy mesher) ───────────────────
-	# top_ly_hint tính từ height grid — tránh scan lại 69 layer/column trong build
+	# top_ly_hint tính từ height grid — tránh scan lại 69 layer/column trong build.
 	var top_ly_hint := PackedInt32Array()
 	top_ly_hint.resize(cols * cols)
 	for vx in range(cols):
 		for vz in range(cols):
-			top_ly_hint[vx * cols + vz] = clampi(
+			var i3: int = vx * cols + vz
+			top_ly_hint[i3] = clampi(
 				floori((height_grid[vx][vz] - _BlockData.SLAB_HEIGHT) / _BlockData.SLAB_HEIGHT) - _BlockData.Y_MIN,
 				0, _BlockData.CHUNK_H - 1)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_Terrain.build_terrain_mesh(st, bd, cols, dim_id, top_ly_hint, true)
+	_Terrain.build_terrain_mesh(st, bd, cols, dim_id, top_ly_hint)
 	_prof("S8 terrain_mesh")
 
 
@@ -1067,14 +1180,17 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if not is_desert_water and (b == _Data.TileType.SAND or b == _Data.TileType.MUDDY_SAND):
 					if dland[vx * cols + vz] <= 3:
 						is_desert_water = true
-				# Cỏ biển multimesh (thay cỏ biển prop cũ) — đáy biển nông OCEAN_DEEP
+				# Cỏ biển multimesh — chỉ đáy biển nông OCEAN_DEEP; rong/taro/lotus
+				# đi theo add_aquatic_plants (chạy cho MỌI ô nước: hồ SILT/SAND/
+				# MUDDY_SAND lẫn biển nông, tự lọc is_ocean bên trong).
+				var aq_biome: int = b
 				if b == _Data.TileType.OCEAN_DEEP:
 					var sea_wx: float = world_ox - half + (float(vx) + 0.5) * _Data.VOXEL
 					var sea_wz: float = world_oz - half + (float(vz) + 0.5) * _Data.VOXEL
 					_Grass.add_voxel_seagrass(vx, vz, pos2, grass_xforms, grass_colors,
 						cols, _Data.WATER_Y - h, sea_wx, sea_wz)
-					_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
-						b == _Data.TileType.SILT, b, lotus_lights, plant_props, is_river, is_desert_water)
+				_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
+					aq_biome == _Data.TileType.SILT, aq_biome, lotus_lights, plant_props, is_river, is_desert_water)
 		mesh_aquatic = st_aq.commit()
 	_prof("S11 aquatic+plants")
 
@@ -1242,14 +1358,27 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 
 
 	# ── 10. Textured block (ore) overlays — bounded scan dưới bề mặt ─────────
-	# Ore chỉ được sinh qua đồi quặng (spawn_ore_hills). Chunk không có đồi
-	# (ore_hill_info.cx==-1) thì không có block quặng trong bd → bỏ hẳn scan.
-	var ore_meshes: Dictionary[int, ArrayMesh] = {}
-	if not fast_mode and _ORES_GENERATION_ENABLED and ore_hill_info.get("cx", -1) >= 0:
-		var max_top_ly: int = 0
+	# Ore tồn tại trong bd ở 2 nơi: (1) đồi quặng (spawn_ore_hills) và (2) đỉnh
+	# núi đá (STONE_PATCH → _stone_patch_top có thể là COAL_ORE/IRON_ORE). Gate
+	# cũ chỉ theo ore_hill_info → chunk núi đá có quặng nhưng không có đồi sẽ bị
+	# bỏ qua toàn bộ scan → quặng hiển thị màu trơn (không texture).
+	# Kiểm tra rẻ: chỉ soi một lớp bề mặt theo top_ly_hint (kể cả cho vùng đồi).
+	var max_top_ly: int = 0
+	for vx in range(cols):
+		for vz in range(cols):
+			max_top_ly = maxi(max_top_ly, top_ly_hint[vx * cols + vz])
+	var has_ore_blocks: bool = ore_hill_info.get("cx", -1) >= 0
+	if not has_ore_blocks:
 		for vx in range(cols):
 			for vz in range(cols):
-				max_top_ly = maxi(max_top_ly, top_ly_hint[vx * cols + vz])
+				var ly: int = top_ly_hint[vx * cols + vz]
+				if ly >= 0 and _TEXTURED_BLOCK_IDS.has(bd.get_block(vx, ly, vz)):
+					has_ore_blocks = true
+					break
+			if has_ore_blocks:
+				break
+	var ore_meshes: Dictionary[int, ArrayMesh] = {}
+	if not fast_mode and _ORES_GENERATION_ENABLED and has_ore_blocks:
 		ore_meshes = _build_textured_block_meshes(bd, cols, max_top_ly)
 	_prof("S13b ore")
 
@@ -2013,6 +2142,65 @@ void fragment() {
 	return m
 
 static var _mat_cache: Dictionary = {}
+static var fade_state: bool = false
+
+## ── Terrain fade (x-ray) khi player ở dưới lòng đất ─────────────────────────
+## Chỉ làm mờ LỚP ĐẤT TRỰC TIẾP quanh player (một ống nhỏ trên đầu) để người
+## chơi thấy rõ khoảng hang/hành lang do mình đào — KHÔNG tạo vùng xám rộng
+## cả chục mét làm lộ ranh giới chunk. Ngoài ống này địa hình giữ nguyên đặc.
+static func _make_terrain_fade_mat(dim_id: int) -> ShaderMaterial:
+	var s := Shader.new()
+	s.code = """
+shader_type spatial;
+render_mode blend_mix;
+uniform vec3 fade_center = vec3(0.0, 0.0, 0.0);   // player position (world)
+uniform float fade_radius = 3.0;                  // bán kính ống làm mờ (m)
+uniform float fade_bottom = 0.0;                  // mốc bắt đầu mờ (phía dưới chân)
+uniform float fade_top    = 1.8;                  // mốc mờ tối đa (phía trên đầu)
+
+void fragment() {
+	vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	ALBEDO = COLOR.rgb;
+	ROUGHNESS = 0.9;
+	METALLIC = 0.0;
+// Khoảng cách ngang tới player: trong ống thì rõ xuyên thấu, mép ống sắc gọn.
+	float d = length(vec2(wp.x - fade_center.x, wp.z - fade_center.z));
+	float inside = 1.0 - smoothstep(fade_radius * 0.5, fade_radius, d);
+	// Block trên đầu → gần như trong suốt (alpha~0), dưới chân giữ đặc (1).
+	float above = smoothstep(fade_bottom, fade_top, wp.y);
+	float alpha = mix(1.0, 1.0 - above, inside);
+	ALPHA = clamp(alpha, 0.0, 1.0);
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = s
+	m.set_shader_parameter("fade_center", Vector3.ZERO)
+	m.set_shader_parameter("fade_radius", 3.0)
+	m.set_shader_parameter("fade_bottom", 0.0)
+	m.set_shader_parameter("fade_top", 1.8)
+	return m
+
+## Cập nhật uniform chung của toàn bộ fade material (1 lần/frame).
+static func set_fade_uniforms(dim_id: int, center: Vector3, radius: float,
+		bottom: float, top: float) -> void:
+	var fm := _mat_cache.get(dim_id, {}).get("terrain_fade", null) as ShaderMaterial
+	if not is_instance_valid(fm):
+		return
+	fm.set_shader_parameter("fade_center", center)
+	fm.set_shader_parameter("fade_radius", radius)
+	fm.set_shader_parameter("fade_bottom", bottom)
+	fm.set_shader_parameter("fade_top", top)
+
+## Bật/tắt x-ray cho terrain mesh của chunk này (vật liệu dùng chung 1 shader).
+func set_terrain_fade(fade: bool) -> void:
+	fade_state = fade
+	if _terrain_mesh_instance == null or not is_instance_valid(_terrain_mesh_instance):
+		return
+	var cache: Dictionary = _mat_cache.get(_dimension_id, {})
+	if fade and cache.has("terrain_fade"):
+		_terrain_mesh_instance.material_override = cache["terrain_fade"]
+	elif cache.has("terrain"):
+		_terrain_mesh_instance.material_override = cache["terrain"]
 
 func _init_materials() -> void:
 	if _mat_cache.has(_dimension_id): return
@@ -2020,12 +2208,16 @@ func _init_materials() -> void:
 		var m_t := StandardMaterial3D.new()
 		m_t.vertex_color_use_as_albedo = true
 		m_t.roughness = 0.9; m_t.metallic_specular = 0.0
-		_mat_cache[_dimension_id] = { "terrain": m_t, "water": _make_water_shader(_dimension_id) }
+		_mat_cache[_dimension_id] = { "terrain": m_t,
+			"terrain_fade": _make_terrain_fade_mat(_dimension_id),
+			"water": _make_water_shader(_dimension_id) }
 		return
 	var m_t := StandardMaterial3D.new()
 	m_t.vertex_color_use_as_albedo = true
 	m_t.roughness = 1.0; m_t.metallic_specular = 0.0
-	_mat_cache[_dimension_id] = { "terrain": m_t, "water": _make_water_shader(_dimension_id) }
+	_mat_cache[_dimension_id] = { "terrain": m_t,
+		"terrain_fade": _make_terrain_fade_mat(_dimension_id),
+		"water": _make_water_shader(_dimension_id) }
 
 ## ── apply_chunk: nhận data từ thread, tạo nodes ──────────────────────────────
 func apply_chunk(data: Dictionary) -> void:
@@ -2067,7 +2259,10 @@ func apply_chunk(data: Dictionary) -> void:
 
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
-	mi.material_override = _mat_cache[_dimension_id]["terrain"]
+	if fade_state and _mat_cache[_dimension_id].has("terrain_fade"):
+		mi.material_override = _mat_cache[_dimension_id]["terrain_fade"]
+	else:
+		mi.material_override = _mat_cache[_dimension_id]["terrain"]
 	container.add_child(mi)
 	_terrain_mesh_instance = mi
 
