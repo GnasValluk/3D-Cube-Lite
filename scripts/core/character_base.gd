@@ -155,7 +155,7 @@ var _world_hp_enabled: bool = false
 var _camera:  Camera3D
 var _iso_rig: Node3D
 var _tp_rig:  Node3D
-var _use_tp:  bool = false
+var _use_tp:  bool = true  # mặc định cam 3 (third-person); ấn F1 → iso
 var _water_mgr: OpenWorldManager = null
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -413,7 +413,24 @@ func set_active(value: bool) -> void:
 			child.visible = value
 	if value and _is_player:
 		await get_tree().process_frame
+		_sync_camera()
 		_camera = get_viewport().get_camera_3d()
+
+## Đồng bộ trạng thái camera rig theo _use_tp — gọi khi player active để
+## đúng ngay từ đầu (không phải bấm F1 2 lần mới chuẩn).
+func _sync_camera() -> void:
+	if not _is_player:
+		return
+	if _use_tp:
+		if is_instance_valid(_iso_rig):
+			_iso_rig.call("deactivate")
+		if is_instance_valid(_tp_rig):
+			_tp_rig.call("activate")
+	else:
+		if is_instance_valid(_tp_rig):
+			_tp_rig.call("deactivate")
+		if is_instance_valid(_iso_rig):
+			_iso_rig.call("activate")
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -906,16 +923,7 @@ func _spawn_damage_number(dmg: int, attacker: Node3D = null, damage_type: int = 
 # ── Camera toggle ─────────────────────────────────────────────────────────────
 func _toggle_camera() -> void:
 	_use_tp = not _use_tp
-	if _use_tp:
-		if is_instance_valid(_iso_rig):
-			_iso_rig.call("deactivate")
-		if is_instance_valid(_tp_rig):
-			_tp_rig.call("activate")
-	else:
-		if is_instance_valid(_tp_rig):
-			_tp_rig.call("deactivate")
-		if is_instance_valid(_iso_rig):
-			_iso_rig.call("activate")
+	_sync_camera()
 	await get_tree().process_frame
 	_camera = get_viewport().get_camera_3d()
 

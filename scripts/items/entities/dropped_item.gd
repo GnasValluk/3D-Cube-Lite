@@ -213,11 +213,30 @@ func collect(player: Node) -> bool:
 		item_count = remaining
 	return false
 
-static func spawn(world: Node3D, def_: ItemDef, pos: Vector3, count: int = 1, velocity: Vector3 = Vector3.ZERO, ground_y: float = -INF) -> DroppedItem:
+static func spawn(world: Node, def_: ItemDef, pos: Vector3, count: int = 1, velocity: Vector3 = Vector3.ZERO, ground_y: float = -INF) -> DroppedItem:
 	var item := DroppedItem.new()
 	item.init(def_, count)
 	item.position = pos + Vector3(0, 0.2, 0)
-	world.add_child(item)
+	var parent := _resolve_world_parent(world)
+	if parent == null:
+		item.queue_free()
+		return null
+	parent.add_child(item)
 	if velocity != Vector3.ZERO:
 		item.launch(velocity, ground_y if ground_y > -INF else pos.y)
 	return item
+
+## Khi world được truyền không phải Node3D (vd. LoadingScreen đang là
+## current_scene trong lúc chuyển cảnh), tìm thế giới 3D thực tế dưới root.
+static func _resolve_world_parent(world: Node) -> Node3D:
+	if world == null:
+		return null
+	if world is Node3D:
+		return world as Node3D
+	var tree := world.get_tree()
+	if tree == null:
+		return null
+	for child in tree.root.get_children():
+		if child is Node3D:
+			return child as Node3D
+	return null

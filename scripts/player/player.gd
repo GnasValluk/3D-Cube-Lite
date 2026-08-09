@@ -47,7 +47,7 @@ var _camera:    Camera3D
 # ── Camera switching ──────────────────────────────────────────────────────────
 var _iso_rig: Node3D      # CameraRig (isometric)
 var _tp_rig:  Node3D      # TPCameraRig (third-person)
-var _use_tp:  bool = false
+var _use_tp:  bool = true  # mặc định cam 3 (third-person); ấn F1 → iso
 
 # ── Squash/stretch ────────────────────────────────────────────────────────────
 var _sy_tgt: float = 1.0
@@ -86,7 +86,9 @@ func _ready() -> void:
 	var scene_root := get_parent()
 	_iso_rig = scene_root.get_node_or_null("CameraRig")
 	_tp_rig  = scene_root.get_node_or_null("TPCameraRig")
-	# Bắt đầu với iso camera
+	# Bắt đầu đúng trạng thái camera theo _use_tp (mặc định cam 3) — tránh
+	# phải bấm F1 2 lần mới chuẩn.
+	_sync_camera()
 	_camera = get_viewport().get_camera_3d()
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -316,8 +318,8 @@ func _read_input() -> Vector3:
 	return fwd * -rz + rgt * rx
 
 # ── Camera toggle ─────────────────────────────────────────────────────────────
-func _toggle_camera() -> void:
-	_use_tp = not _use_tp
+## Đồng bộ trạng thái camera rig theo _use_tp.
+func _sync_camera() -> void:
 	if _use_tp:
 		if is_instance_valid(_iso_rig) and _iso_rig.has_method("deactivate"):
 			_iso_rig.deactivate()
@@ -328,6 +330,10 @@ func _toggle_camera() -> void:
 			_tp_rig.deactivate()
 		if is_instance_valid(_iso_rig) and _iso_rig.has_method("activate"):
 			_iso_rig.activate()
+
+func _toggle_camera() -> void:
+	_use_tp = not _use_tp
+	_sync_camera()
 	# Cập nhật _camera để _read_input dùng đúng camera đang active
 	await get_tree().process_frame
 	_camera = get_viewport().get_camera_3d()

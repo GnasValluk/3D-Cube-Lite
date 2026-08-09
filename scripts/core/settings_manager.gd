@@ -21,6 +21,7 @@ static var touch_enabled: bool = false
 static var joystick_sensitivity: float = 1.0
 static var button_scale: float = 1.0
 static var device_mode: int = 0
+static var player_skin: String = "cora"
 static var key_bindings: Dictionary = {
 	"controls/interact": KEY_F,
 	"controls/inventory": KEY_E,
@@ -86,6 +87,7 @@ func load_settings() -> void:
 	joystick_sensitivity = config.get_value(SECTION, "joystick_sensitivity", 1.0)
 	button_scale = config.get_value(SECTION, "button_scale", 1.0)
 	device_mode = config.get_value(SECTION, "device_mode", 0)
+	player_skin = config.get_value(SECTION, "player_skin", "cora")
 	var saved_keys: Dictionary = config.get_value(SECTION, "key_bindings", {})
 	for action in key_bindings:
 		if saved_keys.has(action):
@@ -143,6 +145,7 @@ static func save_settings() -> void:
 	config.set_value(SECTION, "joystick_sensitivity", joystick_sensitivity)
 	config.set_value(SECTION, "button_scale", button_scale)
 	config.set_value(SECTION, "device_mode", device_mode)
+	config.set_value(SECTION, "player_skin", player_skin)
 	config.set_value(SECTION, "key_bindings", key_bindings)
 	config.save(SETTINGS_PATH)
 

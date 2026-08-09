@@ -103,13 +103,25 @@ func pinch_zoom(factor: float) -> void:
 	_target_ortho = clamp(_target_ortho * factor, zoom_min, zoom_max)
 	emit_signal("zoom_changed", _target_ortho)
 
+## Theo sát player theo trục XZ — gọi ở physics tick để cùng nhịp với
+## chuyển động của player (chống rung lắc do lerp render/physics lệch nhịp).
+func _physics_process(_delta: float) -> void:
+	if not is_instance_valid(_target):
+		return
+	var tx: float = _target.global_position.x
+	var tz: float = _target.global_position.z
+	# Dùng khoá thẳng vị trí leader — player là physics node, world không
+	# bị "vibrate": nó giữ nguyên trên màn hình, địa hình dịch theo nhịp tick.
+	global_position.x = tx
+	global_position.z = tz
+
 func _process(delta: float) -> void:
 	if not is_instance_valid(_target):
 		return
 	_update_shake(delta)
 	var dest := Vector3(_target.global_position.x, 0.0, _target.global_position.z)
-	global_position = global_position.lerp(dest, follow_speed * delta)
 	_camera.position = Vector3(cam_back, cam_height, cam_back) + _shake_offset * 6.0
+	_camera.look_at(dest + Vector3.UP * 1.2, Vector3.UP)
 
 	if abs(_camera.size - _target_ortho) > 0.01:
 		_camera.size = lerp(_camera.size, _target_ortho, delta * zoom_speed)

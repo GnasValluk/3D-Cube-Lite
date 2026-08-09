@@ -5,6 +5,7 @@ const DAY_NAMES: Array[String] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun
 const PHONE_W: float = 1500
 const PHONE_H: float = 860
 const _Settings = preload("res://scripts/core/settings_storage.gd")
+const _PlayerSkin = preload("res://scripts/characters/player/player_skin.gd")
 
 var _phone: Panel
 var _hud: HUD
@@ -13,6 +14,7 @@ var _home_screen: Control
 var _weather_screen: Control
 var _settings_screen: Control
 var _themes_screen: Control
+var _fashion_screen: Control
 var _map_holder: Control
 var _status_time: Label
 var _status_battery: Label
@@ -123,6 +125,7 @@ func _build_ui() -> void:
 	_build_weather_screen()
 	_build_settings_screen()
 	_build_themes_screen()
+	_build_fashion_screen()
 	_build_map_holder()
 
 	_nav_dots = HBoxContainer.new()
@@ -224,6 +227,9 @@ func _build_home_screen() -> void:
 	_add_app_icon(apps_grid, 5, "\u23FB", "Shutdown", Color(0.55, 0.15, 0.15), Color(0.75, 0.30, 0.25), func():
 		if _hud:
 			_hud.exit_to_main_menu()
+	)
+	_add_app_icon(apps_grid, 6, "\U0001F457", "Thời trang", Color(0.75, 0.35, 0.60), Color(0.90, 0.50, 0.75), func():
+		_show_fashion_screen()
 	)
 
 	_home_screen.visible = false
@@ -699,6 +705,112 @@ func _rebuild_themes() -> void:
 	_build_themes_screen()
 	if _current_screen == null:
 		show_screen(_themes_screen)
+
+func _show_fashion_screen() -> void:
+	show_screen(_fashion_screen)
+
+func _rebuild_fashion() -> void:
+	if _fashion_screen:
+		if _current_screen == _fashion_screen:
+			_current_screen = null
+		if _fashion_screen.get_parent():
+			_fashion_screen.get_parent().remove_child(_fashion_screen)
+		_fashion_screen.queue_free()
+		_fashion_screen2 = null
+	_build_fashion_screen()
+	if _current_screen == null:
+		show_screen(_fashion_screen)
+
+var _fashion_screen2: Control = null
+
+func _skin_palette_swatch(parent: Control, palette: Dictionary, y: float, x: float) -> void:
+	var keys: Array[String] = ["skin", "hair", "hair_dark", "eye_iris", "blush",
+		"shirt", "collar", "ribbon", "skirt", "skirt_dark", "socks", "shoes", "hair_tie"]
+	var sw: float = 10.0
+	var x0: float = x
+	for k in keys:
+		var c: Color = palette.get(k, Color(1, 1, 1))
+		var sq := Panel.new()
+		sq.size = Vector2(sw, sw)
+		sq.position = Vector2(x0, y)
+		sq.mouse_filter = Control.MOUSE_FILTER_PASS
+		sq.add_theme_stylebox_override("panel", _make_style(c, 1.5, 1, Color(0,0,0,0.25)))
+		parent.add_child(sq)
+		x0 += sw + 4
+
+func _build_fashion_screen() -> void:
+	var sw: float = _screen_container.size.x
+	var sh: float = _screen_container.size.y
+
+	_fashion_screen = Control.new()
+	_fashion_screen.size = _screen_container.size
+	_screen_container.add_child(_fashion_screen)
+
+	var top := Panel.new()
+	top.size = Vector2(sw, 30)
+	top.add_theme_stylebox_override("panel", _make_style(_bg_card(), 8))
+	top.add_child(_back_button(_fashion_screen))
+	var title := _make_label("Thời trang", 14, _txt_bright())
+	title.position = Vector2(sw * 0.5 - 40, 5)
+	top.add_child(title)
+	_fashion_screen.add_child(top)
+
+	var current_skin: String = SettingsData.player_skin if SettingsData and not SettingsData.player_skin.is_empty() else "cora"
+
+	var cy: float = 46
+	_fashion_screen2 = Control.new()
+	_fashion_screen2.name = "FashionBody"
+	_fashion_screen2.position = Vector2(4, cy)
+	_fashion_screen2.size = Vector2(sw - 8, sh - cy - 4)
+	_fashion_screen.add_child(_fashion_screen2)
+
+	var skin_idx := 0
+	for s in _PlayerSkin.all():
+		_build_skin_card(_fashion_screen2, s, skin_idx, current_skin)
+		skin_idx += 1
+
+	_fashion_screen.visible = false
+
+func _build_skin_card(parent: Control, skin_def: Dictionary, idx: int, current_id: String) -> void:
+	var card_w: float = 170.0
+	var card_h: float = 150.0
+	var col: int = idx % 2
+	var row: int = idx / 2
+	var x: float = col * (card_w + 14)
+	var y: float = row * (card_h + 14)
+
+	var card := Panel.new()
+	card.size = Vector2(card_w, card_h)
+	card.position = Vector2(x, y)
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
+	card.add_theme_stylebox_override("panel", _make_style(_bg_card(), 12, 2,
+		_tc(Color(0.35, 0.75, 0.40, 0.9), Color(0.15, 0.55, 0.25, 0.9)) if skin_def["id"] == current_id
+		else Color(0,0,0,0)))
+	parent.add_child(card)
+
+	var icon := _make_label(skin_def.get("icon", "👤"), 30, Color(1,1,1,0.9))
+	icon.position = Vector2(card_w * 0.5 - 18, 12)
+	card.add_child(icon)
+
+	_skin_palette_swatch(card, skin_def.get("palette", {}), 74.0, 12.0)
+
+	var name_lbl := _make_label(skin_def.get("name", skin_def["id"]), 13, _txt_bright())
+	name_lbl.position = Vector2(10, 104)
+	card.add_child(name_lbl)
+
+	if skin_def["id"] == current_id:
+		var eq := _make_label("\u2713 Đang mặc", 11, _tc(Color(0.50, 0.85, 0.50, 0.95), Color(0.15, 0.55, 0.25, 0.95)))
+		eq.position = Vector2(10, 124)
+		card.add_child(eq)
+
+	var selected_id: String = skin_def["id"] as String
+	card.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed and _hud:
+			var pc: PlayerCharacter = _hud._find_player_character()
+			if pc:
+				pc.apply_skin(selected_id)
+				_rebuild_fashion()
+	)
 
 func _build_map_holder() -> void:
 	var sw: float = _screen_container.size.x

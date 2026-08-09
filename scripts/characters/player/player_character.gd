@@ -10,9 +10,12 @@ const _EggThrow := preload("player_egg_throw.gd")
 const _Halberd := preload("player_halberd.gd")
 const _Fishing := preload("player_fishing.gd")
 const _TavernDoor := preload("res://scripts/world/chunk/tavern_door.gd")
+const _Skin := preload("res://scripts/characters/player/player_skin.gd")
 
 var _mesh: PlayerMesh
 var _anim: PlayerAnimator
+## Skin đang mặc (id trong PlayerSkin.SKINS).
+var skin_id: String = ""
 var inventory: Inventory = null
 var _inventory_open: bool = false
 var _held_item: Dictionary = {}
@@ -143,7 +146,9 @@ func _build_character() -> void:
 	add_child(col)
 	hit_radius = 0.32
 
-	_mesh = PlayerMesh.new()
+	skin_id = _current_skin_id()
+	_mesh = _Skin.make_mesh(skin_id)
+	_mesh.set_palette(_Skin.palette_for(skin_id))
 	_mesh.build(self)
 	_rig = _mesh.rig
 
@@ -155,10 +160,85 @@ func _build_character() -> void:
 	_add_world_voxel_bars()
 	food_changed.emit(food, max_food)
 
+func _current_skin_id() -> String:
+	if SettingsData and not SettingsData.player_skin.is_empty():
+		return SettingsData.player_skin
+	return _Skin.FALLBACK_ID
+
 func _add_world_voxel_bars() -> void:
 	var bars := preload("res://scripts/ui/hud/world_voxel_bars.gd").new()
 	add_child(bars)
 	bars.setup(self)
+
+## Đổi skin người chơi — rebuild mesh nếu skin mới có model khác.
+func apply_skin(new_id: String) -> void:
+	if new_id.is_empty() or new_id == skin_id:
+		return
+	if _Skin.get_skin(new_id).is_empty():
+		return
+
+	var old_script: String = _Skin.get_skin(skin_id).get("mesh_script", "")
+	var new_script: String = _Skin.get_skin(new_id).get("mesh_script", "")
+	skin_id = new_id
+
+	if old_script != new_script:
+		# Model khác — cần rebuild toàn bộ mesh
+		_rebuild_mesh()
+	else:
+		# Cùng model — chỉ đổi màu (nhanh, không gây giật)
+		if _mesh != null:
+			_mesh.apply_palette(_Skin.palette_for(skin_id))
+
+	if SettingsData:
+		SettingsData.player_skin = skin_id
+		SettingsData.save_settings()
+
+## Xóa mesh cũ và build lại từ đầu với skin hiện tại.
+func _rebuild_mesh() -> void:
+	# Tháo equipment khỏi pivot cũ (tránh dangling ref)
+	_detach_all_equipment()
+
+	# Xóa rig cũ (kèm ground anchor)
+	if _mesh != null:
+		if _mesh.ground_anchor != null and is_instance_valid(_mesh.ground_anchor):
+			_mesh.ground_anchor.queue_free()
+		elif _mesh.rig != null and is_instance_valid(_mesh.rig):
+			_mesh.rig.queue_free()
+
+	# Build mesh mới
+	_mesh = _Skin.make_mesh(skin_id)
+	_mesh.set_palette(_Skin.palette_for(skin_id))
+	_mesh.build(self)
+	_rig = _mesh.rig
+
+	# Khởi lại animator với mesh mới
+	if _anim != null:
+		_anim.setup(_mesh, self)
+
+	# Trang bị lại equipment lên pivot mới
+	_reattach_all_equipment()
+
+## Tháo tất cả equipment nodes khỏi pivot (trước khi xóa mesh).
+func _detach_all_equipment() -> void:
+	if _mesh == null:
+		return
+	var pivots := [_mesh.helmet_pivot, _mesh.chestplate_pivot,
+		_mesh.gauntlet_l_pivot, _mesh.gauntlet_r_pivot,
+		_mesh.boot_l_pivot, _mesh.boot_r_pivot,
+		_mesh.leg_armor_l_pivot, _mesh.leg_armor_r_pivot,
+		_mesh.ring_pivot, _mesh.back_gear_pivot]
+	for pv in pivots:
+		if pv == null or not is_instance_valid(pv):
+			continue
+		for ch in pv.get_children():
+			pv.remove_child(ch)
+			ch.queue_free()
+
+## Gắn lại equipment hiện tại sau khi rebuild mesh.
+## Đơn giản nhất: gọi lại _apply_equipped_items nếu có, hoặc noop nếu chưa implement.
+func _reattach_all_equipment() -> void:
+	if has_method("_apply_equipped_items"):
+		call("_apply_equipped_items")
 
 func _setup_pickup_area() -> void:
 	var pickup := Area3D.new()
@@ -769,12 +849,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				return
 			if k.is_action_pressed("jump") and _freeze_timer <= 0.0 and can_jump():
 				_jbuf = JUMP_BUFFER
-			if k.is_action_pressed("camera_toggle"):
-				_toggle_camera()
 			if k.is_action_pressed("save_game"):
 				if SaveManager:
 					SaveManager.save_game()
 					_scroll_inventory_message(tr("GAME_SAVED"))
+	super._unhandled_key_input(event)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not _active:

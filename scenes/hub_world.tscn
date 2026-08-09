@@ -38,13 +38,13 @@ script = ExtResource("2")
 target_path = NodePath("../CharacterManager/Player")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
-current = true
 
 [node name="TPCameraRig" type="Node3D" parent="."]
 script = ExtResource("5")
 target_path = NodePath("../CharacterManager/Player")
 
 [node name="Camera3D" type="Camera3D" parent="TPCameraRig"]
+current = true
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 script = ExtResource("4")

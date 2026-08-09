@@ -141,7 +141,6 @@ var _max_water_ly: int = -1
 var _has_ores: bool = false
 var _has_soil: bool = false
 var _top_ly_cache := PackedInt32Array()
-var _occlude_active: bool = false  # chunk đang dùng terrain_occlude material
 
 ## Block data — cho phép set_block / get_block sau này (build/mine)
 var block_data: _BlockData = null
@@ -2181,91 +2180,6 @@ void fragment() {
 	m.set_shader_parameter("fade_top", 1.8)
 	return m
 
-## ── Terrain occlude — làm mờ block che khuất player (camera iso) ─────────────
-## Chỉ mờ fragment nằm GIỮA camera và player: dùng half-space test với mặt
-## phẳng đi qua player, pháp tuyến = hướng camera→player (ngược lại).
-## Fragment nằm "phía camera" so với player → nằm trong half-space → mờ.
-## Fragment "sau lưng player" so với camera → không bị ảnh hưởng.
-static func _make_terrain_occlude_mat(_dim_id: int) -> ShaderMaterial:
-	var s := Shader.new()
-	s.code = """
-shader_type spatial;
-render_mode blend_mix, cull_back;
-
-uniform vec3  occlude_player  = vec3(0.0);
-uniform vec3  occlude_cam_dir = vec3(0.577, 0.577, 0.577);
-// Khoảng cách từ player đến camera (để giới hạn vùng fade đúng đoạn cam→player)
-uniform float occlude_dist    = 52.0;
-// Bán kính hình trụ quanh trục cam→player
-uniform float occlude_radius  = 8.0;
-// Block sát player (margin đầu) và sát cam (margin cuối) không bị fade
-uniform float occlude_margin  = 1.0;
-// Alpha tối thiểu khi fade mạnh nhất — đủ cao để nhìn thấy địa hình mờ
-uniform float occlude_alpha   = 0.52;
-
-void fragment() {
-	vec3 wp      = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	ALBEDO       = COLOR.rgb;
-	ROUGHNESS    = 0.9;
-	METALLIC     = 0.0;
-
-	vec3  to_frag = wp - occlude_player;
-
-	// Projection lên trục player→cam
-	float along   = dot(to_frag, occlude_cam_dir);
-
-	// Chỉ fade trong đoạn [margin, dist - margin_end]
-	float margin_end = 4.0;
-	float in_range   = smoothstep(occlude_margin, occlude_margin + 1.0, along)
-	                 * (1.0 - smoothstep(occlude_dist - margin_end, occlude_dist, along));
-
-	// Khoảng cách vuông góc → hình trụ mềm
-	vec3  axial  = along * occlude_cam_dir;
-	float r_perp = length(to_frag - axial);
-	float in_cyl = 1.0 - smoothstep(occlude_radius * 0.55, occlude_radius, r_perp);
-
-	float fade = in_cyl * in_range;
-	ALPHA = mix(1.0, occlude_alpha, fade);
-}
-"""
-	var m := ShaderMaterial.new()
-	m.shader = s
-	m.set_shader_parameter("occlude_player",  Vector3.ZERO)
-	m.set_shader_parameter("occlude_cam_dir", Vector3(0.577, 0.577, 0.577))
-	m.set_shader_parameter("occlude_dist",    52.0)
-	m.set_shader_parameter("occlude_radius",  8.0)
-	m.set_shader_parameter("occlude_margin",  1.0)
-	m.set_shader_parameter("occlude_alpha",   0.52)
-	return m
-
-## Cập nhật uniform occlude — gọi mỗi frame khi có chunk đang bị mờ.
-## cam_dir = hướng TỪ PLAYER ĐẾN CAMERA (normalised), dist = khoảng cách thực tế.
-static func set_occlude_uniforms(dim_id: int, player_pos: Vector3,
-		cam_dir: Vector3, dist: float, radius: float, alpha: float) -> void:
-	var fm := _mat_cache.get(dim_id, {}).get("terrain_occlude", null) as ShaderMaterial
-	if not is_instance_valid(fm):
-		return
-	fm.set_shader_parameter("occlude_player",  player_pos)
-	fm.set_shader_parameter("occlude_cam_dir", cam_dir)
-	fm.set_shader_parameter("occlude_dist",    dist)
-	fm.set_shader_parameter("occlude_radius",  radius)
-	fm.set_shader_parameter("occlude_alpha",   alpha)
-
-## Bật/tắt occlude cho terrain mesh của chunk này.
-## occlude=true  → dùng terrain_occlude material (shader làm mờ block che khuất)
-## occlude=false → trả về terrain hoặc terrain_fade tuỳ trạng thái underground
-func set_terrain_occlude(occlude: bool) -> void:
-	_occlude_active = occlude
-	if _terrain_mesh_instance == null or not is_instance_valid(_terrain_mesh_instance):
-		return
-	var cache: Dictionary = _mat_cache.get(_dimension_id, {})
-	if occlude and cache.has("terrain_occlude"):
-		_terrain_mesh_instance.material_override = cache["terrain_occlude"]
-	elif _fade_state and cache.has("terrain_fade"):
-		_terrain_mesh_instance.material_override = cache["terrain_fade"]
-	elif cache.has("terrain"):
-		_terrain_mesh_instance.material_override = cache["terrain"]
-
 ## Cập nhật uniform chung của toàn bộ fade material (1 lần/frame).
 static func set_fade_uniforms(dim_id: int, center: Vector3, radius: float,
 		bottom: float, top: float) -> void:
@@ -2282,9 +2196,6 @@ func set_terrain_fade(fade: bool) -> void:
 	_fade_state = fade
 	if _terrain_mesh_instance == null or not is_instance_valid(_terrain_mesh_instance):
 		return
-	# Occlude có ưu tiên cao hơn — không overwrite khi chunk đang bị che khuất
-	if _occlude_active:
-		return
 	var cache: Dictionary = _mat_cache.get(_dimension_id, {})
 	if fade and cache.has("terrain_fade"):
 		_terrain_mesh_instance.material_override = cache["terrain_fade"]
@@ -2298,7 +2209,6 @@ func _init_materials() -> void:
 		m_t.roughness = 0.9; m_t.metallic_specular = 0.0
 		_mat_cache[_dimension_id] = { "terrain": m_t,
 			"terrain_fade": _make_terrain_fade_mat(_dimension_id),
-			"terrain_occlude": _make_terrain_occlude_mat(_dimension_id),
 			"water": _make_water_shader(_dimension_id) }
 		return
 	var m_t := StandardMaterial3D.new()
@@ -2306,7 +2216,6 @@ func _init_materials() -> void:
 	m_t.roughness = 1.0; m_t.metallic_specular = 0.0
 	_mat_cache[_dimension_id] = { "terrain": m_t,
 		"terrain_fade": _make_terrain_fade_mat(_dimension_id),
-		"terrain_occlude": _make_terrain_occlude_mat(_dimension_id),
 		"water": _make_water_shader(_dimension_id) }
 
 ## ── apply_chunk: nhận data từ thread, tạo nodes ──────────────────────────────
@@ -2696,10 +2605,8 @@ func rebuild_mesh(at := Vector3i(-1, -1, -1)) -> void:
 
 	var mi := MeshInstance3D.new()
 	mi.mesh = mesh
-	# Khôi phục đúng material state: occlude → occlude, underground fade → fade, còn lại → terrain
-	if _occlude_active and _mat_cache[_dimension_id].has("terrain_occlude"):
-		mi.material_override = _mat_cache[_dimension_id]["terrain_occlude"]
-	elif _fade_state and _mat_cache[_dimension_id].has("terrain_fade"):
+	# Khôi phục đúng material state: underground fade → fade, còn lại → terrain
+	if _fade_state and _mat_cache[_dimension_id].has("terrain_fade"):
 		mi.material_override = _mat_cache[_dimension_id]["terrain_fade"]
 	else:
 		mi.material_override = _mat_cache[_dimension_id]["terrain"]
