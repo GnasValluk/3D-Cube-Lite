@@ -153,7 +153,7 @@ static func create_item_db() -> Dictionary:
 	# ── Khối (đào từ thế giới) ─────────────────────────────────────────────────
 	_add(db, "block_grass",       "Cỏ",        ItemDef.Type.BLOCK, Color(0.22, 0.58, 0.14), "🧱", "Khối cỏ",           true, 64)
 	_add(db, "block_dark_grass",  "Cỏ Tối",    ItemDef.Type.BLOCK, Color(0.14, 0.40, 0.08), "🧱", "Khối cỏ tối",       true, 64)
-	_add(db, "block_young_grass", "Cỏ Non",    ItemDef.Type.BLOCK, Color(0.44, 0.38, 0.13), "🧱", "Khối cỏ non — bãi đất pha cỏ mới mọc ở đồng bằng", true, 64)
+	_add(db, "block_young_grass", "Cỏ Non",    ItemDef.Type.BLOCK, Color(0.34, 0.58, 0.14), "🧱", "Khối cỏ non — bãi đất pha cỏ mới mọc ở đồng bằng", true, 64)
 	_add(db, "block_grass_dirt", "Cỏ Đồng Bằng Cỏ", ItemDef.Type.BLOCK, Color(0.16, 0.54, 0.10), "🧱", "Khối cỏ đồng bằng — địa hình đồi thoải chung, hợp nhất đồng bằng + cao nguyên", true, 64)
 	_add(db, "block_desert_plateau", "Cát Cao Nguyên Sa Mạc", ItemDef.Type.BLOCK, Color(0.90, 0.82, 0.55), "🧱", "Khối cát cao nguyên sa mạc — sa mạc nâng cao, địa hình gồ ghề (mesa)", true, 64)
 	_add(db, "block_twilight_grass", "Cỏ Twilight", ItemDef.Type.BLOCK, Color(0.12, 0.28, 0.20), "🧱", "Khối cỏ Twilight — bề mặt thế giới Twilight", true, 64)

@@ -29,6 +29,11 @@ var _loaded_initial: int = 0
 ## ── Fade dưới lòng đất (x-ray) ─────────────────────────────────────────────
 var _fade_active: bool = false
 
+## ── Occlude fade — làm mờ block che khuất player từ camera iso ──────────────
+var _occlude_chunks: Array[WorldChunk] = []  # chunk đang được làm mờ
+var _occlude_timer: float = 0.0              # throttle ray-AABB mỗi 0.1s
+const _OCCLUDE_INTERVAL: float = 0.10        # giây giữa các lần tính chunk
+
 signal initial_chunks_ready
 
 func _ready() -> void:
@@ -105,6 +110,97 @@ func _update_underground_fade(ppos: Vector3) -> void:
 		WorldChunk.set_fade_uniforms(dimension_id, ppos, 2.5,
 			ppos.y - 0.5, ppos.y + 2.0)
 
+## ── Occlude fade: làm mờ terrain block che khuất player từ camera iso ────────
+## Shader dùng half-space test: chỉ mờ fragment nằm về phía camera so với
+## player. Mọi chunk đều dùng chung 1 material (shared shader), chỉ cần
+## bật/tắt khi player di chuyển đủ xa hoặc camera thay đổi góc.
+func _update_occlusion_fade(ppos: Vector3, delta: float) -> void:
+	_occlude_timer -= delta
+
+	# Lấy camera để tính cam_dir và dist
+	var cam: Camera3D = null
+	var vp := get_viewport()
+	if vp != null:
+		cam = vp.get_camera_3d()
+
+	# Tính cam_dir + dist mỗi frame (dùng chung cho cả uniform update lẫn raycast)
+	var cam_dir := Vector3(0.577, 0.577, 0.577)
+	var cam_dist: float = 52.0
+	if cam != null:
+		var v: Vector3 = cam.global_position - ppos
+		cam_dist = v.length()
+		if cam_dist > 0.01:
+			cam_dir = v / cam_dist
+
+	# Luôn push uniform mỗi frame để shader bám player mượt
+	if not _occlude_chunks.is_empty():
+		WorldChunk.set_occlude_uniforms(dimension_id, ppos, cam_dir,
+			cam_dist, 8.0, 0.52)
+
+	if _occlude_timer > 0.0:
+		return
+	_occlude_timer = _OCCLUDE_INTERVAL
+
+	if cam == null:
+		return
+
+	# Tìm chunk nào bị ray camera→player đi qua — dùng ray-AABB slab test.
+	# Shader tự lọc fragment nào thực sự nằm trong hình trụ cam→player.
+	var cam_pos: Vector3 = cam.global_position
+	# dir = hướng từ cam đến player
+	var dir: Vector3 = -cam_dir  # cam_dir là player→cam, đảo lại
+
+	var new_occluded: Array[WorldChunk] = []
+	for key in _chunks:
+		var chunk: WorldChunk = _chunks[key] as WorldChunk
+		if chunk == null or not is_instance_valid(chunk) or not chunk._built:
+			continue
+
+		# AABB chunk (origin = góc TL)
+		var o: Vector3 = chunk.global_position
+		var aabb_min := Vector3(o.x, o.y - 1.0, o.z)
+		var aabb_max := Vector3(o.x + CHUNK_SIZE, o.y + 40.0, o.z + CHUNK_SIZE)
+
+		# Ray-AABB slab test (ray từ cam đến player)
+		var t_min: float = 0.001
+		var t_max: float = cam_dist
+		var hit: bool = true
+		for axis in [0, 1, 2]:
+			if absf(dir[axis]) < 1e-6:
+				if cam_pos[axis] < aabb_min[axis] or cam_pos[axis] > aabb_max[axis]:
+					hit = false; break
+				continue
+			var inv_d: float = 1.0 / dir[axis]
+			var t1: float = (aabb_min[axis] - cam_pos[axis]) * inv_d
+			var t2: float = (aabb_max[axis] - cam_pos[axis]) * inv_d
+			if t1 > t2:
+				var tmp: float = t1; t1 = t2; t2 = tmp
+			t_min = maxf(t_min, t1)
+			t_max = minf(t_max, t2)
+			if t_min > t_max:
+				hit = false; break
+
+		if not hit:
+			continue
+		new_occluded.append(chunk)
+
+	# Tắt occlude cho chunk không còn trên đường cam→player
+	for old_chunk in _occlude_chunks:
+		if is_instance_valid(old_chunk) and not new_occluded.has(old_chunk):
+			old_chunk.set_terrain_occlude(false)
+
+	# Bật occlude cho chunk mới trên đường
+	for new_chunk in new_occluded:
+		if not _occlude_chunks.has(new_chunk):
+			new_chunk.set_terrain_occlude(true)
+
+	_occlude_chunks = new_occluded
+
+	# Push uniform ngay sau khi cập nhật danh sách (chunk mới cần uniform đúng ngay)
+	if not _occlude_chunks.is_empty():
+		WorldChunk.set_occlude_uniforms(dimension_id, ppos, cam_dir,
+			cam_dist, 8.0, 0.52)
+
 func _process(_delta: float) -> void:
 	if _player == null or not is_instance_valid(_player) or not _player.is_inside_tree():
 		_find_player()
@@ -116,6 +212,7 @@ func _process(_delta: float) -> void:
 	var cur := Vector2i(cx, cz)
 
 	_update_underground_fade(ppos)
+	_update_occlusion_fade(ppos, _delta)
 
 	# Promote completed async chunks — theo NGÂN SÁCH THỜI GIAN/frame thay vì
 	# cố định 1 chunk/frame. Chunk nào tính xong trên worker (cheap sau khi đưa
@@ -165,10 +262,16 @@ func _process(_delta: float) -> void:
 
 		for key in _chunks.keys():
 			if not key in keep:
+				var leaving: WorldChunk = _chunks[key] as WorldChunk
+				if leaving != null and is_instance_valid(leaving):
+					_occlude_chunks.erase(leaving)
 				_chunks[key].queue_free()
 				_chunks.erase(key)
 		for key in _loading.keys():
 			if not key in keep:
+				var leaving: WorldChunk = _loading[key] as WorldChunk
+				if leaving != null and is_instance_valid(leaving):
+					_occlude_chunks.erase(leaving)
 				var ck_pending: String = "%d,%d,%d" % [key.x, key.y, dimension_id]
 				WorldChunk._pending_chunks.erase(ck_pending)
 				_loading[key].queue_free()

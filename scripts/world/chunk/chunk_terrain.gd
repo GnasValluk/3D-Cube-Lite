@@ -478,8 +478,8 @@ static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 	# Block đặt lẻ (lơ lửng / chồng lệch) → mặt bên chỉ vẽ nơi hàng xóm CÙNG
 	# layer là AIR/WATER — không bị nuốt mặt, không thấy void xuyên qua.
 	# Mặt dưới vẽ khi dưới đáy run là AIR/WATER (2 góc nhìn của game).
-	var side_mul: float = 0.50
-	var bot_mul: float = 0.35
+	var side_mul: float = 0.62
+	var bot_mul: float = 0.40
 	var _dirs4 := [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 	for x in range(cols):
 		for z in range(cols):

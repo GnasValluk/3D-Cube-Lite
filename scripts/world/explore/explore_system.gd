@@ -208,7 +208,7 @@ func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 	if dn > 0.71:
 		return Color(0.55, 0.48, 0.14)                # DRY_GRASS (cỏ già)
 	if dn > 0.68:
-		return Color(0.44, 0.38, 0.13)                # YOUNG_GRASS
+		return Color(0.34, 0.58, 0.14)                # YOUNG_GRASS
 	if dn > 0.65:
 		return Color(0.28, 0.42, 0.10)                # SPARSE_GRASS (cỏ thưa)
 	if dn > 0.61:

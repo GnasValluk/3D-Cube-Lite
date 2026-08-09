@@ -175,25 +175,25 @@ const RIVER_GRID_R: int = 40
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 
 ## ── Màu sắc theo block ID ────────────────────────────────────────────────────
-## Index = BlockID value — màu đậm, bão hòa cao cho unshaded renderer
+## Index = BlockID value — màu cho unshaded renderer (side_mul=0.50 tạo shading giả)
 const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0, 0, 0, 0),                 # 0 AIR
-	Color(0.18, 0.64, 0.12),           # 1 GRASS
-	Color(0.11, 0.46, 0.07),           # 2 DARK_GRASS
-	Color(0.92, 0.78, 0.32),           # 3 SAND (hồ nội địa)
-	Color(0.42, 0.22, 0.08),           # 4 DIRT
-	Color(0.16, 0.15, 0.13),           # 5 SILT
+	Color(0.22, 0.58, 0.14),           # 1 GRASS — xanh cỏ tươi vừa phải, bớt chói
+	Color(0.12, 0.40, 0.08),           # 2 DARK_GRASS — xanh sậm rừng rậm
+	Color(0.90, 0.76, 0.40),           # 3 SAND (hồ nội địa) — vàng cát ấm
+	Color(0.46, 0.30, 0.14),           # 4 DIRT — nâu đất ấm, tương phản tốt hơn
+	Color(0.20, 0.18, 0.15),           # 5 SILT — xám bùn hơi ấm
 	Color(0.08, 0.36, 0.68, 0.70),     # 6 WATER (backward compat)
-	Color(0.42, 0.42, 0.46),           # 7 STONE
-	Color(0.28, 0.16, 0.06),           # 8 DARK_DIRT
-	Color(0.80, 0.66, 0.28),           # 9 SAND_DEEP
-	Color(0.14, 0.12, 0.14),           # 10 BEDROCK
-	Color(0.76, 0.58, 0.22),           # 11 TRAIL
-	Color(0.22, 0.28, 0.32),           # 12 OCEAN_FLOOR — cát thô xám xanh đáy biển
-	Color(0.86, 0.78, 0.52),           # 13 OCEAN_SAND  — cát bãi biển sáng vừa
-	Color(0.54, 0.46, 0.22),           # 14 MUDDY_SAND — cát bùn pha trộn
-	Color(0.35, 0.30, 0.25),           # 15 OCEAN_GRAVEL — sỏi biển nâu xám
-	Color(0.16, 0.20, 0.22),           # 16 OCEAN_MUD — bùn biển sâu xanh xám
+	Color(0.46, 0.46, 0.50),           # 7 STONE — đá xám hơi xanh lạnh
+	Color(0.30, 0.18, 0.08),           # 8 DARK_DIRT — đất nâu tối
+	Color(0.82, 0.68, 0.32),           # 9 SAND_DEEP — cát sâu vàng nâu ấm
+	Color(0.16, 0.14, 0.16),           # 10 BEDROCK
+	Color(0.78, 0.60, 0.26),           # 11 TRAIL — đường mòn đất nâu vàng
+	Color(0.24, 0.30, 0.34),           # 12 OCEAN_FLOOR — cát thô xám xanh đáy biển
+	Color(0.88, 0.80, 0.56),           # 13 OCEAN_SAND  — cát bãi biển sáng vừa
+	Color(0.56, 0.48, 0.28),           # 14 MUDDY_SAND — cát bùn pha trộn
+	Color(0.38, 0.34, 0.28),           # 15 OCEAN_GRAVEL — sỏi biển nâu xám
+	Color(0.18, 0.22, 0.26),           # 16 OCEAN_MUD — bùn biển sâu xanh xám
 	Color(0.38, 0.29, 0.18),           # 17 COPPER_ORE
 	Color(0.55, 0.35, 0.25),           # 18 BAUXITE_ORE
 	Color(0.35, 0.35, 0.38),           # 19 SILVER_ORE
@@ -209,21 +209,21 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.16, 0.52, 0.76, 0.50),     # 29 WATER_LEVEL_3
 	Color(0.18, 0.56, 0.78, 0.45),     # 30 WATER_LEVEL_2
 	Color(0.20, 0.60, 0.80, 0.40),     # 31 WATER_LEVEL_1
-	Color(0.36, 0.22, 0.11),           # 32 TILLED_SOIL — đất tơi xốp (nâu đất, hơi sẫm hơn DIRT)
-	Color(0.28, 0.28, 0.30),           # 33 COAL_ORE
-	Color(0.42, 0.42, 0.46),           # 34 STONE_QTR — đá tư
-	Color(0.44, 0.44, 0.48),           # 35 STONE_EIGHTH — đá vụn
-	Color(0.40, 0.40, 0.44),           # 36 STONE_THIN — đá phiến mỏng
-	Color(0.54, 0.46, 0.38),           # 37 OAK_WOOD — gỗ sồi (nâu xám)
-	Color(0.44, 0.38, 0.13),           # 38 YOUNG_GRASS — bãi cỏ non (đất pha cỏ vàng xanh)
-	Color(0.38, 0.29, 0.17),           # 39 HARD_WOOD — gỗ cứng (nâu sẫm)
-	Color(0.16, 0.54, 0.10),           # 40 GRASS_DIRT — cỏ đồng bằng cỏ (xanh tươi, hợp nhất cao nguyên)
-	Color(0.90, 0.82, 0.55),           # 41 DESERT_PLATEAU — cát cao nguyên sa mạc (cát khô nhạt, phân biệt với SAND)
+	Color(0.38, 0.24, 0.12),           # 32 TILLED_SOIL — đất tơi xốp ẩm, nâu đậm
+	Color(0.26, 0.26, 0.28),           # 33 COAL_ORE — than đen xám
+	Color(0.46, 0.46, 0.50),           # 34 STONE_QTR — đá tư (khớp STONE)
+	Color(0.48, 0.48, 0.52),           # 35 STONE_EIGHTH — đá vụn sáng hơn chút
+	Color(0.44, 0.44, 0.48),           # 36 STONE_THIN — đá phiến mỏng
+	Color(0.56, 0.48, 0.36),           # 37 OAK_WOOD — gỗ sồi nâu ấm
+	Color(0.36, 0.56, 0.16),           # 38 YOUNG_GRASS — cỏ non xanh vàng tươi
+	Color(0.40, 0.30, 0.18),           # 39 HARD_WOOD — gỗ cứng nâu sẫm
+	Color(0.20, 0.52, 0.12),           # 40 GRASS_DIRT — cỏ đồng bằng xanh trung tính
+	Color(0.92, 0.84, 0.58),           # 41 DESERT_PLATEAU — cát cao nguyên khô nhạt
 	Color(0.12, 0.28, 0.20),           # 42 TWILIGHT_GRASS — cỏ Twilight (xanh tối rêu)
 	Color(0.09, 0.12, 0.10),           # 43 TWILIGHT_DIRT — đất Twilight (nâu tối xanh)
-	Color(0.55, 0.48, 0.14),           # 44 DRY_GRASS — cỏ già khô (vàng rạ)
-	Color(0.28, 0.42, 0.10),           # 45 SPARSE_GRASS — cỏ thưa lẫn đất (xanh nhạt pha đất)
-	Color(0.94, 0.88, 0.62),           # 46 PALE_SAND — cát phai (nhạt hơn DESERT)
+	Color(0.62, 0.54, 0.22),           # 44 DRY_GRASS — cỏ già khô vàng rạ rõ hơn
+	Color(0.32, 0.46, 0.14),           # 45 SPARSE_GRASS — cỏ thưa xanh lá đất
+	Color(0.96, 0.90, 0.68),           # 46 PALE_SAND — cát phai sáng nhạt
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
