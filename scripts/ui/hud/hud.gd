@@ -50,6 +50,7 @@ var _explore_sys: ExploreSystem
 var _mini_map: MiniMap
 var _phone_ui: PhoneUI
 var _nearest_hint = null
+var _chat_overlay: ChatOverlay = null
 
 enum { LOAD_IDLE, LOAD_LOADING, LOAD_READY, LOAD_FADEOUT }
 var _load_state: int = LOAD_IDLE
@@ -89,6 +90,7 @@ const _FurnaceUI = preload("res://scripts/items/ui/furnace_ui.gd")
 const _Library = preload("res://scripts/ui/library/creature_library.gd")
 const _Debug = preload("debug_menu.gd")
 const _NearestHint = preload("res://scripts/ui/hud/nearest_creature_hint.gd")
+const _ChatOverlay = preload("res://scripts/ui/chat_overlay.gd")
 
 func _ready() -> void:
 	_setup_ui()
@@ -192,6 +194,14 @@ func _setup_ui() -> void:
 	_nearest_hint = _NearestHint.new()
 	_nearest_hint.player_getter = Callable(self, "_find_player_character")
 	add_child(_nearest_hint)
+
+	_chat_overlay = _ChatOverlay.new()
+	_chat_overlay.message_submitted.connect(_on_chat_submitted)
+	add_child(_chat_overlay)
+	if Net != null:
+		Net.chat_message_received.connect(_on_chat_message)
+		if Net.is_active():
+			_chat_overlay.visible = true
 
 	_build_hint = Label.new()
 	_build_hint.position = Vector2(17, 78)
@@ -477,6 +487,9 @@ func _process(delta: float) -> void:
 		_update_debug_menu()
 
 	if _load_state == LOAD_IDLE:
+		if Net and Net.is_active():
+			_portal_btn.visible = false
+			return
 		var platform := _find_portal_gate()
 		if platform and platform.is_player_on():
 			var cur := get_tree().current_scene.scene_file_path
@@ -524,6 +537,16 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
+			# Chat: mở input bằng Enter (ui_accept) khi đang chơi và có Net active.
+			if _chat_overlay and Net != null and Net.is_active():
+				if _chat_overlay.is_input_open():
+					if k.is_action_pressed("ui_cancel"):
+						_chat_overlay.close_input()
+						return
+				elif k.is_action_pressed("ui_accept"):
+					_chat_overlay.open_input()
+					return
+
 			if _chest_open:
 				if k.is_action_pressed("controls/interact") or k.is_action_pressed("ui_cancel") or k.is_action_pressed("controls/inventory"):
 					close_chest()
@@ -616,6 +639,14 @@ func _release_focus(node: Node) -> void:
 		node.release_focus()
 	for child in node.get_children():
 		_release_focus(child)
+
+func _on_chat_message(sender_name: String, sender_color: Color, text: String) -> void:
+	if _chat_overlay:
+		_chat_overlay.add_message(sender_name, sender_color, text)
+
+func _on_chat_submitted(text: String) -> void:
+	if Net != null:
+		Net.send_chat_message(text)
 
 func open_chest(chest) -> void:
 	if _chest_open:

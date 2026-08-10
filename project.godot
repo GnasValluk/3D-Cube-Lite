@@ -26,6 +26,7 @@ SFXManager="*res://scripts/audio/sfx_manager.gd"
 CollisionQueue="*res://scripts/core/collision_queue.gd"
 WaterRebuildQueue="*res://scripts/core/water_rebuild_queue.gd"
 SettingsData="*res://scripts/core/settings_manager.gd"
+Net="*res://scripts/core/network_manager.gd"
 
 [display]
 

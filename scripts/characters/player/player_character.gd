@@ -502,7 +502,12 @@ func _spawn_death_chest() -> void:
 			var idx := chest_inv.find_slot_of_item(it)
 			if idx >= 0:
 				chest_inv.slots[idx].durability = eq_dur[i]
-	chest.inventory = chest_inv
+	# Multiplayer: mọi máy spawn death chest giống hệt qua net (host-authoritative).
+	if Net.is_active():
+		chest.queue_free()
+		Net.announce_death_chest(global_position + Vector3(0, 0.6, 0), chest_inv.to_dict())
+	else:
+		chest.inventory = chest_inv
 	if inventory != null:
 		for slot in inventory.slots:
 			slot.clear()
@@ -535,6 +540,8 @@ func _do_respawn() -> void:
 	revive()
 	_death_chest_spawned = false
 	_scroll_inventory_message(tr("DEATH_CHEST_MSG"))
+	if Net.is_active():
+		Net.announce_respawn(global_position)
 
 func use_item_from_inventory(idx: int) -> void:
 	if inventory == null:
@@ -1397,6 +1404,20 @@ func _raycast_target_block() -> Vector3:
 
 func _ready() -> void:
 	await super._ready()
+	if Net.is_active():
+		Net.death_chest_spawned.connect(_on_net_death_chest_spawned)
+
+func _on_net_death_chest_spawned(_owner_peer: int, pos: Vector3, inv_data: Array) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var chest := Chest.new()
+	chest.name = "NetDeathChest"
+	scene.add_child(chest)
+	chest.global_position = pos
+	var chest_inv := Inventory.new(45)
+	chest_inv.from_dict(inv_data)
+	chest.inventory = chest_inv
 
 func _animate(delta: float) -> void:
 	_anim.animate(delta)

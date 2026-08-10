@@ -1,4 +1,4 @@
-keys,en,vi
+﻿keys,en,vi
 SETTINGS_TITLE,Settings,CÀI ĐẶT
 CLOSE,Close,ĐÓNG
 LANGUAGE,Language,Ngôn ngữ
@@ -250,6 +250,9 @@ WEATHER_RAIN,Rain,Mưa
 TEMP_FORMAT,%d°C,%d°C
 FRAMERATE,Framerate (FPS),FPS (Khung hình)
 FPS_UNLIMITED,Unlimited,Không giới hạn
+CHUNK_VIEW,Chunk View Distance,Khoảng cách tải Chunk
+CHUNK_VIEW_DESC,"Controls how many chunks are loaded around you. Higher = see farther (uses more memory).","Điều khiển số chunk tải quanh bạn. Cao hơn = nhìn xa hơn (tốn bộ nhớ hơn)."
+CHUNK_VIEW_DIM,"%d x %d chunks","%d x %d chunk"
 FURNACE_LABEL,Furnace,Lò Nung
 FURNACE_INPUT,Raw Material,Nguyên Liệu
 FURNACE_OUTPUT,Product,Sản Phẩm
@@ -276,3 +279,15 @@ PLANT_PALM,Palm Tree,Cây cọ
 PLANT_WATERMELON,Watermelon Vine,Dây dưa hấu
 PLANT_PUMPKIN,Pumpkin Vine,Dây bí ngô
 PLANT_EGGPLANT,Eggplant,Cà tím
+MULTIPLAYER,Multiplayer,Đa người chơi
+MP_SCANNING,Scanning for hosts...,Đang tìm máy chủ...
+MP_SCANNING_HINT,Find players hosting a world on your network,Chọn người chơi đang mở thế giới trong mạng
+MP_NO_HOSTS,No hosts found,Chưa có máy chủ nào
+MP_YOUR_NAME,Your name,Tên của bạn
+MP_ADVANCED,Advanced,Nâng cao
+MP_JOIN,Join,Vào
+MP_JOIN_FAILED,Connection failed,Không kết nối được
+MP_CONNECTING,Connecting...,Đang kết nối...
+MP_MODE_TITLE,Multiplayer mode (you are the host),Chế độ đa người chơi (bạn là host)
+MP_MODE_HINT,Create this world as a multiplayer server,Tạo thế giới này dưới dạng máy chủ đa người chơi
+CHAT_INPUT_HINT,Type a message (Enter to send),Nhập tin nhắn (Enter để gửi)

@@ -20,6 +20,10 @@ func _ready():
 
 func _process(delta):
 	if _is_in_game_world():
+		# Multiplayer: chỉ host mới là chủ thế giới; client không tự auto-save.
+		if Net and Net.is_active():
+			_load_applied = true
+			return
 		if not _load_applied and WorldSeed.is_loading:
 			_load_and_apply()
 		_auto_save_timer += delta
@@ -30,6 +34,8 @@ func _process(delta):
 func _notification(what: int):
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		if _is_in_game_world():
+			if Net and Net.is_active():
+				return
 			save_game()
 
 func _is_in_game_world() -> bool:

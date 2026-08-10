@@ -330,6 +330,37 @@ func _build_graphics_tab() -> void:
 		)
 		fps_hbox.add_child(btn)
 
+	_section_label(tr("CHUNK_VIEW"))
+	var chunk_desc := Label.new()
+	chunk_desc.text = tr("CHUNK_VIEW_DESC")
+	chunk_desc.add_theme_font_size_override("font_size", 18)
+	chunk_desc.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.70))
+	chunk_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	chunk_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(chunk_desc)
+
+	var cur_chunk_view: int = _get_chunk_view()
+	var chunk_hbox := HBoxContainer.new()
+	chunk_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(chunk_hbox)
+	var chunk_slider := HSlider.new()
+	chunk_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	chunk_slider.min_value = 2.0
+	chunk_slider.max_value = 8.0
+	chunk_slider.step = 1.0
+	chunk_slider.value = cur_chunk_view
+	chunk_hbox.add_child(chunk_slider)
+	var chunk_val := Label.new()
+	chunk_val.add_theme_font_size_override("font_size", 18)
+	chunk_val.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
+	chunk_val.text = tr("CHUNK_VIEW_DIM") % [cur_chunk_view * 2 + 1, cur_chunk_view * 2 + 1]
+	chunk_hbox.add_child(chunk_val)
+	chunk_slider.value_changed.connect(func(v: float):
+		var rv := int(v)
+		chunk_val.text = tr("CHUNK_VIEW_DIM") % [rv * 2 + 1, rv * 2 + 1]
+		_set_chunk_view(rv)
+	)
+
 func _build_audio_tab() -> void:
 	_section_label(tr("MASTER_VOLUME"))
 	_add_slider(_get_master_volume(), func(v): _set_master_volume(v))
@@ -458,6 +489,8 @@ func _get_mouse_sensitivity() -> float: return _Settings.get_mouse_sensitivity()
 func _set_mouse_sensitivity(v: float) -> void: _Settings.set_mouse_sensitivity(v)
 func _is_invert_y() -> bool: return _Settings.is_invert_y()
 func _set_invert_y(v: bool) -> void: _Settings.set_invert_y(v)
+func _get_chunk_view() -> int: return _Settings.get_chunk_view()
+func _set_chunk_view(v: int) -> void: _Settings.set_chunk_view(v)
 
 # ── Language ─────────────────────────────────────────────────────────────────
 

@@ -23,6 +23,8 @@ var _title_lbl: Label
 var _name_lbl: Label
 var _seed_lbl: Label
 var _adv_btn: Button
+var _mp_toggle: CheckButton
+var _mp_hint: Label
 
 func _ready() -> void:
 	_setup()
@@ -38,6 +40,8 @@ func _refresh_texts() -> void:
 	_name_input.placeholder_text = tr("WORLD_NAME_PLACEHOLDER")
 	_adv_btn.text = tr("ADVANCED_SETTINGS")
 	_seed_lbl.text = tr("SEED_WORLD")
+	_mp_toggle.text = tr("MP_MODE_TITLE")
+	_mp_hint.text = tr("MP_MODE_HINT")
 	_create_btn.text = tr("CREATE_JOURNEY")
 	_back_btn.text = tr("BACK")
 
@@ -47,6 +51,7 @@ func setup() -> void:
 	if _name_input:
 		_name_input.text = ""
 		_seed_input.text = ""
+		_mp_toggle.button_pressed = false
 		_adv_panel.visible = false
 		_adv_expanded = false
 
@@ -138,9 +143,12 @@ func _setup() -> void:
 	_adv_btn.pressed.connect(_toggle_advanced)
 	add_child(_adv_btn)
 
+	var btn_w: float = pw * 0.4
+	var btn_y: float = py + ph - 72
+
 	_adv_panel = Control.new()
-	_adv_panel.position = Vector2(px + 28, py + 200)
-	_adv_panel.size = Vector2(pw - 56, 80)
+	_adv_panel.position = Vector2(px + 28, btn_y - 160)
+	_adv_panel.size = Vector2(pw - 56, 150)
 	_adv_panel.visible = false
 	add_child(_adv_panel)
 
@@ -163,8 +171,25 @@ func _setup() -> void:
 	_seed_input.max_length = 10
 	_adv_panel.add_child(_seed_input)
 
-	var btn_w: float = pw * 0.4
-	var btn_y: float = py + ph - 72
+	_mp_toggle = CheckButton.new()
+	_mp_toggle.text = tr("MP_MODE_TITLE")
+	_mp_toggle.button_pressed = false
+	_mp_toggle.position = Vector2(0, 86)
+	_mp_toggle.size = Vector2(pw - 56, 32)
+	_mp_toggle.add_theme_font_size_override("font_size", 19)
+	_mp_toggle.add_theme_color_override("font_color", Color(TEXT_BRIGHT.r, TEXT_BRIGHT.g, TEXT_BRIGHT.b, 0.9))
+	_mp_toggle.add_theme_color_override("font_hover_color", TEXT_BRIGHT)
+	_mp_toggle.add_theme_color_override("font_pressed_color", TEXT_BRIGHT)
+	_mp_toggle.add_theme_constant_override("h_separation", 10)
+	_adv_panel.add_child(_mp_toggle)
+
+	_mp_hint = Label.new()
+	_mp_hint.text = tr("MP_MODE_HINT")
+	_mp_hint.add_theme_font_size_override("font_size", 14)
+	_mp_hint.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.6))
+	_mp_hint.position = Vector2(0, 122)
+	_mp_hint.size = Vector2(pw - 56, 24)
+	_adv_panel.add_child(_mp_hint)
 
 	_create_btn = Button.new()
 	_create_btn.text = tr("CREATE_JOURNEY")
@@ -226,6 +251,13 @@ func _on_create() -> void:
 	var name_text: String = _name_input.text.strip_edges()
 	var seed_str: String = _seed_input.text.strip_edges()
 	var seed_val: int = int(seed_str) if seed_str.is_valid_int() else randi() % 2147483647
+
+	# Chế độ đa người chơi: người tạo hành trình chính là HOST của thế giới đó.
+	if _mp_toggle.button_pressed:
+		var host_name: String = name_text if not name_text.is_empty() else "Host"
+		if not Net.host_game(Net.DEFAULT_PORT, host_name):
+			_mp_toggle.button_pressed = false
+			return
 
 	WorldSeed.start_new_journey(name_text, seed_val)
 	get_tree().change_scene_to_file("res://scenes/loading_screen.tscn")

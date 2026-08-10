@@ -1,0 +1,9 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+== test_mp_state_host ==
+PASS | host_game(7789) ok
+PASS | world_ready sau register_local_player
+PASS | host nhận state từ client (hp=60 max=60 food=10 max=10)
+PASS | host nhận inventory từ client (chứa shrimp)
+PASS | host nhận tín hiệu sẵn sàng của client (hp=61)
+TOTAL | PASS | 0 failures

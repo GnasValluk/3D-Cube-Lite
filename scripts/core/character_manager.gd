@@ -53,11 +53,17 @@ func _ready() -> void:
 
 	# Load lại hành trình: đặt player thẳng tại điểm đứng đã lưu (chunk trung
 	# tâm đã generate quanh vị trí này) — không spawn ở điểm đầu rồi teleport.
-	if WorldSeed.is_loading and WorldSeed.has_saved_player_pos:
+	# Client multiplayer cũng đặt tại spawn pos host gửi qua use_remote_spawn.
+	if WorldSeed.has_saved_player_pos and (WorldSeed.is_loading or WorldSeed.use_remote_spawn):
 		_characters[0].global_position = WorldSeed.saved_player_pos
 
 	_characters[0].set_active(true)
 	_characters[0].play_spawn_animation()
+
+	# Multiplayer: báo Net rằng player cục bộ đã sẵn sàng (host → nhận client
+	# chờ; client → spawn RemotePlayer cho các peer đã biết).
+	if Net:
+		Net.register_local_player(_characters[0])
 
 	_aim_cameras_at(_characters[0])
 	character_switched.emit(_characters[0])

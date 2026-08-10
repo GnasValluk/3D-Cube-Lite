@@ -10,15 +10,17 @@ var _new_journey_ui: Control  = null
 var _journey_list_ui: Control = null
 var _settings_ui: Control     = null
 var _about_ui: Control        = null
+var _multiplayer_ui: Control  = null
 var _new_btn: Button
 var _list_btn: Button
 var _set_btn: Button
 var _about_btn: Button
 var _quit_btn: Button
+var _mp_btn: Button
 
 var _panel: Panel
 var _panel_w: float = 520.0
-var _panel_h: float = 560.0
+var _panel_h: float = 700.0
 var _panel_base_pos: Vector2
 var _mouse_offset: Vector2
 
@@ -45,6 +47,7 @@ func _refresh_texts() -> void:
 	if not _new_btn: return
 	_new_btn.text = tr("NEW_JOURNEY")
 	_list_btn.text = tr("CONTINUE_JOURNEY")
+	_mp_btn.text = tr("MULTIPLAYER")
 	_set_btn.text = tr("SETTINGS_TITLE")
 	_about_btn.text = tr("ABOUT_US")
 	_quit_btn.text = tr("QUIT_GAME")
@@ -172,6 +175,13 @@ func _setup_ui() -> void:
 	content.add_child(_list_btn)
 	btn_y += btn_h + btn_gap
 
+	_mp_btn = _make_button(tr("MULTIPLAYER"), btn_x, btn_y, btn_w, btn_h,
+		Color(0.35, 0.30, 0.55, 0.08), Color(0.35, 0.30, 0.55, 0.20),
+		Color(0.35, 0.30, 0.55, 0.28))
+	_mp_btn.pressed.connect(_on_multiplayer)
+	content.add_child(_mp_btn)
+	btn_y += btn_h + btn_gap
+
 	_set_btn = _make_button(tr("SETTINGS_TITLE"), btn_x, btn_y, btn_w, btn_h,
 		Color(0.15, 0.40, 0.18, 0.08), Color(0.15, 0.40, 0.18, 0.20),
 		Color(0.15, 0.40, 0.18, 0.28))
@@ -234,6 +244,13 @@ func _on_settings() -> void:
 		_settings_ui = preload("res://scripts/ui/menus/settings_ui.gd").new()
 		add_child(_settings_ui)
 	(_settings_ui as SettingsUI).show_settings()
+
+func _on_multiplayer() -> void:
+	if _multiplayer_ui == null:
+		_multiplayer_ui = preload("res://scripts/ui/menus/multiplayer_menu.gd").new()
+		add_child(_multiplayer_ui)
+	_multiplayer_ui.visible = true
+	_multiplayer_ui.call("setup")
 
 func _on_about() -> void:
 	if _about_ui == null:

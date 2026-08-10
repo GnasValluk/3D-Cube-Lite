@@ -2,8 +2,7 @@ extends WorldEnvironment
 
 const CYCLE_DURATION: float = 600.0
 var _lights: Array[Light3D] = []
-var _dir_light: DirectionalLight3D
-var _sky_mat: ProceduralSkyMaterial
+var _sky_mat: ShaderMaterial
 
 const DAY_BG         := Color(0.42, 0.62, 0.72)
 const DAY_AMBIENT    := Color(0.50, 0.62, 0.74)
@@ -30,6 +29,8 @@ func _ready() -> void:
 	env.fog_height = 2.0
 	env.fog_height_density = 0.0
 	env.fog_light_color = Color(0.40, 0.42, 0.48)
+	# Không để fog tô đè lên bầu trời procedural (tránh nền xám phẳng).
+	env.fog_sky_affect = 0.0
 
 	_apply_graphics_preset(env)
 
@@ -142,50 +143,15 @@ func _setup_lights() -> void:
 		o.light_energy = 0.0
 		o.omni_range   = 0.1
 
-	var dir := get_parent().find_child("DirectionalLight3D", true, false) as DirectionalLight3D
-	if dir:
-		dir.light_color  = Color(1.0, 0.95, 0.82)
-		dir.light_energy = 5.0
-		_apply_shadow_settings(dir)
-		_dir_light = dir
-		_lights.append(dir)
-
 	var all := get_parent().find_children("*", "OmniLight3D", true, false)
 	for lt in all:
 		var l := lt as OmniLight3D
 		if l and l.name != "PlayerLight" and not l in _lights:
 			_lights.append(l)
 
-func _apply_shadow_settings(dir: DirectionalLight3D) -> void:
-	var preset: int = SettingsManager.effective_graphics_preset() if SettingsManager else 0
-
-	match preset:
-		SettingsManager.GraphicsPreset.STANDARD:
-			dir.shadow_enabled = false
-		SettingsManager.GraphicsPreset.ENHANCED:
-			dir.shadow_enabled = true
-			dir.shadow_bias = 0.02
-			dir.shadow_normal_bias = 0.5
-			dir.directional_shadow_max_distance = 40.0
-			dir.directional_shadow_split_1 = 0.1
-			dir.directional_shadow_split_2 = 0.3
-			dir.directional_shadow_split_3 = 0.6
-			dir.directional_shadow_blend_splits = false
-		SettingsManager.GraphicsPreset.REALISTIC:
-			dir.shadow_enabled = true
-			dir.shadow_bias = 0.01
-			dir.shadow_normal_bias = 0.3
-			dir.directional_shadow_max_distance = 80.0
-			dir.directional_shadow_split_1 = 0.12
-			dir.directional_shadow_split_2 = 0.3
-			dir.directional_shadow_split_3 = 0.55
-			dir.directional_shadow_blend_splits = true
-
 func _reapply_preset() -> void:
 	if environment:
 		_apply_graphics_preset(environment)
-	if _dir_light:
-		_apply_shadow_settings(_dir_light)
 	SettingsManager.apply_viewport_settings(get_viewport())
 
 func _process(delta: float) -> void:
@@ -203,7 +169,7 @@ func _process(delta: float) -> void:
 	var wi: float = RainManager.get_local_rain_intensity()
 	var rf: float = 1.0 - wi * 0.55
 
-	SkyLight.update_sky(_sky_mat, _dir_light, hour, wi)
+	SkyLight.update_sky(_sky_mat, hour, wi)
 	environment.ambient_light_color = DAY_AMBIENT.lerp(NIGHT_AMBIENT, 1.0 - t).lerp(Color(0.08, 0.10, 0.14), wi * 0.7)
 	environment.ambient_light_energy = lerp(DAY_AMB_ENERGY, NIGHT_AMB_ENERGY, 1.0 - t) * rf
 

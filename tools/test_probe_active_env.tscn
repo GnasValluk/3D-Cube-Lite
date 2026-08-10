@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tools/test_probe_active_env.gd" id="1_test"]
+
+[node name="TestProbeActiveEnv" type="Node"]
+script = ExtResource("1_test")

@@ -132,3 +132,9 @@ static func set_locale(locale: String) -> void:
 	TranslationServer.set_locale(locale)
 	SettingsManager.locale = locale
 	SettingsManager.save_settings()
+
+static func get_chunk_view() -> int:
+	return SettingsManager.chunk_view
+
+static func set_chunk_view(v: int) -> void:
+	SettingsManager.set_chunk_view(v)

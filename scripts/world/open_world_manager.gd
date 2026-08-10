@@ -2,9 +2,13 @@ extends Node3D
 class_name OpenWorldManager
 
 const CHUNK_SIZE: int = 32
-const VIEW_RADIUS: int = 3
-const PRELOAD_RADIUS: int = 3
 const MAX_LOADING_PER_FRAME: int = 1
+
+## Bán kính tải chunk (ô vuông quanh player). Đọc từ SettingsManager để có thể
+## chỉnh trong lúc chơi và áp dụng ngay (rebuild giữ nguyên các chunk trong
+## phạm vi mới, chỉ nạp thêm phần mở rộng).
+var view_radius: int = 3
+var _last_view_radius: int = -1
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _BlockData = preload("res://scripts/world/chunk/chunk_block_data.gd")
@@ -34,6 +38,17 @@ signal initial_chunks_ready
 func _ready() -> void:
 	dimension_name = tr(_Dim.DIM_NAME_KEY.get(dimension_id, ""))
 
+	if SettingsManager:
+		SettingsManager.on_chunk_view_changed(queue_chunk_view_refresh)
+	view_radius = _current_view_radius()
+	_last_view_radius = view_radius
+
+	if Net != null:
+		if not Net.block_edit_applied.is_connected(_on_net_block_edit):
+			Net.block_edit_applied.connect(_on_net_block_edit)
+		if not Net.welcome_received.is_connected(_on_welcome_received):
+			Net.welcome_received.connect(_on_welcome_received)
+
 	WorldChunk.clear_noise_cache()
 	WorldChunk._noise_for_dim(dimension_id)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.TWILIGHT)
@@ -44,22 +59,22 @@ func _ready() -> void:
 	# thẳng tại đó (không sinh vùng (0,0) rồi teleport → gây lag double-gen).
 	var cx := 0
 	var cz := 0
-	if WorldSeed.is_loading and WorldSeed.has_saved_player_pos:
+	if (WorldSeed.is_loading or WorldSeed.use_remote_spawn) and WorldSeed.has_saved_player_pos:
 		cx = int(floor(WorldSeed.saved_player_pos.x / CHUNK_SIZE))
 		cz = int(floor(WorldSeed.saved_player_pos.z / CHUNK_SIZE))
 	_last_chunk = Vector2i(cx, cz)
 	# Count all chunks first before any loading
 	_total_initial = 1  # center chunk
-	for dx in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
-		for dz in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
+	for dx in range(-view_radius, view_radius + 1):
+		for dz in range(-view_radius, view_radius + 1):
 			var key := Vector2i(cx + dx, cz + dz)
 			if key != Vector2i(cx, cz):
 				_total_initial += 1
 
 	_start_loading(Vector2i(cx, cz), true)
 
-	for dx in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
-		for dz in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
+	for dx in range(-view_radius, view_radius + 1):
+		for dz in range(-view_radius, view_radius + 1):
 			var key := Vector2i(cx + dx, cz + dz)
 			if key != Vector2i(cx, cz) and not _loading.has(key) and not _chunks.has(key):
 				_pending.append(key)
@@ -73,6 +88,15 @@ func _ready() -> void:
 
 	_initial_generated = true
 	_check_initial_ready()
+
+func _current_view_radius() -> int:
+	return SettingsManager.chunk_view if SettingsManager else 3
+
+## Callback khi setting chunk_view đổi — đổi view_radius ngay; _process sẽ thấy
+## radius đổi và refresh keep-set (nạp phần mở rộng / thả phần ngoài) trong frame tới.
+func queue_chunk_view_refresh() -> void:
+	if SettingsManager:
+		view_radius = SettingsManager.chunk_view
 
 func _find_player() -> void:
 	var mgr := get_node("../CharacterManager") as CharacterManager
@@ -147,20 +171,31 @@ func _process(_delta: float) -> void:
 		_chunks[ck] = chunk
 		if SaveManager:
 			SaveManager.apply_block_modifications_for_chunk(chunk, ck.x, ck.y)
+		if Net != null and Net.is_active():
+			Net.replay_chunk_edits(dimension_id, chunk, ck.x, ck.y)
 		chunk.refresh_boundary_water()
 		_check_initial_ready()
 
 	var dist_moved := ppos.distance_squared_to(_last_pos)
-	if dist_moved < 0.25 and _pending.is_empty() and cur == _last_chunk:
+
+	# Bán kính tải chunk có thể đổi trong lúc chơi (cài đặt). Nếu đổi thì refresh
+	# ngay: giữ chunk trong phạm vi mới, thả phần ngoài, nạp thêm phần mở rộng.
+	var r := _current_view_radius()
+	if r != _last_view_radius:
+		view_radius = r
+
+	if dist_moved < 0.25 and _pending.is_empty() and cur == _last_chunk and r == _last_view_radius:
 		return
 
 	_last_pos = ppos
 
-	if cur != _last_chunk:
+	var refresh_keep: bool = cur != _last_chunk or view_radius != _last_view_radius
+	if refresh_keep:
 		_last_chunk = cur
+		_last_view_radius = view_radius
 		var keep: Array[Vector2i] = []
-		for dx in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
-			for dz in range(-PRELOAD_RADIUS, PRELOAD_RADIUS + 1):
+		for dx in range(-view_radius, view_radius + 1):
+			for dz in range(-view_radius, view_radius + 1):
 				keep.append(Vector2i(cx + dx, cz + dz))
 
 		for key in _chunks.keys():
@@ -251,19 +286,55 @@ func get_chunk_at(wx: float, wz: float) -> WorldChunk:
 func break_block(wx: float, wy: float, wz: float) -> int:
 	var chunk := get_chunk_at(wx, wz)
 	if chunk == null: return 0
-	return chunk.break_block_at(wx, wy, wz)
+	var old: int = chunk.break_block_at(wx, wy, wz)
+	if old != 0:
+		_announce_edit(wx, wy, wz, _Data.BlockID.AIR)
+	return old
 
 ## Đặt block tại vị trí world. Trả về true nếu thành công.
 func place_block(wx: float, wy: float, wz: float, block_id: int) -> bool:
 	var chunk := get_chunk_at(wx, wz)
 	if chunk == null: return false
-	return chunk.place_block_at(wx, wy, wz, block_id)
+	var ok: bool = chunk.place_block_at(wx, wy, wz, block_id)
+	if ok:
+		_announce_edit(wx, wy, wz, block_id)
+	return ok
 
 ## Cuốc đất tại vị trí world. Trả về block cũ đã cuốc (0 = không cuốc được).
 func till_block(wx: float, wy: float, wz: float) -> int:
 	var chunk := get_chunk_at(wx, wz)
 	if chunk == null: return 0
-	return chunk.till_block_at(wx, wy, wz)
+	var old: int = chunk.till_block_at(wx, wy, wz)
+	if old != 0:
+		_announce_edit(wx, wy, wz, _Data.BlockID.TILLED_SOIL)
+	return old
+
+func _announce_edit(wx: float, wy: float, wz: float, block_id: int) -> void:
+	if Net == null or not Net.is_active():
+		return
+	Net.announce_block_edit(dimension_id, Net.world_pos_to_cell(wx, wy, wz), block_id)
+
+## Áp edit từ network vào chunk local (idempotent — chunk chưa có thì ledger giữ,
+## replay_chunk_edits sẽ áp khi chunk được generate sau).
+func _on_net_block_edit(dim_id: int, cell: Vector3i, block_id: int) -> void:
+	if dim_id != dimension_id:
+		return
+	var chunk := get_chunk_at(cell.x, cell.z)
+	if chunk == null:
+		return
+	var wpos: Vector3 = Net.cell_to_world_pos(cell)
+	if block_id == _Data.BlockID.AIR:
+		chunk.break_block_at(wpos.x, wpos.y, wpos.z)
+	else:
+		chunk.place_block_at(wpos.x, wpos.y, wpos.z, block_id)
+
+## Client nhận world_info (gồm ledger block edits) — replay lên mọi chunk đã load.
+func _on_welcome_received() -> void:
+	if Net == null or not Net.is_active():
+		return
+	for ck in _chunks:
+		var chunk: WorldChunk = _chunks[ck] as WorldChunk
+		Net.replay_chunk_edits(dimension_id, chunk, ck.x, ck.y)
 
 ## Lấy block ID tại vị trí world.
 func get_block(wx: float, wy: float, wz: float) -> int:

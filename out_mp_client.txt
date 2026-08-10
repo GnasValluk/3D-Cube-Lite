@@ -1,0 +1,12 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+== test_mp_state_client ==
+PASS | join_game(127.0.0.1,7789) ok
+PASS | is_client true
+PASS | welcome_received đã phát
+PASS | client nhận state của host (hp=40 max=40 food=8 max=8)
+PASS | client nhận inventory của host (chứa carp)
+PASS | tìm thấy RemotePlayer của host (peer 1)
+PASS | client thấy RemotePlayer host ẩn khi chết (alive=false)
+PASS | client thấy rig RemotePlayer host hiện lại sau respawn
+TOTAL | PASS | 0 failures

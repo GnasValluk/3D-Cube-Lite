@@ -422,6 +422,35 @@ func _build_settings_graphics(parent: VBoxContainer, _sw: float) -> void:
 	_settings_add_toggle(parent, "Fullscreen", _is_fullscreen(), func(v): _set_fullscreen(v))
 	_settings_add_toggle(parent, "VSync", _is_vsync(), func(v): _set_vsync(v))
 
+	_settings_section_label(parent, "Chunk View")
+	_settings_add_chunk_view_slider(parent, "Render Distance", _get_chunk_view(), 2, 8, func(v): _set_chunk_view(v))
+
+func _settings_add_chunk_view_slider(parent: VBoxContainer, label: String, initial: int, min_v: float, max_v: float, cb: Callable) -> void:
+	var hbox := HBoxContainer.new()
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(hbox)
+	var lbl := _make_label(label, 11, _txt_main())
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hbox.add_child(lbl)
+	var slider := HSlider.new()
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.min_value = min_v
+	slider.max_value = max_v
+	slider.step = 1.0
+	slider.value = initial
+	slider.add_theme_color_override("slide_color", _tc(Color(0.22, 0.62, 0.28, 0.5), Color(0.18, 0.50, 0.24, 0.5)))
+	slider.add_theme_color_override("grabber_color", _tc(Color(0.22, 0.62, 0.28), Color(0.18, 0.50, 0.24)))
+	hbox.add_child(slider)
+	var val_lbl := _make_label(_chunk_view_dim_text(initial), 10, _txt_dim())
+	val_lbl.custom_minimum_size = Vector2(64, 0)
+	val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	slider.value_changed.connect(func(v): val_lbl.text = _chunk_view_dim_text(int(v)); cb.call(int(v)))
+	hbox.add_child(val_lbl)
+
+func _chunk_view_dim_text(rv: int) -> String:
+	var dim: int = rv * 2 + 1
+	return "%d x %d" % [dim, dim]
+
 func _build_settings_audio(parent: VBoxContainer, _sw: float) -> void:
 	_settings_add_slider(parent, "Master Volume", _get_master_volume(), 0, 100, 1, func(v): _set_master_volume(v), "%")
 	_settings_add_slider(parent, "Music Volume", _get_music_volume(), 0, 100, 1, func(v): _set_music_volume(v), "%")
@@ -559,6 +588,9 @@ func _set_device_mode(v: int) -> void:
 		SettingsManager.save_settings()
 	if DeviceManager:
 		DeviceManager.set_device(v as DeviceManager.Device)
+
+func _get_chunk_view() -> int: return _Settings.get_chunk_view()
+func _set_chunk_view(v: int) -> void: _Settings.set_chunk_view(v)
 
 func _get_keybinding(action: String, default_key: int) -> int: return _Settings.get_keybinding(action, default_key)
 

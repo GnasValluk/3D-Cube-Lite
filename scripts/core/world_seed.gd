@@ -17,6 +17,10 @@ var is_loading: bool = false
 var saved_player_pos: Vector3 = Vector3.INF
 var has_saved_player_pos: bool = false
 
+## Khi tham gia game multiplayer: nhận spawn pos từ host, client generate
+## chunk quanh điểm đó + đặt player tại đó mà KHÔNG coi là "đang load save".
+var use_remote_spawn: bool = false
+
 func _ready() -> void:
 	randomize()
 	seed_value = randi() % 2147483647
