@@ -1,12 +1,17 @@
 extends RefCounted
 
 const _Data  = preload("chunk_data.gd")
+const _BlockData = preload("chunk_block_data.gd")
 const _Road  = preload("chunk_road.gd")
 const _WoodLamp = preload("res://scripts/world/props/wood_lamp.gd")
 
 const LAMP_SPACING: float = 28.0
 const LAMP_SIDE_OFFSET: float = 2.8
 const LAMP_SKIP_CHANCE: float = 0.45
+
+## Mặt địa hình thực được lượng tử hoá theo SLAB — đèn phải bám đúng mặt này.
+static func _snap_surface_y(h: float) -> float:
+	return floorf(h / _BlockData.SLAB_HEIGHT) * _BlockData.SLAB_HEIGHT
 
 static func compute_positions(cx: int, cz: int, size: int,
 		biome_grid: Array, height_grid: Array, cols: int) -> Array:
@@ -62,7 +67,8 @@ static func compute_positions(cx: int, cz: int, size: int,
 
 					var vx: int = clampi(int((lx - min_x) / _Data.VOXEL), 0, cols - 1)
 					var vz: int = clampi(int((lz - min_z) / _Data.VOXEL), 0, cols - 1)
-					var lamp_y: float = height_grid[vx][vz] if height_grid.size() > 0 else 1.0
+					var lamp_y: float = _snap_surface_y(
+						height_grid[vx][vz] if height_grid.size() > 0 else 1.0)
 
 					if cols > 0 and biome_grid.size() > 0:
 						var biome: int = biome_grid[vx][vz]

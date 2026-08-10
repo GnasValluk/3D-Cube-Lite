@@ -151,6 +151,38 @@ static func start_cannon_aim(player) -> void:
 	player._bow_indicator_root.visible = true
 	make_aoe_ring(player, 7.0, Color(1.0, 0.3, 0.1, 0.30))
 
+## Lấy điểm thế giới mà crosshair đang trỏ (góc 3 / TPS shooting).
+## Raycast từ camera qua người/chuột tới thế giới (block + body); nếu không
+## trúng thì chiếu rơi về mặt phẳng ngang tại Y của player.
+static func ray_hit_world(player, from: Vector3, dir: Vector3, max_dist: float = 220.0) -> Vector3:
+	var space: PhysicsDirectSpaceState3D = player.get_world_3d().direct_space_state
+	if space != null:
+		var q := PhysicsRayQueryParameters3D.new()
+		q.from = from
+		q.to = from + dir * max_dist
+		q.collide_with_areas = false
+		q.collide_with_bodies = true
+		q.exclude = [player]
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			return hit.position
+	var plane_y: float = player.global_position.y
+	if abs(dir.y) > 0.001:
+		var t: float = (plane_y - from.y) / dir.y
+		if t > 0.0:
+			return from + dir * t
+	return from + dir * max_dist
+
+static func aim_world_point(player, max_dist: float = 220.0) -> Vector3:
+	var cam: Camera3D = player.get_viewport().get_camera_3d()
+	if cam == null:
+		return player.global_position + player.global_transform.basis.z * 20.0
+	# Cam 3 chuột bị khóa giữa màn hình → crosshair luôn ở tâm, bắn theo tâm.
+	var center: Vector2 = player.get_viewport().get_visible_rect().size * 0.5
+	var from: Vector3 = cam.project_ray_origin(center)
+	var dir: Vector3 = cam.project_ray_normal(center)
+	return ray_hit_world(player, from, dir, max_dist)
+
 static func update_aim(player, delta: float) -> void:
 	var is_cannon: bool = player.equipped_weapon != null and player.equipped_weapon.id == "watermelon_cannon"
 	if is_cannon:
@@ -158,6 +190,11 @@ static func update_aim(player, delta: float) -> void:
 	else:
 		player._bow_charge = min(player._bow_charge + delta * player._bow_charge_rate, player._bow_max_charge)
 
+	if player._use_tp:
+		_update_aim_tps(player, delta, is_cannon)
+		return
+
+	player._aim_tp_mode = false
 	var cam: Camera3D = player.get_viewport().get_camera_3d()
 	if cam == null:
 		return
@@ -205,6 +242,63 @@ static func update_aim(player, delta: float) -> void:
 		update_pose(player)
 		update_bow_string(player, player._bow_charge / player._bow_max_charge)
 
+## Góc 3 (TPS): aim kiểu bắn súng — crosshair trỏ tới điểm trên thế giới,
+## vũ khí ngắm theo đường X nom thẳng tới điểm đó (gồm cả thành phần Y).
+static func _update_aim_tps(player, delta: float, is_cannon: bool) -> void:
+	player._aim_tp_mode = true
+	var muzzle: Vector3 = _muzzle_world(player)
+	var target: Vector3 = aim_world_point(player)
+	player._aim_world_point = target
+	var to_target: Vector3 = target - muzzle
+	var horiz: Vector3 = to_target
+	horiz.y = 0.0
+	if horiz.length_squared() > 0.01:
+		player.rotation.y = atan2(horiz.x, horiz.z)
+		player._bow_aim_dir = horiz.normalized()
+	else:
+		player._bow_aim_dir = -player.global_transform.basis.z
+
+	var range_len: float = 25.0 if is_cannon else lerp(8.0, 50.0, player._bow_charge / player._bow_max_charge)
+	var aim_dist: float = to_target.length()
+	var use_dist: float = min(aim_dist, range_len)
+	var end_pos: Vector3 = muzzle + to_target.normalized() * use_dist
+
+	if player._bow_indicator_root == null or player._bow_indicator_line == null or player._bow_indicator_target == null:
+		return
+	var plane_y: float = player.global_position.y
+
+	var shown_from: Vector3 = player.global_position + Vector3(0, 0.6, 0)
+	var shown_to: Vector3 = end_pos
+	shown_to.y = max(shown_to.y, plane_y + 0.1)
+	player._bow_indicator_root.global_position = shown_from
+	player._bow_indicator_line.position = (shown_to - shown_from) * 0.5
+	player._bow_indicator_line.mesh.size = Vector3(0.04, 0.04, shown_from.distance_to(shown_to))
+	player._bow_indicator_line.look_at(shown_to, Vector3.UP)
+	player._bow_indicator_target.global_position = Vector3(end_pos.x, max(end_pos.y, plane_y + 0.1), end_pos.z)
+	if player._bow_indicator_aoe:
+		player._bow_indicator_aoe.global_position = player._bow_indicator_target.global_position
+
+	if is_cannon:
+		player._bow_indicator_line.material_override.albedo_color = Color(0.8, 0.3, 0.3, 0.35)
+		player._bow_indicator_target.material_override.albedo_color = Color(1.0, 0.8, 0.3, 0.40)
+	else:
+		var cp: float = player._bow_charge / player._bow_max_charge
+		var line_color := Color.WHITE.lerp(Color(1.0, 0.3, 0.1), cp)
+		line_color.a = 0.30
+		player._bow_indicator_line.material_override.albedo_color = line_color
+		var ring_color := Color(1.0, 0.8, 0.3).lerp(Color(1.0, 0.2, 0.1), cp)
+		ring_color.a = 0.35
+		player._bow_indicator_target.material_override.albedo_color = ring_color
+
+	if not is_cannon:
+		update_pose(player)
+		update_bow_string(player, player._bow_charge / player._bow_max_charge)
+
+static func _muzzle_world(player) -> Vector3:
+	if player._mesh and player._mesh.weapon_pivot:
+		return player._mesh.weapon_pivot.global_transform * Vector3(0, 0.42, 0)
+	return player.global_position + Vector3(0, 0.6, 0) + player.global_transform.basis.z * 0.5
+
 static func update_pose(player) -> void:
 	if player._mesh == null or player._mesh.weapon_pivot == null or player._mesh.arm_r == null:
 		return
@@ -241,14 +335,23 @@ static func fire(player) -> void:
 	var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 8)
 	var total_dmg: int = int(base_dmg * lerp(0.5, 1.5, charge_pct))
 
+	var spawn_from: Vector3 = _muzzle_world(player)
+	var aim_dir: Vector3 = player._bow_aim_dir
+	if player._aim_tp_mode and player._aim_world_point != Vector3.ZERO:
+		var to_tgt: Vector3 = player._aim_world_point - spawn_from
+		if to_tgt.length_squared() > 0.01:
+			aim_dir = to_tgt.normalized()
+			range_len = max(range_len, min(to_tgt.length(), 50.0))
+			arrow_speed = max(arrow_speed, 30.0)
+
 	var arrow := ArrowProjectile.new()
 	var world: Node = player.get_tree().current_scene
 	if world:
 		world.add_child(arrow)
 	else:
 		player.add_child(arrow)
-	arrow.global_position = player.global_position + Vector3(0, 0.5, 0) + player._bow_aim_dir * 0.5
-	arrow.setup(player._bow_aim_dir, total_dmg, arrow_speed, range_len, player)
+	arrow.global_position = spawn_from + aim_dir * 0.5
+	arrow.setup(aim_dir, total_dmg, arrow_speed, range_len, player)
 
 static func fire_watermelon_cannon(player) -> void:
 	if not player.try_skill(player.stamina_cost_lmb):
@@ -259,6 +362,13 @@ static func fire_watermelon_cannon(player) -> void:
 		return
 	player._damage_equipped_tool(1)
 	var dir: Vector3 = player._calc_aim_dir()
+	var spawn_pos: Vector3 = player.global_position + Vector3(0, 0.6, 0) + dir * 0.5
+	if player._mesh and player._mesh.weapon_pivot:
+		spawn_pos = player._mesh.weapon_pivot.global_transform * Vector3(0, 0.42, 0)
+	if player._aim_tp_mode and player._aim_world_point != Vector3.ZERO:
+		var to_tgt: Vector3 = player._aim_world_point - spawn_pos
+		if to_tgt.length_squared() > 0.01:
+			dir = to_tgt.normalized()
 	var base_dmg: int = player.attack_power + player.equipped_weapon.atk_bonus
 	var proj := WatermelonProjectile.new()
 	var world: Node = player.get_tree().current_scene
@@ -266,9 +376,6 @@ static func fire_watermelon_cannon(player) -> void:
 		world.add_child(proj)
 	else:
 		player.add_child(proj)
-	var spawn_pos: Vector3 = player.global_position + Vector3(0, 0.6, 0) + dir * 0.5
-	if player._mesh and player._mesh.weapon_pivot:
-		spawn_pos = player._mesh.weapon_pivot.global_transform * Vector3(0, 0.42, 0)
 	proj.global_position = spawn_pos
 	proj.setup(dir, base_dmg, 17.0, 25.0, 7.0, player)
 	var kb_dir: Vector3 = -dir
@@ -337,6 +444,7 @@ static func _place_cylinder_between(mi: MeshInstance3D, a: Vector3, b: Vector3) 
 static func cancel_aim(player) -> void:
 	player._bow_aiming = false
 	player._bow_charge = 0.0
+	player._aim_tp_mode = false
 	update_bow_string(player, -1.0)
 	if player._bow_indicator_root:
 		player._bow_indicator_root.visible = false

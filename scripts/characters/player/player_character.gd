@@ -88,6 +88,10 @@ var _bow_max_charge: float = 2.0
 var _mortar_vertical_speed: float = 8.0
 var _mortar_launch_angle_deg: float = 60.0
 var _bow_aim_dir: Vector3 = Vector3.FORWARD
+var _aim_world_point: Vector3 = Vector3.ZERO
+var _aim_tp_mode: bool = false
+var _mortar_launch_h: float = 0.0
+var _mortar_launch_v: float = 0.0
 var _bow_indicator_line: MeshInstance3D = null
 var _bow_indicator_target: MeshInstance3D = null
 var _bow_indicator_aoe: MeshInstance3D = null
@@ -696,6 +700,10 @@ func _build_armor(pivot: Node3D, item_id: String) -> void:
 	var shell := Node3D.new()
 	pivot.add_child(shell)
 	ItemMesh.build(shell, item_id)
+	# Ba lô da thú: mặt trang trí (nắp + khoá) được dựng ở +Z cục bộ, nhưng khi
+	# đeo vào lưng (mặt lưng = -Z) phải quay 180° để mặt chính hướng ra ngoài.
+	if item_id == "leather_backpack":
+		shell.rotation.y = PI
 
 func _is_armor_visible(slot_idx: int) -> bool:
 	return armor_visible.get(slot_idx, true)
@@ -1193,7 +1201,8 @@ func _update_block_target() -> void:
 		return
 	var cam := get_viewport().get_camera_3d()
 	if cam == null: return
-	var mouse_pos := get_viewport().get_mouse_position()
+	# Cam 3 chuột bị khóa giữa màn hình → highlight block theo tâm thay vì con trỏ.
+	var mouse_pos: Vector2 = get_viewport().get_visible_rect().size * 0.5 if _use_tp else get_viewport().get_mouse_position()
 	var from := cam.project_ray_origin(mouse_pos)
 	var dir := cam.project_ray_normal(mouse_pos)
 	var space := get_world_3d().direct_space_state
@@ -1274,8 +1283,20 @@ func _process(delta: float) -> void:
 				_Mortar.update_aim(self, delta)
 			else:
 				_Bow.update_aim(self, delta)
+	_sync_aim_camera_zoom()
 	if _halberd_throwing and _state == State.HIT:
 		_Halberd.cancel_aim(self)
+
+func _sync_aim_camera_zoom() -> void:
+	# Góc 3: khi nhấn giữ chuột trái để aim (nỏ/súng cối/pháo dưa hấu)
+	# thì zoom camera gần player theo kiểu bắn súng.
+	if _use_tp and is_instance_valid(_tp_rig) and _tp_rig.has_method("set_aim"):
+		var aiming := _bow_aiming
+		if aiming:
+			var is_egg := _is_egg_aiming()
+			if is_egg or _halberd_throwing or _halberd_charge_time >= 0.0:
+				aiming = false
+		_tp_rig.set_aim(aiming)
 
 func _on_dash() -> void:
 	_Halberd.on_dash(self)
@@ -1354,9 +1375,9 @@ func _fade_tavern_shell(mmi: MultiMeshInstance3D, target_a: float) -> void:
 func _raycast_target_block() -> Vector3:
 	var cam := get_viewport().get_camera_3d()
 	if cam == null: return Vector3.ZERO
-	var mouse_pos := get_viewport().get_mouse_position()
-	var from := cam.project_ray_origin(mouse_pos)
-	var dir := cam.project_ray_normal(mouse_pos)
+	var aim_pos: Vector2 = get_viewport().get_visible_rect().size * 0.5 if _use_tp else get_viewport().get_mouse_position()
+	var from := cam.project_ray_origin(aim_pos)
+	var dir := cam.project_ray_normal(aim_pos)
 	var space := get_world_3d().direct_space_state
 	if space == null: return Vector3.ZERO
 	var query := PhysicsRayQueryParameters3D.new()

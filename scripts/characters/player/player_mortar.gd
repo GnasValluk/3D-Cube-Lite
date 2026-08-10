@@ -57,6 +57,11 @@ static func _setup_indicator(player) -> void:
 	PlayerBow.make_aoe_ring(player, 2.5, Color(1.0, 0.7, 0.1, 0.30))
 
 static func update_aim(player, delta: float) -> void:
+	if player._use_tp:
+		_update_aim_tps(player, delta)
+		return
+
+	player._aim_tp_mode = false
 	var cam: Camera3D = player.get_viewport().get_camera_3d()
 	if cam == null:
 		return
@@ -146,12 +151,6 @@ static func fire(player) -> void:
 		return
 	player._damage_equipped_tool(1)
 
-	var dir: Vector3 = player._calc_aim_dir()
-	if dir.length_squared() < 0.01:
-		dir = -player.global_transform.basis.z
-	var cp: float = player._bow_charge / player._bow_max_charge
-	var h_speed: float = lerp(2.0, 15.0, cp)
-	var v_speed: float = lerp(3.0, 12.0, cp)
 	var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 12)
 
 	var proj := PumpkinProjectile.new()
@@ -160,11 +159,29 @@ static func fire(player) -> void:
 		world.add_child(proj)
 	else:
 		player.add_child(proj)
-	var spawn_pos: Vector3 = player.global_position + Vector3(0, 0.8, 0) + dir * 0.5
+	var spawn_pos: Vector3 = player.global_position + Vector3(0, 0.8, 0) - player.global_transform.basis.z * 0.5
 	if player._mesh and player._mesh.weapon_pivot:
 		spawn_pos = player._mesh.weapon_pivot.global_transform * Vector3(0, 0.35, 0)
-	proj.global_position = spawn_pos
-	proj.setup(dir, base_dmg, h_speed, 2.5, v_speed, player)
+
+	if player._aim_tp_mode and player._aim_world_point != Vector3.ZERO:
+		var to_tgt: Vector3 = player._aim_world_point - spawn_pos
+		to_tgt.y = 0.0
+		var h_speed: float = player._mortar_launch_h
+		var v_speed: float = player._mortar_launch_v
+		var dir: Vector3 = -player.global_transform.basis.z
+		if to_tgt.length_squared() > 0.01:
+			dir = to_tgt.normalized()
+		proj.global_position = spawn_pos
+		proj.setup(dir, base_dmg, max(h_speed, 0.5), 2.5, max(v_speed, 0.5), player)
+	else:
+		var dir: Vector3 = player._calc_aim_dir()
+		if dir.length_squared() < 0.01:
+			dir = -player.global_transform.basis.z
+		var cp: float = player._bow_charge / player._bow_max_charge
+		var h_speed: float = lerp(2.0, 15.0, cp)
+		var v_speed: float = lerp(3.0, 12.0, cp)
+		proj.global_position = spawn_pos
+		proj.setup(dir, base_dmg, h_speed, 2.5, v_speed, player)
 
 	if player._mesh and player._mesh.weapon_pivot:
 		for i in 6:
@@ -194,5 +211,72 @@ static func fire(player) -> void:
 
 static func cancel_aim(player) -> void:
 	player._bow_aiming = false
+	player._aim_tp_mode = false
 	if player._bow_indicator_root:
 		player._bow_indicator_root.visible = false
+
+static func _update_aim_tps(player, delta: float) -> void:
+	player._aim_tp_mode = true
+	player._bow_charge = min(player._bow_charge + delta * player._bow_charge_rate, player._bow_max_charge)
+	var cp: float = player._bow_charge / player._bow_max_charge
+
+	var g: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
+	var start_pos: Vector3 = player.global_position + Vector3(0, 0.8, 0) - player.global_transform.basis.z * 0.5
+	if player._mesh and player._mesh.weapon_pivot:
+		start_pos = player._mesh.weapon_pivot.global_transform * Vector3(0, 0.35, 0)
+
+	var target: Vector3 = PlayerBow.aim_world_point(player)
+	player._aim_world_point = target
+	var to_target_h: Vector3 = target - start_pos
+	to_target_h.y = 0.0
+	var horiz_dist: float = to_target_h.length()
+	player._bow_aim_dir = -player.global_transform.basis.z
+	if horiz_dist > 0.01:
+		var dir_h: Vector3 = to_target_h / horiz_dist
+		player._bow_aim_dir = dir_h
+		player.rotation.y = atan2(dir_h.x, dir_h.z)
+		var t_flight: float = horiz_dist / max(lerp(1.0, 14.0, cp), 0.5)
+		var v_speed: float = (target.y - start_pos.y + 0.5 * g * t_flight * t_flight) / t_flight
+		player._mortar_launch_h = horiz_dist / t_flight
+		player._mortar_launch_v = v_speed
+	else:
+		player._mortar_launch_h = lerp(2.0, 15.0, cp)
+		player._mortar_launch_v = lerp(3.0, 12.0, cp)
+
+	if player._bow_indicator_root == null or player._bow_indicator_target == null:
+		return
+	player._bow_indicator_root.global_position = start_pos
+	player._bow_indicator_target.position = target - start_pos
+	if player._bow_indicator_aoe:
+		player._bow_indicator_aoe.position = player._bow_indicator_target.position
+
+	for ch in player._bow_indicator_root.get_children():
+		if ch != player._bow_indicator_target and ch != player._bow_indicator_aoe:
+			ch.queue_free()
+	var dot_mat := StandardMaterial3D.new()
+	dot_mat.albedo_color = Color(1.0, 0.65, 0.15, 0.35)
+	dot_mat.emission_enabled = true
+	dot_mat.emission_color = Color(1.0, 0.65, 0.15)
+	dot_mat.emission_energy_multiplier = 0.5
+	dot_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	dot_mat.no_depth_test = true
+	var dot_mesh := SphereMesh.new()
+	dot_mesh.radius = 0.05
+	dot_mesh.height = 0.10
+	var h_speed: float = player._mortar_launch_h
+	var v_speed2: float = player._mortar_launch_v
+	var ft: float = horiz_dist / max(h_speed, 0.5)
+	if ft <= 0.0:
+		ft = 0.001
+	var steps: int = 24
+	for i in range(steps):
+		var tt: float = float(i + 1) / float(steps) * ft
+		var hx: float = player._bow_aim_dir.x * h_speed * tt
+		var hz: float = player._bow_aim_dir.z * h_speed * tt
+		var vy: float = v_speed2 * tt - 0.5 * g * tt * tt
+		var dot := MeshInstance3D.new()
+		dot.mesh = dot_mesh
+		dot.material_override = dot_mat
+		dot.position = Vector3(hx, vy, hz)
+		dot.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		player._bow_indicator_root.add_child(dot)

@@ -76,6 +76,7 @@ var _zoom_slider_timer: float = 0.0
 var _zoom_slider_label: Label
 var _last_tp_zoom: float = -1.0
 var _hud_throttle: float = 0.0
+var _crosshair: Control = null
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _Village = preload("res://scripts/world/chunk/village.gd")
@@ -233,6 +234,69 @@ func _setup_ui() -> void:
 	_setup_zoom_slider()
 	_setup_debug_menu()
 	_setup_mobile_controls()
+	_setup_crosshair()
+
+## FPS-style crosshair (chỉ hiện khi đang ngắm vũ khí ở góc 3).
+func _setup_crosshair() -> void:
+	_crosshair = Control.new()
+	_crosshair.name = "Crosshair"
+	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_crosshair.visible = false
+	add_child(_crosshair)
+
+	var gap := 5.0
+	var len := 7.0
+	var th := 2.0
+	var segs: Array[Array] = [
+		[-gap - len, -th * 0.5, len, th],
+		[gap, -th * 0.5, len, th],
+		[-th * 0.5, -gap - len, th, len],
+		[-th * 0.5, gap, th, len],
+	]
+	for s in segs:
+		var r := ColorRect.new()
+		r.position = Vector2(s[0], s[1])
+		r.size = Vector2(s[2], s[3])
+		r.color = Color(1.0, 1.0, 1.0, 0.9)
+		r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_crosshair.add_child(r)
+	var dot := ColorRect.new()
+	dot.color = Color(1.0, 0.3, 0.1, 0.9)
+	dot.position = Vector2(-1.5, -1.5)
+	dot.size = Vector2(3, 3)
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_crosshair.add_child(dot)
+
+## Ẩn con trỏ chuột khi đang chơi (không mở menu nào); hiện lại khi mở UI.
+## Cam 3 (TPS): khóa chuột vào giữa màn hình (MOUSE_MODE_CAPTURED) để xoay
+## camera bằng chuyển động chuột, tránh con trỏ trôi loạn; ISO giữ HIDDEN.
+func _sync_mouse_visibility() -> void:
+	var ui_open := false
+	if _inventory_open or _chest_open or _crafting_open or _furnace_open or _debug_open:
+		ui_open = true
+	elif _settings_ui and _settings_ui.visible:
+		ui_open = true
+	elif _build_menu and _build_menu.visible:
+		ui_open = true
+	elif _explore_map and _explore_map.visible:
+		ui_open = true
+	elif _phone_ui and _phone_ui.visible:
+		ui_open = true
+	elif _library and _library.visible:
+		ui_open = true
+	elif _placement_sys and _placement_sys.is_placing():
+		ui_open = true
+	if ui_open:
+		if Input.get_mouse_mode() != Input.MOUSE_MODE_VISIBLE:
+			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+		return
+	var player := _find_player_character()
+	if player != null and player._use_tp:
+		if Input.get_mouse_mode() != Input.MOUSE_MODE_CAPTURED:
+			Input.set_mouse_mode(Input.MOUSE_MODE_CAPTURED)
+	else:
+		if Input.get_mouse_mode() != Input.MOUSE_MODE_HIDDEN:
+			Input.set_mouse_mode(Input.MOUSE_MODE_HIDDEN)
 
 func _setup_mobile_controls() -> void:
 	const _MobCtrl = preload("res://scripts/ui/mobile/mobile_controls.gd")
@@ -327,6 +391,21 @@ func _process(delta: float) -> void:
 		_build_hint.text = tr("BUILD_HINT_PLACING")
 	else:
 		_build_hint.text = ""
+
+	# Crosshair FPS: chỉ hiện khi ngắm vũ khí tầm xa ở góc 3 (nỏ/cối/pháo dưa hấu).
+	var _cross_player := _find_player_character()
+	var _cross_show := false
+	if _crosshair and _cross_player and _cross_player._use_tp and _cross_player._bow_aiming:
+		if _cross_player.equipped_weapon != null:
+			var _wid: String = _cross_player.equipped_weapon.id
+			if _wid == "crossbow" or _wid == "watermelon_cannon" or _wid == "pumpkin_mortar":
+				_cross_show = true
+	if _crosshair:
+		_crosshair.visible = _cross_show
+		if _cross_show:
+			_crosshair.position = get_viewport().get_visible_rect().size * 0.5
+
+	_sync_mouse_visibility()
 
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	_hud_throttle -= delta

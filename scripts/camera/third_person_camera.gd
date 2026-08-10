@@ -18,6 +18,7 @@ extends Node3D
 @export var zoom_min:     float  = 2.0
 @export var zoom_max:     float  = 12.0
 @export var zoom_step:    float  = 0.5
+@export var aim_zoom:     float  = 1.8  # Khoảng cách khi đang ngắm (góc 3)
 
 @onready var _camera: Camera3D = $Camera3D
 
@@ -25,7 +26,10 @@ var _target:      Node3D
 var _yaw:         float = 0.0    # Xoay ngang (độ)
 var _pitch:       float = -20.0  # Xoay dọc (độ)
 var _cur_dist:    float           # Khoảng cách thực tế (smooth zoom)
-var _is_active:   bool = false
+var _col_dist:    float = 0.0    # Khoảng cách tối đa sau khi va chạm (smooth)
+var _is_active: bool = false
+var _aiming:      bool = false   # Đang ngắm → zoom gần vào player
+var _aim_blend:   float = 0.0
 var _shake_timer: float = 0.0
 var _shake_duration: float = 0.0
 var _shake_intensity: float = 0.0
@@ -35,6 +39,7 @@ var _rng := RandomNumberGenerator.new()
 func _ready() -> void:
 	_target   = get_node_or_null(target_path)
 	_cur_dist = distance
+	_col_dist = distance
 	_rng.randomize()
 	_update_camera_position()
 	_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
@@ -65,16 +70,20 @@ func add_shake(intensity: float, duration: float) -> void:
 	_shake_duration = max(_shake_duration, duration)
 	_shake_timer = max(_shake_timer, duration)
 
+## Bật/tắt chế độ ngắm (zoom gần player) — gọi từ vũ khí đang aim.
+func set_aim(active: bool) -> void:
+	_aiming = active
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_active:
 		return
 	# Xoay camera bằng chuột phải giữ
 	if event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
-			_yaw   -= mm.relative.x * mouse_sens
-			_pitch -= mm.relative.y * mouse_sens
-			_pitch  = clamp(_pitch, pitch_min, pitch_max)
+		# Cam 3: không cần giữ chuột phải — di chuột là xoay camera luôn.
+		_yaw   -= mm.relative.x * mouse_sens
+		_pitch += mm.relative.y * mouse_sens
+		_pitch  = clamp(_pitch, pitch_min, pitch_max)
 	# Zoom bằng cuộn chuột
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -88,22 +97,56 @@ func _process(delta: float) -> void:
 	if not _is_active or not is_instance_valid(_target):
 		return
 	_update_shake(delta)
-	# Smooth zoom
-	_cur_dist = lerp(_cur_dist, distance, delta * 8.0)
+	# Smooth zoom: khi đang ngắm thì kéo gần player, nhả ra thì về khoảng cách chuột.
+	_aim_blend += delta * 8.0 if _aiming else -delta * 8.0
+	_aim_blend = clamp(_aim_blend, 0.0, 1.0)
+	var target_dist: float = lerp(distance, min(aim_zoom, distance), _aim_blend)
+	_cur_dist = lerp(_cur_dist, target_dist, delta * 8.0)
 	# Lerp rig về player
 	var dest := _target.global_position + Vector3(0, height, 0)
 	global_position = global_position.lerp(dest, follow_speed * delta)
+	# Va chạm: kéo camera gần lại nếu đường nhìn bị block che — smooth để ko giật.
+	var limit := _collision_limit()
+	_col_dist = lerp(_col_dist, limit, delta * 10.0)
 	_update_camera_position()
 
-func _update_camera_position() -> void:
-	# Tính offset dựa vào yaw + pitch
+func _camera_dir() -> Vector3:
 	var yaw_rad   := deg_to_rad(_yaw)
 	var pitch_rad := deg_to_rad(_pitch)
-	var offset := Vector3(
+	return Vector3(
 		sin(yaw_rad) * cos(pitch_rad),
 		sin(pitch_rad),
 		cos(yaw_rad) * cos(pitch_rad)
-	) * _cur_dist
+	)
+
+## Khoảng cách camera tối đa còn trong thế giới (không bị ẩn vào tường/đất).
+func _collision_limit() -> float:
+	if _cur_dist <= 0.35:
+		return _cur_dist
+	var from: Vector3 = global_position
+	var dir: Vector3 = _camera_dir()
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return _cur_dist
+	var q := PhysicsRayQueryParameters3D.new()
+	q.from = from
+	q.to = from + dir * (_cur_dist + 0.3)
+	q.collide_with_areas = false
+	q.collide_with_bodies = true
+	if is_instance_valid(_target):
+		q.exclude = [_target]
+	var hit := space.intersect_ray(q)
+	if hit.is_empty():
+		return _cur_dist
+	var d: float = from.distance_to(hit.position) - 0.18
+	return max(d, 0.3)
+
+func _update_camera_position() -> void:
+	# Smooth distance: dùng khoảng cách va chạm nếu nhỏ hơn người dùng chọn.
+	var cam_dist: float = _cur_dist
+	if _col_dist > 0.0 and _col_dist < cam_dist:
+		cam_dist = _col_dist
+	var offset := _camera_dir() * cam_dist
 	_camera.position = offset + _shake_offset
 	_camera.look_at(global_position + _shake_offset * 0.08, Vector3.UP)
 

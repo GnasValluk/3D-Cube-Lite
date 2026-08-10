@@ -100,6 +100,13 @@ func _ready() -> void:
 	var pi: int = pc.inventory.find_slot_of_item(pack)
 	pc.use_item_from_inventory(pi)
 	_check(pc.equipped_back == pack, "đã mặc ba lô")
+	var _pack_shell: Node3D = null
+	if pc._mesh != null and pc._mesh.back_gear_pivot != null:
+		for ch in pc._mesh.back_gear_pivot.get_children():
+			_pack_shell = ch as Node3D
+			break
+	_check(_pack_shell != null and absf(_pack_shell.rotation.y - PI) < 0.001,
+		"ba lô đeo lưng đã xoay 180° quanh Y (mặt trang trí hướng ra sau)")
 	_check(pc.inventory.slots.size() == _Inv.DEFAULT_SIZE + 4,
 		"mặc ba lô → kho %d slot (có %d)" % [_Inv.DEFAULT_SIZE + 4, pc.inventory.slots.size()])
 	_check(absf(pc.get_max_weight() - 105.0) < 0.0001, "ba lô → giới hạn tải 105")

@@ -3,6 +3,7 @@ extends WorldEnvironment
 const CYCLE_DURATION: float = 600.0
 var _lights: Array[Light3D] = []
 var _dir_light: DirectionalLight3D
+var _sky_mat: ProceduralSkyMaterial
 
 const DAY_BG         := Color(0.42, 0.62, 0.72)
 const DAY_AMBIENT    := Color(0.50, 0.62, 0.74)
@@ -15,8 +16,10 @@ const NIGHT_AMB_ENERGY := 0.35
 func _ready() -> void:
 	var env := Environment.new()
 
-	env.background_mode  = Environment.BG_COLOR
-	env.background_color = DAY_BG
+	var sky_data := SkyLight.build_sky()
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky_data[0]
+	_sky_mat = sky_data[1]
 
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color  = DAY_AMBIENT
@@ -186,21 +189,21 @@ func _reapply_preset() -> void:
 	SettingsManager.apply_viewport_settings(get_viewport())
 
 func _process(delta: float) -> void:
-	if _lights.is_empty():
-		return
-
-	var raw: float
+	var hour: float
 	if TimeSystem:
-		var progress: float = TimeSystem.get_cycle_progress_fraction()
-		raw = sin(progress * TAU)
+		hour = TimeSystem.get_hour()
 	else:
-		raw = 0.5
-	var t: float = clamp(raw * 0.5 + 0.5, 0.3, 1.0)
+		var progress: float = TimeSystem.get_cycle_progress_fraction() if TimeSystem else 0.25
+		hour = fmod(progress * 24.0, 24.0)
+
+	# t từ 0 (đêm) đến 1 (trưa) — dùng chung cho ánh sáng khuếch tán.
+	var elev := (hour - 6.0) / 12.0 * PI
+	var t: float = clamp(90.0 * sin(elev) / 90.0, 0.0, 1.0)
 
 	var wi: float = RainManager.get_local_rain_intensity()
 	var rf: float = 1.0 - wi * 0.55
 
-	environment.background_color = DAY_BG.lerp(NIGHT_BG, 1.0 - t).lerp(Color(0.12, 0.14, 0.18), wi * 0.7)
+	SkyLight.update_sky(_sky_mat, _dir_light, hour, wi)
 	environment.ambient_light_color = DAY_AMBIENT.lerp(NIGHT_AMBIENT, 1.0 - t).lerp(Color(0.08, 0.10, 0.14), wi * 0.7)
 	environment.ambient_light_energy = lerp(DAY_AMB_ENERGY, NIGHT_AMB_ENERGY, 1.0 - t) * rf
 

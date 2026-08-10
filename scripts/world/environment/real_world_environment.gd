@@ -2,6 +2,7 @@ extends WorldEnvironment
 class_name RealWorldEnvironment
 
 var _dir_light: DirectionalLight3D
+var _sky_mat: ProceduralSkyMaterial
 
 const CYCLE_DURATION: float = 600.0
 
@@ -43,8 +44,11 @@ func _ready() -> void:
 	var h: float = _get_hour()
 	var k: Dictionary = _sample_lighting(h)
 
-	env.background_mode  = Environment.BG_COLOR
-	env.background_color = k["bg"]
+	# Bầu trời procedural theo giờ + thời tiết, không còn nền phẳng xám.
+	var sky_data := SkyLight.build_sky()
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky_data[0]
+	_sky_mat = sky_data[1]
 
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color  = k["amb"]
@@ -196,12 +200,11 @@ func _process(delta: float) -> void:
 
 	var rain_factor: float = 1.0 - weather_intensity * 0.55
 
-	environment.background_color = k["bg"].lerp(Color(0.12, 0.14, 0.18), weather_intensity * 0.7)
+	SkyLight.update_sky(_sky_mat, _dir_light, h, weather_intensity)
 	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
 	environment.ambient_light_energy = k["ae"] * rain_factor
 
 	if _dir_light:
-		_dir_light.light_color = k["dc"].lerp(Color(0.50, 0.50, 0.55), weather_intensity * 0.5)
 		_dir_light.light_energy = k["de"] * rain_factor
 
 	environment.fog_density = weather_intensity * 0.012

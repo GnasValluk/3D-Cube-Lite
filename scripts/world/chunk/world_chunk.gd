@@ -28,6 +28,12 @@ static func _is_water_bid(bid: int) -> bool:
 	return bid == _Data.BlockID.WATER \
 		or (bid >= _Data.BlockID.WATER_SOURCE and bid <= _Data.BlockID.WATER_LEVEL_1)
 
+## Mặt địa hình thực (top face khối) được lượng tử hoá theo SLAB:
+## cy_top = floor(h / SLAB) * SLAB. Cây/đánh phải bám ĐÚNG mặt này,
+## không gắn theo h thô — nếu không sẽ lơ lửng trên đồi cao.
+static func _snap_surface_y(h: float) -> float:
+	return floorf(h / _BlockData.SLAB_HEIGHT) * _BlockData.SLAB_HEIGHT
+
 ## ── BFS đa nguồn (4-láng giềng, Manhattan) — thay multi-pass distance map ─────
 ## Nguồn = ô có giá trị != CONST_INF (0 cho source, sẵn giá trị band đầu nếu cần).
 ## Lan chỉ vào ô có mask==1 (mask rỗng → mọi ô). Kết quả y hệt multi-pass cũ.
@@ -1211,7 +1217,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					if _is_on_road(world_ox + px, world_oz + pz):
 						continue
 					# Sink slightly into terrain, but never below water surface
-					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "palm", "pos": Vector3(px, y, pz), "variant": "river"})
 
 	# ── 8c. Cây sồi cổ thụ — đồng cỏ, xa nước ≥2 ──────────────────────────
@@ -1232,7 +1238,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				# Cấm mọc trên đường đi
 				if _is_on_road(world_ox + px, world_oz + pz):
 					continue
-				var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+				var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 				var variant := "plains"
 				plant_props.append({"type": "oak", "pos": Vector3(px, y, pz), "variant": variant})
 
@@ -1254,7 +1260,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if randf() < chance:
 					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "eggplant", "pos": Vector3(px, y, pz), "variant": "wild"})
 
 	# ── 8f. Cây dưa hấu dại — GẦN nguồn nước (nước cách ≤2 ô), đồng cỏ ──
@@ -1273,7 +1279,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if randf() < chance:
 					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "watermelon", "pos": Vector3(px, y, pz), "variant": "wild"})
 
 	# ── 8g. Dây bí đỏ dại — XA nguồn nước (nước cách ≥3 ô), đồng cỏ ──
@@ -1293,7 +1299,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if randf() < chance:
 					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "pumpkin", "pos": Vector3(px, y, pz), "variant": "wild"})
 
 	# ── 8h. Cây cam — bờ nước (xa nước 2-3 ô) & trung tâm đồng cỏ tối ────────
@@ -1316,7 +1322,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
 					if _is_on_road(world_ox + px, world_oz + pz):
 						continue
-					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "orange_tree", "pos": Vector3(px, y, pz), "variant": "river"})
 					spawned = true
 				# Trung tâm đồng cỏ: xa nước ≥2
@@ -1325,7 +1331,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
 					if _is_on_road(world_ox + px, world_oz + pz):
 						continue
-					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "orange_tree", "pos": Vector3(px, y, pz), "variant": "plains"})
 
 	# ── 8i. Cây rừng rậm — tán um tùm, xa nước ≥2 trên đồng cỏ ──────────────
@@ -1345,7 +1351,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
 					if _is_on_road(world_ox + px, world_oz + pz):
 						continue
-					var y := maxf(h - 0.0625, _Data.WATER_Y + 0.0625)
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "dense_tree", "pos": Vector3(px, y, pz), "variant": "plains"})
 
 	_prof("S12 plant_props")
