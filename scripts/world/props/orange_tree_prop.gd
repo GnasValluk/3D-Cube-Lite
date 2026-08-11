@@ -1,4 +1,4 @@
-class_name OrangeTreeProp
+﻿class_name OrangeTreeProp
 extends GrowingProp
 
 enum OrangeSize { SMALL, MEDIUM, TALL }
@@ -8,6 +8,7 @@ const _DARKEN: float = 0.72
 
 const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
+const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
 
 var _variant: String = "plains"
 var _size: int = OrangeSize.MEDIUM
@@ -42,7 +43,7 @@ func _birth_span_days() -> float:
 func _stage_thresholds() -> Array[float]:
 	return [8.0, 25.0]
 
-## Cây cam không có giai đoạn vị thành niên — mầm xong là trưởng thành.
+## CÃ¢y cam khÃ´ng cÃ³ giai Ä‘oáº¡n vá»‹ thÃ nh niÃªn â€” máº§m xong lÃ  trÆ°á»Ÿng thÃ nh.
 func _has_young_stage() -> bool:
 	return false
 
@@ -115,7 +116,7 @@ func _get_top_r() -> float:
 		_: r = 0.035
 	return r
 
-# ── GRID helpers ────────────────────────────────────────────────────────────
+# â”€â”€ GRID helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 var _grid: Dictionary = {}
 var _ordered: Array[Vector3] = []
@@ -144,7 +145,10 @@ func _jitter(col: Color) -> Color:
 	col.b = clampf(col.b + j, 0.0, 1.0)
 	return col
 
-# ── MAIN BUILD ──────────────────────────────────────────────────────────────
+# â”€â”€ MAIN BUILD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+var _leaf_cut: int = 0   # index Ä‘áº§u cá»§a nhÃ³m lÃ¡ (lÆ°á»›i 2Ã—VOXEL) â€” scale khÃ¡c thÃ¢n
+var _fruit_cut: int = 0  # index Ä‘áº§u cá»§a nhÃ³m trÃ¡i (lÆ°á»›i má»‹n 1Ã—VOXEL)
 
 func _build_tree() -> void:
 	_grid.clear()
@@ -152,7 +156,7 @@ func _build_tree() -> void:
 
 	if _stage == GrowingProp.Stage.SPROUT:
 		_build_sprout()
-		_commit_visual(_ordered.size(), 0)
+		_commit_visual()
 		return
 
 	var h: float = _get_h()
@@ -161,62 +165,32 @@ func _build_tree() -> void:
 
 	_trunk_voxels(h, base_r, top_r)
 	var branch_tips := _branch_voxels(h)
+	_leaf_cut = _ordered.size()
 	_canopy_voxels(h, top_r, branch_tips)
-	var main_count := _ordered.size()
+	_fruit_cut = _ordered.size()
 	if _stage == GrowingProp.Stage.MATURE:
 		_fruit_voxels(h)
-	var fruit_count := _ordered.size() - main_count
 
-	_commit_visual(main_count, fruit_count)
+	_commit_visual()
 
-func _commit_visual(main_count: int, fruit_count: int) -> void:
+func _commit_visual() -> void:
 	if _ordered.is_empty():
 		return
-
-	var cube := BoxMesh.new()
-	cube.size = Vector3(VOXEL, VOXEL, VOXEL)
-	var cube_mat := StandardMaterial3D.new()
-	cube_mat.vertex_color_use_as_albedo = true
-	cube_mat.metallic = 0.0
-	cube_mat.roughness = 0.85
-	cube.material = cube_mat
-
-	if main_count > 0:
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = cube
-		mm.instance_count = main_count
-		for i in range(main_count):
-			mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[i]))
-			mm.set_instance_color(i, _grid[_key(_ordered[i])])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.name = "OrangeVisual"
-		add_child(mmi)
-
-	if fruit_count > 0:
-		var fruit_mat := StandardMaterial3D.new()
-		fruit_mat.vertex_color_use_as_albedo = true
-		fruit_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		fruit_mat.metallic = 0.0
-		fruit_mat.roughness = 0.7
-		fruit_mat.emission_enabled = true
-		fruit_mat.emission = Color(1.0, 0.55, 0.15) * 0.5
-		fruit_mat.emission_energy_multiplier = 1.0
-		var fruit_mm := MultiMesh.new()
-		fruit_mm.transform_format = MultiMesh.TRANSFORM_3D
-		fruit_mm.use_colors = true
-		fruit_mm.mesh = cube
-		fruit_mm.instance_count = fruit_count
-		for i in range(fruit_count):
-			var idx := main_count + i
-			fruit_mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[idx]))
-			fruit_mm.set_instance_color(i, _grid[_key(_ordered[idx])])
-		var fruit_mmi := MultiMeshInstance3D.new()
-		fruit_mmi.multimesh = fruit_mm
-		fruit_mmi.name = "FruitVisual"
-		add_child(fruit_mmi)
+	# TrÃ¡i dÃ¹ng cá»¡ má»‹n FINE_SCALE, lÃ¡ dÃ¹ng TRUNK_SCALE (che khe lÆ°á»›i 0.125),
+	# thÃ¢n/cÃ nh dÃ¹ng FINE_SCALE â€” nhÃ¬n ngang khÃ´ng lá»— rá»—ng.
+	var positions: Array = []
+	var scales_pack: Array = []
+	var colors_pack: Array = []
+	for i in range(_ordered.size()):
+		positions.append(_ordered[i])
+		var s: float = _VoxelShared.FINE_SCALE
+		if i >= _leaf_cut and i < _fruit_cut:
+			s = _VoxelShared.TRUNK_SCALE
+		scales_pack.append(s)
+		colors_pack.append(_grid[_key(_ordered[i])])
+	var mmi := _VoxelShared.build(positions, scales_pack, colors_pack)
+	mmi.name = "OrangeVisual"
+	add_child(mmi)
 
 func _apply_stage(_from: int, _to: int) -> void:
 	_rebuild()
@@ -231,9 +205,9 @@ func _rebuild() -> void:
 	_setup_collision()
 	_pop_growth()
 
-# ── SPROUT ──────────────────────────────────────────────────────────────────
+# â”€â”€ SPROUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-## Mầm cam: chồi non 2 lá mầm xanh + vài lá bé.
+## Máº§m cam: chá»“i non 2 lÃ¡ máº§m xanh + vÃ i lÃ¡ bÃ©.
 func _build_sprout() -> void:
 	var col_stem := Color(0.34, 0.60, 0.18)
 	var col_leaf := Color(0.30, 0.70, 0.16)
@@ -248,7 +222,7 @@ func _build_sprout() -> void:
 			_fill(lean.x * t, lean.y + t * 0.10, lean.z, col_leaf.lerp(col_tip, t))
 	_fill(0.0, 0.34, 0.0, col_tip)
 
-# ── TRUNK ───────────────────────────────────────────────────────────────────
+# â”€â”€ TRUNK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _trunk_curve_offset(t: float) -> Vector2:
 	var amp: float = 0.08 if _variant != "river" else 0.05
@@ -294,10 +268,10 @@ func _trunk_voxels(h: float, base_r: float, top_r: float) -> void:
 					col = _jitter(col)
 					_fill(curve_x + dx, y, curve_z + dz, col)
 
-# ── BRANCHES ─────────────────────────────────────────────────────────────────
+# â”€â”€ BRANCHES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-## Nhánh thân: 5-7 cành mảnh (1 voxel) vươn từ thân, cong dần lên.
-## Trả về mảng đầu nhánh để đặt chùm lá.
+## NhÃ¡nh thÃ¢n: 5-7 cÃ nh máº£nh (1 voxel) vÆ°Æ¡n tá»« thÃ¢n, cong dáº§n lÃªn.
+## Tráº£ vá» máº£ng Ä‘áº§u nhÃ¡nh Ä‘á»ƒ Ä‘áº·t chÃ¹m lÃ¡.
 func _branch_voxels(h: float) -> Array[Vector3]:
 	var tips: Array[Vector3] = []
 	var branch_count: int = 5 + randi() % 3
@@ -323,14 +297,14 @@ func _branch_voxels(h: float) -> Array[Vector3]:
 		tips.append(e)
 	return tips
 
-# ── CANOPY ──────────────────────────────────────────────────────────────────
+# â”€â”€ CANOPY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _canopy_pos(h: float) -> Vector3:
 	var amp: float = 0.08 if _variant != "river" else 0.05
 	return Vector3(sin(PI * 0.6) * amp * 0.5, h, cos(PI * 0.5) * amp * 0.5 * 0.7)
 
-## Tán cam: 3 vòng lá cầu dẹp — vòng dưới rộng xòe, giữa lớn nhất, chóp cụm.
-## Mỗi đầu nhánh có thêm 1 chùm lá riêng → tán nhiều lớp hơn.
+## TÃ¡n cam: 3 vÃ²ng lÃ¡ cáº§u dáº¹p â€” vÃ²ng dÆ°á»›i rá»™ng xÃ²e, giá»¯a lá»›n nháº¥t, chÃ³p cá»¥m.
+## Má»—i Ä‘áº§u nhÃ¡nh cÃ³ thÃªm 1 chÃ¹m lÃ¡ riÃªng â†’ tÃ¡n nhiá»u lá»›p hÆ¡n.
 func _canopy_voxels(h: float, _top_r: float, branch_tips: Array[Vector3]) -> void:
 	var crown := _canopy_pos(h)
 	var is_river: bool = _variant == "river"
@@ -354,8 +328,8 @@ func _canopy_voxels(h: float, _top_r: float, branch_tips: Array[Vector3]) -> voi
 		var br := 0.16 + randf() * 0.10
 		_leaf_ring(tip, br, br * 0.70, 0.0, col_mid if randf() < 0.5 else col_light)
 
-## Vòng lá ellipsoid trên lưới voxel thô 0.125 (2× voxel thân) — khối lá
-## chunky kiểu Minecraft, giảm 8× số voxel so với lưới mịn cũ.
+## VÃ²ng lÃ¡ ellipsoid trÃªn lÆ°á»›i voxel thÃ´ 0.125 (2Ã— voxel thÃ¢n) â€” khá»‘i lÃ¡
+## chunky kiá»ƒu Minecraft, giáº£m 8Ã— sá»‘ voxel so vá»›i lÆ°á»›i má»‹n cÅ©.
 func _leaf_ring(crown: Vector3, rx: float, ry: float, dy: float, col_base: Color) -> void:
 	var lv := VOXEL * 2.0
 	var br: int = ceili(maxf(rx, ry) / lv)
@@ -379,9 +353,9 @@ func _leaf_ring(crown: Vector3, rx: float, ry: float, dy: float, col_base: Color
 					col = _jitter(col)
 					_fill(crown.x + px, crown.y + dy + py, crown.z + pz, col)
 
-# ── ORANGES ─────────────────────────────────────────────────────────────────
+# â”€â”€ ORANGES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-## Quả cam chín: 4-6 quả tròn cam rực treo xòe ra ngoài mép tán.
+## Quáº£ cam chÃ­n: 4-6 quáº£ trÃ²n cam rá»±c treo xÃ²e ra ngoÃ i mÃ©p tÃ¡n.
 func _fruit_voxels(h: float) -> void:
 	var fruit_count: int = 4 + randi() % 3
 	var crown := _canopy_pos(h)
@@ -421,28 +395,27 @@ func _fruit_voxels(h: float) -> void:
 						col = _jitter(col)
 						_fill(cx + px, cy + py, cz + pz, col)
 
-		# Núm quả + vệt lõm nhỏ
+		# NÃºm quáº£ + vá»‡t lÃµm nhá»
 		_fill(cx, cy + ry + VOXEL * 0.8, cz, col_stem)
 		if fi % 2 == 0:
 			_fill(cx + VOXEL, cy + VOXEL, cz + VOXEL, col_light.lightened(0.10))
 
-# ── HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) ───────────
+# â”€â”€ HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _hit_flash() -> void:
-	for name in ["OrangeVisual", "FruitVisual"]:
-		var mmi := find_child(name, false, false) as MultiMeshInstance3D
-		if mmi == null: continue
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color.WHITE
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		var orig := mmi.material_override
-		mmi.material_override = mat
-		var tween := create_tween()
-		tween.tween_interval(0.08)
-		tween.tween_callback(func():
-			if is_instance_valid(mmi):
-				mmi.material_override = orig
-		)
+	var mmi := find_child("OrangeVisual", false, false) as MultiMeshInstance3D
+	if mmi == null: return
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color.WHITE
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var orig := mmi.material_override
+	mmi.material_override = mat
+	var tween := create_tween()
+	tween.tween_interval(0.08)
+	tween.tween_callback(func():
+		if is_instance_valid(mmi):
+			mmi.material_override = orig
+	)
 
 func _get_mesh_instances() -> Array[MeshInstance3D]:
 	return []

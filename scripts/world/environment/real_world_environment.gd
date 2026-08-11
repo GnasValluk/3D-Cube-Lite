@@ -169,7 +169,7 @@ func _process(delta: float) -> void:
 
 	var rain_factor: float = 1.0 - weather_intensity * 0.55
 
-	SkyLight.update_sky(_sky_mat, h, weather_intensity)
+	SkyLight.update_sky(_sky_mat, h, weather_intensity, float(TimeSystem.get_total_days()) if TimeSystem else -1.0)
 	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
 	environment.ambient_light_energy = k["ae"] * rain_factor
 

@@ -11,7 +11,10 @@
 
 extends Node
 
-const MAX_PER_FRAME: int = 2
+const MAX_PER_FRAME: int = 4
+## Budget thời gian chung cho mỗi frame — tránh 1 job nước rất nặng (~60ms)
+## chiếm trọn frame; nếu job rẻ thì xử lý được nhiều job hơn trong cùng budget.
+const TIME_BUDGET_US: int = 6000
 
 var _pending: Array = []
 var _mutex: Mutex = Mutex.new()
@@ -36,8 +39,11 @@ func clear_for_chunk(inst_id: int) -> void:
 func _process(_delta: float) -> void:
 	if _pending.is_empty():
 		return
+	var t_budget := Time.get_ticks_usec()
 	var count: int = 0
 	while count < MAX_PER_FRAME and not _pending.is_empty():
+		if count > 0 and Time.get_ticks_usec() - t_budget >= TIME_BUDGET_US:
+			break
 		_mutex.lock()
 		var job: Variant = _pending.pop_front()
 		_mutex.unlock()

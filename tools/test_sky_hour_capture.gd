@@ -29,12 +29,16 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var rw := we as RealWorldEnvironment
-	for hour in [6.0, 10.0, 12.0, 15.0, 17.0, 18.5, 21.0, 0.0]:
+	for hour in [6.0, 8.0, 10.0, 12.0, 15.0, 16.5, 17.5, 18.5, 21.0, 0.0]:
 		# giả lập giờ bằng cách tự push uniform trực tiếp lên sky material
 		var mat: ShaderMaterial = rw._sky_mat
-		SkyLight.update_sky(mat, hour, 0.0)
+		SkyLight.update_sky(mat, hour, 0.0, 7.0)
 		await get_tree().process_frame
 		await get_tree().process_frame
-		var px := _sample_pixels()
-		print("hour %5.1f  top=%s  mid=%s  low=%s" % [hour, str(px[0]), str(px[2]), str(px[5])])
+		var top: Color = mat.get_shader_parameter("sky_top_color")
+		var hor: Color = mat.get_shader_parameter("sky_horizon_color")
+		var sun: Color = mat.get_shader_parameter("sun_color")
+		var phase: float = mat.get_shader_parameter("moon_phase")
+		var ecl: float = mat.get_shader_parameter("moon_eclipse")
+		print("hour %5.1f topR=%.2f topB=%.2f horR=%.2f sunR=%.2f sunG=%.2f moon_phase=%.2f ecl=%.2f" % [hour, top.r, top.b, hor.r, sun.r, sun.g, phase, ecl])
 	get_tree().quit(0)

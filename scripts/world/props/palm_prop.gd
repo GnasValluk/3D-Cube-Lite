@@ -1,4 +1,4 @@
-class_name PalmProp
+﻿class_name PalmProp
 extends GrowingProp
 
 enum PalmSize { SMALL, MEDIUM, TALL }
@@ -9,6 +9,7 @@ const _DARKEN: float = 0.72
 const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 const _CoconutMesh = preload("res://scripts/items/models/coconut.gd")
+const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
 
 var _variant: String = "river"
 var _size: int = PalmSize.MEDIUM
@@ -45,7 +46,7 @@ func _birth_span_days() -> float:
 func _stage_thresholds() -> Array[float]:
 	return [8.0, 25.0]
 
-## Cây dừa không có giai đoạn vị thành niên — mầm xong là trưởng thành.
+## CÃ¢y dá»«a khÃ´ng cÃ³ giai Ä‘oáº¡n vá»‹ thÃ nh niÃªn â€” máº§m xong lÃ  trÆ°á»Ÿng thÃ nh.
 func _has_young_stage() -> bool:
 	return false
 
@@ -132,9 +133,9 @@ func _get_top_r() -> float:
 			_: r = 0.10
 	return r
 
-# ── GRID helpers ────────────────────────────────────────────────────────────
+# â”€â”€ GRID helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-var _grid: Dictionary = {}       # key (int) → Color
+var _grid: Dictionary = {}       # key (int) â†’ Color
 var _ordered: Array[Vector3] = []  # insertion order for MultiMesh
 
 func _key(v: Vector3) -> int:
@@ -154,7 +155,7 @@ func _add_voxel(pos: Vector3, col: Color) -> void:
 func _fill(px: float, py: float, pz: float, col: Color) -> void:
 	_add_voxel(Vector3(px, py, pz), col * _DARKEN)
 
-# ── MAIN BUILD ──────────────────────────────────────────────────────────────
+# â”€â”€ MAIN BUILD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _build_tree() -> void:
 	_grid.clear()
@@ -175,28 +176,22 @@ func _build_tree() -> void:
 	if _stage == GrowingProp.Stage.MATURE:
 		_commit_coconuts(h, top_r)
 
-func _commit_visual(main_count: int = -1) -> void:
+func _commit_visual() -> void:
 	if _ordered.is_empty():
 		return
-
-	var cube := BoxMesh.new()
-	cube.size = Vector3(VOXEL, VOXEL, VOXEL)
-	var cube_mat := StandardMaterial3D.new()
-	cube_mat.vertex_color_use_as_albedo = true
-	cube_mat.metallic = 0.0
-	cube_mat.roughness = 0.85
-	cube.material = cube_mat
-
-	var mm := MultiMesh.new()
-	mm.transform_format = MultiMesh.TRANSFORM_3D
-	mm.use_colors = true
-	mm.mesh = cube
-	mm.instance_count = _ordered.size()
+	# 1 MultiMesh duy nháº¥t cho cáº£ cÃ¢y (thÃ¢n + tÃ u lÃ¡), scale khá»›p lÆ°á»›i 0.125 â€”
+	# nhÃ¬n ngang khÃ´ng cÃ²n khe rá»—ng giá»¯a cÃ¡c cube. Máº§m dÃ¹ng cá»¡ má»‹n FINE_SCALE.
+	var positions: Array = []
+	var scales_pack: Array = []
+	var colors_pack: Array = []
+	var s := _VoxelShared.TRUNK_SCALE
+	if _stage == GrowingProp.Stage.SPROUT:
+		s = _VoxelShared.FINE_SCALE
 	for i in range(_ordered.size()):
-		mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[i]))
-		mm.set_instance_color(i, _grid[_key(_ordered[i])])
-	var mmi := MultiMeshInstance3D.new()
-	mmi.multimesh = mm
+		positions.append(_ordered[i])
+		scales_pack.append(s)
+		colors_pack.append(_grid[_key(_ordered[i])])
+	var mmi := _VoxelShared.build(positions, scales_pack, colors_pack)
 	mmi.name = "PalmVisual"
 	add_child(mmi)
 
@@ -213,7 +208,7 @@ func _rebuild() -> void:
 	_setup_collision()
 	_pop_growth()
 
-## Cây dừa mầm: chồi non nhỏ với các lá dạng lưỡi kiếm dựng đứng, chưa có thân.
+## CÃ¢y dá»«a máº§m: chá»“i non nhá» vá»›i cÃ¡c lÃ¡ dáº¡ng lÆ°á»¡i kiáº¿m dá»±ng Ä‘á»©ng, chÆ°a cÃ³ thÃ¢n.
 func _build_sprout() -> void:
 	var is_river: bool = _variant == "river"
 	var count: int = 6 + randi() % 2
@@ -250,7 +245,7 @@ func _build_sprout() -> void:
 				_fill(up_pos.x, up_pos.y, up_pos.z, col_leaf)
 				_fill(lo_pos.x, lo_pos.y, lo_pos.z, col_leaf.darkened(0.12))
 
-# ── TRUNK ───────────────────────────────────────────────────────────────────
+# â”€â”€ TRUNK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _trunk_voxels(h: float, base_r: float, top_r: float) -> void:
 	var lv := VOXEL * 2.0
@@ -320,7 +315,7 @@ func _jitter(col: Color) -> Color:
 	col.b = clampf(col.b + j, 0.0, 1.0)
 	return col
 
-# ── CROWN ───────────────────────────────────────────────────────────────────
+# â”€â”€ CROWN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _crown_pos(h: float) -> Vector3:
 	var is_river: bool = _variant == "river"
@@ -329,7 +324,7 @@ func _crown_pos(h: float) -> Vector3:
 	var curve_z := cos(PI * 0.6) * amp * 0.8 * 0.6
 	return Vector3(curve_x, h, curve_z)
 
-# ── FRONDS ──────────────────────────────────────────────────────────────────
+# â”€â”€ FRONDS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _frond_voxels(h: float, _top_r: float) -> void:
 	var is_river: bool = _variant == "river"
@@ -337,8 +332,8 @@ func _frond_voxels(h: float, _top_r: float) -> void:
 	var crown := _crown_pos(h)
 	var seed_a: float = randf() * TAU
 
-	# Nhóm lá non trong tán trưởng thành: vài lá ngắn dựng cao, còn lại là
-	# lá già dài trĩu xuống — tán dừa lúc nào cũng rậm đủ lớp.
+	# NhÃ³m lÃ¡ non trong tÃ¡n trÆ°á»Ÿng thÃ nh: vÃ i lÃ¡ ngáº¯n dá»±ng cao, cÃ²n láº¡i lÃ 
+	# lÃ¡ giÃ  dÃ i trÄ©u xuá»‘ng â€” tÃ¡n dá»«a lÃºc nÃ o cÅ©ng ráº­m Ä‘á»§ lá»›p.
 	var young_n: int = maxi(1, count / 4)
 
 	for fi in range(count):
@@ -442,11 +437,11 @@ func _frond_voxels(h: float, _top_r: float) -> void:
 						_fill(lup.x, lup.y, lup.z, col_up)
 						_fill(llo.x, llo.y, llo.z, col_lo)
 
-# ── COCONUTS ────────────────────────────────────────────────────────────────
+# â”€â”€ COCONUTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-## Gắn model quả dừa chuẩn (CoconutMesh.whole_data — elip + đài hoa + 3 gờ)
-## vào chòm lá ngọn: 2-4 quả treo quanh tán, phát sáng nhẹ. Một MultiMesh
-## duy nhất cho mọi quả (1 draw call), màu vertex giữ nguyên chi tiết model.
+## Gáº¯n model quáº£ dá»«a chuáº©n (CoconutMesh.whole_data â€” elip + Ä‘Ã i hoa + 3 gá»)
+## vÃ o chÃ²m lÃ¡ ngá»n: 2-4 quáº£ treo quanh tÃ¡n, phÃ¡t sÃ¡ng nháº¹. Má»™t MultiMesh
+## duy nháº¥t cho má»i quáº£ (1 draw call), mÃ u vertex giá»¯ nguyÃªn chi tiáº¿t model.
 func _commit_coconuts(h: float, top_r: float) -> void:
 	var data: Array = _CoconutMesh.whole_data("green")
 	if data.is_empty():
@@ -491,7 +486,7 @@ func _commit_coconuts(h: float, top_r: float) -> void:
 	mmi.name = "CoconutVisual"
 	add_child(mmi)
 
-# ── HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) ───────────
+# â”€â”€ HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _hit_flash() -> void:
 	for name in ["PalmVisual", "CoconutVisual"]:

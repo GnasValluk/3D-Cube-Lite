@@ -176,6 +176,12 @@ func _process(_delta: float) -> void:
 		chunk.refresh_boundary_water()
 		_check_initial_ready()
 
+	# ── Lazy collision ────────────────────────────────────────────────────────
+	# Chunk mới chỉ đánh dấu _collision_pending (không dựng trimesh ngay — mỗi
+	# trimesh ~6-12ms, cost theo body). Chỉ push shape cho chunk gần player
+	# (bán kính 2) → boot/teleport không phải dựng N shape cùng lúc.
+	_push_lazy_collision(cur)
+
 	var dist_moved := ppos.distance_squared_to(_last_pos)
 
 	# Bán kính tải chunk có thể đổi trong lúc chơi (cài đặt). Nếu đổi thì refresh
@@ -224,6 +230,34 @@ func _process(_delta: float) -> void:
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading(key, false)
 
+## ── Lazy collision scan ─────────────────────────────────────────────────────
+## Push trimesh đến CollisionQueue cho các chunk đã built nhưng còn
+## _collision_pending trong bán kính `r` quanh chunk player. Chunk xa giữ
+## pending (không tạo body) tới khi player lại gần → giảm spike dựng shape.
+## Push theo thứ tự gần-trước để chunk player đang đứng/cách 1 luôn có body
+## sớm nhất (tránh rơi xuyên khi spawn/teleport vào chunk chưa tạo shape).
+func _push_lazy_collision(cur: Vector2i, r: int = 2) -> void:
+	if not is_instance_valid(CollisionQueue):
+		return
+	var pending: Array[WorldChunk] = []
+	for ck in _chunks.keys():
+		var chunk: WorldChunk = _chunks[ck]
+		if chunk == null or not chunk._collision_pending:
+			continue
+		var d := Vector2i(ck.x - cur.x, ck.y - cur.y)
+		if absi(d.x) > r or absi(d.y) > r:
+			continue
+		if chunk._terrain_mesh_instance != null:
+			pending.append(chunk)
+	if pending.is_empty():
+		return
+	pending.sort_custom(func(a: WorldChunk, b: WorldChunk) -> bool:
+		return (a.position - _player.global_position).length_squared() \
+				< (b.position - _player.global_position).length_squared())
+	for chunk in pending:
+		CollisionQueue.push_mesh(chunk, chunk._terrain_mesh_instance.mesh)
+		chunk._collision_pending = false
+
 func _start_loading(key: Vector2i, sync: bool) -> void:
 	var chunk := WorldChunk.new()
 	chunk.position = Vector3(key.x * CHUNK_SIZE, 0.0, key.y * CHUNK_SIZE)
@@ -236,6 +270,12 @@ func _start_loading(key: Vector2i, sync: bool) -> void:
 		if SaveManager:
 			SaveManager.apply_block_modifications_for_chunk(chunk, key.x, key.y)
 		chunk.refresh_boundary_water()
+		# Center chunk load sync → player đang đứng trên → cần collision ngay.
+		if chunk._collision_pending and is_instance_valid(CollisionQueue):
+			var mesh: ArrayMesh = chunk._terrain_mesh_instance.mesh if chunk._terrain_mesh_instance != null else null
+			if mesh != null:
+				CollisionQueue.push_mesh(chunk, mesh)
+				chunk._collision_pending = false
 
 func _check_initial_ready() -> void:
 	if _loading_ready or _total_initial == 0: return

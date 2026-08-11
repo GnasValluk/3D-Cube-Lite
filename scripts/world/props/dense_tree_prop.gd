@@ -1,9 +1,9 @@
-class_name DenseTreeProp
+﻿class_name DenseTreeProp
 extends GrowingProp
 
-## Cây rừng rậm — 6-8 nhánh chính vươn xa + nhánh con, tán cực um tùm với
-## gradient nhiều sắc xanh lá đậm (rừng thẫm → xanh tươi → ngọn sáng). Vòng
-## đời: mầm → trưởng thành (không có vị thành niên).
+## CÃ¢y rá»«ng ráº­m â€” 6-8 nhÃ¡nh chÃ­nh vÆ°Æ¡n xa + nhÃ¡nh con, tÃ¡n cá»±c um tÃ¹m vá»›i
+## gradient nhiá»u sáº¯c xanh lÃ¡ Ä‘áº­m (rá»«ng tháº«m â†’ xanh tÆ°Æ¡i â†’ ngá»n sÃ¡ng). VÃ²ng
+## Ä‘á»i: máº§m â†’ trÆ°á»Ÿng thÃ nh (khÃ´ng cÃ³ vá»‹ thÃ nh niÃªn).
 
 enum DenseSize { SMALL, MEDIUM, TALL }
 
@@ -12,6 +12,7 @@ const _DARKEN: float = 0.72
 
 const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
+const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
 
 var _variant: String = "plains"
 var _size: int = DenseSize.MEDIUM
@@ -42,7 +43,7 @@ func _birth_span_days() -> float:
 func _stage_thresholds() -> Array[float]:
 	return [10.0, 30.0]
 
-## Cây rừng rậm không có giai đoạn vị thành niên — mầm xong là trưởng thành.
+## CÃ¢y rá»«ng ráº­m khÃ´ng cÃ³ giai Ä‘oáº¡n vá»‹ thÃ nh niÃªn â€” máº§m xong lÃ  trÆ°á»Ÿng thÃ nh.
 func _has_young_stage() -> bool:
 	return false
 
@@ -111,7 +112,7 @@ func _get_top_r() -> float:
 		_: r = 0.12
 	return r
 
-# ── GRID helpers ────────────────────────────────────────────────────────────
+# â”€â”€ GRID helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 var _grid: Dictionary = {}
 var _ordered: Array[Vector3] = []
@@ -140,7 +141,7 @@ func _jitter(col: Color) -> Color:
 	col.b = clampf(col.b + j, 0.0, 1.0)
 	return col
 
-## Palette gradient xanh lá đậm 6 sắc: rừng thẫm → xanh tươi → ngọn sáng.
+## Palette gradient xanh lÃ¡ Ä‘áº­m 6 sáº¯c: rá»«ng tháº«m â†’ xanh tÆ°Æ¡i â†’ ngá»n sÃ¡ng.
 const _LEAF_TONES: Array[Color] = [
 	Color(0.10, 0.26, 0.05),
 	Color(0.13, 0.34, 0.07),
@@ -150,7 +151,10 @@ const _LEAF_TONES: Array[Color] = [
 	Color(0.33, 0.72, 0.18),
 ]
 
-# ── MAIN BUILD ──────────────────────────────────────────────────────────────
+# â”€â”€ MAIN BUILD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+## TÃ¡ch voxel theo loáº¡i lÆ°á»›i khi build: thÃ¢n/cÃ nh lÆ°á»›i thÃ´, lÃ¡ lÆ°á»›i má»‹n.
+var _leaf_cut: int = 0   # sá»‘ voxel Ä‘áº§u tiÃªn thuá»™c nhÃ³m lÃ¡ (sau index nÃ y)
 
 func _build_tree() -> void:
 	_grid.clear()
@@ -158,7 +162,7 @@ func _build_tree() -> void:
 
 	if _stage == GrowingProp.Stage.SPROUT:
 		_build_sprout()
-		_commit_visual(_ordered.size(), 0)
+		_commit_visual()
 		return
 
 	var h: float = _get_h()
@@ -167,41 +171,26 @@ func _build_tree() -> void:
 
 	_trunk_voxels(h, base_r, top_r)
 	var branch_tips := _branch_voxels(h)
+	_leaf_cut = _ordered.size()
 	_canopy_voxels(h, branch_tips)
-	var main_count := _ordered.size()
 
-	_commit_visual(main_count, 0)
+	_commit_visual()
 
-func _commit_visual(main_count: int, fruit_count: int) -> void:
+func _commit_visual() -> void:
 	if _ordered.is_empty():
 		return
-
-	var cube := BoxMesh.new()
-	cube.size = Vector3(VOXEL, VOXEL, VOXEL)
-	var cube_mat := StandardMaterial3D.new()
-	cube_mat.vertex_color_use_as_albedo = true
-	cube_mat.metallic = 0.0
-	cube_mat.roughness = 0.85
-	cube.material = cube_mat
-
-	if main_count > 0:
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = cube
-		mm.instance_count = main_count
-		for i in range(main_count):
-			mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[i]))
-			mm.set_instance_color(i, _grid[_key(_ordered[i])])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.name = "DenseVisual"
-		add_child(mmi)
-
-	if fruit_count > 0:
-		var fruit_mmi := MultiMeshInstance3D.new()
-		fruit_mmi.name = "FruitVisual"
-		add_child(fruit_mmi)
+	# 1 MultiMesh duy nháº¥t: thÃ¢n/cÃ nh dÃ¹ng TRUNK_SCALE (che khe lÆ°á»›i 0.125),
+	# lÃ¡ dÃ¹ng LEAF_SCALE (che khe lÆ°á»›i 0.1875) â€” nhÃ¬n ngang khÃ´ng lá»— rá»—ng.
+	var positions: Array = []
+	var scales_pack: Array = []
+	var colors_pack: Array = []
+	for i in range(_ordered.size()):
+		positions.append(_ordered[i])
+		scales_pack.append(_VoxelShared.LEAF_SCALE if i >= _leaf_cut else _VoxelShared.TRUNK_SCALE)
+		colors_pack.append(_grid[_key(_ordered[i])])
+	var mmi := _VoxelShared.build(positions, scales_pack, colors_pack)
+	mmi.name = "DenseVisual"
+	add_child(mmi)
 
 func _apply_stage(_from: int, _to: int) -> void:
 	_rebuild()
@@ -216,9 +205,9 @@ func _rebuild() -> void:
 	_setup_collision()
 	_pop_growth()
 
-# ── SPROUT ──────────────────────────────────────────────────────────────────
+# â”€â”€ SPROUT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-## Mầm cây rừng: chồi mập 2 lá mầm to.
+## Máº§m cÃ¢y rá»«ng: chá»“i máº­p 2 lÃ¡ máº§m to.
 func _build_sprout() -> void:
 	var col_stem := Color(0.28, 0.20, 0.10)
 	var col_leaf := Color(0.22, 0.54, 0.14)
@@ -232,7 +221,7 @@ func _build_sprout() -> void:
 			_fill(lean.x * t, lean.y + t * 0.10, lean.z, col_leaf.lerp(col_tip, t))
 	_fill(0.0, 0.34, 0.0, col_tip)
 
-# ── TRUNK ───────────────────────────────────────────────────────────────────
+# â”€â”€ TRUNK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _trunk_curve_offset(t: float) -> Vector2:
 	var amp: float = 0.07
@@ -275,10 +264,10 @@ func _trunk_voxels(h: float, base_r: float, top_r: float) -> void:
 					col = _jitter(col)
 					_fill(off.x + dx, y, off.y + dz, col)
 
-# ── BRANCHES ────────────────────────────────────────────────────────────────
+# â”€â”€ BRANCHES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-## Hệ nhánh: 6-8 nhánh chính vươn xa, mỗi nhánh rẽ thêm 1-2 nhánh con —
-## đầu mọi nhánh đều có chùm lá → tán cực rậm.
+## Há»‡ nhÃ¡nh: 6-8 nhÃ¡nh chÃ­nh vÆ°Æ¡n xa, má»—i nhÃ¡nh ráº½ thÃªm 1-2 nhÃ¡nh con â€”
+## Ä‘áº§u má»i nhÃ¡nh Ä‘á»u cÃ³ chÃ¹m lÃ¡ â†’ tÃ¡n cá»±c ráº­m.
 func _branch_voxels(h: float) -> Array[Vector3]:
 	var tips: Array[Vector3] = []
 	var count: int = 6 + randi() % 3
@@ -324,15 +313,15 @@ func _draw_branch(p0: Vector3, p1: Vector3, p2: Vector3, col: Color) -> void:
 			for off in [[VOXEL, 0.0], [-VOXEL, 0.0], [0.0, VOXEL], [0.0, -VOXEL]]:
 				_fill(p.x + off[0], p.y, p.z + off[1], col)
 
-# ── CANOPY ──────────────────────────────────────────────────────────────────
+# â”€â”€ CANOPY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-## Tán um tùm: 5-6 vòng cầu dẹp quanh chóp với gradient nhiều sắc xanh lá đậm
-## + chùm lá to ở đầu mọi nhánh.
+## TÃ¡n um tÃ¹m: 5-6 vÃ²ng cáº§u dáº¹p quanh chÃ³p vá»›i gradient nhiá»u sáº¯c xanh lÃ¡ Ä‘áº­m
+## + chÃ¹m lÃ¡ to á»Ÿ Ä‘áº§u má»i nhÃ¡nh.
 func _canopy_voxels(h: float, branch_tips: Array[Vector3]) -> void:
 	var crown_off := _trunk_curve_offset(1.0)
 	var crown := Vector3(crown_off.x, h, crown_off.y)
 
-	# Gradient xanh lá đậm: rừng thẫm dưới → xanh tươi giữa → ngọn sáng.
+	# Gradient xanh lÃ¡ Ä‘áº­m: rá»«ng tháº«m dÆ°á»›i â†’ xanh tÆ°Æ¡i giá»¯a â†’ ngá»n sÃ¡ng.
 	var rings: Array = [
 		{"r": 0.95, "ry": 0.36, "dy": -0.40, "col": _LEAF_TONES[0]},
 		{"r": 1.10, "ry": 0.40, "dy": -0.10, "col": _LEAF_TONES[1]},
@@ -349,8 +338,8 @@ func _canopy_voxels(h: float, branch_tips: Array[Vector3]) -> void:
 		var bry := br * 0.72
 		_leaf_ring(tip, br, bry, 0.0, _LEAF_TONES[2 + randi() % 3])
 
-## Vòng lá ellipsoid trên lưới voxel thô 0.1875 (3× voxel thân) — khối lá
-## chunky kiểu Minecraft, dày hơn lưới 0.25 để lá không quá thưa.
+## VÃ²ng lÃ¡ ellipsoid trÃªn lÆ°á»›i voxel thÃ´ 0.1875 (3Ã— voxel thÃ¢n) â€” khá»‘i lÃ¡
+## chunky kiá»ƒu Minecraft, dÃ y hÆ¡n lÆ°á»›i 0.25 Ä‘á»ƒ lÃ¡ khÃ´ng quÃ¡ thÆ°a.
 func _leaf_ring(crown: Vector3, rx: float, ry: float, dy: float, col_base: Color) -> void:
 	var lv := VOXEL * 3.0
 	var br: int = ceili(maxf(rx, ry) / lv)
@@ -378,7 +367,7 @@ func _leaf_ring(crown: Vector3, rx: float, ry: float, dy: float, col_base: Color
 					col = _jitter(col)
 					_fill(crown.x + px, crown.y + dy + py, crown.z + pz, col)
 
-# ── HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) ───────────
+# â”€â”€ HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _hit_flash() -> void:
 	var mmi := find_child("DenseVisual", false, false) as MultiMeshInstance3D

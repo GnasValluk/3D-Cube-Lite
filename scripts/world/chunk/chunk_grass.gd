@@ -1,6 +1,7 @@
 extends RefCounted
 
 const GV: float = 0.028
+const _GRASS_CONST_INF: int = 999
 
 static func _noise(x: float, y: float) -> float:
 	return sin(x * 0.0071 + y * 0.0053) * 0.40 \
@@ -8,11 +9,15 @@ static func _noise(x: float, y: float) -> float:
 		+ sin(x * 0.0017 + y * 0.0037 + 3.8) * 0.20 \
 		+ sin(x * 0.0109 + y * 0.0083 + 5.1) * 0.10
 
-static func add_voxel_grass(vx: int, vz: int, pos: Vector3, out_xforms: Array, out_colors: Array, cols: int, wdist: PackedInt32Array) -> void:
+static func add_voxel_grass(vx: int, vz: int, pos: Vector3, out_xforms: Array, out_colors: Array, cols: int, wdist: PackedInt32Array, hdist: PackedInt32Array = PackedInt32Array()) -> void:
 	var wx: int = int(round(pos.x))
 	var wz: int = int(round(pos.z))
 
-	if wdist[vx * cols + vz] > 3:
+	# Cho phép 2 nguồn: gần nước (wdist≤3) hoặc chân núi/đồi (hdist≤2).
+	var near_water: bool = wdist[vx * cols + vz] <= 3
+	var hill_foot: bool = hdist.size() > 0 \
+		and hdist[vx * cols + vz] != _GRASS_CONST_INF and hdist[vx * cols + vz] <= 2
+	if not near_water and not hill_foot:
 		return
 
 	var cx := wx / 12

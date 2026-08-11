@@ -10,7 +10,11 @@
 
 extends Node
 
-const MAX_PER_FRAME: int = 2
+const MAX_PER_FRAME: int = 8
+## Budget thời gian chung mỗi frame — trimesh shape tốn ~6-12ms/cái (cost theo
+## body, không theo tris). Giới hạn theo ms để không dồn nhiều shape nặng trong
+## cùng 1 frame; luôn xử lý ≥1 job để không bị đói.
+const TIME_BUDGET_US: int = 8000
 
 ## Mỗi entry: [chunk, mesh] dạng Variant array
 ## để tránh crash khi chunk bị freed trước khi entry được xử lý.
@@ -39,8 +43,11 @@ func _process(_delta: float) -> void:
 	if _queue.is_empty():
 		return
 
+	var t_budget := Time.get_ticks_usec()
 	var count: int = 0
 	while count < MAX_PER_FRAME and not _queue.is_empty():
+		if count > 0 and Time.get_ticks_usec() - t_budget >= TIME_BUDGET_US:
+			break
 		_mutex.lock()
 		var entry: Array = _queue.pop_front()
 		_mutex.unlock()

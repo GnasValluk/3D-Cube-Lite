@@ -1,11 +1,11 @@
-class_name OakProp
+﻿class_name OakProp
 extends GrowingProp
 
-## Cây sồi kiểu Minecraft — thân cột nâu đậm thẳng đứng (vỏ nâu sẫm ấm, không
-## rêu/xám), tán lá xanh lá chuối (vàng-xanh sáng) dạng khối blob chunky lớn:
-## lõi sẫm, giữa tươi, ngoài sáng đón nắng; nhiều cành nhánh vươn ra mang chùm
-## lá riêng, gió đu nhẹ theo chùm. Vòng đời: mầm (sapling) → trưởng thành.
-## Chặt rìu rơi khối gỗ sồi.
+## CÃ¢y sá»“i kiá»ƒu Minecraft â€” thÃ¢n cá»™t nÃ¢u Ä‘áº­m tháº³ng Ä‘á»©ng (vá» nÃ¢u sáº«m áº¥m, khÃ´ng
+## rÃªu/xÃ¡m), tÃ¡n lÃ¡ xanh lÃ¡ chuá»‘i (vÃ ng-xanh sÃ¡ng) dáº¡ng khá»‘i blob chunky lá»›n:
+## lÃµi sáº«m, giá»¯a tÆ°Æ¡i, ngoÃ i sÃ¡ng Ä‘Ã³n náº¯ng; nhiá»u cÃ nh nhÃ¡nh vÆ°Æ¡n ra mang chÃ¹m
+## lÃ¡ riÃªng, giÃ³ Ä‘u nháº¹ theo chÃ¹m. VÃ²ng Ä‘á»i: máº§m (sapling) â†’ trÆ°á»Ÿng thÃ nh.
+## Cháº·t rÃ¬u rÆ¡i khá»‘i gá»— sá»“i.
 
 enum OakSize { SMALL, MEDIUM, TALL }
 
@@ -14,25 +14,25 @@ const _DARKEN: float = 0.72
 
 const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
+const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
 
 var _variant: String = "plains"
 var _size: int = OakSize.MEDIUM
 var _base_h: float = 4.4
 
-var _tuft_nodes: Array[Node3D] = []
-var _tuft_freqs: Array[float] = []
-var _tuft_phases: Array[float] = []
-var _tuft_amps: Array[float] = []
+var _sway_phase: float
+var _sway_freq: float
+var _sway_amp: float
 
-var _tuft_data: Array = []   # { center, pos[], col[] } — chùm lá (local của chùm)
-var _grid: Dictionary = {}   # key (int) → Color
+var _tuft_data: Array = []   # { center, pos[], col[] } â€” chÃ¹m lÃ¡ (local cá»§a chÃ¹m)
+var _grid: Dictionary = {}   # key (int) â†’ Color
 var _ordered: Array[Vector3] = []
 
 var _canopy_centers: Array[Vector3] = []
 
 func setup(variant: String = "plains") -> void:
 	_variant = variant
-	# Loại bỏ dạng ít lá: cây sồi luôn chỉ có cỡ vừa/lớn, tán lúc nào cũng um tùm.
+	# Loáº¡i bá» dáº¡ng Ã­t lÃ¡: cÃ¢y sá»“i luÃ´n chá»‰ cÃ³ cá»¡ vá»«a/lá»›n, tÃ¡n lÃºc nÃ o cÅ©ng um tÃ¹m.
 	var r := randf()
 	if r < 0.45: _size = OakSize.MEDIUM
 	else: _size = OakSize.TALL
@@ -50,7 +50,7 @@ func _birth_span_days() -> float:
 func _stage_thresholds() -> Array[float]:
 	return [15.0, 55.0]
 
-## Cây sồi không có giai đoạn vị thành niên — mầm xong là trưởng thành.
+## CÃ¢y sá»“i khÃ´ng cÃ³ giai Ä‘oáº¡n vá»‹ thÃ nh niÃªn â€” máº§m xong lÃ  trÆ°á»Ÿng thÃ nh.
 func _has_young_stage() -> bool:
 	return false
 
@@ -58,6 +58,9 @@ func _ready() -> void:
 	super._ready()
 	_build_tree()
 	_setup_collision()
+	_sway_phase = randf() * TAU
+	_sway_freq = 0.5 + randf() * 0.3
+	_sway_amp = deg_to_rad(0.8 + randf() * 0.4)
 
 func _get_h() -> float:
 	if _stage == GrowingProp.Stage.SPROUT:
@@ -77,18 +80,14 @@ func _on_destroy() -> void:
 func _process(delta: float) -> void:
 	super._process(delta)
 	var t := Time.get_ticks_usec() * 0.000001
-	for i in range(_tuft_nodes.size()):
-		var tn: Node3D = _tuft_nodes[i]
-		if tn == null or not is_instance_valid(tn):
-			continue
-		tn.rotation.x = sin(t * _tuft_freqs[i] + _tuft_phases[i]) * _tuft_amps[i]
-		tn.rotation.z = cos(t * _tuft_freqs[i] * 0.8 + _tuft_phases[i] + 1.0) * _tuft_amps[i] * 0.7
+	rotation.x = sin(t * _sway_freq + _sway_phase) * _sway_amp
+	rotation.z = cos(t * _sway_freq * 0.8 + _sway_phase + 1.0) * _sway_amp * 0.7
 
 func _setup_collision() -> void:
 	var h := _get_h()
 	var body := StaticBody3D.new()
 	body.name = "OakCollision"
-	# Thân cây: trụ nhỏ khớp đúng phần gỗ thật (bán kính theo gốc thân).
+	# ThÃ¢n cÃ¢y: trá»¥ nhá» khá»›p Ä‘Ãºng pháº§n gá»— tháº­t (bÃ¡n kÃ­nh theo gá»‘c thÃ¢n).
 	var trunk := CollisionShape3D.new()
 	var cyl := CylinderShape3D.new()
 	cyl.radius = _get_base_r() * 0.85 + 0.10
@@ -96,8 +95,8 @@ func _setup_collision() -> void:
 	trunk.shape = cyl
 	trunk.position.y = h * 0.5
 	body.add_child(trunk)
-	# Tán: 1 quả cầu nhỏ cho mỗi đùm lá tại đúng tâm đùm — khớp silhouette
-	# thật của cây thay vì 1 trụ khổng lồ phủ cả tán (trước đây to hơn cây).
+	# TÃ¡n: 1 quáº£ cáº§u nhá» cho má»—i Ä‘Ã¹m lÃ¡ táº¡i Ä‘Ãºng tÃ¢m Ä‘Ã¹m â€” khá»›p silhouette
+	# tháº­t cá»§a cÃ¢y thay vÃ¬ 1 trá»¥ khá»•ng lá»“ phá»§ cáº£ tÃ¡n (trÆ°á»›c Ä‘Ã¢y to hÆ¡n cÃ¢y).
 	for t in _tuft_data:
 		if not "r" in t:
 			continue
@@ -133,7 +132,7 @@ func _get_top_r() -> float:
 		_: r = 0.19
 	return r
 
-## Bán kính tán — xòe rộng theo phương ngang kiểu Minecraft.
+## BÃ¡n kÃ­nh tÃ¡n â€” xÃ²e rá»™ng theo phÆ°Æ¡ng ngang kiá»ƒu Minecraft.
 func _canopy_r() -> float:
 	var r: float
 	match _size:
@@ -147,7 +146,7 @@ func _canopy_r() -> float:
 		r *= 0.25
 	return r
 
-# ── GRID helpers ────────────────────────────────────────────────────────────
+# â”€â”€ GRID helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _key(v: Vector3) -> int:
 	return int(round(v.x / VOXEL)) + int(round(v.y / VOXEL)) * 10000 + int(round(v.z / VOXEL)) * 100000000
@@ -170,13 +169,13 @@ func _add_tuft_voxel(tuft: Dictionary, x: float, y: float, z: float, col: Color)
 	(tuft["pos"] as Array).append(Vector3(round(x / VOXEL) * VOXEL, round(y / VOXEL) * VOXEL, round(z / VOXEL) * VOXEL))
 	(tuft["col"] as Array).append(col * _DARKEN)
 
-## Lá dùng lưới thô 0.1875 (3× voxel thân) — khối lá chunky kiểu Minecraft.
+## LÃ¡ dÃ¹ng lÆ°á»›i thÃ´ 0.1875 (3Ã— voxel thÃ¢n) â€” khá»‘i lÃ¡ chunky kiá»ƒu Minecraft.
 func _add_tuft_voxel_c(tuft: Dictionary, x: float, y: float, z: float, col: Color) -> void:
 	var s := VOXEL * 3.0
 	(tuft["pos"] as Array).append(Vector3(round(x / s) * s, round(y / s) * s, round(z / s) * s))
 	(tuft["col"] as Array).append(col * _DARKEN)
 
-## Đoạn trụ voxel hóa giữa 2 điểm (thân mảnh cành) — lưới 0.125.
+## Äoáº¡n trá»¥ voxel hÃ³a giá»¯a 2 Ä‘iá»ƒm (thÃ¢n máº£nh cÃ nh) â€” lÆ°á»›i 0.125.
 func _stroke(a: Vector3, b: Vector3, r: float, col: Color) -> void:
 	var lv := VOXEL * 2.0
 	var dist := a.distance_to(b)
@@ -197,7 +196,7 @@ func _stroke(a: Vector3, b: Vector3, r: float, col: Color) -> void:
 					c2 = col.darkened(0.10)
 				_fill(p.x + vx * lv, p.y, p.z + vz * lv, c2)
 
-# ── MAIN BUILD ──────────────────────────────────────────────────────────────
+# â”€â”€ MAIN BUILD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _build_tree() -> void:
 	_grid.clear()
@@ -218,60 +217,31 @@ func _build_tree() -> void:
 	_commit_visual()
 
 func _commit_visual() -> void:
-	var total := _ordered.size()
+	# Gá»™p má»i voxel (thÃ¢n + lÃ¡ cá»§a Má»ŒI chÃ¹m) vÃ o 1 MultiMesh duy nháº¥t.
+	# Voxel thÃ¢n dÃ¹ng lÆ°á»›i 0.125 â†’ cube 0.13 (TRUNK_SCALE), lÃ¡ dÃ¹ng lÆ°á»›i
+	# 0.1875 â†’ cube 0.20 (LEAF_SCALE) â€” Ä‘Ãºng cá»¡ lÆ°á»›i nÃªn nhÃ¬n ngang khÃ´ng
+	# cÃ²n khe rá»—ng giá»¯a cÃ¡c cube. Má»—i cÃ¢y = 1 draw call (trÆ°á»›c: 1+1/cÃ¢y).
+	var positions: Array = []
+	var scales_pack: Array = []
+	var colors_pack: Array = []
+
+	for p in _ordered:
+		positions.append(p)
+		scales_pack.append(_VoxelShared.TRUNK_SCALE)
+		colors_pack.append(_grid[_key(p)])
 	for t in _tuft_data:
-		total += (t["pos"] as Array).size()
-	if total == 0:
-		return
-
-	var cube := BoxMesh.new()
-	cube.size = Vector3(VOXEL, VOXEL, VOXEL)
-	var cube_mat := StandardMaterial3D.new()
-	cube_mat.vertex_color_use_as_albedo = true
-	cube_mat.metallic = 0.0
-	cube_mat.roughness = 0.85
-	cube.material = cube_mat
-
-	if not _ordered.is_empty():
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = cube
-		mm.instance_count = _ordered.size()
-		for i in range(_ordered.size()):
-			mm.set_instance_transform(i, Transform3D.IDENTITY.translated(_ordered[i]))
-			mm.set_instance_color(i, _grid[_key(_ordered[i])])
-		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
-		mmi.name = "OakVisual"
-		add_child(mmi)
-
-	for ti in range(_tuft_data.size()):
-		var tuft: Dictionary = _tuft_data[ti]
-		var pos: Array = tuft["pos"]
-		if pos.is_empty():
-			continue
-		var col: Array = tuft["col"]
-		var tn := Node3D.new()
-		tn.name = "Tuft%d" % ti
-		tn.position = tuft["center"]
-		add_child(tn)
-		var tmm := MultiMesh.new()
-		tmm.transform_format = MultiMesh.TRANSFORM_3D
-		tmm.use_colors = true
-		tmm.mesh = cube
-		tmm.instance_count = pos.size()
+		var pos: Array = t["pos"]
+		var col: Array = t["col"]
 		for i in range(pos.size()):
-			tmm.set_instance_transform(i, Transform3D.IDENTITY.translated(pos[i]))
-			tmm.set_instance_color(i, col[i])
-		var tmi := MultiMeshInstance3D.new()
-		tmi.multimesh = tmm
-		tmi.name = "TuftVisual"
-		tn.add_child(tmi)
-		_tuft_nodes.append(tn)
-		_tuft_freqs.append(0.5 + randf() * 0.3)
-		_tuft_phases.append(randf() * TAU)
-		_tuft_amps.append(deg_to_rad(1.0 + randf() * 1.0))
+			positions.append(t["center"] + pos[i])
+			scales_pack.append(_VoxelShared.LEAF_SCALE)
+			colors_pack.append(col[i])
+
+	if positions.is_empty():
+		return
+	var mmi := _VoxelShared.build(positions, scales_pack, colors_pack)
+	mmi.name = "OakVisual"
+	add_child(mmi)
 
 func _apply_stage(_from: int, _to: int) -> void:
 	_rebuild()
@@ -282,18 +252,11 @@ func _rebuild() -> void:
 		if ch is MultiMeshInstance3D or ch is StaticBody3D or ch is CPUParticles3D:
 			remove_child(ch)
 			ch.queue_free()
-		elif ch is Node3D and ch.name.begins_with("Tuft"):
-			remove_child(ch)
-			ch.queue_free()
-	_tuft_nodes.clear()
-	_tuft_freqs.clear()
-	_tuft_phases.clear()
-	_tuft_amps.clear()
 	_build_tree()
 	_setup_collision()
 	_pop_growth()
 
-## Mầm cây sồi kiểu sapling: thân nhỏ nâu sáng + cụm lá xanh trên ngọn.
+## Máº§m cÃ¢y sá»“i kiá»ƒu sapling: thÃ¢n nhá» nÃ¢u sÃ¡ng + cá»¥m lÃ¡ xanh trÃªn ngá»n.
 func _build_sprout() -> void:
 	var stem := Color(0.42, 0.30, 0.15)
 	var stem_h := 0.22 + randf() * 0.10
@@ -305,7 +268,7 @@ func _build_sprout() -> void:
 	_build_blob(tuft, br)
 	_tuft_data.append(tuft)
 
-# ── TRUNK (thân cột nâu đậm, gần thẳng, vỏ nâu sẫm ấm) ─────────────────────
+# â”€â”€ TRUNK (thÃ¢n cá»™t nÃ¢u Ä‘áº­m, gáº§n tháº³ng, vá» nÃ¢u sáº«m áº¥m) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _build_trunk(h: float) -> void:
 	var base_r := _get_base_r()
@@ -319,7 +282,7 @@ func _build_trunk(h: float) -> void:
 		var r := lerpf(base_r, top_r, t)
 		r *= 1.0 + sin(vy * 0.7 + wob) * 0.05
 		if vy < 2:
-			r *= 1.0 + (1.0 - float(vy) / 2.0) * 0.15   # phình nhẹ chân
+			r *= 1.0 + (1.0 - float(vy) / 2.0) * 0.15   # phÃ¬nh nháº¹ chÃ¢n
 		var cx := sin(vy * 1.0 + wob) * 0.03 * (1.0 - t)
 		var cz := cos(vy * 0.8 + wob * 1.7) * 0.03 * (1.0 - t)
 		var rv: int = ceili(r / lv)
@@ -330,7 +293,7 @@ func _build_trunk(h: float) -> void:
 				if dx * dx + dz * dz > r * r:
 					continue
 				_fill(dx, y, dz, _bark_vary())
-		# sẹo cành ngắn rải rác trên thân (vài chấm sẫm)
+		# sáº¹o cÃ nh ngáº¯n ráº£i rÃ¡c trÃªn thÃ¢n (vÃ i cháº¥m sáº«m)
 		if vy > ny / 3 and vy % 15 == 3 and randf() < 0.6:
 			var sa: float = randf() * TAU
 			_fill(cos(sa) * r, y, sin(sa) * r, Color(0.30, 0.19, 0.08))
@@ -344,7 +307,7 @@ func _bark_vary() -> Color:
 		return Color(0.32, 0.20, 0.09)
 	return Color(0.39, 0.26, 0.12)
 
-# ── BRANCH ARMS (cành vươn lên mang chùm lá) ───────────────────────────────
+# â”€â”€ BRANCH ARMS (cÃ nh vÆ°Æ¡n lÃªn mang chÃ¹m lÃ¡) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _branch_arms(h: float) -> void:
 	var n_arm: int = 3 + randi() % 3
@@ -361,15 +324,15 @@ func _branch_arms(h: float) -> void:
 		_stroke(start, end, lerpf(base_r * 0.55, base_r * 0.30, randf()), _jitter(Color(0.39, 0.26, 0.12)))
 		_canopy_centers.append(end + Vector3(0, 0.15, 0))
 
-# ── CANOPY: khối blob lá chunky kiểu Minecraft ─────────────────────────────
+# â”€â”€ CANOPY: khá»‘i blob lÃ¡ chunky kiá»ƒu Minecraft â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _build_canopy(h: float) -> void:
 	var canopy := _canopy_r()
-	# Chùm trung tâm trên ngọn thân + chùm ở đầu từng cành.
+	# ChÃ¹m trung tÃ¢m trÃªn ngá»n thÃ¢n + chÃ¹m á»Ÿ Ä‘áº§u tá»«ng cÃ nh.
 	var centers: Array[Vector3] = [Vector3(0.0, h * 0.96, 0.0)]
 	centers.append_array(_canopy_centers)
-	# Cây sồi LUÔN rất nhiều lá: mỗi điểm gắn sinh nhiều đùm lá tròn to,
-	# lệch vị trí quanh gốc, mỗi đùm 1 tông màu trong bảng palette.
+	# CÃ¢y sá»“i LUÃ”N ráº¥t nhiá»u lÃ¡: má»—i Ä‘iá»ƒm gáº¯n sinh nhiá»u Ä‘Ã¹m lÃ¡ trÃ²n to,
+	# lá»‡ch vá»‹ trÃ­ quanh gá»‘c, má»—i Ä‘Ã¹m 1 tÃ´ng mÃ u trong báº£ng palette.
 	for c in centers:
 		var n_sub: int = 3 if c == centers[0] else 2
 		for si in range(n_sub):
@@ -385,8 +348,8 @@ func _build_canopy(h: float) -> void:
 			_build_blob(tuft, r)
 			_tuft_data.append(tuft)
 
-## Đùm lá: elip dẹp (giống tán cây cam) trên lưới voxel thô 0.1875 (3× voxel
-## thân) — khối chunky kiểu Minecraft, dày hơn lưới 0.25 để lá không quá thưa.
+## ÄÃ¹m lÃ¡: elip dáº¹p (giá»‘ng tÃ¡n cÃ¢y cam) trÃªn lÆ°á»›i voxel thÃ´ 0.1875 (3Ã— voxel
+## thÃ¢n) â€” khá»‘i chunky kiá»ƒu Minecraft, dÃ y hÆ¡n lÆ°á»›i 0.25 Ä‘á»ƒ lÃ¡ khÃ´ng quÃ¡ thÆ°a.
 func _build_blob(tuft: Dictionary, r: float) -> void:
 	var tone := _LEAF_TONES[randi() % _LEAF_TONES.size()]
 	var squash := 0.70 + randf() * 0.25
@@ -420,8 +383,8 @@ func _build_blob(tuft: Dictionary, r: float) -> void:
 					continue
 				_add_tuft_voxel_c(tuft, px, py, pz, _leaf_color(tone, d01, randf()))
 
-## Bảng tông lá chuối (vàng-xanh sáng): lõi vàng-xanh sẫm → giữa vàng-xanh
-## tươi → ngoài vàng-xanh sáng đón nắng — mỗi đùm lá mang 1 tông riêng.
+## Báº£ng tÃ´ng lÃ¡ chuá»‘i (vÃ ng-xanh sÃ¡ng): lÃµi vÃ ng-xanh sáº«m â†’ giá»¯a vÃ ng-xanh
+## tÆ°Æ¡i â†’ ngoÃ i vÃ ng-xanh sÃ¡ng Ä‘Ã³n náº¯ng â€” má»—i Ä‘Ã¹m lÃ¡ mang 1 tÃ´ng riÃªng.
 const _LEAF_TONES: Array[Color] = [
 	Color(0.45, 0.62, 0.12),
 	Color(0.52, 0.70, 0.14),
@@ -431,7 +394,7 @@ const _LEAF_TONES: Array[Color] = [
 	Color(0.76, 0.92, 0.24),
 ]
 
-## Màu lá: lõi sẫm hơn tông → giữa bằng tông → ngoài sáng hơn tông đón nắng.
+## MÃ u lÃ¡: lÃµi sáº«m hÆ¡n tÃ´ng â†’ giá»¯a báº±ng tÃ´ng â†’ ngoÃ i sÃ¡ng hÆ¡n tÃ´ng Ä‘Ã³n náº¯ng.
 func _leaf_color(tone: Color, d01: float, rnd: float) -> Color:
 	if rnd < 0.08 and d01 > 0.6:
 		return tone.lightened(0.25)
@@ -448,31 +411,22 @@ func _jitter(col: Color) -> Color:
 	col.b = clampf(col.b + j, 0.0, 1.0)
 	return col
 
-# ── HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) ───────────
+# â”€â”€ HIT FLASH override (MultiMeshInstance3D, not MeshInstance3D) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 func _hit_flash() -> void:
-	var all: Array[MultiMeshInstance3D] = []
 	var mmi := find_child("OakVisual", false, false) as MultiMeshInstance3D
-	if mmi != null:
-		all.append(mmi)
-	for tn in _tuft_nodes:
-		if tn == null or not is_instance_valid(tn):
-			continue
-		var tmi: MultiMeshInstance3D = tn.find_child("TuftVisual", false, false)
-		if tmi != null:
-			all.append(tmi)
-	for mi in all:
-		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color.WHITE
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		var orig := mi.material_override
-		mi.material_override = mat
-		var tween := create_tween()
-		tween.tween_interval(0.08)
-		tween.tween_callback(func():
-			if is_instance_valid(mi):
-				mi.material_override = orig
-		)
+	if mmi == null: return
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color.WHITE
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var orig := mmi.material_override
+	mmi.material_override = mat
+	var tween := create_tween()
+	tween.tween_interval(0.08)
+	tween.tween_callback(func():
+		if is_instance_valid(mmi):
+			mmi.material_override = orig
+	)
 
 func _get_mesh_instances() -> Array[MeshInstance3D]:
 	return []

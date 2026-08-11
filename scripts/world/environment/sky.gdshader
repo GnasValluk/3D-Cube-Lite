@@ -13,6 +13,9 @@ uniform vec3 moon_dir = vec3(0.0, -0.5, -1.0);
 uniform vec3 moon_color : source_color = vec3(0.9, 0.92, 1.0);
 uniform float moon_energy : hint_range(0.0, 6.0) = 1.2;
 uniform float moon_angle_max : hint_range(0.0, 40.0) = 7.0;
+uniform float moon_phase : hint_range(0.0, 1.0) = 0.5;
+uniform float moon_eclipse : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 moon_eclipse_color : source_color = vec3(0.70, 0.22, 0.12);
 
 uniform vec3 sky_top_color : source_color = vec3(0.22, 0.52, 0.92);
 uniform vec3 sky_horizon_color : source_color = vec3(0.74, 0.84, 0.94);
@@ -85,12 +88,24 @@ void sky() {
 	col += sun_color * sun_energy * (s_disc + s_glow);
 
 	// Đĩa mặt trăng + quầng rất hẹp (tránh che hết sao quanh trăng).
+	// Terminator: phần đĩa có surface normal quay về phía mặt trời thì sáng.
 	float moon_cos = dot(dir, moon_dir);
 	float m_edge = cos(radians(moon_angle_max * 1.2));
 	float m_core = cos(radians(moon_angle_max * 0.35));
 	float m_disc = smoothstep(m_edge, m_core, moon_cos);
+	// Hướng "xem" 1 điểm trên đĩa trăng ≈ dir (disc nhỏ). Surface normal của
+	// quả cầu trăng bật góc theo offset: n = normalize(moon_dir + (dir - moon_dir*moon_cos)*k).
+	vec3 disc_off = dir - moon_dir * moon_cos;
+	vec3 surf_n = normalize(moon_dir + disc_off * 6.0);
+	// Pha: ánh sáng trăng đến từ hướng ngược mặt trời (full moon đối diện nắng
+	// → N·(−sun_dir) dương). Vẽ terminator theo hình cầu thật.
+	float phase_amt = clamp(dot(surf_n, -sun_dir), 0.0, 1.0);
+	phase_amt = smoothstep(-0.05, 0.5, phase_amt) * 0.35 + smoothstep(0.5, 0.75, phase_amt) * 0.65;
+	// Nguyệt thực: toàn đĩa ngả đỏ thẫm, viền sáng còn lại dịu.
+	vec3 moon_col = mix(moon_color, moon_eclipse_color, moon_eclipse);
+	float ecl_bright = 1.0 - moon_eclipse * 0.75;
 	float m_glow = pow(max(moon_cos, 0.0), 100.0) * moon_energy * 0.7;
-	col += moon_color * moon_energy * (m_disc + m_glow);
+	col += moon_col * moon_energy * (m_disc * phase_amt * ecl_bright + m_glow);
 
 	// Sao đêm: 3 lớp lattice, mật độ và kích thước khác nhau cho chiều sâu.
 	if (night_factor > 0.05 && y > 0.02) {
