@@ -55,6 +55,8 @@ var _rig: Node3D = null
 var _rotor_hub: Node3D = null
 var _rotor_blades: Node3D = null
 var _tail_rotor: Node3D = null
+var _blur_disc: MeshInstance3D = null
+var _rotor_speed: float = 0.0
 var _spotlight: SpotLight3D = null
 var _beacon_mat: StandardMaterial3D = null
 var _beacon_mat2: StandardMaterial3D = null
@@ -222,18 +224,24 @@ func _physics_process(delta: float) -> void:
 
 	# Nghiêng theo chuyển động (động cơ quán tính)
 	if _rig:
-		var tilt_x := clampf(_fwd_speed / MAX_SPEED, -1.0, 1.0) * PITCH_TILT_MAX
+		# Tiến (+) → chúi mũi xuống (−rotation.x); ngược lại khi lùi.
+		var tilt_x := -clampf(_fwd_speed / MAX_SPEED, -1.0, 1.0) * PITCH_TILT_MAX
 		var tilt_z := clampf(horiz.dot(rt) / MAX_SPEED, -1.0, 1.0) * ROLL_TILT_MAX
 		_rig.rotation.x = lerp_angle(_rig.rotation.x, tilt_x, delta * 4.0)
 		_rig.rotation.z = lerp_angle(_rig.rotation.z, tilt_z, delta * 4.0)
 
-	# Cánh quạt quay (đứng im cũng quay khi có người lái)
-	var spin: float = 0.0
+	# Cánh quạt quay (chỉ khi có người lái; dừng khi hạ cánh/không lái)
+	# RPM đích: ~12 vòng/s lúc chạy, 0 khi tắt máy. Gia tốc lên/xuống nhịp nhàng.
+	var target_rpm: float = 0.0
+	if is_driven():
+		target_rpm = 12.0 + absf(_fwd_speed) * 0.35 + maxf(climb, 0.0) * 2.0
+	_rotor_speed = move_toward(_rotor_speed, target_rpm, 14.0 * delta)
+	if _blur_disc:
+		_blur_disc.visible = _rotor_speed > 1.0
 	if _rotor_hub:
-		spin = (12.0 + absf(_fwd_speed) * 0.35 + climb * 2.0) * delta * 60.0
-		_rotor_hub.rotation.y += spin
+		_rotor_hub.rotation.y += _rotor_speed * delta * TAU
 	if _tail_rotor:
-		_tail_rotor.rotation.z -= spin * 4.0
+		_tail_rotor.rotation.z -= _rotor_speed * delta * TAU * 4.0
 
 	# Bụi rotor wash khi bay thấp gần đất
 	if _dust:
@@ -250,6 +258,9 @@ func _sync_driver() -> void:
 	_driver.global_position = global_transform * DRIVER_SEAT
 	_driver.rotation.y = rotation.y + PI
 	if _rig:
+		# Player mesh quay mặt +Z, máy bay bay về −Z (sau +PI mặt player về
+		# phía mũi). Rig chúi mũi khi tiến (rotation.x âm) → player nghiêng
+		# về TRƯỚC cùng dấu (đầu ngả về phía mũi), không ngã về sau.
 		_driver.rotation.x = _rig.rotation.x
 		_driver.rotation.z = _rig.rotation.z
 	if _driver is CharacterBody3D:
@@ -312,7 +323,8 @@ func _add_v(sts: Dictionary, mat_id: String, pos: Vector3, size: Vector3,
 		st.add_vertex(pos + (u + v))
 		st.add_vertex(pos + (-u + v))
 
-func _commit_meshes(rig: Node3D, sts: Dictionary, mat_map: Dictionary) -> void:
+func _commit_meshes(rig: Node3D, sts: Dictionary, mat_map: Dictionary) -> MeshInstance3D:
+	var last: MeshInstance3D = null
 	for id in sts:
 		var st: SurfaceTool = sts[id] as SurfaceTool
 		var mesh := st.commit()
@@ -326,6 +338,8 @@ func _commit_meshes(rig: Node3D, sts: Dictionary, mat_map: Dictionary) -> void:
 			if mat.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED \
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		rig.add_child(mi)
+		last = mi
+	return last
 
 func _build_mesh() -> void:
 	var rig := Node3D.new()
@@ -507,7 +521,9 @@ func _build_mesh() -> void:
 	# Motion blur disc (đĩa mờ khi quay)
 	var disc_sts: Dictionary = {}
 	_add_v(disc_sts, "blur", Vector3(0, 3.36, 0.1), Vector3(5.1, 0.01, 5.1), Vector3.ZERO)
-	_commit_meshes(rig, disc_sts, mats)
+	_blur_disc = _commit_meshes(rig, disc_sts, mats)
+	if _blur_disc:
+		_blur_disc.name = "_BlurDisc"
 
 	# ═══ CÁNH QUẠT ĐUÔI (fenestron) ═══════════════════════════════════════════
 	# Khung vòng bảo vệ

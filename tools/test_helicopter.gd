@@ -178,6 +178,13 @@ func _ready() -> void:
 	var fwd_speed: float = heli._fwd_speed
 	_check(fwd_speed > 2.0, "W tiến đạt tốc độ (v=%s)" % str(fwd_speed))
 	_check(moved > 1.0, "trực thăng di chuyển về phía trước (d=%s)" % str(moved))
+	# Tiến → máy bay chúi mũi xuống (rotation.x âm) và player nghiêng theo,
+	# KHÔNG ngã người về sau (góc nghiêng player phải cùng dấu nhỏ).
+	_check(heli._rig.rotation.x < 0.0,
+		"tiến → rig chúi mũi xuống (rig.rotation.x=%s)" % str(heli._rig.rotation.x))
+	var driver_pitch: float = heli._driver.rotation.x
+	_check(driver_pitch < 0.0,
+		"tiến → player nghiêng về trước (driver.rotation.x=%s)" % str(driver_pitch))
 
 	var rot_before: float = heli.rotation.y
 	Input.action_press("move_left")
@@ -194,6 +201,7 @@ func _ready() -> void:
 
 	# ── 6. Xuống máy bay ────────────────────────────────────────────────────
 	print("-- 6. Xuống --")
+	var hub_rot_before_exit: float = heli._rotor_hub.rotation.y
 	heli.try_exit()
 	_check(not heli.is_driven(), "try_exit: hết tài xế")
 	_check(not driver.has_meta("driving_vehicle"), "try_exit: nhả khóa điều khiển")
@@ -202,6 +210,15 @@ func _ready() -> void:
 		"try_exit: người chơi đứng gần máy bay (d=%s)" % str(driver.global_position.distance_to(heli.global_position)))
 	await _wait_physics(60)
 	_check(heli.global_position.y < 2.5, "không người lái → đáp xuống đất (y=%s)" % str(heli.global_position.y))
+
+	# ── 6b. Cánh quạt dừng khi không lái ────────────────────────────────────
+	print("-- 6b. Rotor dừng --")
+	await _wait_physics(180)
+	var hub_rot_stopped: float = heli._rotor_hub.rotation.y
+	await _wait_physics(10)
+	var hub_rot_later: float = heli._rotor_hub.rotation.y
+	_check(absf(hub_rot_later - hub_rot_stopped) < 0.001, "không lái → cánh quạt dừng hẳn (Δ=%s)" % str(hub_rot_later - hub_rot_stopped))
+	_check(not heli._blur_disc.visible, "không lái → đĩa blur cánh quạt bị ẩn")
 
 	# ── 7. Đèn beacon + spotlight theo giờ ──────────────────────────────────
 	print("-- 7. Đèn --")
