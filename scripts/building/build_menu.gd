@@ -42,7 +42,7 @@ func _ready() -> void:
 
 func _setup_categories() -> void:
 	_categories = [
-		{"label": "Công Trình", "ids": ["twilight_gate", "chest", "crafting_table", "furnace", "fishing_boat", "tractor"]},
+		{"label": "Công Trình", "ids": ["twilight_gate", "chest", "crafting_table", "furnace", "fishing_boat", "tractor", "rescue_helicopter"]},
 		{"label": "Khối", "ids": []},
 		{"label": "Quặng", "ids": []},
 	]

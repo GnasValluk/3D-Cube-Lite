@@ -882,7 +882,7 @@ func _on_hotbar_slot_changed(idx: int) -> void:
 func _is_building_item(def: ItemDef) -> bool:
 	if def.type == ItemDef.Type.BLOCK:
 		return true
-	if def.id in ["twilight_gate", "chest", "crafting_table", "water_bucket", "fishing_boat", "tractor"]:
+	if def.id in ["twilight_gate", "chest", "crafting_table", "water_bucket", "fishing_boat", "tractor", "rescue_helicopter"]:
 		return true
 	if def.id in ["coconut_seed", "taro_seed", "seaweed_seed", "seagrass_seed", "eggplant_seed", "watermelon_seed", "pumpkin_seed"]:
 		return true

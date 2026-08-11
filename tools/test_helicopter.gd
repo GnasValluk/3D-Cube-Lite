@@ -262,6 +262,24 @@ func _ready() -> void:
 		_check(placed.try_destroy("axe"), "rìu (heavy) phá được trực thăng")
 		_check(placed.hp < hp_before, "hp giảm sau đòn heavy")
 
+	# ── 10. Entry point placement (UI): hud + build menu ────────────────────
+	print("-- 10. Entry point placement --")
+	var hud_script := load("res://scripts/ui/hud/hud.gd")
+	var hud = hud_script.new()
+	_check(hud._is_building_item(heli_def), "hud nhận trực thăng là item đặt được")
+	_check(hud._is_building_item(ItemDatabase.items_db.get("tractor") as ItemDef),
+		"hud vẫn nhận tractor là item đặt được")
+	_check(not hud._is_building_item(ItemDatabase.items_db.get("axe") as ItemDef),
+		"hud không nhận công cụ thường là item đặt được")
+	hud.queue_free()
+	var bm_script := load("res://scripts/building/build_menu.gd")
+	var bm = bm_script.new()
+	bm._setup_categories()
+	var cat0: Array = bm._categories[0].ids
+	_check("rescue_helicopter" in cat0, "build menu Công Trình có trực thăng")
+	_check("tractor" in cat0 and "fishing_boat" in cat0, "build menu vẫn giữ các xe cũ")
+	bm.queue_free()
+
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())
 	get_tree().quit(0 if _failures == 0 else 1)
