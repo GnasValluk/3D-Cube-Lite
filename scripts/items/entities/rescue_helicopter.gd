@@ -259,7 +259,8 @@ func _make_mat(color: Color, opts: Dictionary = {}) -> StandardMaterial3D:
 	m.albedo_color = color
 	m.metallic = opts.get("metallic", 0.0)
 	m.roughness = opts.get("roughness", 0.85)
-	m.vertex_color_use_as_albedo = true
+	if opts.get("vertex_color", true):
+		m.vertex_color_use_as_albedo = true
 	if opts.get("emissive", false):
 		m.emission_enabled = true
 		m.emission = color
@@ -269,7 +270,7 @@ func _make_mat(color: Color, opts: Dictionary = {}) -> StandardMaterial3D:
 	return m
 
 func _add_v(sts: Dictionary, mat_id: String, pos: Vector3, size: Vector3,
-		rot: Vector3 = Vector3.ZERO) -> void:
+		rot: Vector3 = Vector3.ZERO, alpha: float = 1.0) -> void:
 	var st: SurfaceTool = sts.get(mat_id) as SurfaceTool
 	if st == null:
 		st = SurfaceTool.new()
@@ -295,7 +296,7 @@ func _add_v(sts: Dictionary, mat_id: String, pos: Vector3, size: Vector3,
 		var mul: float = 0.72
 		if absf(n.y) > 0.9:
 			mul = 1.0 if n.y > 0.0 else 0.5
-		var c := Color(mul * tint, mul * tint, mul * tint, 1.0)
+		var c := Color(mul * tint, mul * tint, mul * tint, alpha)
 		st.set_normal(n)
 		st.set_color(c)
 		st.add_vertex(pos + (-u - v))
@@ -337,9 +338,9 @@ func _build_mesh() -> void:
 		"steel_d": _make_mat(Color(0.16, 0.17, 0.19)),
 		"carbon": _make_mat(Color(0.10, 0.10, 0.11)),
 		"yellow": _make_mat(Color(0.98, 0.78, 0.12)),
-		"glass": _make_mat(Color(0.55, 0.72, 0.88), {"transparent": true}),
-		"glass_dark": _make_mat(Color(0.20, 0.30, 0.42), {"transparent": true}),
-		"blur": _make_mat(Color(0.35, 0.38, 0.42), {"transparent": true}),
+		"glass": _make_mat(Color(0.55, 0.72, 0.88, 0.85), {"transparent": true, "vertex_color": false, "roughness": 0.15, "metallic": 0.4}),
+		"glass_dark": _make_mat(Color(0.20, 0.30, 0.42, 0.9), {"transparent": true, "vertex_color": false, "roughness": 0.2, "metallic": 0.3}),
+		"blur": _make_mat(Color(0.60, 0.62, 0.66, 0.35), {"transparent": true, "vertex_color": false}),
 		"beacon": _make_mat(Color(1.0, 0.20, 0.10), {"emissive": true, "energy": 3.0}),
 		"beacon2": _make_mat(Color(1.0, 0.30, 0.12), {"emissive": true, "energy": 2.0}),
 		"nav_green": _make_mat(Color(0.20, 1.0, 0.40), {"emissive": true, "energy": 2.6}),

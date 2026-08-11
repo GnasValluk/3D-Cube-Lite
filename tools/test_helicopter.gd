@@ -280,6 +280,29 @@ func _ready() -> void:
 	_check("tractor" in cat0 and "fishing_boat" in cat0, "build menu vẫn giữ các xe cũ")
 	bm.queue_free()
 
+	# ── 11. Lái thật qua PlayerCharacter.interact_with_nearby ──────────────
+	print("-- 11. Interact thật (PlayerCharacter) --")
+	var _PC := preload("res://scripts/characters/player/player_character.gd")
+	var player: Node = _PC.new()
+	player.name = "TestPlayer"
+	add_child(player)
+	await _wait_physics(6)
+	# Đưa máy bay về vị trí đất bằng, đặt player sát bên
+	heli.global_position = Vector3(0, 0.6, 0)
+	heli.rotation.y = 0.0
+	heli.velocity = Vector3.ZERO
+	player.global_position = Vector3(1.5, 0.8, 0.4)
+	player.velocity = Vector3.ZERO
+	await _wait_physics(20)
+	player.interact_with_nearby()
+	_check(heli.is_driven() and heli.is_driver(player), "interact → player lên được trực thăng")
+	_check(player.has_meta("driving_vehicle") and player.get_meta("driving_vehicle") == heli,
+		"player bị khóa điều khiển khi lái")
+	await _wait_physics(10)
+	heli.try_exit()
+	_check(not heli.is_driven(), "try_exit → hết tài xế")
+	player.queue_free()
+
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())
 	get_tree().quit(0 if _failures == 0 else 1)

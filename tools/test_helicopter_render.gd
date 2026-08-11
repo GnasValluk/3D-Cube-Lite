@@ -29,6 +29,8 @@ func _make_cam() -> Camera3D:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.9, 0.9, 0.95)
 	env.ambient_light_energy = 0.8
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color(0.06, 0.12, 0.18)
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -74,6 +76,17 @@ func _model_px(img: Image) -> int:
 				white += 1
 	return red + white
 
+## Đếm pixel màu nền tối (xanh đen) — model phải che bớt 1 phần; nếu phủ kín
+## hình (0px nền) tức model bị tô đầy khung hình (dấu hiệu mesh lỗi).
+func _bg_px(img: Image) -> int:
+	var n := 0
+	for x in range(0, img.get_width(), 3):
+		for y in range(0, img.get_height(), 3):
+			var c := img.get_pixel(x, y)
+			if c.r < 0.30 and c.g < 0.35 and c.b < 0.45 and c.g < c.b:
+				n += 1
+	return n
+
 func _ready() -> void:
 	print("== test_helicopter_render ==")
 	var heli: Node = _Heli.new()
@@ -103,8 +116,11 @@ func _ready() -> void:
 		var img := Image.load_from_file("res://.godot/test_heli_%s.png" % s["name"])
 		var cvg := _coverage(img)
 		var mp := _model_px(img)
-		print("verify %s coverage=%d%% model_px=%d" % [s["name"], cvg, mp])
+		var bg := _bg_px(img)
+		print("verify %s coverage=%d%% model_px=%d bg_px=%d" % [s["name"], cvg, mp, bg])
 		if mp < 100:
+			fail += 1
+		if bg < 100:
 			fail += 1
 	print("RENDER | %s" % ["PASS" if fail == 0 else "FAIL"])
 	get_tree().quit(0 if fail == 0 else 1)

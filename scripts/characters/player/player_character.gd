@@ -290,6 +290,14 @@ func interact_with_nearby() -> void:
 			if tr.is_driver(self):
 				tr.try_exit()
 				return
+		if child is RescueHelicopter:
+			var he := child as RescueHelicopter
+			if he.is_player_nearby(self):
+				he.try_board(self)
+				return
+			if he.is_driver(self):
+				he.try_exit()
+				return
 		if child is Chest and child.is_player_nearby():
 			child.open_ui()
 			return
