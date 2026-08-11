@@ -173,16 +173,8 @@ func _process(delta: float) -> void:
 	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
 	environment.ambient_light_energy = k["ae"] * rain_factor
 
-	# Fog vàng ấm nhẹ lúc sáng (6-10h) và chiều (14-19h) — sương quang đãng,
-	# làm chân trời vàng cam dịu; không cộng khi mưa to để giữ rõ nét.
-	var morning_fog: float = clamp(1.0 - abs(h - 8.0) / 2.5, 0.0, 1.0)
-	var evening_fog: float = clamp(1.0 - abs(h - 17.0) / 3.0, 0.0, 1.0)
-	var warm_fog: float = maxf(morning_fog, evening_fog) * (1.0 - weather_intensity * 0.8)
-	environment.fog_density = weather_intensity * 0.012 + warm_fog * 0.004
-	environment.fog_height_density = weather_intensity * 0.08 + warm_fog * 0.02
-	# Màu fog vàng cam theo giờ (sáng ấm, chiều đậm hơn).
-	environment.fog_light_color = Color(0.98, 0.80, 0.45).lerp(
-		Color(1.0, 0.70, 0.30), evening_fog).lerp(Color(0.40, 0.42, 0.48), weather_intensity * 0.9)
+	environment.fog_density = weather_intensity * 0.012
+	environment.fog_height_density = weather_intensity * 0.08
 
 func get_cycle_progress() -> float:
 	if TimeSystem:
