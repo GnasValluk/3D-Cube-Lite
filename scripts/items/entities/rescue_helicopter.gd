@@ -12,22 +12,22 @@ const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const _BlockData = preload("res://scripts/world/chunk/chunk_block_data.gd")
 
 # ── Kích thước (m) ────────────────────────────────────────────────────────────
-const BODY_LEN: float = 3.3
-const BODY_WID: float = 0.95
-const CABIN_H: float = 0.85
-const TAIL_LEN: float = 2.6
-const RIDE_HEIGHT: float = 0.9
-const DRIVER_SEAT := Vector3(0, 1.15, 0.25)
-const BOARD_RANGE: float = 3.5
+const BODY_WID: float = 2.4
+const CABIN_H: float = 2.1
+const TAIL_LEN: float = 4.2
+const RIDE_HEIGHT: float = 1.0
+const DRIVER_SEAT := Vector3(-0.55, 1.0, -1.9)
+const DRIVER_SCALE := Vector3(0.75, 0.75, 0.75)
+const BOARD_RANGE: float = 4.5
 
 # ── Vật lý bay (m/s) ─────────────────────────────────────────────────────────
-const MAX_SPEED: float = 15.0
-const MAX_CLIMB: float = 6.0
-const ACCEL: float = 6.5
-const CLIMB_ACCEL: float = 9.0
-const YAW_RATE: float = 1.6
-const HOVER_DAMP: float = 3.2
-const PITCH_TILT_MAX: float = 0.16
+const MAX_SPEED: float = 7.0
+const MAX_CLIMB: float = 2.6
+const ACCEL: float = 4.0
+const CLIMB_ACCEL: float = 6.0
+const YAW_RATE: float = 1.0
+const HOVER_DAMP: float = 2.5
+const PITCH_TILT_MAX: float = 0.14
 const ROLL_TILT_MAX: float = 0.12
 
 # ── Đèn ───────────────────────────────────────────────────────────────────────
@@ -92,6 +92,8 @@ func try_board(player: Node3D) -> bool:
 	player.set_meta("driving_vehicle", self)
 	if "velocity" in player and player is CharacterBody3D:
 		player.velocity = Vector3.ZERO
+	# Thu nhỏ người chơi để "ngồi" vừa buồng lái, hướng mặt về mũi máy bay.
+	player.scale = DRIVER_SCALE
 	_disable_driver_collision(player, true)
 	_sync_driver()
 	return true
@@ -103,6 +105,7 @@ func try_exit() -> void:
 	_driver = null
 	if is_instance_valid(player):
 		player.remove_meta("driving_vehicle")
+		player.scale = Vector3.ONE
 	_disable_driver_collision(player, false)
 	if player == null or not is_instance_valid(player) or not player.is_inside_tree():
 		return
@@ -246,6 +249,9 @@ func _sync_driver() -> void:
 		return
 	_driver.global_position = global_transform * DRIVER_SEAT
 	_driver.rotation.y = rotation.y + PI
+	if _rig:
+		_driver.rotation.x = _rig.rotation.x
+		_driver.rotation.z = _rig.rotation.z
 	if _driver is CharacterBody3D:
 		_driver.velocity = Vector3.ZERO
 
@@ -338,8 +344,8 @@ func _build_mesh() -> void:
 		"steel_d": _make_mat(Color(0.16, 0.17, 0.19)),
 		"carbon": _make_mat(Color(0.10, 0.10, 0.11)),
 		"yellow": _make_mat(Color(0.98, 0.78, 0.12)),
-		"glass": _make_mat(Color(0.55, 0.72, 0.88, 0.85), {"transparent": true, "vertex_color": false, "roughness": 0.15, "metallic": 0.4}),
-		"glass_dark": _make_mat(Color(0.20, 0.30, 0.42, 0.9), {"transparent": true, "vertex_color": false, "roughness": 0.2, "metallic": 0.3}),
+		"glass": _make_mat(Color(0.60, 0.75, 0.92, 0.50), {"transparent": true, "vertex_color": false, "roughness": 0.15, "metallic": 0.4}),
+		"glass_dark": _make_mat(Color(0.22, 0.33, 0.46, 0.65), {"transparent": true, "vertex_color": false, "roughness": 0.2, "metallic": 0.3}),
 		"blur": _make_mat(Color(0.60, 0.62, 0.66, 0.35), {"transparent": true, "vertex_color": false}),
 		"beacon": _make_mat(Color(1.0, 0.20, 0.10), {"emissive": true, "energy": 3.0}),
 		"beacon2": _make_mat(Color(1.0, 0.30, 0.12), {"emissive": true, "energy": 2.0}),
@@ -356,103 +362,135 @@ func _build_mesh() -> void:
 			rot: Vector3 = Vector3.ZERO) -> void:
 		_add_v(sts, mat_id, pos, size, rot)
 
-	# ═══ THÂN CHÍNH ═══════════════════════════════════════════════════════════
-	# Sàn + vỏ dưới (đỏ)
-	b.call(Vector3(0, 0.30, 0.35), Vector3(BODY_WID * 0.9, 0.28, 2.6), "red_dark")
-	b.call(Vector3(0, 0.46, 0.35), Vector3(BODY_WID, 0.34, 2.6), "red")
-	# Thân giữa bo cong (nhiều lớp nhỏ tạo dáng mềm)
-	for i in 4:
-		var t: float = float(i) / 3.0
-		var w: float = BODY_WID * (0.72 + 0.28 * (1.0 - t))
-		b.call(Vector3(0, 0.72 + t * 0.32, 0.55), Vector3(w, 0.20, 2.3 - t * 0.4), "red")
-	# Trần
-	b.call(Vector3(0, 1.02, 0.45), Vector3(BODY_WID * 0.7, 0.10, 2.0), "white")
+	# ═══ CÀNG ĐÁP (skids) ═════════════════════════════════════════════════════
+	# 2 thanh dọc chịu lực (đen) + đầu bọc bạc
+	for s in [1.0, -1.0]:
+		b.call(Vector3(1.18 * s, 0.38, 0.15), Vector3(0.16, 0.14, 3.8), "black")
+		b.call(Vector3(1.18 * s, 0.38, -1.55), Vector3(0.16, 0.14, 0.35), "steel")
+		b.call(Vector3(1.18 * s, 0.38, 1.85), Vector3(0.16, 0.14, 0.35), "steel")
+		# Chân trước + sau chữ V
+		b.call(Vector3(0.95 * s, 0.72, -1.35), Vector3(0.09, 0.72, 0.09), "black", Vector3(0, 0, 0.30 * s))
+		b.call(Vector3(0.95 * s, 0.72, 1.45), Vector3(0.09, 0.72, 0.09), "black", Vector3(0, 0, -0.30 * s))
+	# Thanh ngang nối giữa 2 càng
+	b.call(Vector3(0, 0.36, 0.15), Vector3(2.1, 0.05, 0.05), "steel")
 
-	# ── Mũi & kính vòm ──
+	# ═══ BỤNG + THÂN CHÍNH ════════════════════════════════════════════════════
+	# Bụng bo tròn (nhiều lớp)
+	b.call(Vector3(0, 0.78, 0.1), Vector3(1.9, 0.32, 4.5), "red_dark")
+	b.call(Vector3(0, 1.06, 0.1), Vector3(2.1, 0.36, 4.6), "red")
+	# Thân giữa
+	b.call(Vector3(0, 1.50, 0.1), Vector3(2.2, 0.52, 4.5), "red")
+	b.call(Vector3(0, 2.02, 0.1), Vector3(2.1, 0.52, 4.3), "red")
+	# Thân trên thu hẹp
+	b.call(Vector3(0, 2.52, 0.1), Vector3(1.85, 0.5, 4.1), "red")
+	# Trần trắng
+	b.call(Vector3(0, 2.95, 0.1), Vector3(1.6, 0.36, 3.9), "white")
+	b.call(Vector3(0, 3.13, 0.1), Vector3(1.35, 0.12, 3.7), "white_d")
+	# Sọc trắng trang trí 2 bên hông
+	for s in [1.0, -1.0]:
+		b.call(Vector3(1.08 * s, 1.65, 0.1), Vector3(0.05, 0.30, 4.3), "white")
+	# Huy hiệu chữ thập đỏ 2 bên
+	for s in [1.0, -1.0]:
+		b.call(Vector3(1.12 * s, 1.85, 0.85), Vector3(0.06, 0.85, 0.85), "white")
+		b.call(Vector3(1.14 * s, 2.02, 0.85), Vector3(0.05, 0.16, 0.62), "red")
+		b.call(Vector3(1.14 * s, 1.85, 0.68), Vector3(0.05, 0.62, 0.16), "red")
+
+	# ── MŨI & KÍNH VÒM (buồng lái 2 chỗ) ──
 	# Mũi nhọn dần
-	b.call(Vector3(0, 0.62, -1.45), Vector3(BODY_WID * 0.55, 0.5, 0.55), "red")
-	b.call(Vector3(0, 0.70, -1.82), Vector3(BODY_WID * 0.34, 0.44, 0.40), "red")
-	# Vòm kính (2 lớp để có đường cong)
-	b.call(Vector3(0, 0.92, -1.30), Vector3(BODY_WID * 0.72, 0.44, 0.85), "glass")
-	b.call(Vector3(0, 1.06, -1.22), Vector3(BODY_WID * 0.58, 0.32, 0.66), "glass")
-	# Khung kính đen (dải ôm mũi)
-	b.call(Vector3(0, 0.72, -1.30), Vector3(BODY_WID * 0.78, 0.06, 0.92), "black")
-	b.call(Vector3(0, 1.16, -1.22), Vector3(BODY_WID * 0.62, 0.05, 0.70), "black")
-	b.call(Vector3(0, 0.94, -1.62), Vector3(BODY_WID * 0.42, 0.05, 0.10), "black")
+	b.call(Vector3(0, 1.15, -2.55), Vector3(1.5, 0.95, 1.3), "red")
+	b.call(Vector3(0, 1.15, -3.15), Vector3(1.0, 0.72, 0.95), "red")
+	b.call(Vector3(0, 1.10, -3.68), Vector3(0.55, 0.5, 0.62), "red_dark")
+	# Kính vòm trước (canopy 2 lớp cong)
+	b.call(Vector3(0, 1.95, -2.05), Vector3(1.75, 1.3, 1.6), "glass")
+	b.call(Vector3(0, 2.35, -1.9), Vector3(1.45, 0.85, 1.4), "glass")
+	# Kính gió chắn mưa (xiên)
+	b.call(Vector3(0, 2.35, -1.55), Vector3(1.4, 0.4, 0.25), "glass", Vector3(0.35, 0, 0))
+	# Khung kính đen
+	b.call(Vector3(0, 1.35, -2.1), Vector3(1.8, 0.12, 1.7), "black")
+	b.call(Vector3(0, 2.7, -1.95), Vector3(1.55, 0.1, 1.45), "black")
+	b.call(Vector3(0, 2.0, -2.72), Vector3(1.4, 1.2, 0.12), "black")
+	# Cửa sổ cabin 2 bên
+	for s in [1.0, -1.0]:
+		b.call(Vector3(1.12 * s, 1.95, 0.35), Vector3(0.06, 0.7, 1.1), "glass")
+		b.call(Vector3(1.12 * s, 1.95, 1.5), Vector3(0.06, 0.7, 0.7), "glass")
 
-	# ── Nội thất ca-bin (nhìn xuyên kính) ──
+	# ── NỘI THẤT BUỒNG LÁI (nhìn xuyên kính) ──
 	# Dashboard phát sáng
-	b.call(Vector3(0, 0.78, -1.02), Vector3(0.70, 0.10, 0.18), "black")
-	b.call(Vector3(0.16, 0.82, -1.04), Vector3(0.20, 0.04, 0.05), "dash_green")
-	b.call(Vector3(-0.08, 0.82, -1.04), Vector3(0.10, 0.04, 0.04), "dash_red")
-	b.call(Vector3(-0.24, 0.82, -1.04), Vector3(0.08, 0.04, 0.04), "dash_amber")
-	# 2 ghế phi công đen
-	for s in [1.0, -1.0]:
-		b.call(Vector3(0.22 * s, 0.60, -0.55), Vector3(0.22, 0.16, 0.26), "black")
-		b.call(Vector3(0.22 * s, 0.72, -0.60), Vector3(0.18, 0.22, 0.16), "black")
+	b.call(Vector3(0, 1.42, -1.75), Vector3(1.5, 0.22, 0.35), "black")
+	b.call(Vector3(-0.5, 1.5, -1.9), Vector3(0.22, 0.08, 0.06), "dash_green")
+	b.call(Vector3(0.0, 1.5, -1.9), Vector3(0.14, 0.08, 0.06), "dash_red")
+	b.call(Vector3(0.5, 1.5, -1.9), Vector3(0.2, 0.08, 0.06), "dash_amber")
+	# 2 ghế phi công
+	for s in [0.55, -0.55]:
+		b.call(Vector3(s, 1.18, -1.35), Vector3(0.5, 0.2, 0.5), "black")
+		b.call(Vector3(s, 1.55, -1.5), Vector3(0.5, 0.55, 0.18), "black")
 		# Cần lái
-		b.call(Vector3(0.20 * s, 0.52, -0.92), Vector3(0.03, 0.26, 0.03), "steel")
+		b.call(Vector3(s, 1.35, -1.65), Vector3(0.05, 0.3, 0.05), "steel")
+	# Vô lăng / cần tập trung
+	b.call(Vector3(0.55, 1.3, -1.0), Vector3(0.5, 0.12, 0.2), "steel")
 
-	# ── Cửa trượt 2 bên (mở hé) ──
+	# ── CỬA TRƯỢT 2 BÊN (mở hé) ──
 	for s in [1.0, -1.0]:
-		# Ô cửa
-		b.call(Vector3((BODY_WID * 0.5 + 0.02) * s, 0.80, 0.25), Vector3(0.05, 0.55, 0.95), "red_dark")
-		# Cửa trượt hé
-		b.call(Vector3((BODY_WID * 0.5 + 0.09) * s, 0.80, 0.55), Vector3(0.03, 0.50, 0.80), "white")
+		# Ô cửa lõm
+		b.call(Vector3((1.15) * s, 1.55, 0.45), Vector3(0.06, 0.85, 1.15), "red_dark")
+		# Cửa trượt hé mở
+		b.call(Vector3((1.18) * s, 1.55, 0.85), Vector3(0.04, 0.78, 0.95), "white")
 		# Tay nắm
-		b.call(Vector3((BODY_WID * 0.5 + 0.02) * s, 0.78, 0.45), Vector3(0.05, 0.04, 0.28), "black")
+		b.call(Vector3((1.12) * s, 1.6, 0.6), Vector3(0.08, 0.05, 0.35), "black")
 
-	# ── Khoang sau: băng ca + hộp sơ cứu ──
-	# Băng ca cứu thương (trắng, nằm)
-	b.call(Vector3(-0.30, 0.56, 0.55), Vector3(0.30, 0.08, 1.05), "white")
-	b.call(Vector3(-0.30, 0.62, 0.35), Vector3(0.26, 0.10, 0.30), "white_d")
-	# Hộp sơ cứu đỏ + chữ thập trắng
-	b.call(Vector3(0.28, 0.60, 0.55), Vector3(0.26, 0.22, 0.30), "red")
-	b.call(Vector3(0.28, 0.60, 0.62), Vector3(0.08, 0.20, 0.04), "cross")
-	b.call(Vector3(0.28, 0.66, 0.55), Vector3(0.26, 0.05, 0.30), "cross")
-	# Cuộn dây thừng đay
-	b.call(Vector3(0.30, 0.52, 0.95), Vector3(0.18, 0.20, 0.18), "wood")
+	# ── KHOANG SAU: băng ca + hộp sơ cứu ──
+	# Băng ca cứu thương
+	b.call(Vector3(-0.55, 1.28, 1.0), Vector3(0.45, 0.12, 1.5), "white")
+	b.call(Vector3(-0.55, 1.38, 0.8), Vector3(0.38, 0.14, 0.45), "white_d")
+	# Hộp sơ cứu đỏ + chữ thập
+	b.call(Vector3(0.55, 1.35, 1.0), Vector3(0.4, 0.32, 0.45), "red")
+	b.call(Vector3(0.55, 1.35, 1.08), Vector3(0.1, 0.28, 0.06), "cross")
+	b.call(Vector3(0.55, 1.42, 1.0), Vector3(0.4, 0.06, 0.45), "cross")
+	# Bình dưỡng khí bạc
+	b.call(Vector3(-0.1, 1.3, 1.6), Vector3(0.22, 0.42, 0.22), "steel")
+	b.call(Vector3(-0.1, 1.46, 1.62), Vector3(0.16, 0.1, 0.12), "steel_d")
 
-	# ── Tời cứu hộ (phía trên cửa phải) ──
-	b.call(Vector3(0.42, 1.05, 0.75), Vector3(0.10, 0.10, 0.24), "steel_d")
-	b.call(Vector3(0.44, 1.02, 0.86), Vector3(0.04, 0.04, 0.20), "steel")
+	# ── TỜI CỨU HỘ (phía trên cửa phải) ──
+	b.call(Vector3(0.95, 2.4, 1.1), Vector3(0.14, 0.14, 0.32), "steel_d")
+	b.call(Vector3(0.98, 2.36, 1.25), Vector3(0.06, 0.06, 0.28), "steel")
 	# Cáp + móc rủ xuống
-	b.call(Vector3(0.44, 0.62, 0.86), Vector3(0.02, 0.80, 0.02), "steel")
-	b.call(Vector3(0.44, 0.56, 0.86), Vector3(0.10, 0.06, 0.08), "steel_d")
+	b.call(Vector3(0.98, 1.45, 1.25), Vector3(0.03, 1.8, 0.03), "steel")
+	b.call(Vector3(0.98, 1.32, 1.25), Vector3(0.14, 0.1, 0.12), "steel_d")
 
 	# ═══ ĐUÔI ═════════════════════════════════════════════════════════════════
-	# Ống đuôi thon dài
+	# Ống đuôi thon dài (đỏ-trắng xen kẽ)
 	for i in 5:
 		var t: float = float(i) / 4.0
-		var w: float = BODY_WID * 0.34 * (1.0 - t * 0.55)
-		var z: float = 1.6 + t * 1.4
-		b.call(Vector3(0, 0.70 + t * 0.16, z), Vector3(w, 0.36 - t * 0.12, 1.15), "red" if i % 2 == 0 else "white")
+		var w: float = 1.0 * (1.0 - t * 0.68)
+		var z: float = 2.7 + t * 3.7
+		b.call(Vector3(0, 1.72 + t * 0.16, z), Vector3(w, 0.95 - t * 0.45, 1.0), "red" if i % 2 == 0 else "white")
 	# Sọc thể thao dọc đuôi
 	for i in 3:
-		b.call(Vector3(0, 0.78, 1.75 + i * 0.55), Vector3(BODY_WID * 0.30, 0.10, 0.28), "red" if i % 2 == 1 else "white")
-	# Chóp đuôi
-	b.call(Vector3(0, 0.92, 3.30), Vector3(BODY_WID * 0.16, 0.30, 0.30), "white")
+		b.call(Vector3(0, 1.78, 3.1 + i * 1.2), Vector3(0.9 - i * 0.2, 0.14, 0.45), "red" if i % 2 == 1 else "white")
+	# Vây đuôi đứng
+	b.call(Vector3(0, 2.35, 6.15), Vector3(0.2, 1.0, 1.0), "red")
+	b.call(Vector3(0, 2.7, 6.2), Vector3(0.16, 0.5, 0.8), "white")
 	# Đèn định vị đuôi (trắng)
-	b.call(Vector3(0, 0.95, 3.42), Vector3(0.06, 0.06, 0.06), "nav_red")
+	b.call(Vector3(0, 2.0, 6.85), Vector3(0.08, 0.08, 0.08), "nav_red")
 
 	# ═══ CÁNH QUẠT CHÍNH ══════════════════════════════════════════════════════
 	# Trục + hub (trên trần)
-	b.call(Vector3(0, 1.14, 0.45), Vector3(0.14, 0.14, 0.14), "steel_d")
-	b.call(Vector3(0, 1.22, 0.45), Vector3(0.20, 0.08, 0.20), "steel")
-	b.call(Vector3(0, 1.30, 0.45), Vector3(0.12, 0.06, 0.12), "black")
+	b.call(Vector3(0, 3.12, 0.1), Vector3(0.18, 0.3, 0.18), "steel_d")
+	b.call(Vector3(0, 3.28, 0.1), Vector3(0.26, 0.12, 0.26), "steel")
+	b.call(Vector3(0, 3.36, 0.1), Vector3(0.16, 0.08, 0.16), "black")
 	# Động cơ + lưới tản nhiệt (dưới hub)
-	b.call(Vector3(0, 0.95, 0.35), Vector3(0.50, 0.30, 0.55), "steel")
-	for gx in [-0.16, -0.05, 0.06, 0.17]:
-		b.call(Vector3(gx, 0.98, 0.62), Vector3(0.05, 0.16, 0.03), "black")
+	b.call(Vector3(0, 2.65, 0.25), Vector3(0.75, 0.45, 0.9), "steel")
+	for gx in [-0.24, -0.08, 0.08, 0.24]:
+		b.call(Vector3(gx, 2.7, 0.62), Vector3(0.06, 0.22, 0.04), "black")
 	# Ống xả đôi bạc
-	for s in [0.28, -0.28]:
-		b.call(Vector3(s, 0.78, 0.78), Vector3(0.06, 0.08, 0.20), "steel")
-		b.call(Vector3(s, 0.78, 0.90), Vector3(0.07, 0.09, 0.06), "black")
+	for s in [0.32, -0.32]:
+		b.call(Vector3(s, 2.45, 1.15), Vector3(0.08, 0.12, 0.3), "steel")
+		b.call(Vector3(s, 2.45, 1.33), Vector3(0.1, 0.13, 0.08), "black")
 
 	# Cánh quạt (rotor hub xoay — 4 lá + đầu vàng)
 	_rotor_hub = Node3D.new()
 	_rotor_hub.name = "_RotorHub"
-	_rotor_hub.position = Vector3(0, 1.34, 0.45)
+	_rotor_hub.position = Vector3(0, 3.38, 0.1)
 	rig.add_child(_rotor_hub)
 	var r_sts: Dictionary = {}
 	var rb: Callable = func(pos: Vector3, size: Vector3, mat_id: String,
@@ -460,24 +498,24 @@ func _build_mesh() -> void:
 		_add_v(r_sts, mat_id, pos, size, rot)
 	for i in 4:
 		var ang: float = float(i) / 4.0 * TAU
-		rb.call(Vector3(0, 0, 0), Vector3(0.03, 0.05, 2.35), "carbon", Vector3(0, ang, 0))
-		rb.call(Vector3(0, 0, 2.05), Vector3(0.05, 0.05, 0.28), "yellow", Vector3(0, ang, 0))
-	rb.call(Vector3(0, 0, 0), Vector3(0.16, 0.05, 0.16), "black")
+		rb.call(Vector3(0, 0, 0), Vector3(0.05, 0.07, 4.6), "carbon", Vector3(0, ang, 0))
+		rb.call(Vector3(0, 0, 4.1), Vector3(0.08, 0.07, 0.5), "yellow", Vector3(0, ang, 0))
+	rb.call(Vector3(0, 0, 0), Vector3(0.22, 0.07, 0.22), "black")
 	_commit_meshes(_rotor_hub, r_sts, mats)
 	_rotor_blades = _rotor_hub
 
 	# Motion blur disc (đĩa mờ khi quay)
 	var disc_sts: Dictionary = {}
-	_add_v(disc_sts, "blur", Vector3(0, 1.34, 0.45), Vector3(2.55, 0.01, 2.55), Vector3(PI * 0.5, 0, 0))
+	_add_v(disc_sts, "blur", Vector3(0, 3.36, 0.1), Vector3(5.1, 0.01, 5.1), Vector3.ZERO)
 	_commit_meshes(rig, disc_sts, mats)
 
 	# ═══ CÁNH QUẠT ĐUÔI (fenestron) ═══════════════════════════════════════════
 	# Khung vòng bảo vệ
-	b.call(Vector3(0, 0.98, 3.42), Vector3(0.36, 0.40, 0.10), "white")
-	b.call(Vector3(0, 0.98, 3.42), Vector3(0.42, 0.08, 0.12), "red")
+	b.call(Vector3(0, 1.95, 6.6), Vector3(0.6, 0.8, 0.18), "white")
+	b.call(Vector3(0, 1.95, 6.6), Vector3(0.68, 0.16, 0.24), "red")
 	_tail_rotor = Node3D.new()
 	_tail_rotor.name = "_TailRotor"
-	_tail_rotor.position = Vector3(0, 0.98, 3.42)
+	_tail_rotor.position = Vector3(0, 1.95, 6.6)
 	rig.add_child(_tail_rotor)
 	var t_sts: Dictionary = {}
 	var tb: Callable = func(pos: Vector3, size: Vector3, mat_id: String,
@@ -485,34 +523,24 @@ func _build_mesh() -> void:
 		_add_v(t_sts, mat_id, pos, size, rot)
 	for i in 4:
 		var ang: float = float(i) / 4.0 * TAU
-		tb.call(Vector3(0, 0, 0), Vector3(0.16, 0.16, 0.03), "carbon", Vector3(ang, 0, 0))
-	tb.call(Vector3(0, 0, 0), Vector3(0.08, 0.08, 0.06), "black")
+		tb.call(Vector3(0, 0, 0), Vector3(0.28, 0.28, 0.05), "carbon", Vector3(ang, 0, 0))
+	tb.call(Vector3(0, 0, 0), Vector3(0.12, 0.12, 0.09), "black")
 	_commit_meshes(_tail_rotor, t_sts, mats)
-
-	# ═══ CÀNG ĐÁP (skids) ═════════════════════════════════════════════════════
-	# 2 thanh dọc đen
-	for s in [1.0, -1.0]:
-		b.call(Vector3((BODY_WID * 0.62) * s, 0.10, 0.45), Vector3(0.10, 0.08, 2.9), "black")
-	# 4 chân chống chữ V
-	for s in [1.0, -1.0]:
-		for z in [-0.65, 1.45]:
-			b.call(Vector3((BODY_WID * 0.42) * s, 0.34, z), Vector3(0.06, 0.52, 0.06), "black", Vector3(0, 0, -0.35 * s))
-			b.call(Vector3((BODY_WID * 0.46) * s, 0.26, z), Vector3(0.05, 0.36, 0.05), "steel_d", Vector3(0, 0, 0.35 * s))
 
 	# ═══ ĐÈN ══════════════════════════════════════════════════════════════════
 	# Beacon đỏ trên đỉnh hub (nhấp nháy)
 	_beacon_mat = mats["beacon"] as StandardMaterial3D
 	_beacon_mat2 = mats["beacon2"] as StandardMaterial3D
-	b.call(Vector3(0, 1.44, 0.45), Vector3(0.08, 0.10, 0.08), "beacon")
+	b.call(Vector3(0, 3.5, 0.1), Vector3(0.1, 0.16, 0.1), "beacon")
 	# Beacon bụng
-	b.call(Vector3(0, 0.20, 0.45), Vector3(0.07, 0.06, 0.07), "beacon2")
+	b.call(Vector3(0, 0.62, 0.1), Vector3(0.1, 0.08, 0.1), "beacon2")
 	# Đèn định vị hông
 	_nav_mat = mats["nav_red"] as StandardMaterial3D
-	b.call(Vector3((BODY_WID * 0.5 + 0.02), 0.72, -0.25), Vector3(0.05, 0.05, 0.05), "nav_red")
-	b.call(Vector3(-(BODY_WID * 0.5 + 0.02), 0.72, -0.25), Vector3(0.05, 0.05, 0.05), "nav_green")
+	b.call(Vector3(1.13, 1.55, -1.4), Vector3(0.08, 0.08, 0.08), "nav_red")
+	b.call(Vector3(-1.13, 1.55, -1.4), Vector3(0.08, 0.08, 0.08), "nav_green")
 	# Spotlight dưới mũi
-	b.call(Vector3(0, 0.28, -1.30), Vector3(0.16, 0.10, 0.20), "steel_d")
-	b.call(Vector3(0, 0.22, -1.30), Vector3(0.12, 0.05, 0.16), "dash_amber")
+	b.call(Vector3(0, 0.85, -3.1), Vector3(0.24, 0.14, 0.3), "steel_d")
+	b.call(Vector3(0, 0.76, -3.1), Vector3(0.18, 0.07, 0.24), "dash_amber")
 
 	_commit_meshes(rig, sts, mats)
 
@@ -527,7 +555,7 @@ func _build_lights() -> void:
 	spot.spot_angle = 30.0
 	spot.spot_attenuation = 1.1
 	spot.shadow_enabled = false
-	spot.position = Vector3(0, -0.1, -1.3)
+	spot.position = Vector3(0, 0.75, -3.1)
 	spot.rotation.x = deg_to_rad(90.0)
 	_rig.add_child(spot)
 	_spotlight = spot
@@ -597,7 +625,7 @@ func _build_particles() -> void:
 	ramp.set_color(0, Color(0.62, 0.55, 0.42, 0.5))
 	ramp.set_color(1, Color(0.62, 0.55, 0.42, 0.0))
 	d.color_ramp = ramp
-	d.position = Vector3(0, -0.2, 0.45)
+	d.position = Vector3(0, -0.4, 0.1)
 	_rig.add_child(d)
 	_dust = d
 
@@ -620,7 +648,7 @@ func _build_particles() -> void:
 	eramp.set_color(0, Color(0.9, 0.9, 0.9, 0.4))
 	eramp.set_color(1, Color(0.85, 0.85, 0.85, 0.0))
 	p.color_ramp = eramp
-	p.position = Vector3(0.28, 0.8, 1.0)
+	p.position = Vector3(0.32, 2.45, 1.15)
 	_rig.add_child(p)
 	_exhaust = p
 
@@ -634,10 +662,16 @@ func _update_particles(delta: float) -> void:
 func _build_collision() -> void:
 	var col := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(1.1, 0.7, 4.6)
+	box.size = Vector3(2.5, 2.2, 5.6)
 	col.shape = box
-	col.position = Vector3(0, 0.75, 0.4)
+	col.position = Vector3(0, 1.4, -0.2)
 	add_child(col)
+	var tail := CollisionShape3D.new()
+	var tbox := BoxShape3D.new()
+	tbox.size = Vector3(0.8, 1.0, 3.6)
+	tail.shape = tbox
+	tail.position = Vector3(0, 1.9, 4.6)
+	add_child(tail)
 
 # ── Phá huỷ ───────────────────────────────────────────────────────────────────
 func try_destroy(weapon_id: String, damage: int = 1) -> bool:

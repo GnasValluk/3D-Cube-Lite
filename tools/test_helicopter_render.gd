@@ -6,15 +6,14 @@ extends Node3D
 const _Heli = preload("res://scripts/items/entities/rescue_helicopter.gd")
 
 const SHOTS: Array[Dictionary] = [
-	{"y": 1.0,  "pitch": -12.0, "name": "heli_side"},
-	{"y": 0.0,  "pitch": -8.0,  "name": "heli_front"},
+	{"pos": Vector3(11.0, 4.2, 1.5), "target": Vector3(0, 2.0, 0),  "name": "heli_side"},
+	{"pos": Vector3(0.0, 3.4, -9.5), "target": Vector3(0, 1.8, 0),  "name": "heli_front"},
 ]
 
 func _make_cam() -> Camera3D:
 	var cam := Camera3D.new()
 	cam.current = true
-	cam.fov = 55.0
-	cam.position = Vector3(0, 4.2, 9.5)
+	cam.fov = 50.0
 	add_child(cam)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, 30, 0)
@@ -36,8 +35,10 @@ func _make_cam() -> Camera3D:
 	add_child(we)
 	return cam
 
-func _shot(cam: Camera3D, pitch: float, name: String) -> void:
-	cam.rotation_degrees = Vector3(pitch, 0, 0)
+func _shot(cam: Camera3D, pos: Vector3, target: Vector3, name: String) -> void:
+	cam.position = pos
+	cam.look_at(target, Vector3.UP)
+	await get_tree().process_frame
 	var img := get_viewport().get_texture().get_image()
 	var err := img.save_png("res://.godot/test_heli_%s.png" % name)
 	var coverage := _coverage(img)
@@ -100,16 +101,19 @@ func _ready() -> void:
 	var cam := _make_cam()
 	for s in SHOTS:
 		await get_tree().process_frame
-		_shot(cam, s["pitch"], s["name"])
+		await _shot(cam, s["pos"], s["target"], s["name"])
 		await get_tree().process_frame
 
 	var mini := Node3D.new()
 	ItemMesh.build(mini, "rescue_helicopter")
 	mini.position = Vector3(0, 0.5, 0)
 	add_child(mini)
-	cam.position = Vector3(0, 2.6, 4.0)
+	cam.position = Vector3(0, 3.2, 5.5)
+	cam.look_at(Vector3(0, 0.5, 0), Vector3.UP)
 	await get_tree().process_frame
-	_shot(cam, -12.0, "heli_mini")
+	var img2 := get_viewport().get_texture().get_image()
+	img2.save_png("res://.godot/test_heli_heli_mini.png")
+	print("shot heli_mini err=0 coverage=%d%%" % _coverage(img2))
 
 	var fail: int = 0
 	for s in SHOTS:

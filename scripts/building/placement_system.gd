@@ -295,17 +295,24 @@ func _build_ghost_helicopter() -> void:
 	var white_mat := _ghost_mat(Color(0.92, 0.90, 0.86, 0.30), Color(0.30, 0.28, 0.26), 0.2)
 	var mi := MeshInstance3D.new()
 	var box := BoxMesh.new()
-	box.size = Vector3(1.0, 0.9, 3.1)
+	box.size = Vector3(2.3, 2.2, 4.6)
 	mi.mesh = box
 	mi.material_override = body_mat
-	mi.position = Vector3(0, 0.75, 0.35)
+	mi.position = Vector3(0, 1.6, -0.2)
 	_ghost.add_child(mi)
+	var nose := MeshInstance3D.new()
+	var nbox := BoxMesh.new()
+	nbox.size = Vector3(1.5, 1.6, 1.4)
+	nose.mesh = nbox
+	nose.material_override = body_mat
+	nose.position = Vector3(0, 1.6, -2.7)
+	_ghost.add_child(nose)
 	var tail := MeshInstance3D.new()
 	var tbox := BoxMesh.new()
-	tbox.size = Vector3(0.35, 0.4, 2.4)
+	tbox.size = Vector3(0.7, 0.8, 3.6)
 	tail.mesh = tbox
 	tail.material_override = white_mat
-	tail.position = Vector3(0, 0.85, 3.1)
+	tail.position = Vector3(0, 1.8, 4.4)
 	_ghost.add_child(tail)
 
 func _build_ghost_chest() -> void:

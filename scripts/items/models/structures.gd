@@ -305,35 +305,49 @@ static func rescue_helicopter(p: Node3D) -> void:
 	var glass     := Color(0.55, 0.72, 0.88)
 	var glass_d   := Color(0.20, 0.30, 0.42)
 
-	# Thân chính đỏ
-	ItemMeshShared.add_cube(p, 0, 0.2, 0.5, 1.6, 0.8, 3.6, red)
+	# Càng đáp (skids)
+	ItemMeshShared.add_cube(p, 1.0, -0.45, 0.0, 0.16, 0.12, 3.2, black)
+	ItemMeshShared.add_cube(p, -1.0, -0.45, 0.0, 0.16, 0.12, 3.2, black)
+	for s in [1.0, -1.0]:
+		ItemMeshShared.add_cube(p, 0.8 * s, -0.1, -1.3, 0.08, 0.6, 0.08, black)
+		ItemMeshShared.add_cube(p, 0.8 * s, -0.1, 1.3, 0.08, 0.6, 0.08, black)
+	# Bụng + thân chính đỏ
+	ItemMeshShared.add_cube(p, 0, 0.2, 0.0, 1.8, 0.4, 3.6, red_d)
+	ItemMeshShared.add_cube(p, 0, 0.55, 0.0, 2.0, 0.7, 3.7, red)
+	# Thân trên + trần trắng
+	ItemMeshShared.add_cube(p, 0, 1.05, 0.0, 1.8, 0.5, 3.6, red)
+	ItemMeshShared.add_cube(p, 0, 1.4, 0.0, 1.4, 0.3, 3.4, white)
 	# Sọc trắng hông
-	ItemMeshShared.add_cube(p, 0, 0.45, 0.5, 1.66, 0.18, 3.6, white)
-	# Mũi kính vòm
-	ItemMeshShared.add_cube(p, 0, 0.55, -1.4, 1.1, 0.7, 1.3, glass)
-	ItemMeshShared.add_cube(p, 0, 0.7, -1.4, 0.9, 0.5, 1.0, glass_d)
+	for s in [1.0, -1.0]:
+		ItemMeshShared.add_cube(p, 1.02 * s, 0.6, 0.0, 0.05, 0.2, 3.6, white)
+	# Huy hiệu chữ thập 2 bên
+	for s in [1.0, -1.0]:
+		ItemMeshShared.add_cube(p, 1.04 * s, 0.8, 0.9, 0.05, 0.7, 0.7, white)
+		ItemMeshShared.add_cube(p, 1.06 * s, 0.92, 0.9, 0.04, 0.14, 0.5, red)
+		ItemMeshShared.add_cube(p, 1.06 * s, 0.8, 0.78, 0.04, 0.5, 0.14, red)
+	# Mũi kính vòm (buồng lái 2 chỗ)
+	ItemMeshShared.add_cube(p, 0, 0.75, -2.3, 1.2, 0.6, 1.0, glass)
+	ItemMeshShared.add_cube(p, 0, 0.95, -2.1, 1.0, 0.45, 0.8, glass_d)
 	# Khung kính đen
-	ItemMeshShared.add_cube(p, 0, 0.42, -1.4, 1.2, 0.06, 1.4, black)
-	ItemMeshShared.add_cube(p, 0, 0.85, -1.35, 1.0, 0.05, 1.1, black)
+	ItemMeshShared.add_cube(p, 0, 0.5, -2.15, 1.3, 0.07, 1.2, black)
+	ItemMeshShared.add_cube(p, 0, 1.2, -2.1, 1.1, 0.06, 0.95, black)
+	# Mũi nhọn đỏ
+	ItemMeshShared.add_cube(p, 0, 0.7, -2.85, 0.7, 0.5, 0.6, red)
 	# Đuôi trắng thon
-	ItemMeshShared.add_cube(p, 0, 0.5, 2.4, 0.55, 0.6, 3.0, white)
-	ItemMeshShared.add_cube(p, 0, 0.6, 2.4, 0.6, 0.12, 3.0, red)
+	ItemMeshShared.add_cube(p, 0, 0.6, 2.1, 0.6, 0.6, 2.6, white)
+	ItemMeshShared.add_cube(p, 0, 0.72, 2.1, 0.65, 0.14, 2.6, red)
+	# Vây đuôi đứng
+	ItemMeshShared.add_cube(p, 0, 1.05, 3.0, 0.12, 0.7, 0.7, red)
 	# Chóp đuôi + cánh đuôi fenestron
-	ItemMeshShared.add_cube(p, 0, 0.6, 4.05, 0.5, 0.5, 0.35, red)
-	ItemMeshShared.add_cube(p, 0, 0.6, 4.05, 0.75, 0.14, 0.3, carbon)
+	ItemMeshShared.add_cube(p, 0, 0.6, 3.85, 0.5, 0.55, 0.35, red)
+	ItemMeshShared.add_cube(p, 0, 0.6, 3.85, 0.75, 0.14, 0.3, carbon)
 	# Trục cánh quạt + hub
-	ItemMeshShared.add_cube(p, 0, 0.85, 0.5, 0.3, 0.12, 0.3, black)
-	ItemMeshShared.add_cube(p, 0, 0.95, 0.5, 0.42, 0.08, 0.42, steel)
+	ItemMeshShared.add_cube(p, 0, 1.6, 0.0, 0.14, 0.16, 0.14, black)
+	ItemMeshShared.add_cube(p, 0, 1.75, 0.0, 0.26, 0.1, 0.26, steel)
 	# 4 cánh quạt đen + đầu vàng
 	for i in 4:
 		var ang := deg_to_rad(i * 90.0)
-		ItemMeshShared.add_cube(p, sin(ang) * 1.5, 0.99, 0.5 + cos(ang) * 1.5, 0.28, 0.03, 3.0, carbon)
-	ItemMeshShared.add_cube(p, sin(0.0) * 2.4, 0.99, 0.5 + cos(0.0) * 2.4, 0.2, 0.04, 0.5, yellow)
-	# Đuôi cánh quạt
-	ItemMeshShared.add_cube(p, 0, 0.6, 4.05, 0.12, 0.12, 0.3, black)
-	# Càng đáp
-	ItemMeshShared.add_cube(p, 0.85, -0.35, 0.3, 0.2, 0.12, 3.4, black)
-	ItemMeshShared.add_cube(p, -0.85, -0.35, 0.3, 0.2, 0.12, 3.4, black)
-	for s in [1.0, -1.0]:
-		ItemMeshShared.add_cube(p, 0.6 * s, -0.05, -0.7, 0.1, 0.5, 0.1, black)
-		ItemMeshShared.add_cube(p, 0.6 * s, -0.05, 1.4, 0.1, 0.5, 0.1, black)
+		ItemMeshShared.add_cube(p, sin(ang) * 1.9, 1.8, cos(ang) * 1.9, 0.2, 0.03, 3.8, carbon)
+	ItemMeshShared.add_cube(p, 0, 1.8, 3.4, 0.2, 0.03, 0.6, yellow)
+	# Beacon trên hub
+	ItemMeshShared.add_cube(p, 0, 1.92, 0.0, 0.08, 0.12, 0.08, red)

@@ -160,6 +160,9 @@ func _ready() -> void:
 	_check(driver.has_meta("driving_vehicle") and driver.get_meta("driving_vehicle") == heli,
 		"player bị khóa điều khiển (meta driving_vehicle)")
 	_check(driver.get_node("CollisionShape3D").disabled, "shape người chơi bị tắt khi lên máy bay")
+	_check(driver.scale.is_equal_approx(heli.DRIVER_SCALE), "người chơi thu nhỏ để ngồi buồng lái")
+	_check(heli._driver != null and absf(heli._driver.rotation.y - (heli.rotation.y + PI)) < 0.05,
+		"người chơi quay mặt về hướng bay (mũi máy bay)")
 
 	var y0: float = heli.global_position.y
 	Input.action_press("jump")
@@ -194,6 +197,7 @@ func _ready() -> void:
 	heli.try_exit()
 	_check(not heli.is_driven(), "try_exit: hết tài xế")
 	_check(not driver.has_meta("driving_vehicle"), "try_exit: nhả khóa điều khiển")
+	_check(driver.scale.is_equal_approx(Vector3.ONE), "try_exit: trả lại kích thước người chơi")
 	_check(driver.global_position.distance_to(heli.global_position) < 7.0,
 		"try_exit: người chơi đứng gần máy bay (d=%s)" % str(driver.global_position.distance_to(heli.global_position)))
 	await _wait_physics(60)
