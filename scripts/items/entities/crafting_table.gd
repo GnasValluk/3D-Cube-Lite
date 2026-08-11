@@ -32,49 +32,77 @@ func _box(parent: Node3D, size: Vector3, pos: Vector3, mat: Material) -> MeshIns
 
 func _setup_mesh() -> void:
 	var wood := _m(Color(0.42, 0.26, 0.14), 0.05, 0.85)
+	var wood2 := _m(Color(0.38, 0.22, 0.11), 0.05, 0.9)
 	var wood_dark := _m(Color(0.35, 0.20, 0.10), 0.05, 0.90)
+	var wood_dark2 := _m(Color(0.30, 0.16, 0.07), 0.05, 0.92)
 	var wood_light := _m(Color(0.50, 0.32, 0.17), 0.05, 0.80)
 	var metal := _m(Color(0.22, 0.22, 0.25), 0.4, 0.6)
+	var metal_bright := _m(Color(0.45, 0.45, 0.50), 0.6, 0.35)
 	var metal_dark := _m(Color(0.15, 0.15, 0.18), 0.4, 0.7)
 	var anvil_mat := _m(Color(0.28, 0.28, 0.32), 0.5, 0.5)
 	var fire_glow := _m(Color(0.70, 0.20, 0.05), 0.0, 0.8)
 	var fire_hot := _m(Color(0.90, 0.55, 0.10), 0.0, 0.7)
 	var grid_mark := _m(Color(0.28, 0.16, 0.08))
+	var grid_edge := _m(Color(0.20, 0.11, 0.05))
 	var gold_coin := _m(Color(0.80, 0.65, 0.15), 0.8, 0.2)
 	var scrap := _m(Color(0.30, 0.30, 0.32), 0.5, 0.6)
 	var gem_blue := _m(Color(0.15, 0.40, 0.80), 0.3, 0.1)
+	var gem_red := _m(Color(0.70, 0.15, 0.15), 0.3, 0.1)
+	var gem_green := _m(Color(0.15, 0.60, 0.30), 0.3, 0.1)
 	var bottle_glass := _m(Color(0.55, 0.65, 0.75), 0.1, 0.1)
 	var bottle_red := _m(Color(0.70, 0.15, 0.15), 0.0, 0.3)
 	var bottle_green := _m(Color(0.15, 0.55, 0.25), 0.0, 0.3)
+	var book_red := _m(Color(0.55, 0.15, 0.15), 0.0, 0.7)
+	var book_blue := _m(Color(0.15, 0.25, 0.55), 0.0, 0.7)
+	var paper := _m(Color(0.88, 0.84, 0.70), 0.0, 0.85)
+	var brass := _m(Color(0.55, 0.42, 0.16), 0.5, 0.4)
+	var rope := _m(Color(0.55, 0.45, 0.30), 0.0, 0.9)
 
 	var tw := 1.80
 	var td := 0.85
 	var th := 0.05
 	var ty := 0.65
 
-	# ---- TABLE TOP ----
-	_box(self, Vector3(tw, th, td), Vector3(0, ty - th * 0.5, 0), wood)
+	# ---- TABLE TOP (3 planks, slightly varying tone) ----
+	var top_y := ty - th * 0.5
+	_box(self, Vector3(tw, th, td), Vector3(0, top_y, 0), wood)
+	for i in range(3):
+		var plank_cx := -0.60 + i * 0.60
+		_box(self, Vector3(0.58, 0.008, td - 0.06), Vector3(plank_cx, top_y - 0.002, 0), wood2)
+	# Plank seams (top face)
+	for i in range(2):
+		var sx := -0.60 + i * 0.60
+		_box(self, Vector3(0.02, 0.006, td - 0.06), Vector3(sx + 0.30, top_y + 0.003, 0), grid_edge)
+	# Edge trim around top
+	for i in range(2):
+		_box(self, Vector3(tw, 0.035, 0.045), Vector3(0, top_y - th * 0.5 - 0.018, (-0.5 + i) * (td - 0.045)), wood_dark)
+	for i in range(2):
+		_box(self, Vector3(0.045, 0.035, td - 0.045), Vector3((-0.5 + i) * (tw - 0.045), top_y - th * 0.5 - 0.018, 0), wood_dark)
 
-	# ---- LEGS ----
+	# ---- LEGS (tapered feel: thick base + thin top) ----
 	var lt := 0.05
 	var lh := ty - th
 	for x in [-tw * 0.5 + lt * 0.6, tw * 0.5 - lt * 0.6]:
 		for z in [-td * 0.5 + lt * 0.6, td * 0.5 - lt * 0.6]:
 			_box(self, Vector3(lt * 0.7, lh, lt * 0.7), Vector3(x, lh * 0.5, z), wood_dark)
+			_box(self, Vector3(lt * 0.9, 0.06, lt * 0.9), Vector3(x, 0.03, z), wood_dark2)
 
 	# ---- CROSSBARS ----
 	_box(self, Vector3(tw - 0.24, 0.03, 0.04), Vector3(0, 0.15, -td * 0.5 + lt * 0.6), wood_dark)
 	_box(self, Vector3(tw - 0.24, 0.03, 0.04), Vector3(0, 0.15, td * 0.5 - lt * 0.6), wood_dark)
 
-	# ---- CRAFTING GRID (center) ----
+	# ---- CRAFTING GRID (center, recessed cells) ----
 	var gc := 0.42
 	var cell := gc / 3.0
-	_box(self, Vector3(gc + 0.04, 0.01, gc + 0.04), Vector3(0, ty, 0), grid_mark)
+	_box(self, Vector3(gc + 0.08, 0.015, gc + 0.08), Vector3(0, ty, 0), grid_edge)
+	_box(self, Vector3(gc + 0.05, 0.012, gc + 0.05), Vector3(0, ty + 0.005, 0), _m(Color(0.34, 0.20, 0.10)))
 	for row in range(3):
 		for col in range(3):
 			var cx := (col - 1) * cell
 			var cz := (row - 1) * cell
-			_box(self, Vector3(cell - 0.02, 0.01, cell - 0.02), Vector3(cx, ty + 0.005, cz), wood_light)
+			_box(self, Vector3(cell - 0.03, 0.015, cell - 0.03), Vector3(cx, ty + 0.01, cz), wood_light)
+			# inner shadow line
+			_box(self, Vector3(cell - 0.09, 0.008, cell - 0.09), Vector3(cx, ty + 0.02, cz), _m(Color(0.40, 0.25, 0.13)))
 
 	# ---- FORGE (right) ----
 	var fx := 0.52
@@ -83,6 +111,9 @@ func _setup_mesh() -> void:
 	_box(self, Vector3(0.16, 0.04, 0.14), Vector3(fx, ty + 0.14, fz), fire_glow)
 	_box(self, Vector3(0.08, 0.02, 0.07), Vector3(fx, ty + 0.17, fz), fire_hot)
 	_box(self, Vector3(0.26, 0.02, 0.22), Vector3(fx, ty + 0.13, fz), metal)
+	# chimney pipe behind forge
+	_box(self, Vector3(0.10, 0.18, 0.10), Vector3(fx, ty + 0.10, fz - 0.13), metal_dark)
+	_box(self, Vector3(0.12, 0.04, 0.12), Vector3(fx, ty + 0.18, fz - 0.13), metal)
 
 	# ---- ANVIL (right, next to forge) ----
 	var ax := 0.75
@@ -90,10 +121,28 @@ func _setup_mesh() -> void:
 	_box(self, Vector3(0.12, 0.06, 0.09), Vector3(ax, ty + 0.08, az), anvil_mat)
 	_box(self, Vector3(0.08, 0.04, 0.06), Vector3(ax, ty + 0.14, az), anvil_mat)
 	_box(self, Vector3(0.10, 0.02, 0.07), Vector3(ax, ty + 0.06, az), metal)
+	# anvil horn (pointed end)
+	_box(self, Vector3(0.06, 0.02, 0.03), Vector3(ax - 0.07, ty + 0.11, az), anvil_mat)
 
 	# Tools on anvil
 	_box(self, Vector3(0.02, 0.06, 0.02), Vector3(ax + 0.03, ty + 0.18, az), _m(Color(0.35, 0.22, 0.08)))
 	_box(self, Vector3(0.04, 0.02, 0.01), Vector3(ax - 0.03, ty + 0.17, az), metal)
+
+	# ---- TOOL RACK (left edge, hanging tools) ----
+	var rack_y := ty + 0.05
+	var rack_z := -0.28
+	_box(self, Vector3(0.22, 0.02, 0.03), Vector3(-0.42, rack_y, rack_z), wood_dark)
+	for hx in [-0.52, -0.38, -0.24]:
+		_box(self, Vector3(0.015, 0.015, 0.06), Vector3(hx, rack_y - 0.015, rack_z), metal)
+	# Hammer hanging (left)
+	_box(self, Vector3(0.02, 0.10, 0.02), Vector3(-0.52, rack_y - 0.07, rack_z), wood2)
+	_box(self, Vector3(0.05, 0.03, 0.03), Vector3(-0.52, rack_y - 0.12, rack_z), metal)
+	# Saw hanging (middle)
+	_box(self, Vector3(0.02, 0.14, 0.015), Vector3(-0.38, rack_y - 0.08, rack_z), metal)
+	_box(self, Vector3(0.025, 0.03, 0.025), Vector3(-0.38, rack_y - 0.015, rack_z), metal)
+	# Wrench hanging (right)
+	_box(self, Vector3(0.015, 0.12, 0.015), Vector3(-0.24, rack_y - 0.07, rack_z), metal_bright)
+	_box(self, Vector3(0.035, 0.015, 0.015), Vector3(-0.24, rack_y - 0.015, rack_z), metal_bright)
 
 	# ---- APOTHECARY (back-right corner) ----
 	var apx := 0.46
@@ -102,11 +151,23 @@ func _setup_mesh() -> void:
 	_box(self, Vector3(0.02, 0.05, 0.02), Vector3(apx - 0.05, ty + 0.065, apz), bottle_red)
 	_box(self, Vector3(0.02, 0.06, 0.02), Vector3(apx, ty + 0.07, apz), bottle_green)
 	_box(self, Vector3(0.02, 0.05, 0.02), Vector3(apx + 0.05, ty + 0.065, apz), bottle_glass)
+	# Bottle cork
+	_box(self, Vector3(0.02, 0.015, 0.02), Vector3(apx, ty + 0.085, apz), _m(Color(0.35, 0.25, 0.15)))
 	# Mortar and pestle
 	_box(self, Vector3(0.04, 0.02, 0.04), Vector3(apx - 0.02, ty + 0.05, apz + 0.04), _m(Color(0.40, 0.38, 0.35)))
 	_box(self, Vector3(0.01, 0.04, 0.01), Vector3(apx - 0.02, ty + 0.07, apz + 0.04), _m(Color(0.45, 0.42, 0.38)))
 
-	# ---- SCATTERED MATERIALS (left) ----
+	# ---- OPEN BOOK (back-left) ----
+	var bx := -0.20
+	var bz := 0.26
+	_box(self, Vector3(0.16, 0.015, 0.11), Vector3(bx, ty + 0.01, bz), book_red)
+	_box(self, Vector3(0.01, 0.025, 0.10), Vector3(bx, ty + 0.02, bz), paper)
+	_box(self, Vector3(0.07, 0.012, 0.10), Vector3(bx - 0.04, ty + 0.026, bz), paper)
+	_box(self, Vector3(0.07, 0.012, 0.10), Vector3(bx + 0.04, ty + 0.026, bz), _m(Color(0.93, 0.90, 0.78)))
+	# second closed book
+	_box(self, Vector3(0.10, 0.025, 0.13), Vector3(bx + 0.16, ty + 0.01, bz + 0.02), book_blue)
+
+	# ---- SCATTERED MATERIALS (left, near tools) ----
 	_box(self, Vector3(0.06, 0.02, 0.06), Vector3(-0.50, ty + 0.01, -0.18), gold_coin)
 	_box(self, Vector3(0.06, 0.02, 0.06), Vector3(-0.38, ty + 0.01, -0.12), gold_coin)
 	_box(self, Vector3(0.06, 0.04, 0.06), Vector3(-0.44, ty + 0.03, -0.15), gold_coin)
@@ -115,17 +176,29 @@ func _setup_mesh() -> void:
 	_box(self, Vector3(0.04, 0.04, 0.04), Vector3(-0.60, ty + 0.02, 0.02), gem_blue)
 	_box(self, Vector3(0.06, 0.01, 0.03), Vector3(-0.32, ty + 0.005, -0.22), wood_light)
 	_box(self, Vector3(0.02, 0.02, 0.03), Vector3(-0.48, ty + 0.01, 0.25), _m(Color(0.50, 0.35, 0.15)))
+	# coiled rope
+	_box(self, Vector3(0.05, 0.015, 0.05), Vector3(-0.68, ty + 0.008, 0.18), rope)
 
 	# ---- STORAGE BOXES (under table, both sides) ----
 	var ub_y := ty - th - 0.06
 	_box(self, Vector3(0.12, 0.05, 0.10), Vector3(-0.55, ub_y, -0.20), wood_dark)
 	_box(self, Vector3(0.12, 0.05, 0.10), Vector3(-0.55, ub_y, 0.20), wood_dark)
 	_box(self, Vector3(0.08, 0.03, 0.08), Vector3(0.60, ub_y, -0.25), wood_dark)
+	# box lids + brass handle
+	for bbox in [Vector3(-0.55, ub_y, -0.20), Vector3(-0.55, ub_y, 0.20), Vector3(0.60, ub_y, -0.25)]:
+		_box(self, Vector3(0.13, 0.015, 0.11), Vector3(bbox.x, bbox.y + 0.033, bbox.z), wood_light)
+		_box(self, Vector3(0.05, 0.015, 0.05), Vector3(bbox.x, bbox.y + 0.048, bbox.z), brass)
 
 	# ---- DRAWERS (under front edge) ----
 	var dr_y := ty - th - 0.04
 	_box(self, Vector3(0.14, 0.04, 0.08), Vector3(-0.30, dr_y, td * 0.5 - 0.04), wood_light)
 	_box(self, Vector3(0.14, 0.02, 0.02), Vector3(-0.30, dr_y + 0.02, td * 0.5 - 0.02), _m(Color(0.25, 0.18, 0.10)))
+	# second drawer (right)
+	_box(self, Vector3(0.14, 0.04, 0.08), Vector3(0.28, dr_y, td * 0.5 - 0.04), wood_light)
+	_box(self, Vector3(0.14, 0.02, 0.02), Vector3(0.28, dr_y + 0.02, td * 0.5 - 0.02), _m(Color(0.25, 0.18, 0.10)))
+	# drawer handles
+	_box(self, Vector3(0.05, 0.02, 0.02), Vector3(-0.30, dr_y + 0.01, td * 0.5 - 0.005), brass)
+	_box(self, Vector3(0.05, 0.02, 0.02), Vector3(0.28, dr_y + 0.01, td * 0.5 - 0.005), brass)
 
 	# ---- COLLISION ----
 	var col := CollisionShape3D.new()

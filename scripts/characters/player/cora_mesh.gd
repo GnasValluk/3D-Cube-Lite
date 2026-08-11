@@ -21,6 +21,11 @@ var _sk3: StandardMaterial3D  # viền váy tối
 var _sox: StandardMaterial3D  # tất
 var _sho: StandardMaterial3D  # giày
 var _htr: StandardMaterial3D  # buộc tóc
+var _mth: StandardMaterial3D  # miệng hồng
+var _sol: StandardMaterial3D  # đế giày trắng
+var _kny: StandardMaterial3D  # khuy áo trắng
+var _blt: StandardMaterial3D  # đai lưng navy
+var _bag: StandardMaterial3D  # túi ba lô nâu
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 func build(root: CharacterBody3D) -> void:
@@ -52,6 +57,11 @@ func _make_materials() -> void:
 	_sox = MeshBuilder.emit_mat(_c("socks",      Color(0.96, 0.94, 0.96)), Color(0,0,0), 0)
 	_sho = MeshBuilder.emit_mat(_c("shoes",      Color(0.30, 0.20, 0.16)), Color(0,0,0), 0)
 	_htr = MeshBuilder.emit_mat(_c("hair_tie",   Color(0.96, 0.28, 0.42)), Color(0,0,0), 0)
+	_mth = MeshBuilder.emit_mat(_c("mouth",      Color(0.90, 0.45, 0.55)), Color(0,0,0), 0)
+	_sol = MeshBuilder.emit_mat(_c("shoe_sole",  Color(0.98, 0.96, 0.95)), Color(0,0,0), 0)
+	_kny = MeshBuilder.emit_mat(_c("button",     Color(1.00, 0.98, 0.96)), Color(0,0,0), 0)
+	_blt = MeshBuilder.emit_mat(_c("belt",       Color(0.30, 0.36, 0.62)), Color(0,0,0), 0)
+	_bag = MeshBuilder.emit_mat(_c("bag",        Color(0.72, 0.50, 0.34)), Color(0,0,0), 0)
 
 func apply_palette(palette_new: Dictionary) -> void:
 	_palette = palette_new
@@ -71,7 +81,11 @@ func apply_palette(palette_new: Dictionary) -> void:
 	_sox.albedo_color = _c("socks",      _sox.albedo_color)
 	_sho.albedo_color = _c("shoes",      _sho.albedo_color)
 	_htr.albedo_color = _c("hair_tie",   _htr.albedo_color)
-
+	_mth.albedo_color = _c("mouth",      _mth.albedo_color)
+	_sol.albedo_color = _c("shoe_sole",  _sol.albedo_color)
+	_kny.albedo_color = _c("button",     _kny.albedo_color)
+	_blt.albedo_color = _c("belt",       _blt.albedo_color)
+	_bag.albedo_color = _c("bag",        _bag.albedo_color)
 # ── Head ──────────────────────────────────────────────────────────────────────
 func _build_head() -> void:
 	head = MeshBuilder.pivot(rig, Vector3(0, 0.72, 0))
@@ -102,6 +116,13 @@ func _build_face() -> void:
 	MeshBuilder.box(head, Vector3(-0.02, -0.10, ez+0.01), Vector3(0.02, 0.02, 0.01), _hd)
 	MeshBuilder.box(head, Vector3( 0.02, -0.10, ez+0.01), Vector3(0.02, 0.02, 0.01), _hd)
 	MeshBuilder.box(head, Vector3( 0.00, -0.11, ez+0.01), Vector3(0.04, 0.02, 0.01), _hd)
+	# Lông mày hồng mảnh
+	MeshBuilder.box(head, Vector3(-0.11, 0.10, ez+0.00), Vector3(0.09, 0.018, 0.02), _hd)
+	MeshBuilder.box(head, Vector3( 0.11, 0.10, ez+0.00), Vector3(0.09, 0.018, 0.02), _hd)
+	# Mũi nhỏ
+	MeshBuilder.box(head, Vector3( 0.00, -0.03, ez+0.01), Vector3(0.03, 0.03, 0.015), _sk)
+	# Miệng cười nhỏ
+	MeshBuilder.box(head, Vector3( 0.00, -0.14, ez+0.01), Vector3(0.05, 0.015, 0.01), _mth)
 
 # ── Hair ──────────────────────────────────────────────────────────────────────
 func _build_hair() -> void:
@@ -116,8 +137,16 @@ func _build_hair() -> void:
 	MeshBuilder.box(hair_pivot, Vector3(-0.06, 0.16, 0.20), Vector3(0.20, 0.08, 0.06), _hr)
 	MeshBuilder.box(hair_pivot, Vector3(-0.10, 0.10, 0.22), Vector3(0.14, 0.06, 0.04), _hr)
 	MeshBuilder.box(hair_pivot, Vector3( 0.08, 0.16, 0.20), Vector3(0.10, 0.06, 0.06), _hd)
+	# Mái chéo sang phải (bang)
+	MeshBuilder.box(hair_pivot, Vector3(-0.16, 0.24, 0.18), Vector3(0.22, 0.05, 0.06), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(-0.06, 0.26, 0.19), Vector3(0.20, 0.05, 0.06), _hr)
+	MeshBuilder.box(hair_pivot, Vector3( 0.10, 0.24, 0.18), Vector3(0.14, 0.05, 0.06), _hd)
+	# Lọn tóc bồng bềnh trước vai
+	MeshBuilder.box(hair_pivot, Vector3(-0.26, 0.02, 0.02), Vector3(0.05, 0.16, 0.24), _hr)
+	MeshBuilder.box(hair_pivot, Vector3( 0.26, 0.02, 0.02), Vector3(0.05, 0.16, 0.24), _hr)
 	MeshBuilder.box(hair_pivot, Vector3(0, 0.04, -0.21),  Vector3(0.40, 0.28, 0.04), _hr)
 	MeshBuilder.box(hair_pivot, Vector3(0, -0.06, -0.21), Vector3(0.36, 0.18, 0.04), _hr)
+	MeshBuilder.box(hair_pivot, Vector3(0, -0.14, -0.20), Vector3(0.30, 0.10, 0.03), _hd)
 
 # ── Twin Tails ────────────────────────────────────────────────────────────────
 func _build_twin_tails() -> void:
@@ -125,20 +154,27 @@ func _build_twin_tails() -> void:
 	tails_pivot.name = "TailsPivot"
 	var tie_l := MeshBuilder.pivot(tails_pivot, Vector3(-0.22, 0.28, 0.02))
 	MeshBuilder.box(tie_l, Vector3(0, 0, 0), Vector3(0.07, 0.07, 0.07), _htr)
-	MeshBuilder.box(tie_l, Vector3(0, -0.08,  0.00), Vector3(0.12, 0.10, 0.12), _hr)
-	MeshBuilder.box(tie_l, Vector3(0, -0.18,  0.02), Vector3(0.12, 0.10, 0.12), _hr)
-	MeshBuilder.box(tie_l, Vector3(0, -0.28,  0.00), Vector3(0.10, 0.10, 0.10), _hr)
-	MeshBuilder.box(tie_l, Vector3(0, -0.38, -0.02), Vector3(0.10, 0.10, 0.10), _hd)
-	MeshBuilder.box(tie_l, Vector3(0, -0.48, -0.02), Vector3(0.08, 0.10, 0.08), _hd)
-	MeshBuilder.box(tie_l, Vector3(0, -0.56, -0.04), Vector3(0.06, 0.08, 0.06), _hr)
+	MeshBuilder.box(tie_l, Vector3(0, -0.06,  0.00), Vector3(0.14, 0.12, 0.14), _hr)
+	MeshBuilder.box(tie_l, Vector3(0, -0.16,  0.02), Vector3(0.14, 0.12, 0.12), _hr)
+	MeshBuilder.box(tie_l, Vector3(0, -0.26,  0.00), Vector3(0.12, 0.12, 0.10), _hr)
+	MeshBuilder.box(tie_l, Vector3(0, -0.36, -0.02), Vector3(0.10, 0.12, 0.10), _hd)
+	MeshBuilder.box(tie_l, Vector3(0, -0.46, -0.02), Vector3(0.08, 0.12, 0.08), _hd)
+	MeshBuilder.box(tie_l, Vector3(0, -0.56, -0.04), Vector3(0.06, 0.10, 0.06), _hr)
+	MeshBuilder.box(tie_l, Vector3(0, -0.64, -0.05), Vector3(0.05, 0.06, 0.05), _hr)
+	# Lọn xoắn phía trong mỗi đuôi (đan chéo nhìn từ sau)
+	MeshBuilder.box(tie_l, Vector3(0, -0.10, -0.09), Vector3(0.08, 0.10, 0.05), _hd)
+	MeshBuilder.box(tie_l, Vector3(0, -0.30, -0.09), Vector3(0.07, 0.10, 0.05), _hd)
 	var tie_r := MeshBuilder.pivot(tails_pivot, Vector3( 0.22, 0.28, 0.02))
 	MeshBuilder.box(tie_r, Vector3(0, 0, 0), Vector3(0.07, 0.07, 0.07), _htr)
-	MeshBuilder.box(tie_r, Vector3(0, -0.08,  0.00), Vector3(0.12, 0.10, 0.12), _hr)
-	MeshBuilder.box(tie_r, Vector3(0, -0.18,  0.02), Vector3(0.12, 0.10, 0.12), _hr)
-	MeshBuilder.box(tie_r, Vector3(0, -0.28,  0.00), Vector3(0.10, 0.10, 0.10), _hr)
-	MeshBuilder.box(tie_r, Vector3(0, -0.38, -0.02), Vector3(0.10, 0.10, 0.10), _hd)
-	MeshBuilder.box(tie_r, Vector3(0, -0.48, -0.02), Vector3(0.08, 0.10, 0.08), _hd)
-	MeshBuilder.box(tie_r, Vector3(0, -0.56, -0.04), Vector3(0.06, 0.08, 0.06), _hr)
+	MeshBuilder.box(tie_r, Vector3(0, -0.06,  0.00), Vector3(0.14, 0.12, 0.14), _hr)
+	MeshBuilder.box(tie_r, Vector3(0, -0.16,  0.02), Vector3(0.14, 0.12, 0.12), _hr)
+	MeshBuilder.box(tie_r, Vector3(0, -0.26,  0.00), Vector3(0.12, 0.12, 0.10), _hr)
+	MeshBuilder.box(tie_r, Vector3(0, -0.36, -0.02), Vector3(0.10, 0.12, 0.10), _hd)
+	MeshBuilder.box(tie_r, Vector3(0, -0.46, -0.02), Vector3(0.08, 0.12, 0.08), _hd)
+	MeshBuilder.box(tie_r, Vector3(0, -0.56, -0.04), Vector3(0.06, 0.10, 0.06), _hr)
+	MeshBuilder.box(tie_r, Vector3(0, -0.64, -0.05), Vector3(0.05, 0.06, 0.05), _hr)
+	MeshBuilder.box(tie_r, Vector3(0, -0.10, -0.09), Vector3(0.08, 0.10, 0.05), _hd)
+	MeshBuilder.box(tie_r, Vector3(0, -0.30, -0.09), Vector3(0.07, 0.10, 0.05), _hd)
 
 # ── Body ──────────────────────────────────────────────────────────────────────
 func _build_body() -> void:
@@ -160,6 +196,17 @@ func _build_body() -> void:
 	MeshBuilder.box(torso, Vector3(0, -0.20, 0.00), Vector3(0.36, 0.06, 0.26), _sk2)
 	MeshBuilder.box(torso, Vector3(0, -0.26, 0.00), Vector3(0.38, 0.06, 0.28), _sk2)
 	MeshBuilder.box(torso, Vector3(0, -0.30, 0.00), Vector3(0.38, 0.02, 0.28), _sk3)
+	# Khuy áo trắng dọc giữa ngực
+	MeshBuilder.box(torso, Vector3(0, 0.12, 0.115), Vector3(0.03, 0.03, 0.01), _kny)
+	MeshBuilder.box(torso, Vector3(0, 0.04, 0.115), Vector3(0.03, 0.03, 0.01), _kny)
+	MeshBuilder.box(torso, Vector3(0, -0.04, 0.115), Vector3(0.03, 0.03, 0.01), _kny)
+	# Đai lưng navy + khoá
+	MeshBuilder.box(torso, Vector3(0, -0.10, 0.00), Vector3(0.32, 0.04, 0.22), _blt)
+	MeshBuilder.box(torso, Vector3(0, -0.10, 0.12), Vector3(0.06, 0.05, 0.02), _kny)
+	# Nếp gấp váy (dải dọc sáng)
+	MeshBuilder.box(torso, Vector3(-0.12, -0.24, 0.14), Vector3(0.02, 0.12, 0.02), _sk3)
+	MeshBuilder.box(torso, Vector3(0,    -0.24, 0.14), Vector3(0.02, 0.12, 0.02), _sk3)
+	MeshBuilder.box(torso, Vector3( 0.12, -0.24, 0.14), Vector3(0.02, 0.12, 0.02), _sk3)
 
 # ── Arms ──────────────────────────────────────────────────────────────────────
 func _build_arms() -> void:
@@ -168,6 +215,7 @@ func _build_arms() -> void:
 	for arm in [arm_l, arm_r]:
 		MeshBuilder.box(arm, Vector3(0,  0.00, 0), Vector3(0.12, 0.16, 0.12), _wh)
 		MeshBuilder.box(arm, Vector3(0, -0.12, 0), Vector3(0.12, 0.10, 0.12), _wh)
+		MeshBuilder.box(arm, Vector3(0, -0.16, 0), Vector3(0.12, 0.03, 0.12), _col)
 		MeshBuilder.box(arm, Vector3(0, -0.20, 0), Vector3(0.10, 0.06, 0.10), _sk)
 		MeshBuilder.box(arm, Vector3(0, -0.26, 0), Vector3(0.10, 0.06, 0.08), _sk)
 	weapon_pivot = MeshBuilder.pivot(arm_r, Vector3(0.0, -0.28, 0.0))
@@ -191,9 +239,14 @@ func _build_legs() -> void:
 	for leg in [leg_l, leg_r]:
 		MeshBuilder.box(leg, Vector3(0,  0.04, 0), Vector3(0.13, 0.12, 0.13), _sk)
 		MeshBuilder.box(leg, Vector3(0, -0.06, 0), Vector3(0.12, 0.14, 0.12), _sox)
-		MeshBuilder.box(leg, Vector3(0, -0.16, 0), Vector3(0.11, 0.08, 0.11), _sox)
+		MeshBuilder.box(leg, Vector3(0, -0.14, 0), Vector3(0.12, 0.03, 0.12), _htr)
+		MeshBuilder.box(leg, Vector3(0, -0.18, 0), Vector3(0.11, 0.06, 0.11), _sox)
 		MeshBuilder.box(leg, Vector3(0, -0.22,  0.02), Vector3(0.13, 0.06, 0.16), _sho)
 		MeshBuilder.box(leg, Vector3(0, -0.24,  0.06), Vector3(0.11, 0.04, 0.12), _sho)
+		MeshBuilder.box(leg, Vector3(0, -0.26,  0.02), Vector3(0.14, 0.02, 0.18), _sol)
+		# Quai giày hồng
+		MeshBuilder.box(leg, Vector3(0, -0.22,  0.10), Vector3(0.12, 0.03, 0.02), _htr)
+		MeshBuilder.box(leg, Vector3(0, -0.20,  0.09), Vector3(0.02, 0.05, 0.02), _htr)
 	boot_l_pivot = MeshBuilder.pivot(leg_l, Vector3(0, -0.22, 0))
 	boot_l_pivot.name = "BootLPivot"
 	boot_r_pivot = MeshBuilder.pivot(leg_r, Vector3(0, -0.22, 0))
@@ -214,6 +267,14 @@ func _build_backpack() -> void:
 	MeshBuilder.box(backpack, Vector3(0,  0.06, -0.20), Vector3(0.04, 0.04, 0.03), _rb)
 	MeshBuilder.box(backpack, Vector3(-0.09, 0.06, -0.08), Vector3(0.03, 0.18, 0.03), _sk3)
 	MeshBuilder.box(backpack, Vector3( 0.09, 0.06, -0.08), Vector3(0.03, 0.18, 0.03), _sk3)
+	# Nắp ba lô cong
+	MeshBuilder.box(backpack, Vector3(0,  0.10, -0.13), Vector3(0.20, 0.04, 0.12), _sk3)
+	# Túi trước + khoá kim loại
+	MeshBuilder.box(backpack, Vector3(0, -0.04, -0.21), Vector3(0.16, 0.12, 0.04), _bag)
+	MeshBuilder.box(backpack, Vector3(0, -0.04, -0.23), Vector3(0.05, 0.05, 0.02), _kny)
+	# Dây đeo ba lô
+	MeshBuilder.box(backpack, Vector3(-0.08,  0.02, -0.05), Vector3(0.04, 0.20, 0.03), _blt)
+	MeshBuilder.box(backpack, Vector3( 0.08,  0.02, -0.05), Vector3(0.04, 0.20, 0.03), _blt)
 	back_gear_pivot = MeshBuilder.pivot(rig, Vector3(0, 0.53, -0.18))
 	back_gear_pivot.name = "BackGearPivot"
 	back_gear_pivot.scale = Vector3(0.85, 0.85, 0.85)

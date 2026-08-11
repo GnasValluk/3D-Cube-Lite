@@ -24,6 +24,11 @@ const DEFAULT_PALETTE: Dictionary = {
 	"socks":       Color(0.96, 0.94, 0.96),
 	"shoes":       Color(0.30, 0.20, 0.16),
 	"hair_tie":    Color(0.96, 0.28, 0.42),
+	"mouth":       Color(0.90, 0.45, 0.55),
+	"shoe_sole":   Color(0.98, 0.96, 0.95),
+	"button":      Color(1.00, 0.98, 0.96),
+	"belt":        Color(0.30, 0.36, 0.62),
+	"bag":         Color(0.72, 0.50, 0.34),
 }
 
 ## Danh sách skin — chỉ thêm entry mới vào đây. icon = emoji hiển thị trên

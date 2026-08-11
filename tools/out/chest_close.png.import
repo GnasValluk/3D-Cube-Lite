@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b4adv4yg5kpie"
-path="res://.godot/imported/out_sky_capture.png-3923204fcb2cd86b2d3f45c860c8d8b5.ctex"
+uid="uid://b34w4wy2k6ura"
+path="res://.godot/imported/chest_close.png-67080f6f05b6b27fe0b680a52de08605.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://out_sky_capture.png"
-dest_files=["res://.godot/imported/out_sky_capture.png-3923204fcb2cd86b2d3f45c860c8d8b5.ctex"]
+source_file="res://tools/out/chest_close.png"
+dest_files=["res://.godot/imported/chest_close.png-67080f6f05b6b27fe0b680a52de08605.ctex"]
 
 [params]
 

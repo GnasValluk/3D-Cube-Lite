@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://clqk7m2cl6b8x"
-path="res://.godot/imported/out_scene_noon.png-9257c8fe132e9f2cb3129390b2c890a1.ctex"
+uid="uid://bhpjhb5lshti4"
+path="res://.godot/imported/ghibli_noon.png-1c5b36d11116a0eaa636554671bede1d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://out_scene_noon.png"
-dest_files=["res://.godot/imported/out_scene_noon.png-9257c8fe132e9f2cb3129390b2c890a1.ctex"]
+source_file="res://tools/out/ghibli_noon.png"
+dest_files=["res://.godot/imported/ghibli_noon.png-1c5b36d11116a0eaa636554671bede1d.ctex"]
 
 [params]
 

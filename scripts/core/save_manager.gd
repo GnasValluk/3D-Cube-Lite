@@ -50,6 +50,8 @@ func get_world_dir(world_name: String = "") -> String:
 
 ## Tên thư mục an toàn cho mọi hệ điều hành: chỉ giữ chữ/số/._-,
 ## cắt độ dài, né tên reserved của Windows (CON/NUL/COM1...), luôn có giá trị.
+## Windows không cho phép thư mục kết thúc bằng dấu chấm hoặc chỉ gồm dấu chấm
+## (Windows tự strip trailing dot → tên thành rỗng), nên phải trim cả 2 đầu.
 func _sanitize(name: String) -> String:
 	var safe = ""
 	for c in name:
@@ -59,6 +61,12 @@ func _sanitize(name: String) -> String:
 			safe += c
 		elif c == " ":
 			safe += "_"
+	# Trim dấu chấm/underscore 2 đầu: trailing dot bất hợp lệ trên Windows,
+	# leading dot = thư mục ẩn trên Unix, "."/".." = thư mục đặc biệt nguy hiểm.
+	while safe.begins_with(".") or safe.begins_with("_"):
+		safe = safe.substr(1)
+	while safe.ends_with(".") or safe.ends_with("_"):
+		safe = safe.substr(0, safe.length() - 1)
 	if safe.is_empty():
 		safe = FALLBACK_WORLD_NAME
 	if safe.to_upper() in _WINDOWS_RESERVED:

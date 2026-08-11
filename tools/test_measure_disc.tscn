@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://tools/test_measure_disc.gd" id="1_sc"]
+
+[node name="TestMeasureDisc" type="Node"]
+script = ExtResource("1_sc")
+
