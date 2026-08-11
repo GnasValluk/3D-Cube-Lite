@@ -151,13 +151,19 @@ void sky() {
 	vec3 col = mix(sky_horizon_color, sky_top_color, pow(h, sky_curve));
 
 	// Dải ấm mỏng sát chân trời (đặc trưng Ghibli) — ngả vàng nhẹ, không trắng.
+	// Áp cho CẢ trời và đất chân trời để không tạo seam phân cách.
 	float day = smoothstep(-0.08, 0.25, sun_dir.y);
-	col = mix(col, vec3(1.0, 0.88, 0.62), (1.0 - pow(h, 3.5)) * 0.10 * day);
+	vec3 warm_band = vec3(1.0, 0.88, 0.62);
+	float band_amt = (1.0 - pow(h, 3.5)) * 0.10 * day;
+	col = mix(col, warm_band, band_amt);
 
-	// Gradient đất.
+	// Gradient đất: chuyển mềm từ trời → đất trong ~0.09 rad để không còn dải
+	// phân cách rõ rệt tại đường chân trời kể cả khi nhìn từ trên cao xuống.
 	float g = clamp(-y, 0.0, 1.0);
 	vec3 ground = mix(ground_horizon_color, ground_bottom_color, pow(g, ground_curve));
-	col = mix(col, ground, smoothstep(0.0, -0.02, y));
+	// Nhuộm cùng dải ấm ngay sát chân trời để đất hòa màu trời không seam.
+	ground = mix(ground, warm_band, band_amt * (1.0 - pow(g, 2.0)));
+	col = mix(col, ground, smoothstep(0.0, -0.09, y));
 
 	// Ánh sáng khuếch tán nền.
 	col *= mix(sky_energy, sky_energy * 0.4, night_factor * 0.6);
