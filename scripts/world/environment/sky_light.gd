@@ -94,10 +94,19 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	mat.set_shader_parameter("sky_curve", 0.5)
 	mat.set_shader_parameter("sky_energy", lerp(0.6, 1.2, day_t) * (1.0 - weather * 0.35))
 
-	mat.set_shader_parameter("ground_bottom_color", top_night.lerp(DAY_TOP, day_t).darkened(0.55))
-	mat.set_shader_parameter("ground_horizon_color", hor_night.lerp(hor_day, day_t).darkened(0.35))
-	mat.set_shader_parameter("ground_curve", 0.25)
-	mat.set_shader_parameter("ground_energy", 0.6)
+	# Đất dưới chân trời: tông nâu-xanh rêu ấm (không còn xám lạnh gây "void").
+	# Chân trời đất ngả vàng cam lúc sáng/chiều, xanh rêu lúc trưa, tối ban đêm.
+	var ground_day_bottom := Color(0.18, 0.26, 0.16)
+	var ground_day_horizon := Color(0.42, 0.48, 0.34)
+	var ground_night_bottom := Color(0.03, 0.05, 0.09)
+	var ground_night_horizon := Color(0.10, 0.13, 0.20)
+	var g_bottom: Color = ground_night_bottom.lerp(ground_day_bottom, day_t)
+	var g_horizon: Color = ground_night_horizon.lerp(ground_day_horizon, day_t)
+	g_horizon = g_horizon.lerp(dusk_color, glow * warm_strength * 0.55)
+	mat.set_shader_parameter("ground_bottom_color", g_bottom)
+	mat.set_shader_parameter("ground_horizon_color", g_horizon)
+	mat.set_shader_parameter("ground_curve", 0.35)
+	mat.set_shader_parameter("ground_energy", 0.8)
 
 	# Mặt trời: chân trời → cam đỏ, lên cao dần → vàng ấm → trắng-vàng.
 	# Sø sáng: ngả vàng hơn ($ morning), chiều: ngả cam đỏ hơn (golden_hour).
