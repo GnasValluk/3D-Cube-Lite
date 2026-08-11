@@ -291,3 +291,49 @@ static func tractor(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, 0.55, 0.75, 4.5, 0.8, 0.3, 0.5, straw)
 	ItemMeshShared.add_cube(p, -0.9, 0.75, 5.6, 0.6, 0.25, 0.4, straw)
 	ItemMeshShared.add_cube(p, 0.6, 0.75, 6.0, 0.6, 0.25, 0.4, wood)
+
+
+# ── RESCUE HELICOPTER (mini model: trực thăng cứu hộ đỏ-trắng) ────────────────
+static func rescue_helicopter(p: Node3D) -> void:
+	var red       := Color(0.78, 0.14, 0.10)
+	var red_d     := Color(0.50, 0.07, 0.06)
+	var white     := Color(0.93, 0.91, 0.87)
+	var black     := Color(0.06, 0.06, 0.07)
+	var steel     := Color(0.34, 0.35, 0.38)
+	var carbon    := Color(0.10, 0.10, 0.11)
+	var yellow    := Color(0.98, 0.78, 0.12)
+	var glass     := Color(0.55, 0.72, 0.88)
+	var glass_d   := Color(0.20, 0.30, 0.42)
+
+	# Thân chính đỏ
+	ItemMeshShared.add_cube(p, 0, 0.2, 0.5, 1.6, 0.8, 3.6, red)
+	# Sọc trắng hông
+	ItemMeshShared.add_cube(p, 0, 0.45, 0.5, 1.66, 0.18, 3.6, white)
+	# Mũi kính vòm
+	ItemMeshShared.add_cube(p, 0, 0.55, -1.4, 1.1, 0.7, 1.3, glass)
+	ItemMeshShared.add_cube(p, 0, 0.7, -1.4, 0.9, 0.5, 1.0, glass_d)
+	# Khung kính đen
+	ItemMeshShared.add_cube(p, 0, 0.42, -1.4, 1.2, 0.06, 1.4, black)
+	ItemMeshShared.add_cube(p, 0, 0.85, -1.35, 1.0, 0.05, 1.1, black)
+	# Đuôi trắng thon
+	ItemMeshShared.add_cube(p, 0, 0.5, 2.4, 0.55, 0.6, 3.0, white)
+	ItemMeshShared.add_cube(p, 0, 0.6, 2.4, 0.6, 0.12, 3.0, red)
+	# Chóp đuôi + cánh đuôi fenestron
+	ItemMeshShared.add_cube(p, 0, 0.6, 4.05, 0.5, 0.5, 0.35, red)
+	ItemMeshShared.add_cube(p, 0, 0.6, 4.05, 0.75, 0.14, 0.3, carbon)
+	# Trục cánh quạt + hub
+	ItemMeshShared.add_cube(p, 0, 0.85, 0.5, 0.3, 0.12, 0.3, black)
+	ItemMeshShared.add_cube(p, 0, 0.95, 0.5, 0.42, 0.08, 0.42, steel)
+	# 4 cánh quạt đen + đầu vàng
+	for i in 4:
+		var ang := deg_to_rad(i * 90.0)
+		ItemMeshShared.add_cube(p, sin(ang) * 1.5, 0.99, 0.5 + cos(ang) * 1.5, 0.28, 0.03, 3.0, carbon)
+	ItemMeshShared.add_cube(p, sin(0.0) * 2.4, 0.99, 0.5 + cos(0.0) * 2.4, 0.2, 0.04, 0.5, yellow)
+	# Đuôi cánh quạt
+	ItemMeshShared.add_cube(p, 0, 0.6, 4.05, 0.12, 0.12, 0.3, black)
+	# Càng đáp
+	ItemMeshShared.add_cube(p, 0.85, -0.35, 0.3, 0.2, 0.12, 3.4, black)
+	ItemMeshShared.add_cube(p, -0.85, -0.35, 0.3, 0.2, 0.12, 3.4, black)
+	for s in [1.0, -1.0]:
+		ItemMeshShared.add_cube(p, 0.6 * s, -0.05, -0.7, 0.1, 0.5, 0.1, black)
+		ItemMeshShared.add_cube(p, 0.6 * s, -0.05, 1.4, 0.1, 0.5, 0.1, black)

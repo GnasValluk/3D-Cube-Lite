@@ -52,6 +52,7 @@ static func create_item_db() -> Dictionary:
 	_add(db, "fishing_rod", "Cần câu", ItemDef.Type.TOOL, Color(0.55, 0.40, 0.25), "🎣", "Cần câu cá — dùng để câu cá ở vùng nước", false, 1, 0, 0, 0, -1, 64)
 	_add(db, "fishing_boat", "Thuyền Đánh Cá", ItemDef.Type.TOOL, Color(0.55, 0.36, 0.18), "⛵", "Thuyền đánh cá — đặt xuống nước, nhấn F để lên thuyền chèo ra sông câu cá", false, 1)
 	_add(db, "tractor", "Máy Kéo Nông Nghiệp", ItemDef.Type.TOOL, Color(0.72, 0.10, 0.08), "🚜", "Máy kéo + rơ-moóc chở hàng — đặt xuống đất, nhấn F để lên lái xe băng qua ruộng", false, 1)
+	_add(db, "rescue_helicopter", "Trực Thăng Cứu Hộ", ItemDef.Type.TOOL, Color(0.82, 0.16, 0.10), "🚁", "Trực thăng cứu hộ đa năng — đặt xuống, nhấn F lên lái, SPACE bay lên / SHIFT hạ xuống / WASD di chuyển", false, 1)
 	_add(db, "water_bucket", "Xô Nước", ItemDef.Type.TOOL, Color(0.15, 0.40, 0.70), "🌊", "Xô đựng nước — đặt khối nước tại vị trí chỉ định", false, 16)
 
 	# ── Cá (thức ăn) ──────────────────────────────────────────────────────────
@@ -234,7 +235,7 @@ const WEIGHTS: Dictionary = {
 	"coconut_seed": 0.2, "taro_seed": 0.2, "seaweed_seed": 0.1, "seagrass_seed": 0.1,
 	"carp": 1.0, "climbing_perch": 0.8, "red_tilapia": 1.2, "snakehead": 1.5,
 	"flowerhorn": 1.4, "shrimp": 0.4, "raw_pork": 3.0, "taro": 0.6,
-	"tractor": 40.0, "fishing_boat": 50.0,
+	"tractor": 40.0, "fishing_boat": 50.0, "rescue_helicopter": 55.0,
 	"iron_helmet": 1.5, "iron_chestplate": 4.5, "iron_boots": 1.0,
 	"iron_leggings": 1.8,
 	"golden_ring": 0.1, "leather_backpack": 2.0,

@@ -5,6 +5,7 @@ const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const _FurnaceScript = preload("res://scripts/items/entities/furnace.gd")
 const _FishingBoat = preload("res://scripts/items/entities/fishing_boat.gd")
 const _Tractor = preload("res://scripts/items/entities/tractor.gd")
+const _RescueHelicopter = preload("res://scripts/items/entities/rescue_helicopter.gd")
 const _EggplantProp = preload("res://scripts/world/props/eggplant_prop.gd")
 const _WatermelonVine = preload("res://scripts/world/props/watermelon_vine_prop.gd")
 const _PumpkinVine = preload("res://scripts/world/props/pumpkin_vine_prop.gd")
@@ -88,6 +89,8 @@ func _make_ghost() -> void:
 		_build_ghost_boat()
 	elif _item_id == "tractor":
 		_build_ghost_tractor()
+	elif _item_id == "rescue_helicopter":
+		_build_ghost_helicopter()
 	elif _item_id == "chest":
 		_build_ghost_chest()
 	elif _item_id == "crafting_table":
@@ -285,6 +288,25 @@ func _build_ghost_tractor() -> void:
 	tr.material_override = trailer_mat
 	tr.position = Vector3(0, 0.55, 2.85)
 	_ghost.add_child(tr)
+
+## Ghost trực thăng cứu hộ: thân 3.3 + đuôi 2.6 + cánh quạt.
+func _build_ghost_helicopter() -> void:
+	var body_mat := _ghost_mat(Color(0.78, 0.14, 0.10, 0.30), Color(0.30, 0.04, 0.04), 0.2)
+	var white_mat := _ghost_mat(Color(0.92, 0.90, 0.86, 0.30), Color(0.30, 0.28, 0.26), 0.2)
+	var mi := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(1.0, 0.9, 3.1)
+	mi.mesh = box
+	mi.material_override = body_mat
+	mi.position = Vector3(0, 0.75, 0.35)
+	_ghost.add_child(mi)
+	var tail := MeshInstance3D.new()
+	var tbox := BoxMesh.new()
+	tbox.size = Vector3(0.35, 0.4, 2.4)
+	tail.mesh = tbox
+	tail.material_override = white_mat
+	tail.position = Vector3(0, 0.85, 3.1)
+	_ghost.add_child(tail)
 
 func _build_ghost_chest() -> void:
 	var body_mat := _ghost_mat(Color(0.35, 0.22, 0.12, 0.35), Color(0.15, 0.08, 0.05), 0.2)
@@ -492,6 +514,8 @@ func _make_throw_mesh(item_id: String) -> Node3D:
 		ItemMesh.build(root, item_id)
 	elif item_id == "tractor":
 		ItemMesh.build(root, item_id)
+	elif item_id == "rescue_helicopter":
+		ItemMesh.build(root, item_id)
 	elif item_id == "chest":
 		ItemMesh.build(root, item_id)
 	elif item_id == "crafting_table":
@@ -598,6 +622,13 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 		parent.add_child(tractor_obj)
 		tractor_obj.global_position = pos
 		tractor_obj.rotation.y = _placement_rotation
+		SFXManager.play_block_place()
+	elif item_id == "rescue_helicopter":
+		var heli_obj = _RescueHelicopter.new()
+		heli_obj.name = "RescueHelicopter"
+		parent.add_child(heli_obj)
+		heli_obj.global_position = pos
+		heli_obj.rotation.y = _placement_rotation
 		SFXManager.play_block_place()
 	elif item_id == "chest":
 		var chest_obj := Chest.new()

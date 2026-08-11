@@ -32,6 +32,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"twilight_gate": StructuresMesh.gate(parent)
 		"fishing_boat": StructuresMesh.fishing_boat(parent)
 		"tractor": StructuresMesh.tractor(parent)
+		"rescue_helicopter": StructuresMesh.rescue_helicopter(parent)
 		"palm_wood": MaterialMeshes.palm_wood(parent)
 		"eggplant_fruit": _build_eggplant_fruit_icon(parent)
 		"eggplant_slice": _build_eggplant_slice_icon(parent)
