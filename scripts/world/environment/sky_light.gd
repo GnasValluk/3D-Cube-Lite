@@ -127,11 +127,16 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 		dayf_c = SYNODIC_MONTH * 0.5  # mặc định full moon (tương thích test cũ)
 	var phase: float = fposmod(dayf_c / SYNODIC_MONTH, 1.0)
 
-	# Giờ mọc trăng phụ thuộc pha: trăng mới mọc cùng nắng (6h), tròn mọc lúc 18h.
-	var rise_hour: float = fposmod(6.0 + phase * 24.0, 24.0)
-	var moon_e := (hour - rise_hour) / 12.0 * PI
-	var moon_elev_deg: float = 90.0 * sin(moon_e)
-	var moon_yaw_deg: float = yaw_deg + phase * 360.0
+	# Điểm cao nhất của trăng (transit) lệch sau mặt trời theo pha:
+	# trăng mới transit 12h (đi cùng nắng), trăng tròn transit ~0h (nửa đêm).
+	var transit_hour := fposmod(12.0 + phase * 24.0, 24.0)
+	# scan ∈ [0,24): 6 = mọc, 12 = đỉnh, 18 = lặn — quỹ đạo riêng theo transit.
+	var moon_scan := fposmod(hour - transit_hour + 12.0, 24.0)
+	# Độ cao & hướng tính NHẤT QUÁN từ cùng góc scan — trăng không bám yaw mặt trời.
+	var moon_elev_deg: float = 90.0 * sin(deg_to_rad((moon_scan - 6.0) * 15.0))
+	# Nghiêng quỹ đạo theo pha: trăng mọc lệch dần hướng bắc/nam qua các ngày
+	# (thay vì phase*360 → luôn chạy song song trên cùng vĩ tuyến với mặt trời).
+	var moon_yaw_deg: float = 90.0 - moon_scan * 15.0 + (phase - 0.5) * 40.0
 	var mp_rad := deg_to_rad(moon_elev_deg)
 	var my_rad := deg_to_rad(moon_yaw_deg)
 	var moon_dir := Vector3(cos(mp_rad) * cos(my_rad), sin(mp_rad), cos(mp_rad) * sin(my_rad))
@@ -144,7 +149,7 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	# Nguyệt thực: hiếm xảy ra (15% số trăng tròn), chỉ khi trăng đang cao.
 	var full_cycle: int = int(dayf_c / SYNODIC_MONTH)
 	var eclipse_chance: bool = _hash01(full_cycle * 71 + 3) < 0.15
-	var moon_up: float = clamp(sin(moon_e) * 1.3, 0.0, 1.0)
+	var moon_up: float = clamp(moon_elev_deg / 60.0, 0.0, 1.0)
 	var eclipse: float = 0.0
 	if eclipse_chance and abs(phase - 0.5) < 0.03:
 		eclipse = moon_up

@@ -30,6 +30,15 @@ func _ready() -> void:
 		var syaw := rad_to_deg(atan2(sdir.z, sdir.x))
 		print("dayf %5.1f phase=%.2f ecl=%.2f moon_yaw=%6.1f sun_yaw=%6.1f" % [dayf, phase, ecl, myaw, syaw])
 
+	# Quỹ đạo độc lập: trăng full (dayf 14.8) phải mọc 18h/lặn 6h, lên cao nhất nửa đêm.
+	print("-- moon daily path (full moon dayf=14.8) --")
+	for hour in [6.0, 12.0, 18.0, 22.0, 0.0, 3.0]:
+		SkyLight.update_sky(mat, hour, 0.0, 14.8)
+		var mdir: Vector3 = mat.get_shader_parameter("moon_dir")
+		var elev := rad_to_deg(asin(clamp(mdir.y, -1.0, 1.0)))
+		var myaw := rad_to_deg(atan2(mdir.z, mdir.x))
+		print("hour %5.1f moon_elev=%6.1f moon_yaw=%6.1f" % [hour, elev, myaw])
+
 	# Nguyệt thực: tìm chu kỳ trăng tròn đủ điều kiện (15% random theo hash).
 	var found := false
 	for cycle in range(0, 40):

@@ -95,8 +95,8 @@ func _build_mesh() -> void:
 		var mat := _make_aquatic_mat()
 		if plant_type == "seagrass":
 			# Lá cao 2-5 đơn vị → sóng nhìn rõ hơn, đu đưa chậm theo dòng
-			mat.set_shader_parameter("sway_amount", 0.05)
-			mat.set_shader_parameter("sway_speed", 1.2)
+			mat.set_shader_parameter("sway_amount", 0.09)
+			mat.set_shader_parameter("sway_speed", 1.7)
 		mi.material_override = mat
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mi)

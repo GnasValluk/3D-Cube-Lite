@@ -64,8 +64,8 @@ func _ready() -> void:
 	_setup_collision()
 	_base_rotation = rotation
 	_sway_phase = randf() * TAU
-	_sway_freq = 0.4 + randf() * 0.3
-	_sway_amp = deg_to_rad(0.6 + randf() * 0.4)
+	_sway_freq = 0.9 + randf() * 0.5
+	_sway_amp = deg_to_rad(1.6 + randf() * 0.9)
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _build_mesh(arm_dir: Vector3) -> void:
@@ -218,9 +218,9 @@ func _notification(what: int) -> void:
 func _process(delta: float) -> void:
 	var t := Time.get_ticks_usec() * 0.000001
 	rotation = _base_rotation + Vector3(
-		sin(t * _sway_freq + _sway_phase) * _sway_amp,
+		(sin(t * _sway_freq + _sway_phase) * 0.7 + sin(t * _sway_freq * 2.7 + _sway_phase * 1.3 + 0.7) * 0.3) * _sway_amp,
 		0,
-		cos(t * _sway_freq * 0.7 + _sway_phase + 1.2) * _sway_amp * 0.6
+		(cos(t * _sway_freq * 0.7 + _sway_phase + 1.2) * 0.7 + cos(t * _sway_freq * 2.1 + _sway_phase + 2.2) * 0.3) * _sway_amp * 0.6
 	)
 
 func _on_destroy() -> void:

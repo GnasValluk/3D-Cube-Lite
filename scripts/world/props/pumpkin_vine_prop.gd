@@ -52,8 +52,8 @@ func _ready() -> void:
 	_build_tree()
 	_setup_collision()
 	_sway_phase = randf() * TAU
-	_sway_freq = 0.4 + randf() * 0.3
-	_sway_amp = deg_to_rad(0.6 + randf() * 0.5)
+	_sway_freq = 1.2 + randf() * 0.7
+	_sway_amp = deg_to_rad(2.0 + randf() * 1.2)
 
 ## Chiều cao tán dây — luôn sát mặt đất, chỉ lớn theo giai đoạn.
 func _get_h() -> float:
@@ -532,7 +532,7 @@ func _on_destroy() -> void:
 func _process(delta: float) -> void:
 	super._process(delta)
 	var t := Time.get_ticks_usec() * 0.000001
-	rotation.y = sin(t * _sway_freq + _sway_phase) * _sway_amp
+	rotation.y = (sin(t * _sway_freq + _sway_phase) * 0.7 + sin(t * _sway_freq * 2.6 + _sway_phase * 1.3 + 0.9) * 0.3) * _sway_amp
 
 ## ── COLLISION ───────────────────────────────────────────────────────────────
 

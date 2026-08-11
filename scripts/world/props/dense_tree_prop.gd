@@ -52,8 +52,8 @@ func _ready() -> void:
 	_build_tree()
 	_setup_collision()
 	_sway_phase = randf() * TAU
-	_sway_freq = 0.45 + randf() * 0.35
-	_sway_amp = deg_to_rad(0.6 + randf() * 0.4)
+	_sway_freq = 0.9 + randf() * 0.5
+	_sway_amp = deg_to_rad(1.6 + randf() * 0.7)
 
 func _get_h() -> float:
 	if _stage == GrowingProp.Stage.SPROUT:
@@ -76,8 +76,8 @@ func _process(delta: float) -> void:
 	var amp := _sway_amp
 	if _stage == GrowingProp.Stage.SPROUT:
 		amp *= 0.4
-	rotation.x = sin(t * _sway_freq + _sway_phase) * amp
-	rotation.z = cos(t * _sway_freq * 0.7 + _sway_phase + 1.0) * amp * 0.6
+	rotation.x = (sin(t * _sway_freq + _sway_phase) * 0.7 + sin(t * _sway_freq * 2.7 + _sway_phase * 1.3 + 0.7) * 0.3) * amp
+	rotation.z = (cos(t * _sway_freq * 0.7 + _sway_phase + 1.0) * 0.7 + cos(t * _sway_freq * 2.1 + _sway_phase + 2.2) * 0.3) * amp * 0.6
 
 func _setup_collision() -> void:
 	var h := _get_h()

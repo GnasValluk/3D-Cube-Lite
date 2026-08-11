@@ -2951,8 +2951,8 @@ static func _build_aquatic_shader() -> ShaderMaterial:
 shader_type spatial;
 render_mode blend_mix, cull_disabled, unshaded;
 uniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-uniform float sway_speed  : hint_range(0.1, 5.0) = 1.6;
-uniform float sway_amount : hint_range(0.0, 0.5) = 0.035;
+uniform float sway_speed  : hint_range(0.1, 5.0) = 2.2;
+uniform float sway_amount : hint_range(0.0, 0.5) = 0.06;
 uniform float sway_freq   : hint_range(0.1, 8.0) = 2.8;
 void vertex() {
 	float is_flat = step(0.85, abs(NORMAL.y));
