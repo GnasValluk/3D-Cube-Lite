@@ -62,6 +62,16 @@ var equipped_feet: ItemDef = null
 var equipped_back: ItemDef = null
 var equipped_sub: ItemDef = null
 
+## Khí độc rừng ngập mặn — bắt buộc mặc đủ bộ giáp biển (sea_*) khi ở trong
+## rừng; không đủ → mất máu theo giây (bỏ qua _invul_timer để không bị nuốt đòn).
+const MANGROVE_TOXIN_DMG: int = 4
+const MANGROVE_TOXIN_TICK: float = 1.0
+const MANGROVE_CHECK_INTERVAL: float = 0.4
+var _mangrove_check_timer: float = 0.0
+var _mangrove_toxin_timer: float = 0.0
+var _mangrove_active: bool = false
+var _mangrove_warned: bool = false
+
 var combo_step: int = 0
 var combo_timer: float = 0.0
 const COMBO_WINDOW: float = 0.55
@@ -856,6 +866,60 @@ func update_overload_effects() -> void:
 	else:
 		effects.set_persistent_slow(0)
 
+# ── Khí độc rừng ngập mặn ─────────────────────────────────────────────────────
+## Đếm số món giáp biển đang mặc trong 4 slot chính (mũ/thân/quần/giày).
+func _count_sea_armor() -> int:
+	var n: int = 0
+	for slot in [equipped_head, equipped_body, equipped_legs, equipped_feet]:
+		if slot != null and (slot.id == "sea_helmet" or slot.id == "sea_chestplate" \
+				or slot.id == "sea_leggings" or slot.id == "sea_boots"):
+			n += 1
+	return n
+
+## Có đang đứng trong vùng rừng ngập mặn không (mask noise + sát bờ biển).
+func _is_in_mangrove() -> bool:
+	if WorldChunk == null:
+		return false
+	var nd: Dictionary = WorldChunk._noise_for_dim(_Data._Dim.DimensionID.REAL_WORLD)
+	return WorldChunk._mangrove_strength_at(nd, global_position.x, global_position.z) >= 0.5
+
+## Tick định kỳ: trong rừng mà thiếu giáp biển → sát thương độc theo giây.
+## Damage áp trực tiếp, bỏ qua giáp/kháng (chỉ bộ giáp biển mới chặn) và bỏ qua
+## _invul_timer để đòn độc không bị nuốt sau khi trúng đòn khác.
+func _tick_mangrove_toxin(delta: float) -> void:
+	if not _active or not is_alive:
+		_mangrove_toxin_timer = 0.0
+		return
+	_mangrove_check_timer -= delta
+	if _mangrove_check_timer <= 0.0:
+		_mangrove_check_timer = MANGROVE_CHECK_INTERVAL
+		_mangrove_active = _is_in_mangrove()
+		if _mangrove_active and _count_sea_armor() >= 4:
+			_mangrove_toxin_timer = 0.0
+			_mangrove_warned = false
+	if not _mangrove_active or _count_sea_armor() >= 4:
+		_mangrove_toxin_timer = 0.0
+		return
+	if not _mangrove_warned:
+		_mangrove_warned = true
+		_scroll_inventory_message("⚠ Rừng ngập mặn: khí độc đầm lầy ngấm vào người — chế và MẶC ĐỦ bộ Giáp Biển để kháng!")
+	_mangrove_toxin_timer += delta
+	if _mangrove_toxin_timer >= MANGROVE_TOXIN_TICK:
+		_mangrove_toxin_timer = 0.0
+		hp = maxi(0, hp - MANGROVE_TOXIN_DMG)
+		_invul_timer = 0.05
+		_hit_timer = 0.18
+		_hit_flash()
+		_spawn_damage_number(MANGROVE_TOXIN_DMG, null)
+		SFXManager.play_hurt()
+		_state = CharacterBase.State.HIT
+		_attack_timer = 0.0
+		_attack2_timer = 0.0
+		hp_changed.emit(hp, max_hp)
+		damage_taken.emit(MANGROVE_TOXIN_DMG, null)
+		if hp <= 0:
+			_die(null)
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if _is_building_placing():
 		return
@@ -1273,6 +1337,7 @@ func _process(delta: float) -> void:
 		sprint_speed = 6.8
 	super._process(delta)
 	update_overload_effects()
+	_tick_mangrove_toxin(delta)
 	if _active and is_alive:
 		_tick_food(delta)
 		if _eating:

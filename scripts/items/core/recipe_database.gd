@@ -223,6 +223,42 @@ static func ensure() -> void:
 			"category": CAT_MATERIALS,
 			"desc": "Luyện thép từ sắt + cacbon — hợp kim bền, nguyên liệu chế máy kéo & công trình lớn.",
 		},
+		{
+			"id": "sea_helmet",
+			"name": "Mũ Vỏ Sò",
+			"result": "sea_helmet",
+			"count": 1,
+			"ingredients": { "tropical_seaweed": 4, "coconut": 2 },
+			"category": CAT_TOOLS,
+			"desc": "Mũ vỏ sò bão hòa muối biển — chế từ rong biển và dừa. Mặc đủ bộ giáp biển để kháng khí độc rừng ngập mặn.",
+		},
+		{
+			"id": "sea_chestplate",
+			"name": "Giáp San Hô",
+			"result": "sea_chestplate",
+			"count": 1,
+			"ingredients": { "tropical_seaweed": 6, "coconut": 3, "iron_ingot": 1 },
+			"category": CAT_TOOLS,
+			"desc": "Áo giáp san hô đan rong — chế từ rong biển, dừa và sắt. Mặc đủ bộ giáp biển để kháng khí độc rừng ngập mặn.",
+		},
+		{
+			"id": "sea_leggings",
+			"name": "Quần Vảy Cá",
+			"result": "sea_leggings",
+			"count": 1,
+			"ingredients": { "tropical_seaweed": 5, "coconut": 2 },
+			"category": CAT_TOOLS,
+			"desc": "Quần vảy cá — chế từ rong biển và dừa. Mặc đủ bộ giáp biển để kháng khí độc rừng ngập mặn.",
+		},
+		{
+			"id": "sea_boots",
+			"name": "Giày Vây Cá",
+			"result": "sea_boots",
+			"count": 1,
+			"ingredients": { "tropical_seaweed": 3, "coconut": 1 },
+			"category": CAT_TOOLS,
+			"desc": "Giày vây cá lội bùn — chế từ rong biển và dừa. Mặc đủ bộ giáp biển để kháng khí độc rừng ngập mặn.",
+		},
 	]
 
 ## Đếm item trong lưới chế tạo → dictionary {item_id: count}.

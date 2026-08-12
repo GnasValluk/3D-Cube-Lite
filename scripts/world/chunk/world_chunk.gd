@@ -23,6 +23,10 @@ const _ChimneySmoke = preload("chimney_smoke.gd")
 const _TavernDoor = preload("tavern_door.gd")
 const _WaterFlow = preload("water_flow.gd")
 const _OreTex = preload("res://scripts/items/models/ore_texture.gd")
+const _MangroveProp = preload("res://scripts/world/props/mangrove_prop.gd")
+const _CattailProp = preload("res://scripts/world/props/cattail_prop.gd")
+const _MudCrabProp = preload("res://scripts/world/props/mud_crab_prop.gd")
+const _FireflyProp = preload("res://scripts/world/props/firefly_prop.gd")
 
 static func _is_water_bid(bid: int) -> bool:
 	return bid == _Data.BlockID.WATER \
@@ -190,7 +194,10 @@ static func _prop_cost(ptype: String) -> int:
 		"dense_tree": return 4
 		"palm": return 3
 		"orange_tree": return 3
+		"mangrove": return 3
 		"pumpkin", "watermelon", "eggplant": return 1
+		"mud_crab": return 2
+		"firefly": return 1
 		_: return 1
 
 ## ── Profiler section timing (benchmark test bật; mặc định tắt) ─────────────
@@ -411,6 +418,60 @@ static func find_mountain(wx: float, wz: float, max_radius: float = 15000.0) -> 
 			var mtn_t: float = clamp((mtn - 0.58) / 0.14, 0.0, 1.0)
 			mtn_t = mtn_t * mtn_t * (3.0 - 2.0 * mtn_t)
 			if mtn_t > 0.50:
+				return { "ok": true, "x": sx, "z": sz }
+		r += STEP
+	return { "ok": false }
+
+## Cường độ rừng đước tại (wx,wz): 0 = không, ≈1 = lõi rừng ngập mặn ven biển.
+## Khớp logic intertidal pass trong compute_chunk() để teleport tìm đúng chỗ:
+## mask mangrove noise + phải gần bờ (đổi mask biển/đất trong ~14 block).
+static func _mangrove_strength_at(nd: Dictionary, wx: float, wz: float) -> float:
+	var mg: float = (nd["mangrove"].get_noise_2d(wx, wz) + 1.0) * 0.5
+	var mg_mask: float = clamp((mg - 0.46) / 0.22, 0.0, 1.0)
+	if mg_mask <= 0.0:
+		return 0.0
+	var is_oc: bool = _ocean_mask_at(nd, wx, wz)
+	var near_shore: bool = false
+	for k in range(8):
+		var ang: float = float(k) / 8.0 * TAU
+		var sx: float = wx + cos(ang) * 14.0
+		var sz: float = wz + sin(ang) * 14.0
+		if _ocean_mask_at(nd, sx, sz) != is_oc:
+			near_shore = true
+			break
+	if not near_shore:
+		return 0.0
+	return mg_mask
+
+## Giá trị ngẫu nhiên [0,1) XÁC ĐỊNH từ ô (vx,vz) — KHÔNG tiêu global RNG.
+## Các rule thực vật dại khác (cà tím, dưa hấu, bí, cam...) dùng randf() chung
+## với stream toàn cục; nếu rule rừng đước dùng randf() sẽ làm lệch stream →
+## đổi phân bố cây dại trên các chunk sau. Hash này trả kết quả cố định.
+static func _cell_hash01(vx: int, vz: int) -> float:
+	var x := int(vx) * 73856093 + int(vz) * 19349663 + 83492791
+	x = (x ^ (x >> 12)) * 715225241
+	x = (x ^ (x >> 17)) * 449984367
+	x = x ^ (x >> 13)
+	return float(x & 0x7FFFFFFF) / 2147483648.0
+
+## Tìm world pos vùng RỪNG NGẬP MẶN (bùn triều ven biển) gần (wx,wz).
+## Dùng cho debug teleport "Rừng Ngập Mặn". Trả { "ok", "x", "z" }.
+static func find_mangrove(wx: float, wz: float, max_radius: float = 25000.0) -> Dictionary:
+	const DIM: int = _Data._Dim.DimensionID.REAL_WORLD
+	var nd: Dictionary = _Noise._noise_for_dim(DIM)
+	var n_mg: FastNoiseLite = nd.get("mangrove")
+	if n_mg == null:
+		return { "ok": false }
+	var origin := Vector2(wx, wz)
+	const STEP: float = 150.0
+	var r: float = STEP
+	while r <= max_radius:
+		var samples: int = max(10, int(r / STEP * TAU))
+		for i in range(samples):
+			var angle: float = float(i) / float(samples) * TAU
+			var sx: float = origin.x + cos(angle) * r
+			var sz: float = origin.y + sin(angle) * r
+			if _mangrove_strength_at(nd, sx, sz) >= 0.60:
 				return { "ok": true, "x": sx, "z": sz }
 		r += STEP
 	return { "ok": false }
@@ -941,6 +1002,46 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					if mtn_t > 0.62 and _Data.is_grass_tile(biome_grid[ivx][ivz]):
 						biome_grid[ivx][ivz] = _Data.TileType.STONE_PATCH
 
+		# ── 3a1b. MANGROVE — rừng ngập mặn intertidal dọc bờ biển ────────────
+		# Vệt bùn triều chạy 2 bên mực nước: thềm bùn ngập ăn ra biển, bãi bùn
+		# ăn vào đất liền vài block. Độ cao kéo về mực triều (WATER_Y) → bãi
+		# bùn ngập/nổi xen kẽ theo noise; chỗ terr cao thành mô bùn khô ráo.
+		const MANGROVE_SEA_RANGE: float = 16.0   # ăn ra thềm biển (bùn ngập)
+		const MANGROVE_LAND_RANGE: float = 15.0  # ăn sâu vào đất liền (bãi bùn)
+		const MANGROVE_STRENGTH: float = 0.42    # ngưỡng trở thành rừng đước
+		for ivx in range(cols):
+			var pvx: int = ivx + _Data.PAD
+			for ivz in range(cols):
+				var pvz: int = ivz + _Data.PAD
+				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+				var mg: float = (nd["mangrove"].get_noise_2d(wx, wz) + 1.0) * 0.5
+				var mg_mask: float = clamp((mg - 0.46) / 0.22, 0.0, 1.0)
+				if mg_mask <= 0.0: continue
+				var is_oc: bool = oct_small[pvx][pvz]
+				var pos: float
+				if is_oc:
+					var sd: int = shore_dst[pvx * total + pvz]
+					if sd == _Data.CONST_INF: continue
+					pos = -float(sd)
+				else:
+					pos = float(odst[pvx * total + pvz] - 1)
+				var t_edge: float = clamp(-pos / MANGROVE_SEA_RANGE, 0.0, 1.0) if pos < 0.0 \
+					else clamp(pos / MANGROVE_LAND_RANGE, 0.0, 1.0)
+				var strength: float = mg_mask * (1.0 - t_edge)
+				if strength < MANGROVE_STRENGTH: continue
+				var inner: float = (nd["mangrove_inner"].get_noise_2d(wx, wz) + 1.0) * 0.5
+				var terr: float = (nd["mangrove_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
+				biome_grid[ivx][ivz] = _Data.TileType.MANGROVE_MUD
+				if is_oc:
+					# Thềm bùn ngập: đáy nông gần mặt nước; chỗ terr cao nổi mô bùn
+					height_grid[ivx][ivz] = min(
+						lerp(_Data.WATER_Y - 1.15, _Data.WATER_Y + 0.65, terr) + inner * 0.3,
+						_Data.WATER_Y + 0.9)
+				else:
+					# Bãi bùn lục địa: hạ xuống mực triều, lạch nước ngập xen kẽ
+					height_grid[ivx][ivz] = lerp(_Data.WATER_Y - 0.5, _Data.WATER_Y + 0.95, terr) + inner * 0.35
+
 		# ── 3a2. Hồ ĐỒNG CỎ: đáy thoải theo khoảng cách từ bờ (BFS padded,
 		# hàn liền qua biên chunk; ring 0 = WATER_Y như hồ cát dựa trên dst) ──
 		var lake_mask: PackedByteArray = PackedByteArray()
@@ -1407,6 +1508,34 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 						continue
 					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "dense_tree", "pos": Vector3(px, y, pz), "variant": "plains"})
+
+	# ── 8j. RỪNG NGẬP MẶN — đước + thủy trúc + cua bùn trên bãi bùn triều ───
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				if biome_grid[vx][vz] != _Data.TileType.MANGROVE_MUD:
+					continue
+				var h: float = height_grid[vx][vz]
+				var mx: float = -half + (float(vx) + 0.5) * _Data.VOXEL
+				var mz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
+				# Cây đước — bãi bùn gần mực nước, rễ chùm ăn xuống lạch triều
+				if h > _Data.WATER_Y - 0.9 and _cell_hash01(vx, vz) < 0.028:
+					if _is_on_road(world_ox + mx, world_oz + mz):
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "mangrove", "pos": Vector3(mx, y, mz), "variant": "coast"})
+				# Thủy trúc (cattail) — bãi bùn ngập nông, mọc thành cụm sát nước
+				if h > _Data.WATER_Y - 1.5 and h <= _Data.WATER_Y + 0.2 and _cell_hash01(vx + 991, vz) < 0.022:
+					var y2 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "cattail", "pos": Vector3(mx, y2, mz), "variant": "mangrove"})
+				# Cua bùn — bãi bùn nhô trên mực nước (mô bùn khô)
+				if h > _Data.WATER_Y + 0.1 and _cell_hash01(vx + 1817, vz + 331) < 0.010:
+					var y3 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "mud_crab", "pos": Vector3(mx, y3, mz), "variant": "mud"})
+				# Đom đóm — rải rác trên bãi bùn, hiện sáng về đêm
+				if _cell_hash01(vx + 295, vz + 755) < 0.008:
+					var y4 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625) + 0.4
+					plant_props.append({"type": "firefly", "pos": Vector3(mx, y4, mz), "variant": "mangrove"})
 
 	_prof("S12 plant_props")
 
@@ -2505,6 +2634,26 @@ func _process(delta: float) -> void:
 			add_child(prop)
 		elif ptype == "pumpkin":
 			var prop := _PumpkinVine.new(40, DestroyableProp.WeaponReq.SWORD, "pumpkin")
+			prop.position = pd["pos"]
+			prop.setup()
+			add_child(prop)
+		elif ptype == "mangrove":
+			var prop := _MangroveProp.new(220, DestroyableProp.WeaponReq.AXE, "mangrove_wood")
+			prop.position = pd["pos"]
+			prop.setup(pd.get("variant", "coast"))
+			add_child(prop)
+		elif ptype == "cattail":
+			var prop := _CattailProp.new(30, DestroyableProp.WeaponReq.SWORD, "cattail")
+			prop.position = pd["pos"]
+			prop.setup()
+			add_child(prop)
+		elif ptype == "mud_crab":
+			var prop := _MudCrabProp.new(60, DestroyableProp.WeaponReq.NONE, "mud_crab")
+			prop.position = pd["pos"]
+			prop.setup()
+			add_child(prop)
+		elif ptype == "firefly":
+			var prop := _FireflyProp.new()
 			prop.position = pd["pos"]
 			prop.setup()
 			add_child(prop)

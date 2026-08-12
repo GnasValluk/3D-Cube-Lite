@@ -213,6 +213,39 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_basin.fractal_lacunarity = 2.0
 	n_basin.fractal_gain = 0.5
 
+	## n_mangrove: MASK rừng ngập mặn — vệt dọc bờ biển, tần số thấp để cụm
+	## ven biển rộng; ngưỡng quyết định nằm ở world_chunk (kết hợp ocean mask).
+	var n_mangrove := FastNoiseLite.new()
+	n_mangrove.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_mangrove.seed = base_seed + 78001
+	n_mangrove.frequency = 0.004
+	n_mangrove.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_mangrove.fractal_octaves = 3
+	n_mangrove.fractal_lacunarity = 2.0
+	n_mangrove.fractal_gain = 0.5
+
+	## n_mangrove_inner: mật độ bên trong rừng — đốm loang để bờ triều không
+	## phải một dải bùn trơn; kết hợp "khoảng cách tới biển" tạo vùng lõi rừng.
+	var n_mangrove_inner := FastNoiseLite.new()
+	n_mangrove_inner.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_mangrove_inner.seed = base_seed + 78002
+	n_mangrove_inner.frequency = 0.03
+	n_mangrove_inner.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_mangrove_inner.fractal_octaves = 2
+	n_mangrove_inner.fractal_lacunarity = 2.0
+	n_mangrove_inner.fractal_gain = 0.5
+
+	## n_mangrove_terr: độ gồ ghề đáy bùn bên trong rừng — mô đất thấp nhấp nhô
+	## giữa các lạch nước, cho địa hình "bán ngập" sinh động.
+	var n_mangrove_terr := FastNoiseLite.new()
+	n_mangrove_terr.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_mangrove_terr.seed = base_seed + 78003
+	n_mangrove_terr.frequency = 0.04
+	n_mangrove_terr.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_mangrove_terr.fractal_octaves = 3
+	n_mangrove_terr.fractal_lacunarity = 2.0
+	n_mangrove_terr.fractal_gain = 0.5
+
 	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
 		"lake_type": n_lake_type, "ocean": n_ocean,
 		"sea_rough": n_sea_rough, "sea_large": n_sea_large, "sea_biome": n_sea_biome,
@@ -222,7 +255,9 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 		"patch_var": n_patch_var,
 		"patch2": n_patch2,
 		"patch_stone": n_patch_stone, "patch_dirt": n_patch_dirt,
-		"basin": n_basin, "mountain": n_mountain }
+		"basin": n_basin, "mountain": n_mountain,
+		"mangrove": n_mangrove, "mangrove_inner": n_mangrove_inner,
+		"mangrove_terr": n_mangrove_terr }
 	_noise_cache[dim_id] = result
 	return result
 

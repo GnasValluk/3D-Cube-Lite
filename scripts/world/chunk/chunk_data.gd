@@ -1,6 +1,6 @@
 extends RefCounted
 
-enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE, MUDDY_SAND, DESERT, YOUNG_GRASS, GRASS_DIRT, SAND_DEEP, TWILIGHT_GRASS, TWILIGHT_DIRT, DRY_GRASS, SPARSE_GRASS, PALE_SAND, STONE_PATCH }
+enum TileType { GRASS, DARK_GRASS, SAND, DIRT, SILT, OCEAN_SHALLOW, OCEAN_DEEP, SAND_WHITE, MUDDY_SAND, DESERT, YOUNG_GRASS, GRASS_DIRT, SAND_DEEP, TWILIGHT_GRASS, TWILIGHT_DIRT, DRY_GRASS, SPARSE_GRASS, PALE_SAND, STONE_PATCH, MANGROVE_MUD }
 
 ## Tile "đồng cỏ" hợp nhất: đều mọc cỏ/được props/được coi là cỏ nền.
 ## (Đồ BẰNG = GRASS_DIRT/GRASS/DARK_GRASS/YOUNG_GRASS — nhiều loại khối cỏ.
@@ -60,6 +60,8 @@ enum BlockID {
 	DRY_GRASS = 44,   # Cỏ già/khô — đốm vàng rạ trên đồng bằng (lẫn GRASS thường)
 	SPARSE_GRASS = 45,  # Cỏ thưa — cỏ lẫn đất, đốm thưa giữa dải GRASS_DIRT
 	PALE_SAND = 46,   # Cát phai — đốm cát nhạt hơn DESERT (đồi mòn / cồn già)
+	MANGROVE_MUD = 47,  # Bùn ngập mặn — bùn đen đầm lầy vùng triều, nền rừng đước
+	MANGROVE_WOOD = 48, # Gỗ đước — vân gỗ nâu đỏ, chặt từ cây đước rừng ngập mặn
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -100,6 +102,8 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.DRY_GRASS: "block_dry_grass",
 	BlockID.SPARSE_GRASS: "block_sparse_grass",
 	BlockID.PALE_SAND: "block_pale_sand",
+	BlockID.MANGROVE_MUD: "block_mangrove_mud",
+	BlockID.MANGROVE_WOOD: "mangrove_wood",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -141,6 +145,8 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"block_dry_grass": BlockID.DRY_GRASS,
 	"block_sparse_grass": BlockID.SPARSE_GRASS,
 	"block_pale_sand": BlockID.PALE_SAND,
+	"block_mangrove_mud": BlockID.MANGROVE_MUD,
+	"mangrove_wood": BlockID.MANGROVE_WOOD,
 }
 
 const VOXEL: float = 1.0
@@ -224,6 +230,8 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.62, 0.54, 0.22),           # 44 DRY_GRASS — cỏ già khô vàng rạ rõ hơn
 	Color(0.32, 0.46, 0.14),           # 45 SPARSE_GRASS — cỏ thưa xanh lá đất
 	Color(0.96, 0.90, 0.68),           # 46 PALE_SAND — cát phai sáng nhạt
+	Color(0.13, 0.11, 0.09),           # 47 MANGROVE_MUD — bùn đầm lầy đen ngấm nước
+	Color(0.56, 0.26, 0.14),           # 48 MANGROVE_WOOD — gỗ đước nâu đỏ
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -274,6 +282,8 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.09, 0.08, 0.04),           # 44 DRY_GRASS (TW palette placeholder)
 	Color(0.05, 0.07, 0.03),           # 45 SPARSE_GRASS (TW palette placeholder)
 	Color(0.10, 0.09, 0.06),           # 46 PALE_SAND (TW palette placeholder)
+	Color(0.04, 0.05, 0.04),           # 47 MANGROVE_MUD (TW palette placeholder)
+	Color(0.06, 0.05, 0.04),           # 48 MANGROVE_WOOD (TW palette placeholder)
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -295,6 +305,7 @@ static func grass_dirt_id(block_id: int) -> int:
 		BlockID.DRY_GRASS:    return BlockID.DIRT
 		BlockID.SPARSE_GRASS: return BlockID.DIRT
 		BlockID.TWILIGHT_GRASS: return BlockID.TWILIGHT_DIRT
+		BlockID.MANGROVE_MUD: return BlockID.MANGROVE_MUD
 		_: return -1
 
 static func is_grass_top_block(block_id: int) -> bool:
@@ -362,7 +373,8 @@ static func is_tillable(bid: int) -> bool:
 	return bid == BlockID.GRASS or bid == BlockID.DARK_GRASS \
 		or bid == BlockID.DIRT or bid == BlockID.DARK_DIRT \
 		or bid == BlockID.YOUNG_GRASS or bid == BlockID.GRASS_DIRT \
-		or bid == BlockID.DRY_GRASS or bid == BlockID.SPARSE_GRASS
+		or bid == BlockID.DRY_GRASS or bid == BlockID.SPARSE_GRASS \
+		or bid == BlockID.MANGROVE_MUD
 
 ## ── Độ cứng block (giây đào với công cụ sắt đúng loại) ─────────────────────
 ## -1 = không thể phá vỡ. Không có trong bảng (0) = không đào được.
@@ -406,6 +418,10 @@ const BLOCK_HARDNESS: Dictionary = {
 	BlockID.SPARSE_GRASS: 1.2,
 	# Cát phai — như cát
 	BlockID.PALE_SAND:    1.2,
+	# Bùn ngập mặn — như đất sình, xẻng
+	BlockID.MANGROVE_MUD: 1.3,
+	# Gỗ đước — như gỗ sồi, rìu
+	BlockID.MANGROVE_WOOD: 1.5,
 	# Cỏ đồng bằng cỏ — như cỏ thường
 	BlockID.GRASS_DIRT: 1.2,
 	# Cát cao nguyên sa mạc — như cát
@@ -438,11 +454,13 @@ static func is_shovelable(bid: int) -> bool:
 		or bid == BlockID.SAND or bid == BlockID.SAND_DEEP or bid == BlockID.OCEAN_SAND \
 		or bid == BlockID.MUDDY_SAND or bid == BlockID.OCEAN_GRAVEL or bid == BlockID.OCEAN_MUD \
 		or bid == BlockID.SILT or bid == BlockID.TRAIL or bid == BlockID.OCEAN_FLOOR \
-		or bid == BlockID.DESERT_PLATEAU
+		or bid == BlockID.DESERT_PLATEAU \
+		or bid == BlockID.MANGROVE_MUD
 
 ## Block nào rìu (axe) đào được — gỗ.
 static func is_axable(bid: int) -> bool:
-	return bid == BlockID.OAK_WOOD or bid == BlockID.HARD_WOOD
+	return bid == BlockID.OAK_WOOD or bid == BlockID.HARD_WOOD \
+		or bid == BlockID.MANGROVE_WOOD
 
 ## ── Legacy tile colors (giữ lại để tương thích các code cũ) ─────────────────
 const TILE_COLORS_TW: Array[Dictionary] = [

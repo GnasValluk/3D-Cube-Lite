@@ -1133,6 +1133,14 @@ func _setup_debug_menu() -> void:
 	tp_desert_btn.pressed.connect(_on_teleport_biome.bind("desert"))
 	_debug_panel.add_child(tp_desert_btn)
 
+	var tp_mangrove_btn := Button.new()
+	tp_mangrove_btn.position = Vector2(234, y - 2)
+	tp_mangrove_btn.size = Vector2(202, 34)
+	tp_mangrove_btn.add_theme_font_size_override("font_size", 20)
+	tp_mangrove_btn.text = "🌿 Rừng Ngập Mặn"
+	tp_mangrove_btn.pressed.connect(_on_teleport_biome.bind("mangrove"))
+	_debug_panel.add_child(tp_mangrove_btn)
+
 	# ── Teleport to Công Trình ───────────────────────────────────────────────
 	y += 34
 	var tp_c_lbl := Label.new()
@@ -1265,6 +1273,12 @@ func _on_teleport_biome(biome_type: String) -> void:
 					# Sa mạc đúng — DESERT (đã bỏ cao nguyên sa mạc)
 					if bio == _Data.TileType.DESERT:
 						found = Vector2(wx, wz); found_ok = true; break
+				"mangrove":
+					# Rừng ngập mặn — dùng find_mangrove riêng (cần sát bờ biển),
+					# vòng lặp trên không nhận biết được qua biome_at (bỏ qua).
+					var mg := WorldChunk.find_mangrove(origin.x, origin.y, MAX_R)
+					if mg.get("ok", false):
+						found = Vector2(mg["x"], mg["z"]); found_ok = true; break
 		r += STEP
 
 	if found_ok:
@@ -1273,6 +1287,8 @@ func _on_teleport_biome(biome_type: String) -> void:
 			biome_name = "Biển Khơi"
 		elif biome_type == "desert":
 			biome_name = "Sa Mạc"
+		elif biome_type == "mangrove":
+			biome_name = "Rừng Ngập Mặn"
 		# Build chunk chứa điểm đích đồng bộ → lấy đúng cao độ mặt đất, tránh
 		# thả rơi từ cao hoặc chui xuống đất khi vùng chưa được stream.
 		WorldChunk.ensure_chunk_built(found.x, found.y)

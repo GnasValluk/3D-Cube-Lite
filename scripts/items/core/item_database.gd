@@ -184,6 +184,13 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_oak_wood", "Gỗ Sồi", ItemDef.Type.BLOCK, Color(0.62, 0.47, 0.28), "🧱", "Khối gỗ sồi — vân nâu sáng ấm, chặt từ cây sồi bằng rìu, xây dựng và chế tạo", true, 64)
 	_add(db, "block_hard_wood", "Gỗ Cứng", ItemDef.Type.BLOCK, Color(0.47, 0.36, 0.20), "🧱", "Khối gỗ cứng — vân nâu sẫm chắc chắn, chặt từ cây rừng rậm bằng rìu", true, 64)
 
+	# ── Rừng ngập mặn ─────────────────────────────────────────────────────────
+	_add(db, "block_mangrove_mud", "Bùn Ngập Mặn", ItemDef.Type.BLOCK, Color(0.13, 0.11, 0.09), "🧱", "Khối bùn đen đầm lầy — bãi bùn vùng triều rừng ngập mặn, xẻng đào được", true, 64)
+	_add(db, "mangrove_wood", "Gỗ Đước", ItemDef.Type.BLOCK, Color(0.56, 0.26, 0.14), "🧱", "Khối gỗ đước — thớ nâu đỏ chìm trong nước mặn, chặt từ cây đước bằng rìu, xây dựng và chế tạo", true, 64)
+	_add(db, "mangrove_seed", "Mầm Đước", ItemDef.Type.MATERIAL, Color(0.28, 0.35, 0.16), "🌱", "Mầm đước hình nón — rơi từ cây đước trưởng thành, trồng trên bùn ngập mặn", true, 16)
+	_add(db, "cattail", "Bông Thủy Trúc", ItemDef.Type.MATERIAL, Color(0.30, 0.40, 0.20), "🌾", "Bông thủy trúc — lau sậy đầm lầy, nguyên liệu chế tạo", true, 32)
+	_add(db, "mud_crab", "Thịt Cua Bùn", ItemDef.Type.FOOD, Color(0.60, 0.28, 0.16), "🦀", "Cua bùn rừng ngập mặn — thịt ngọt chắc, ăn tươi hồi máu", true, 16, 10)
+
 	# ── Cà tím ───────────────────────────────────────────────────────────────
 	_add(db, "eggplant_fruit", "Trái Cà Tím", ItemDef.Type.FOOD, Color(0.42, 0.14, 0.50), "🍆", "Trái cà tím — tím hoàng gia mộng nước, vỏ bóng mượt vệt sáng trắng xanh, đài hoa xanh ngả tím; ăn được hoặc chế biến", true, 16, 10)
 	_add(db, "eggplant_slice", "Cà Tím Bổ Đôi", ItemDef.Type.FOOD, Color(0.94, 0.90, 0.78), "🍆", "Cà tím bổ đôi — ruột trắng kem sốp nhẹ, hạt vàng nâu quanh tâm, nguyên liệu nấu ăn", true, 32, 6)
@@ -206,6 +213,15 @@ static func create_item_db() -> Dictionary:
 	_add(db, "iron_chestplate", "Giáp Sắt",    ItemDef.Type.ARMOR, Color(0.55, 0.57, 0.66), "⛨", "Áo giáp sắt — +4.5 giáp, găng tay sắt đã hợp vào thân", false, 1, 0, 0, 4.5, ItemDef.ArmorSlot.BODY, 260)
 	_add(db, "iron_boots",      "Giày Sắt",    ItemDef.Type.ARMOR, Color(0.54, 0.56, 0.64), "👢", "Giày sắt — +1 giáp", false, 1, 0, 0, 1.0, ItemDef.ArmorSlot.FEET, 160)
 	_add(db, "iron_leggings",   "Quần Sắt",    ItemDef.Type.ARMOR, Color(0.57, 0.59, 0.67), "🩳", "Quần sắt bảo vệ đôi chân — +1.5 giáp", false, 1, 0, 0, 1.5, ItemDef.ArmorSlot.LEGS, 170)
+
+	# ── Bộ giáp biển (rừng ngập mặn) ──────────────────────────────────────────
+	# Bắt buộc phải mặc đủ khi lội vào rừng ngập mặn — nếu không, khí độc đầm
+	# lầy ngấm vào người gây sát thương theo giây. Chế từ rong biển + dừa +
+	# sắt (có thể tìm ngoài bờ biển trước khi vào rừng — tránh khóa tiến trình).
+	_add(db, "sea_helmet",     "Mũ Vỏ Sò",     ItemDef.Type.ARMOR, Color(0.28, 0.72, 0.70), "⛑", "Mũ vỏ sò bão hòa muối biển — +1.5 giáp; mặc cùng giáp biển để kháng khí độc rừng ngập mặn", false, 1, 0, 0, 1.5, ItemDef.ArmorSlot.HEAD, 240)
+	_add(db, "sea_chestplate", "Giáp San Hô",  ItemDef.Type.ARMOR, Color(0.22, 0.66, 0.64), "⛨", "Áo giáp san hô đan rong — +4.0 giáp; kháng khí độc rừng ngập mặn", false, 1, 0, 0, 4.0, ItemDef.ArmorSlot.BODY, 300)
+	_add(db, "sea_leggings",   "Quần Vảy Cá",  ItemDef.Type.ARMOR, Color(0.26, 0.62, 0.58), "🩳", "Quần vảy cá — +1.5 giáp; mặc cùng giáp biển để kháng khí độc rừng ngập mặn", false, 1, 0, 0, 1.5, ItemDef.ArmorSlot.LEGS, 210)
+	_add(db, "sea_boots",      "Giày Vây Cá",  ItemDef.Type.ARMOR, Color(0.24, 0.58, 0.55), "👢", "Giày vây cá lội bùn — +1.0 giáp; mặc cùng giáp biển để kháng khí độc rừng ngập mặn", false, 1, 0, 0, 1.0, ItemDef.ArmorSlot.FEET, 190)
 
 	# ── Trang sức & phụ kiện ─────────────────────────────────────────────────
 	_add(db, "golden_ring",     "Nhẫn Vàng",   ItemDef.Type.ARMOR, Color(0.90, 0.72, 0.12), "💍", "Nhẫn vàng — tăng vận may ẩn (+2 luck), câu được đồ hiếm hơn", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.SUB, 0, 2.0)
@@ -241,6 +257,9 @@ const WEIGHTS: Dictionary = {
 	"tractor": 40.0, "fishing_boat": 50.0, "rescue_helicopter": 55.0,
 	"iron_helmet": 1.5, "iron_chestplate": 4.5, "iron_boots": 1.0,
 	"iron_leggings": 1.8,
+	"sea_helmet": 1.5, "sea_chestplate": 4.5, "sea_boots": 1.0,
+	"sea_leggings": 1.8, "mud_crab": 0.6, "cattail": 0.4,
+	"block_mangrove_mud": 2.0, "mangrove_wood": 2.0, "mangrove_seed": 0.2,
 	"golden_ring": 0.1, "leather_backpack": 2.0,
 }
 
