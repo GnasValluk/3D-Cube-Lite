@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://djyu1kxm5cdu1"]
 
-[ext_resource type="Script" uid="uid://cmb6cfumjgen4" path="res://scripts/camera/iso_camera.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/camera/first_person_camera.gd" id="1"]
 [ext_resource type="Script" uid="uid://cgk83lsgccw4s" path="res://scripts/player/neon_pulse.gd" id="2"]
 [ext_resource type="Script" uid="uid://dwjrs840c6r84" path="res://scripts/world/environment/twilight_environment.gd" id="3"]
 [ext_resource type="Script" uid="uid://ex08qqw2wr71" path="res://scripts/camera/third_person_camera.gd" id="4"]

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://d1vcg5plkwkbt"]
 
-[ext_resource type="Script" uid="uid://cmb6cfumjgen4" path="res://scripts/camera/iso_camera.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/camera/first_person_camera.gd" id="1"]
 [ext_resource type="Script" uid="uid://w3yc7hqcm2jj" path="res://scripts/world/environment/real_world_environment.gd" id="2"]
 [ext_resource type="Script" uid="uid://ex08qqw2wr71" path="res://scripts/camera/third_person_camera.gd" id="3"]
 [ext_resource type="Script" uid="uid://lovun7bimwf2" path="res://scripts/core/character_manager.gd" id="4"]

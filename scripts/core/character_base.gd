@@ -153,9 +153,9 @@ var _world_hp_enabled: bool = false
 
 # ── Camera refs ───────────────────────────────────────────────────────────────
 var _camera:  Camera3D
-var _iso_rig: Node3D
+var _fp_rig:  Node3D
 var _tp_rig:  Node3D
-var _use_tp:  bool = true  # mặc định cam 3 (third-person); ấn F1 → iso
+var _use_tp:  bool = true  # mặc định cam 3 (third-person); ấn F1 → first-person
 var _water_mgr: OpenWorldManager = null
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -173,8 +173,8 @@ func _ready() -> void:
 		var root: Node = get_parent().get_parent()
 		if root == null:
 			root = get_parent()
-		_iso_rig = root.get_node_or_null("CameraRig")
-		_tp_rig  = root.get_node_or_null("TPCameraRig")
+		_fp_rig = root.get_node_or_null("CameraRig")
+		_tp_rig = root.get_node_or_null("TPCameraRig")
 		_camera  = get_viewport().get_camera_3d()
 	if not has_meta("no_world_hp_bar") and _world_hp_enabled and show_world_hp_bar:
 		_add_world_hp_bar()
@@ -422,15 +422,15 @@ func _sync_camera() -> void:
 	if not _is_player:
 		return
 	if _use_tp:
-		if is_instance_valid(_iso_rig):
-			_iso_rig.call("deactivate")
+		if is_instance_valid(_fp_rig):
+			_fp_rig.call("deactivate")
 		if is_instance_valid(_tp_rig):
 			_tp_rig.call("activate")
 	else:
 		if is_instance_valid(_tp_rig):
 			_tp_rig.call("deactivate")
-		if is_instance_valid(_iso_rig):
-			_iso_rig.call("activate")
+		if is_instance_valid(_fp_rig):
+			_fp_rig.call("activate")
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 func _unhandled_key_input(event: InputEvent) -> void:

@@ -9,7 +9,7 @@ signal character_switched(ch: CharacterBase)
 var _characters: Array[CharacterBase] = []
 var _current:    int = 0
 
-var _iso_rig: Node3D
+var _fp_rig: Node3D
 var _tp_rig:  Node3D
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -34,8 +34,8 @@ func _ready() -> void:
 		return
 
 	var root := get_parent()
-	_iso_rig = root.get_node_or_null("CameraRig")
-	_tp_rig  = root.get_node_or_null("TPCameraRig")
+	_fp_rig = root.get_node_or_null("CameraRig")
+	_tp_rig = root.get_node_or_null("TPCameraRig")
 
 	for ch in _characters:
 		ch.set_physics_process(false)
@@ -136,11 +136,11 @@ func switch_by_name(name: String) -> void:
 
 # ── Camera ────────────────────────────────────────────────────────────────────
 func _aim_cameras_at(ch: CharacterBase) -> void:
-	if is_instance_valid(_iso_rig):
-		if _iso_rig.has_method("set_target"):
-			_iso_rig.set_target(ch)
+	if is_instance_valid(_fp_rig):
+		if _fp_rig.has_method("set_target"):
+			_fp_rig.set_target(ch)
 		else:
-			_iso_rig.set("_target", ch)
+			_fp_rig.set("_target", ch)
 	if is_instance_valid(_tp_rig):
 		if _tp_rig.has_method("set_target"):
 			_tp_rig.set_target(ch)

@@ -16,7 +16,7 @@ extends Node3D
 @export var pitch_max:    float  =  70.0 # Góc pitch cao nhất (độ)
 @export var mouse_sens:   float  = 0.20  # Độ nhạy chuột
 @export var zoom_min:     float  = 2.0
-@export var zoom_max:     float  = 12.0
+@export var zoom_max: float = 22.0
 @export var zoom_step:    float  = 0.5
 @export var aim_zoom:     float  = 1.8  # Khoảng cách khi đang ngắm (góc 3)
 

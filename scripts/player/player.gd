@@ -45,9 +45,9 @@ var _time:      float = 0.0
 var _camera:    Camera3D
 
 # ── Camera switching ──────────────────────────────────────────────────────────
-var _iso_rig: Node3D      # CameraRig (isometric)
-var _tp_rig:  Node3D      # TPCameraRig (third-person)
-var _use_tp:  bool = true  # mặc định cam 3 (third-person); ấn F1 → iso
+var _fp_rig: Node3D      # CameraRig (first-person)
+var _tp_rig: Node3D      # TPCameraRig (third-person)
+var _use_tp:  bool = true  # mặc định cam 3 (third-person); ấn F1 → first-person
 
 # ── Squash/stretch ────────────────────────────────────────────────────────────
 var _sy_tgt: float = 1.0
@@ -84,8 +84,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	# Lấy tham chiếu tới cả 2 camera rig từ scene cha
 	var scene_root := get_parent()
-	_iso_rig = scene_root.get_node_or_null("CameraRig")
-	_tp_rig  = scene_root.get_node_or_null("TPCameraRig")
+	_fp_rig = scene_root.get_node_or_null("CameraRig")
+	_tp_rig = scene_root.get_node_or_null("TPCameraRig")
 	# Bắt đầu đúng trạng thái camera theo _use_tp (mặc định cam 3) — tránh
 	# phải bấm F1 2 lần mới chuẩn.
 	_sync_camera()
@@ -97,7 +97,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		if k.pressed and not k.echo:
 			if k.is_action_pressed("jump"):
 				_jbuf = JUMP_BUFFER
-			# F1: chuyển đổi giữa iso camera và third-person camera
+			# F1: chuyển đổi giữa first-person camera và third-person camera
 			if k.is_action_pressed("camera_toggle"):
 				_toggle_camera()
 
@@ -321,15 +321,15 @@ func _read_input() -> Vector3:
 ## Đồng bộ trạng thái camera rig theo _use_tp.
 func _sync_camera() -> void:
 	if _use_tp:
-		if is_instance_valid(_iso_rig) and _iso_rig.has_method("deactivate"):
-			_iso_rig.deactivate()
+		if is_instance_valid(_fp_rig) and _fp_rig.has_method("deactivate"):
+			_fp_rig.deactivate()
 		if is_instance_valid(_tp_rig) and _tp_rig.has_method("activate"):
 			_tp_rig.activate()
 	else:
 		if is_instance_valid(_tp_rig) and _tp_rig.has_method("deactivate"):
 			_tp_rig.deactivate()
-		if is_instance_valid(_iso_rig) and _iso_rig.has_method("activate"):
-			_iso_rig.activate()
+		if is_instance_valid(_fp_rig) and _fp_rig.has_method("activate"):
+			_fp_rig.activate()
 
 func _toggle_camera() -> void:
 	_use_tp = not _use_tp

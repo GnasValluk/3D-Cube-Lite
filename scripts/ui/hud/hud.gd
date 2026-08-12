@@ -330,6 +330,12 @@ func _setup_mobile_controls() -> void:
 			_explore_map.open(_explore_sys)
 	)
 	mob.pinch_zoom.connect(func(factor: float):
+		var pl := get_tree().get_first_node_in_group("player")
+		if pl and pl._use_tp:
+			var tp := get_parent().get_node_or_null("TPCameraRig")
+			if tp:
+				tp.pinch_zoom(1.0 / factor)
+			return
 		var rig := get_parent().get_node_or_null("CameraRig")
 		if rig:
 			rig.pinch_zoom(1.0 / factor)
@@ -472,7 +478,7 @@ func _process(delta: float) -> void:
 		if tp_dist != _last_tp_zoom:
 			_last_tp_zoom = tp_dist
 			var tp_min: float = tp_rig.zoom_min if "zoom_min" in tp_rig else 2.0
-			var tp_max: float = tp_rig.zoom_max if "zoom_max" in tp_rig else 12.0
+			var tp_max: float = tp_rig.zoom_max if "zoom_max" in tp_rig else 22.0
 			_on_zoom_changed(tp_dist, tp_min, tp_max)
 	if _zoom_slider.visible:
 		_zoom_slider.position = Vector2(vp.x - 48, (vp.y - _zoom_slider.size.y) * 0.5)

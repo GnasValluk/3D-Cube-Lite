@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
 [ext_resource type="Script" path="res://scripts/world/environment/hub_world.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/camera/iso_camera.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/camera/first_person_camera.gd" id="2"]
 [ext_resource type="Script" path="res://scripts/player/neon_pulse.gd" id="3"]
 [ext_resource type="Script" path="res://scripts/world/environment/twilight_environment.gd" id="4"]
 [ext_resource type="Script" path="res://scripts/camera/third_person_camera.gd" id="5"]
