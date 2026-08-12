@@ -1,7 +1,8 @@
 extends Node3D
 
-## Headless verification: level creature (fish/pig theo biến thể), hệ số +2% stat
-## một level, hệ số drop rate +5% level, và sinh vật Slime (tách đàn + drop).
+## Headless verification: level creature = 1 (gốc) + mob_bonus_lv (cá la hán +1,
+## slime +2) + bio_bonus_lv (đồng bằng/núi/sa mạc/biển), hệ số +2% stat & +5%
+## drop rate một level, slime tách đàn + drop, và cửa sổ giờ spawn slime đêm.
 
 const _Fish = preload("res://scripts/characters/fish/fish_character.gd")
 const _Pig  = preload("res://scripts/characters/pig/pig_character.gd")
@@ -57,7 +58,12 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	_check(pig_n.level == 1, "heo thường mặc định lv1 (lv=%d)" % pig_n.level)
-	_check(pig_s.level == 2, "heo sa mạc (SAND) mặc định lv2 (lv=%d)" % pig_s.level)
+	_check(pig_s.level == 1, "heo sa mạc (SAND) mặc định lv1 (lv=%d)" % pig_s.level)
+
+	# ── 1b. mob_bonus_lv theo sinh vật ──
+	_check(carp.mob_bonus_lv == 0, "cá chép mob_bonus_lv = 0")
+	_check(flower.mob_bonus_lv == 1, "cá la hán mob_bonus_lv = 1")
+	_check(pig_s.mob_bonus_lv == 0, "heo sa mạc mob_bonus_lv = 0")
 
 	# ── 2. Hệ số +2% stat / level và +5% drop rate / level ──
 	flower.level = 2
@@ -71,7 +77,7 @@ func _ready() -> void:
 	var f_hp_at_lv21 := flower.get_stat_mult()
 	_check(absf(f_hp_at_lv21 - 1.40) < 0.001, "lv21 stat mult = 1.40 (thực tế %.3f)" % f_hp_at_lv21)
 
-	# ── 4. Drop rate heo: sand lv2 (0.9 * 1.05 = 0.945) cao hơn thường lv1 (0.9) ──
+	# ── 4. Drop rate heo: cả hai lv1 → thịt ~90% ──
 	var rate_n := 0.0
 	var rate_s := 0.0
 	var trials := 6000
@@ -85,7 +91,7 @@ func _ready() -> void:
 	rate_n /= float(trials)
 	rate_s /= float(trials)
 	_check(absf(rate_n - 0.9) < 0.03, "heo thường drop thịt ~90%% (thực tế %.2f%%)" % (rate_n * 100.0))
-	_check(absf(rate_s - 0.945) < 0.03, "heo sa mạc drop thịt ~94.5%% (thực tế %.2f%%)" % (rate_s * 100.0))
+	_check(absf(rate_s - 0.9) < 0.03, "heo sa mạc drop thịt ~90%% (thực tế %.2f%%)" % (rate_s * 100.0))
 
 	# ── 5. Slime: kích thước + stat ──
 	var big := _Slime.new()
@@ -105,6 +111,17 @@ func _ready() -> void:
 	_check(absf(big.scale.x - 2.0) < 0.01 and absf(small.scale.x - 0.5) < 0.01, "slime scale theo size (L=%.1f S=%.1f)" % [big.scale.x, small.scale.x])
 	_check(big.is_in_group("slime"), "slime thuộc group 'slime' (để cận chiến đánh trúng)")
 	_check(big._world_hp_enabled == true, "slime bật world HP bar (thù địch)")
+
+	# ── 5b. Slime level = 1 + mob_bonus_lv(2) + bio_bonus_lv ──
+	_check(big.mob_bonus_lv == 2, "slime mob_bonus_lv = 2")
+	_check(big.level == 3, "slime lv gốc = 1 + 2 = 3 (lv=%d)" % big.level)
+	var bio_slime := _Slime.new()
+	bio_slime.slime_size = _Slime.SlimeSize.MEDIUM
+	bio_slime.bio_bonus_lv = 5
+	add_child(bio_slime)
+	await get_tree().process_frame
+	_check(bio_slime.level == 8, "slime + bio bonus: 1 + 2 + 5 = lv8 (lv=%d)" % bio_slime.level)
+	_check(bio_slime.max_hp == 13, "lv8 slime HP 12*1.14 = 13 (thực tế %d)" % bio_slime.max_hp)
 
 	# ── 6. Slime Lớn chết → tách 2-4 con Vừa + drop Slimeball ──
 	var before_children := _count_slimes_of(_Slime.SlimeSize.MEDIUM)
@@ -135,6 +152,48 @@ func _ready() -> void:
 
 	# ── 8. Item slime_ball tồn tại trong database ──
 	_check(ItemDatabase.items_db.has("slime_ball"), "item slime_ball có trong database")
+
+	# ── 9. roll_bio_bonus_at: bonus nằm trong khoảng theo zones ──
+	var bio_ok := true
+	var samples: Array[Vector2] = [Vector2(0, 0), Vector2(1200, 340), Vector2(-800, 2100), Vector2(3000, -1500)]
+	for s in samples:
+		var res: Dictionary = WorldChunk.roll_bio_bonus_at(s.x, s.y)
+		var zs: Array = res.get("zones", [])
+		var b: int = res.get("bonus", 0)
+		if zs.is_empty():
+			bio_ok = false
+			break
+		var lo: int = 0
+		var hi: int = 0
+		match zs[0]:
+			"sea": lo = 0; hi = 30
+			"desert": lo = 10; hi = 15
+			"plain": lo = 0; hi = 5
+		if zs.has("mountain"):
+			lo += 5
+			hi += 10
+		if b < lo or b > hi:
+			bio_ok = false
+			break
+	_check(bio_ok, "roll_bio_bonus_at: bonus nằm trong khoảng theo zones")
+
+	# ── 10. Cửa sổ giờ spawn slime (chiều tối → sáng sớm) ──
+	var spawner := SlimeSpawner.new()
+	add_child(spawner)
+	await get_tree().process_frame
+	TimeSystem.set_hour(12.0)
+	_check(spawner.call("_is_night_window") == false, "ban ngày 12h: không spawn")
+	TimeSystem.set_hour(16.0)
+	_check(spawner.call("_is_night_window") == false, "chiều 16h: chưa mở cửa sổ")
+	TimeSystem.set_hour(17.0)
+	_check(spawner.call("_is_night_window") == true, "chiều tối 17h: mở cửa sổ")
+	TimeSystem.set_hour(21.0)
+	_check(spawner.call("_is_night_window") == true, "đêm 21h: được spawn")
+	TimeSystem.set_hour(3.0)
+	_check(spawner.call("_is_night_window") == true, "sáng sớm 3h: được spawn")
+	TimeSystem.set_hour(6.0)
+	_check(spawner.call("_is_night_window") == false, "sáng 6h: hết cửa sổ")
+	TimeSystem.set_hour(12.0)
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())

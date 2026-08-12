@@ -415,6 +415,38 @@ static func find_mountain(wx: float, wz: float, max_radius: float = 15000.0) -> 
 		r += STEP
 	return { "ok": false }
 
+## ── Creature bio bonus (level theo vùng sinh thái) ─────────────────────────
+## Phân loại vùng sinh thái tại (wx,wz) rồi roll bonus level cho sinh vật spawn:
+##   Biển 0..30, Sa mạc 10..15, Đồng bằng 0..5; Núi +5..10 CHỒNG lên trên đất
+##   (núi nằm trong đồng bằng/sa mạc → cộng dồn, đúng ví dụ user:
+##   slime ở ruộng lúa trên núi trong đồng bằng = 1 + 2 + đồng bằng + núi).
+## Trả về { "bonus": int, "zones": Array[String] }.
+static func roll_bio_bonus_at(wx: float, wz: float) -> Dictionary:
+	const DIM: int = _Data._Dim.DimensionID.REAL_WORLD
+	var nd: Dictionary = _noise_for_dim(DIM)
+	var zones: Array[String] = []
+	var bonus: int = 0
+	if _ocean_mask_at(nd, wx, wz):
+		bonus += randi_range(0, 30)
+		zones.append("sea")
+	else:
+		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5
+		if d > 0.55:
+			bonus += randi_range(10, 15)
+			zones.append("desert")
+		else:
+			bonus += randi_range(0, 5)
+			zones.append("plain")
+		var n_mt: FastNoiseLite = nd["mountain"]
+		if n_mt:
+			var mtn: float = (n_mt.get_noise_2d(wx, wz) + 1.0) * 0.5
+			var mtn_t: float = clamp((mtn - 0.58) / 0.14, 0.0, 1.0)
+			mtn_t = mtn_t * mtn_t * (3.0 - 2.0 * mtn_t)
+			if mtn_t > 0.50:
+				bonus += randi_range(5, 10)
+				zones.append("mountain")
+	return { "bonus": bonus, "zones": zones }
+
 ## Kiểm tra có quán rượu THẬT đã build tại world pos (chunk phải nằm trong cache).
 ## Dùng cho teleport "quán gần nhất" để chỉ nhắm vào quán đã được dựng.
 static func is_tavern_built_at(wx: float, wz: float) -> bool:

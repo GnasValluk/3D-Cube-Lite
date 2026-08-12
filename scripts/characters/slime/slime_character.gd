@@ -38,7 +38,8 @@ func _init() -> void:
 func _build_character() -> void:
 	_is_player = false
 	character_name = "Green Slime"
-	level = 1
+	mob_bonus_lv = 2
+	level = compute_level()
 	var smult: float = get_stat_mult()
 	max_hp = maxi(1, int(SIZE_HP[slime_size] * smult))
 	hp = max_hp

@@ -104,6 +104,10 @@ func _process(delta: float) -> void:
 		return true
 	)
 
+	# Slime chỉ spawn từ chiều tối (17h) tới sáng sớm (6h) — ngoài giờ không spawn
+	if not _is_night_window():
+		return
+
 	_try_generate_packs(player_pos)
 
 	for pack in _packs:
@@ -143,6 +147,8 @@ func _try_generate_packs(player_pos: Vector3) -> void:
 		if too_close:
 			continue
 		if not _is_valid_terrain(home_pos):
+			continue
+		if not _is_rice_grass_zone(home_pos):
 			continue
 
 		var pack := SlimePack.new()
@@ -184,6 +190,7 @@ func _spawn_slime(pos: Vector3, pack: SlimePack) -> void:
 	else:
 		size = SlimeCharacter.SlimeSize.LARGE
 	slime.set("slime_size", size)
+	slime.set("bio_bonus_lv", WorldChunk.roll_bio_bonus_at(pos.x, pos.z)["bonus"])
 	slime.name = "Slime_%d_%d" % [_packs.find(pack), pack.slimes.size()]
 	slime.set("_is_player", false)
 	add_child(slime)
@@ -200,6 +207,38 @@ func _is_valid_terrain(pos: Vector3) -> bool:
 	var below: int = _world_mgr.get_block(pos.x, pos.y - 0.2, pos.z)
 	var above: int = _world_mgr.get_block(pos.x, pos.y + 0.5, pos.z)
 	return below != 0 and above == 0
+
+# ── Giờ spawn: chiều tối → sáng sớm ──────────────────────────────────────────
+const NIGHT_START_HOUR: float = 17.0  # chiều tối
+const NIGHT_END_HOUR: float = 6.0     # sáng sớm
+
+func _is_night_window() -> bool:
+	var h: float = TimeSystem.get_hour()
+	return h >= NIGHT_START_HOUR or h < NIGHT_END_HOUR
+
+func _is_water_block(b: int) -> bool:
+	return b == _Data.BlockID.WATER or b == _Data.BlockID.WATER_SOURCE \
+		or (b >= _Data.BlockID.WATER_LEVEL_7 and b <= _Data.BlockID.WATER_LEVEL_1)
+
+## Slime spawn gần bụi cỏ lúa: đất cỏ vùng trũng và có nước trong bán kính ~3 ô
+## (cỏ lúa mọc sát nước — khớp chunk_grass near_water wdist <= 3). Đất lầy
+## (DARK_GRASS/MUDDY_SAND) mặc định là ruộng lúa.
+func _is_rice_grass_zone(pos: Vector3) -> bool:
+	if _world_mgr == null or not _world_mgr.has_method("get_block"):
+		return false
+	var below: int = _world_mgr.get_block(pos.x, pos.y - 0.2, pos.z)
+	if below == _Data.BlockID.DARK_GRASS or below == _Data.BlockID.MUDDY_SAND:
+		return true
+	if not _Data.is_grass_tile(below):
+		return false
+	const R: int = 3
+	for ox in range(-R, R + 1):
+		for oz in range(-R, R + 1):
+			if ox == 0 and oz == 0:
+				continue
+			if _is_water_block(_world_mgr.get_block(pos.x + ox, pos.y - 0.2, pos.z + oz)):
+				return true
+	return false
 
 func _get_ground_y(wx: float, wz: float) -> float:
 	var space := get_world_3d().direct_space_state

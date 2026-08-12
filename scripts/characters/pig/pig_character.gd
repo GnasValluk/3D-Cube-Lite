@@ -47,8 +47,9 @@ var _world_mgr: Node = null
 func _build_character() -> void:
 	_is_player = false
 	character_name = "Pig"
-	# Level creature: heo sa mạc khỏe hơn — mặc định lv2, heo thường lv1
-	level = 2 if pig_variant == Variant.SAND else 1
+	# Level creature: mọi heo hạ về lv gốc 1; bio bonus do spawner đặt
+	mob_bonus_lv = 0
+	level = compute_level()
 	var smult: float = get_stat_mult()
 	max_hp = int(VARIANT_HP[pig_variant] * smult)
 	if is_baby:

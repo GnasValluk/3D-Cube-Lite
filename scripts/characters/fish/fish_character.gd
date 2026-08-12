@@ -116,8 +116,9 @@ func _build_character() -> void:
 	_is_player = false
 	character_name = VARIANT_NAMES[fish_variant]
 
-	# Level creature: cá la hán săn mồi mạnh hơn — mặc định lv2, còn lại lv1
-	level = 2 if fish_variant == FishVariant.FLOWERHORN else 1
+	# Level creature: cá la hán +1, còn lại lv gốc 1; bio bonus do spawner đặt
+	mob_bonus_lv = 1 if fish_variant == FishVariant.FLOWERHORN else 0
+	level = compute_level()
 
 	# Randomize personality
 	_boldness = randf_range(0.3, 1.0)

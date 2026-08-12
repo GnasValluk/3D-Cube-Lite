@@ -312,6 +312,16 @@ func _spawn_splash(entering: bool) -> void:
 
 # ── Level / Exp ───────────────────────────────────────────────────────────────
 const MAX_LEVEL: int = 100
+
+## Bonus level theo bản thân sinh vật (vd: cá la hán +1, slime +2).
+var mob_bonus_lv: int = 0
+## Bonus level theo vùng sinh thái nơi spawn (do spawner đặt trước add_child).
+var bio_bonus_lv: int = 0
+
+## Level tổng của creature = 1 (gốc) + mob_bonus_lv + bio_bonus_lv.
+func compute_level() -> int:
+	return 1 + mob_bonus_lv + bio_bonus_lv
+
 ## Hệ số chỉ số theo level creature: mỗi level trên 1 tăng +2%.
 ##   stat_eff = base * get_stat_mult()
 func get_stat_mult() -> float:

@@ -143,6 +143,7 @@ func _spawn_fish(wx: float, wy: float, wz: float, has_silt: bool) -> void:
 	fish.set("fish_scale", _rng.randf_range(0.85, 1.15))
 	fish.name = "Fish_%d" % _fish_list.size()
 	fish.set("_is_player", false)
+	fish.set("bio_bonus_lv", WorldChunk.roll_bio_bonus_at(wx, wz)["bonus"])
 
 	add_child(fish)
 	fish.global_position = Vector3(wx, wy, wz)

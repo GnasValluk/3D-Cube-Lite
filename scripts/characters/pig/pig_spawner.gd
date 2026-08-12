@@ -193,6 +193,7 @@ func _spawn_pig(pos: Vector3, herd: PigHerd) -> void:
 	pig.set("pig_scale", _rng.randf_range(0.45, 0.55) if is_baby else _rng.randf_range(0.85, 1.15))
 	pig.name = "Pig_%d_%d" % [_herds.find(herd), herd.pigs.size()]
 	pig.set("_is_player", false)
+	pig.set("bio_bonus_lv", WorldChunk.roll_bio_bonus_at(pos.x, pos.z)["bonus"])
 	add_child(pig)
 	pig.global_position = pos
 	pig.rotation.y = _rng.randf_range(0.0, TAU)
