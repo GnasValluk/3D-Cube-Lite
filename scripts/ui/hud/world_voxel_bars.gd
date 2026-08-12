@@ -8,15 +8,14 @@ const WORLD_W: float = 3.84
 const WORLD_H: float = 1.2
 const VS: float = 6.0
 
-const DEF_TIERS: Array[Dictionary] = [
-	{ "max": 0, "color": Color(0.15, 0.10, 0.20, 0.10) },
-	{ "max": 2, "color": Color(0.55, 0.41, 0.08, 0.55)  },
-	{ "max": 4, "color": Color(0.72, 0.45, 0.20, 0.60)  },
-	{ "max": 7, "color": Color(0.65, 0.65, 0.65, 0.65)  },
-	{ "max": 10, "color": Color(0.95, 0.80, 0.10, 0.65) },
-	{ "max": 14, "color": Color(0.20, 0.85, 0.45, 0.65) },
-	{ "max": 18, "color": Color(0.10, 0.75, 0.85, 0.70) },
-	{ "max": 999, "color": Color(0.60, 0.20, 0.80, 0.75) },
+# ── Màu nền hộp LEVEL theo cấp độ người chơi (tối đa 100) ──
+const LV_TIERS: Array[Dictionary] = [
+	{ "lv": 0,   "color": Color(0.12, 0.30, 0.14, 0.70) },
+	{ "lv": 20,  "color": Color(0.12, 0.45, 0.30, 0.72) },
+	{ "lv": 40,  "color": Color(0.16, 0.45, 0.72, 0.72) },
+	{ "lv": 60,  "color": Color(0.45, 0.35, 0.80, 0.72) },
+	{ "lv": 80,  "color": Color(0.80, 0.35, 0.70, 0.72) },
+	{ "lv": 100, "color": Color(0.95, 0.75, 0.15, 0.75) },
 ]
 
 var _player: CharacterBase
@@ -24,16 +23,16 @@ var _sub_viewport: SubViewport
 var _health_vbar: VoxelBar
 var _food_vbar: VoxelBar
 var _oxygen_vbar: VoxelBar
-var _shield_box: ColorRect
-var _def_label: Label
+var _level_box: ColorRect
+var _level_label: Label
 var _effects_label: Label
 var _effects_icon: ColorRect
 
-func _get_def_tier(def_val: int) -> Color:
-	for t in DEF_TIERS:
-		if def_val <= t["max"]:
+func _get_level_color(lv: int) -> Color:
+	for t in LV_TIERS:
+		if lv <= t["lv"]:
 			return t["color"]
-	return DEF_TIERS[-1]["color"]
+	return LV_TIERS[-1]["color"]
 
 func setup(target: CharacterBase) -> void:
 	_player = target
@@ -43,6 +42,8 @@ func setup(target: CharacterBase) -> void:
 	target.oxygen_changed.connect(_on_oxygen_changed)
 	if target.has_signal("food_changed"):
 		target.food_changed.connect(_on_food_changed)
+	if target.has_signal("level_up"):
+		target.level_up.connect(func(_lv: int): _update_level())
 	_on_hp_changed(target.hp, target.max_hp)
 	_on_oxygen_changed(int(target.oxygen), int(target.max_oxygen))
 
@@ -67,55 +68,40 @@ func _build() -> void:
 	root.add_child(ob)
 	_oxygen_vbar = ob
 
-	# ── Shield indicator ──
-	_shield_box = ColorRect.new()
-	_shield_box.size = Vector2(74, 140)
-	_shield_box.position = Vector2(8, 116)
-	_shield_box.color = DEF_TIERS[0]["color"]
-	_shield_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(_shield_box)
+	# ── Cấp độ người chơi (nền màu theo level, số = level) ──
+	_level_box = ColorRect.new()
+	_level_box.size = Vector2(74, 140)
+	_level_box.position = Vector2(8, 116)
+	_level_box.color = _get_level_color(_player.level)
+	_level_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_level_box)
 
-	var shield_border := ColorRect.new()
-	shield_border.color = Color(1, 1, 1, 0.06)
-	shield_border.size = Vector2(74, 140)
-	shield_border.position = Vector2(8, 116)
-	shield_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(shield_border)
+	var level_border := ColorRect.new()
+	level_border.color = Color(1, 1, 1, 0.06)
+	level_border.size = Vector2(74, 140)
+	level_border.position = Vector2(8, 116)
+	level_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(level_border)
 
-	# Shield icon
-	var sb := ColorRect.new()
-	sb.color = Color(1, 1, 1, 0.15)
-	sb.size = Vector2(34, 50)
-	sb.position = Vector2(28, 126)
-	sb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(sb)
+	# LEVEL number
+	_level_label = Label.new()
+	_level_label.text = str(_player.level)
+	_level_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_level_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_level_label.size = Vector2(74, 40)
+	_level_label.position = Vector2(8, 192)
+	_level_label.add_theme_font_size_override("font_size", 34)
+	_level_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.90))
+	root.add_child(_level_label)
 
-	var st := ColorRect.new()
-	st.color = Color(1, 1, 1, 0.15)
-	st.size = Vector2(26, 16)
-	st.position = Vector2(32, 112)
-	st.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(st)
-
-	# DEF number
-	_def_label = Label.new()
-	_def_label.text = "0"
-	_def_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_def_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_def_label.size = Vector2(74, 40)
-	_def_label.position = Vector2(8, 192)
-	_def_label.add_theme_font_size_override("font_size", 34)
-	_def_label.add_theme_color_override("font_color", Color(1, 1, 1, 0.80))
-	root.add_child(_def_label)
-
-	var dt := Label.new()
-	dt.text = "DEF"
-	dt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dt.size = Vector2(74, 18)
-	dt.position = Vector2(8, 230)
-	dt.add_theme_font_size_override("font_size", 13)
-	dt.add_theme_color_override("font_color", Color(1, 1, 1, 0.35))
-	root.add_child(dt)
+	var lv_text := Label.new()
+	lv_text.text = "LV"
+	lv_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lv_text.size = Vector2(74, 18)
+	lv_text.position = Vector2(8, 230)
+	lv_text.add_theme_font_size_override("font_size", 13)
+	lv_text.add_theme_color_override("font_color", Color(1, 1, 1, 0.35))
+	root.add_child(lv_text)
 
 	# ── HP row ──
 	var hb := VoxelBar.new()
@@ -171,9 +157,12 @@ func _build() -> void:
 func _on_hp_changed(current: int, max_hp_val: int) -> void:
 	if not is_instance_valid(_player): return
 	_health_vbar.value = current
-	var def_val: int = _player.defense
-	_shield_box.color = _get_def_tier(def_val)
-	_def_label.text = str(def_val)
+	_update_level()
+
+func _update_level() -> void:
+	if not is_instance_valid(_player): return
+	_level_label.text = str(_player.level)
+	_level_box.color = _get_level_color(_player.level)
 
 func _on_food_changed(current: int, max_food_val: int) -> void:
 	if not is_instance_valid(_player): return

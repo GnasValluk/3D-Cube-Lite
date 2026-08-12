@@ -311,9 +311,14 @@ func _spawn_splash(entering: bool) -> void:
 		tw.tween_callback(sp.queue_free)
 
 # ── Level / Exp ───────────────────────────────────────────────────────────────
+const MAX_LEVEL: int = 100
+
 func add_exp(amount: int) -> void:
+	if level >= MAX_LEVEL:
+		exp = exp_to_next
+		return
 	exp += amount
-	while exp >= exp_to_next:
+	while exp >= exp_to_next and level < MAX_LEVEL:
 		exp -= exp_to_next
 		level += 1
 		exp_to_next = level * 100

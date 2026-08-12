@@ -266,6 +266,8 @@ func _on_pickup_area_entered(area: Area3D) -> void:
 			item.queue_free()
 		else:
 			item.item_count = remaining
+	elif area is ExperienceOrb:
+		(area as ExperienceOrb).collect(self)
 
 func interact_with_nearby() -> void:
 	if not can_interact():

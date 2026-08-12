@@ -543,10 +543,20 @@ const LOOT_TABLE: Dictionary = {
 }
 
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
+const _ExpOrb = preload("res://scripts/items/entities/experience_orb.gd")
+const EXP_DROP_RATE: float = 0.05
 
 func _die(_attacker: Node3D = null) -> void:
 	super._die(_attacker)
 	_roll_loot()
+	_roll_exp_drop()
+
+func _roll_exp_drop() -> void:
+	var world := get_tree().current_scene
+	if world == null:
+		return
+	if randf() < EXP_DROP_RATE:
+		_ExpOrb.spawn(world, global_position, global_position.y)
 
 func _roll_loot() -> void:
 	var table: Array = LOOT_TABLE.get(fish_variant, [])
