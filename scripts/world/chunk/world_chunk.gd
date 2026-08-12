@@ -1690,19 +1690,25 @@ static func _build_textured_block_mesh(bd: _BlockData, cols: int, target_block_i
 
 	for x in range(cols):
 		for z in range(cols):
-			var ly: int = top_ly[x * cols + z]
-			if ly < 0: continue
+			var hi: int = top_ly[x * cols + z]
+			if hi < 0: continue
+			# Chạy dọc đặc của loại block này [lo..hi] — gộp mọi block cùng loại
+			# xếp chồng để texture phủ kín cả cột (block dưới không mất texture
+			# khi place chồng thêm — trước đây chỉ vẽ topmost nên dưới chỉ brown).
+			var lo: int = hi
+			while lo > 0 and bd.get_block(x, lo - 1, z) == target_block_id:
+				lo -= 1
 			var cx_f: float = -half + (float(x) + 0.5) * _Data.VOXEL
 			var cz_f: float = -half + (float(z) + 0.5) * _Data.VOXEL
-			var cy_top: float = float(ly + Y_MIN) * SLAB + SLAB
-			var cy_bot: float = float(ly + Y_MIN) * SLAB
+			var cy_top: float = float(hi + Y_MIN) * SLAB + SLAB
+			var cy_bot: float = float(lo + Y_MIN) * SLAB
 
 			st.set_color(Color.WHITE)
 			_Terrain._add_quad_uv(st, Vector3(cx_f, cy_top + 0.01, cz_f),
 				Vector3(hw, 0, 0), Vector3(0, 0, hw), Vector3(0, 1, 0))
 
-			if ly > 0:
-				var below: int = bd.get_block(x, ly - 1, z)
+			if lo > 0:
+				var below: int = bd.get_block(x, lo - 1, z)
 				if below == B.AIR or below == B.WATER:
 					st.set_color(Color(_BOT_MUL, _BOT_MUL, _BOT_MUL))
 					_Terrain._add_quad_uv(st, Vector3(cx_f, cy_bot, cz_f),
@@ -1718,16 +1724,17 @@ static func _build_textured_block_mesh(bd: _BlockData, cols: int, target_block_i
 				if not c[0]: continue
 				var nx: int = c[1]; var nz: int = c[2]
 				var nly: int = top_ly[nx * cols + nz]
-				if nly >= ly: continue
+				if nly >= hi: continue
 				var nrm: Vector3 = c[3]; var off: Vector3 = c[4]
 				var n_top: float = float(nly + Y_MIN) * SLAB + SLAB if nly >= 0 else float(Y_MIN) * SLAB
-				var side_h: float = cy_top - max(cy_bot, n_top)
+				var side_h: float = cy_top - maxf(cy_bot, n_top)
 				if side_h <= 0: continue
 				var cy_mid: float = cy_top - side_h * 0.5
 				var side_u: Vector3 = Vector3(hw, 0, 0) if abs(off.x) < 0.01 else Vector3(0, 0, hw)
 				st.set_color(Color(_SIDE_MUL, _SIDE_MUL, _SIDE_MUL))
+				# UV lặp lại theo từng slab (mỗi block cao 0.5 → 1 họa tiết)
 				_Terrain._add_quad_uv(st, Vector3(cx_f + off.x + nrm.x * 0.01, cy_mid, cz_f + off.z + nrm.z * 0.01),
-					side_u, Vector3(0, side_h * 0.5, 0), nrm)
+					side_u, Vector3(0, side_h * 0.5, 0), nrm, Vector2(1, side_h / SLAB))
 
 	return st.commit()
 

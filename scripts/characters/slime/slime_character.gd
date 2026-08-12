@@ -20,6 +20,11 @@ const ATTACK_RANGE: float = 1.6
 const ATTACK_COOLDOWN: float = 1.0
 const HOP_COOLDOWN: float = 0.9
 
+## Bán kính lang thang quanh điểm spawn — đi xa hơn thì quay về nhà.
+const WANDER_RADIUS: float = 6.0
+## Tốc độ lúc rảnh (không đuổi theo): chỉ còn ~1/3 tốc độ thường.
+const WANDER_SPEED_MULT: float = 0.35
+
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 const _ExpOrb = preload("res://scripts/items/entities/experience_orb.gd")
 const EXP_DROP_RATE: float = 0.07
@@ -31,6 +36,9 @@ var _hop_cd: float = 0.0
 var _attack_cd: float = 0.0
 var _target_dir: Vector3 = Vector3.FORWARD
 var _was_on_floor_ai: bool = false
+var _base_move_speed: float = 3.4
+var _wander_t: float = 0.0
+var _idle_t: float = 0.0
 
 func _init() -> void:
 	show_world_hp_bar = true
@@ -43,7 +51,8 @@ func _build_character() -> void:
 	var smult: float = get_stat_mult()
 	max_hp = maxi(1, int(SIZE_HP[slime_size] * smult))
 	hp = max_hp
-	move_speed = SIZE_SPEED[slime_size] * smult
+	_base_move_speed = SIZE_SPEED[slime_size] * smult
+	move_speed = _base_move_speed
 	sprint_speed = move_speed
 	acceleration = 30.0
 	friction = 8.0
@@ -77,6 +86,7 @@ func _ready() -> void:
 	_home = global_position
 	add_to_group("slime")
 	_target_dir = -global_transform.basis.z
+	_wander_t = randf_range(1.0, 2.5)
 
 func _find_player() -> Node3D:
 	var world := get_tree().current_scene
@@ -100,11 +110,13 @@ func _animate(delta: float) -> void:
 		_player = _find_player()
 
 	var attacking := false
+	var chasing := false
 	if _player and is_instance_valid(_player) and _player.get("is_alive"):
 		var to_player := _player.global_position - global_position
 		to_player.y = 0.0
 		var dist := to_player.length()
-		if dist < AGGRO_RANGE:
+		chasing = dist < AGGRO_RANGE
+		if chasing:
 			if dist > 0.01:
 				_target_dir = to_player.normalized()
 			if dist < ATTACK_RANGE and _attack_cd <= 0.0:
@@ -119,9 +131,37 @@ func _animate(delta: float) -> void:
 				_hop_cd = HOP_COOLDOWN + randf_range(-0.2, 0.2)
 				_sy_tgt = 0.72  # squash trước khi bật
 				attacking = true
-	else:
-		# Lang thang chậm — không nhảy
-		_target_dir = _target_dir.lerp(Vector3(sin(_time * 0.6), 0, cos(_time * 0.6)), delta * 0.5)
+	move_speed = _base_move_speed * (WANDER_SPEED_MULT if not chasing else 1.0)
+	sprint_speed = move_speed
+	if not chasing:
+		# Lang thang CHẬM quanh điểm spawn: đổi hướng ngẫu nhiên, đứng yên
+		# thỉnh thoảng, quay về nhà khi đi quá xa — không lủi thẳng một phía.
+		var to_home := _home - global_position
+		to_home.y = 0.0
+		var home_dist := to_home.length()
+		if home_dist > WANDER_RADIUS:
+			_target_dir = to_home.normalized()
+			_idle_t = 0.0
+			_wander_t = randf_range(0.5, 1.5)
+		elif _idle_t > 0.0:
+			_idle_t -= delta
+			_target_dir = _target_dir.lerp(Vector3.ZERO, delta * 3.0)
+		else:
+			_wander_t -= delta
+			if _wander_t <= 0.0:
+				if randf() < 0.35:
+					_idle_t = randf_range(0.8, 2.2)
+				else:
+					_wander_t = randf_range(1.5, 3.5)
+					_target_dir = Vector3(cos(randf() * TAU), 0, sin(randf() * TAU))
+			_target_dir = _target_dir.lerp(
+				Vector3(_target_dir.x + sin(_time * 0.6) * 0.3, 0, _target_dir.z + cos(_time * 0.6) * 0.3),
+				delta * 0.6)
+		if _idle_t <= 0.0 and is_on_floor() and _hop_cd <= 0.0:
+			_jbuf = JUMP_BUFFER
+			_coyote = COYOTE_TIME
+			_hop_cd = HOP_COOLDOWN + randf_range(-0.2, 0.2)
+			_sy_tgt = 0.72  # squash trước khi bật
 
 	# Biểu cảm miệng
 	if _mesh:

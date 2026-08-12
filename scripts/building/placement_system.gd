@@ -2,6 +2,7 @@ extends Node
 class_name PlacementSystem
 
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
+const _BlockData = preload("res://scripts/world/chunk/chunk_block_data.gd")
 const _FurnaceScript = preload("res://scripts/items/entities/furnace.gd")
 const _FishingBoat = preload("res://scripts/items/entities/fishing_boat.gd")
 const _Tractor = preload("res://scripts/items/entities/tractor.gd")
@@ -204,12 +205,16 @@ func _build_ghost_block() -> void:
 	var box := BoxMesh.new()
 	var bid: int = _Data.ITEM_TO_BLOCK.get(_item_id, 0)
 	var shape: Vector3 = _Data.block_shape(bid)
+	# Gốc ghost = min-corner ô đặt (đúng kết quả _snap_to_surface); box đặt tâm ô
+	# để trùng đúng block thật: full = 1.0×0.5×1.0, shaped = kích thước riêng.
+	var cell_cx: float = _Data.VOXEL * 0.5
+	var cell_cy: float = _BlockData.SLAB_HEIGHT * 0.5
 	if shape != Vector3.ZERO:
-		# Block hình dạng riêng — hộp đúng kích thước, đáy trùng với vị trí đặt
 		box.size = shape
-		mi.position = Vector3(0, shape.y * 0.5, 0)
+		mi.position = Vector3(cell_cx, shape.y * 0.5, cell_cx)
 	else:
-		box.size = Vector3(VOXEL, VOXEL, VOXEL)
+		box.size = Vector3(_Data.VOXEL, _BlockData.SLAB_HEIGHT, _Data.VOXEL)
+		mi.position = Vector3(cell_cx, cell_cy, cell_cx)
 	mi.mesh = box
 	mi.material_override = block_mat
 	_ghost.add_child(mi)
@@ -384,7 +389,9 @@ func update_placement() -> void:
 	var cam: Camera3D = get_viewport().get_camera_3d()
 	if cam == null:
 		return
-	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+	# Cam 3 (TPS): chuột khóa giữa màn hình → aim theo tâm như khi phá block.
+	var tp_aim: bool = _player is CharacterBase and (_player as CharacterBase)._use_tp
+	var mouse_pos: Vector2 = get_viewport().get_visible_rect().size * 0.5 if tp_aim else get_viewport().get_mouse_position()
 	var from: Vector3 = cam.project_ray_origin(mouse_pos)
 	var dir: Vector3 = cam.project_ray_normal(mouse_pos)
 	var space_state: PhysicsDirectSpaceState3D = cam.get_world_3d().direct_space_state
@@ -433,7 +440,9 @@ func update_placement() -> void:
 		y_offset = VOXEL
 	elif _Data.ITEM_TO_BLOCK.has(_item_id):
 		y_offset = 0.0
-	_ghost_pos = snapped + Vector3(0, y_offset, 0)
+	# Mầm cây đặt chính giữa ô (min-corner snap lệch về cạnh ô).
+	var horiz_off: Vector3 = Vector3(_Data.VOXEL * 0.5, 0, _Data.VOXEL * 0.5) if _is_seed_item(_item_id) else Vector3.ZERO
+	_ghost_pos = snapped + Vector3(0, y_offset, 0) + horiz_off
 	_ghost.global_position = _ghost_pos
 	_ghost.visible = true
 	_ghost_valid = true
@@ -462,16 +471,15 @@ func _can_place_boat_pos(pos: Vector3) -> bool:
 	return false
 
 func _snap_to_surface(hit_pos: Vector3, normal: Vector3) -> Vector3:
-	var sx: float = round(hit_pos.x / VOXEL) * VOXEL
-	var sz: float = round(hit_pos.z / VOXEL) * VOXEL
-	var sy: float
-	if normal.y > 0.5:
-		sy = floor((hit_pos.y - 0.0001) / VOXEL) * VOXEL + VOXEL
-	elif normal.y < -0.5:
-		sy = ceil((hit_pos.y + 0.0001) / VOXEL) * VOXEL - VOXEL
-	else:
-		sy = hit_pos.y
-	return Vector3(sx, sy, sz)
+	# Ô nằm TRƯỚC mặt đã chạm (phía ray tới / phía người chơi): hit_pos dời
+	# nhẹ theo normal xuyên mặt → floor/world_y_to_layer ra ô trống cần đặt.
+	# X/Z theo lưới VOXEL=1.0, Y theo slab 0.5 — đặt ngang/sang bên không cần
+	# block phía dưới. Trả về min-corner ô đặt (place_block floor đúng ô).
+	var tx: int = int(floor(hit_pos.x + normal.x * 0.001))
+	var tz: int = int(floor(hit_pos.z + normal.z * 0.001))
+	var tl: int = _BlockData.world_y_to_layer(hit_pos.y + normal.y * 0.001)
+	var sy: float = float(tl + _BlockData.Y_MIN) * _BlockData.SLAB_HEIGHT
+	return Vector3(float(tx), sy, float(tz))
 
 func confirm_placement() -> bool:
 	if not _placing or not _ghost_valid or _item_id.is_empty():

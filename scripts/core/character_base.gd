@@ -42,6 +42,12 @@ const DAMAGE_TYPE_NAMES: Dictionary = {
 @export var hp:                 int   = 100
 @export var defense:            int   = 0
 @export var attack_power:       int   = 15
+
+## Giáp phòng thủ tổng (defense cơ bản + bonus trang bị).
+## Player ghi đè để cộng def_bonus của giáp đang mặc.
+func get_total_def() -> float:
+	return float(defense)
+
 @export var move_speed:         float = 5.5
 @export var sprint_speed:       float = 9.5
 @export var acceleration:       float = 26.0

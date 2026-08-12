@@ -5,10 +5,12 @@ const BAR_WIDTH: float = 1.2
 const BAR_HEIGHT: float = 0.08
 const BAR_OFFSET_Y: float = 2.6
 const BAR_GAP: float = 0.02
+const LABEL_OFFSET_Y: float = 0.16
 
 var _pivot: Node3D
 var _fill: MeshInstance3D
 var _shield: MeshInstance3D
+var _label: Label3D
 var _target: CharacterBase
 
 func setup(target: CharacterBase) -> void:
@@ -44,6 +46,18 @@ func _build() -> void:
 	_shield.material_override = mat_shield
 	_shield.position = Vector3(-BAR_WIDTH * 0.5, -(BAR_HEIGHT + BAR_GAP) * 2, 0.0)
 	_pivot.add_child(_shield)
+
+	# Nhãn phía trên thanh HP: Lv + tên sinh vật, billboard hướng camera.
+	_label = Label3D.new()
+	_label.text = "Lv.%d %s" % [_target.level, _target.character_name]
+	_label.font_size = 28
+	_label.outline_size = 10
+	_label.outline_modulate = Color(0, 0, 0, 0.9)
+	_label.modulate = Color(1, 1, 1, 1)
+	_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_label.no_depth_test = true
+	_label.position = Vector3(0, BAR_HEIGHT * 0.5 + LABEL_OFFSET_Y, 0)
+	_pivot.add_child(_label)
 
 func _process(_delta: float) -> void:
 	var cam: Camera3D = get_viewport().get_camera_3d()

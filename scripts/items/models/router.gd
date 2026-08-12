@@ -74,6 +74,10 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"gold_ore": BlockMeshes.block_cube(parent, "gold_ore")
 		"titan_ore": BlockMeshes.block_cube(parent, "titan_ore")
 		"platinum_ore": BlockMeshes.block_cube(parent, "platinum_ore")
+		"coal_ore": BlockMeshes.block_cube(parent, "coal_ore")
+		# ── Fuel (Than) ─────────────────────────────────────────────
+		"coal": MaterialMeshes.coal_lump(parent)
+		"charcoal": MaterialMeshes.charcoal(parent)
 		# ── Ingots ────────────────────────────────────────
 		"copper_ingot": MaterialMeshes.ingot(parent, Color(0.70, 0.55, 0.15), Color(0.48, 0.27, 0.23))
 		"copper_high_ingot": MaterialMeshes.ingot_high(parent, Color(0.85, 0.70, 0.20), Color(0.66, 0.49, 0.37))

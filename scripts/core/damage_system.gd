@@ -7,7 +7,8 @@ extends RefCounted
 static func take_damage(character: CharacterBase, amount: int, attacker: Node3D = null, damage_type: int = 0) -> void:
 	if not character.is_alive or character._invul_timer > 0.0:
 		return
-	var dmg := maxi(1, amount - character.defense)
+	var total_def: float = character.get_total_def()
+	var dmg := maxi(1, amount - int(total_def))
 	if character.shield > 0:
 		var absorbed := mini(character.shield, dmg)
 		character.shield -= absorbed
@@ -58,6 +59,7 @@ static func revive(character: CharacterBase) -> void:
 	character._flash_restore()
 	character._death_timer = 0.0
 	character._hit_timer = 0.0
+	character._invul_timer = 0.0
 	character.set_physics_process(true)
 	character.set_process_unhandled_input(true)
 	character.set_process_unhandled_key_input(true)

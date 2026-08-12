@@ -420,6 +420,8 @@ func _process(_delta: float) -> void:
 	var player := _player_ref
 	if player == null:
 		return
+	if not player.is_alive:
+		return
 	var cur := player.equipped_weapon
 	var sel_slot := _inventory.slots[_selected]
 	var target := sel_slot.item if not sel_slot.is_empty() else null

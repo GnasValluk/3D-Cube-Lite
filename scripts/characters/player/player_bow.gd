@@ -214,7 +214,7 @@ static func update_aim(player, delta: float) -> void:
 
 	if player._bow_indicator_root == null or player._bow_indicator_line == null or player._bow_indicator_target == null:
 		return
-	var range_len: float = 25.0 if is_cannon else lerp(8.0, 50.0, player._bow_charge / player._bow_max_charge)
+	var range_len: float = 25.0 if is_cannon else lerp(16.0, 100.0, player._bow_charge / player._bow_max_charge)
 	var end_pos: Vector3 = player._bow_aim_dir * range_len
 	end_pos.y = plane_y
 
@@ -258,7 +258,7 @@ static func _update_aim_tps(player, delta: float, is_cannon: bool) -> void:
 	else:
 		player._bow_aim_dir = -player.global_transform.basis.z
 
-	var range_len: float = 25.0 if is_cannon else lerp(8.0, 50.0, player._bow_charge / player._bow_max_charge)
+	var range_len: float = 25.0 if is_cannon else lerp(16.0, 100.0, player._bow_charge / player._bow_max_charge)
 	var aim_dist: float = to_target.length()
 	var use_dist: float = min(aim_dist, range_len)
 	var end_pos: Vector3 = muzzle + to_target.normalized() * use_dist
@@ -330,8 +330,8 @@ static func fire(player) -> void:
 	player._damage_equipped_tool(1)
 
 	var charge_pct: float = player._bow_charge / player._bow_max_charge
-	var range_len: float = lerp(8.0, 50.0, charge_pct)
-	var arrow_speed: float = lerp(15.0, 50.0, charge_pct)
+	var range_len: float = lerp(16.0, 100.0, charge_pct)
+	var arrow_speed: float = lerp(20.0, 68.0, charge_pct)
 	var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 8)
 	var total_dmg: int = int(base_dmg * lerp(0.5, 1.5, charge_pct))
 
@@ -341,8 +341,8 @@ static func fire(player) -> void:
 		var to_tgt: Vector3 = player._aim_world_point - spawn_from
 		if to_tgt.length_squared() > 0.01:
 			aim_dir = to_tgt.normalized()
-			range_len = max(range_len, min(to_tgt.length(), 50.0))
-			arrow_speed = max(arrow_speed, 30.0)
+			range_len = max(range_len, min(to_tgt.length(), 100.0))
+			arrow_speed = max(arrow_speed, 40.0)
 
 	var arrow := ArrowProjectile.new()
 	var world: Node = player.get_tree().current_scene

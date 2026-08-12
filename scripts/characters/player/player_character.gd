@@ -497,10 +497,6 @@ func _spawn_death_chest() -> void:
 	scene.add_child(chest)
 	chest.global_position = global_position + Vector3(0, 0.6, 0)
 	var chest_inv := Inventory.new(45)
-	if inventory != null:
-		for slot in inventory.slots:
-			if not slot.is_empty() and slot.item != null:
-				chest_inv.add_item(slot.item, slot.count)
 	var equipped: Array = [equipped_weapon, equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_back, equipped_sub]
 	var eq_dur: Array = [_equipped_durability, -1, -1, -1, -1, -1, -1]
 	for i in equipped.size():
@@ -512,6 +508,16 @@ func _spawn_death_chest() -> void:
 			var idx := chest_inv.find_slot_of_item(it)
 			if idx >= 0:
 				chest_inv.slots[idx].durability = eq_dur[i]
+	if inventory != null:
+		for i in range(inventory.slots.size()):
+			var slot: ItemSlot = inventory.slots[i]
+			if slot.is_empty() or slot.item == null:
+				continue
+			# Vũ khí đang cầm nằm trong hotbar → đã được thêm qua equipped loop,
+			# bỏ qua để tránh trùng item khi chết.
+			if i == _equipped_slot_idx and slot.item == equipped_weapon:
+				continue
+			chest_inv.add_item(slot.item, slot.count)
 	# Multiplayer: mọi máy spawn death chest giống hệt qua net (host-authoritative).
 	if Net.is_active():
 		chest.queue_free()
@@ -548,6 +554,7 @@ func _do_respawn() -> void:
 	oxygen_changed.emit(int(oxygen), int(max_oxygen))
 	stamina_changed.emit(stamina, max_stamina)
 	revive()
+	_sync_camera()
 	_death_chest_spawned = false
 	_scroll_inventory_message(tr("DEATH_CHEST_MSG"))
 	if Net.is_active():
@@ -1327,8 +1334,8 @@ func _physics_process(delta: float) -> void:
 		velocity.z *= 0.5
 	if not is_alive and _death_timer <= 0.0 and not _death_chest_spawned:
 		_death_chest_spawned = true
-		_spawn_death_chest()
 		_do_respawn()
+		call_deferred("_spawn_death_chest")
 		return
 	if _halberd_dashing:
 		if _state == State.DASH:

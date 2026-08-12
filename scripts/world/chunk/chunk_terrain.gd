@@ -593,15 +593,16 @@ static func _emit_solid_column(st: SurfaceTool, data: PackedByteArray, cols: int
 				span_blk, colors, side_mul)
 
 ## ── _add_quad_uv: quad với UV (dùng cho ore texture) ────────────────────────
+## tscale: số lần lặp texture theo (u, v) — mặt bên đặt 1 họa tiết/slab.
 static func _add_quad_uv(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,
-		n: Vector3) -> void:
+		n: Vector3, tscale: Vector2 = Vector2(1, 1)) -> void:
 	st.set_normal(n)
-	st.set_uv(Vector2(0, 0)); st.add_vertex(center - u - v)
-	st.set_uv(Vector2(1, 0)); st.add_vertex(center + u - v)
-	st.set_uv(Vector2(1, 1)); st.add_vertex(center + u + v)
-	st.set_uv(Vector2(0, 0)); st.add_vertex(center - u - v)
-	st.set_uv(Vector2(1, 1)); st.add_vertex(center + u + v)
-	st.set_uv(Vector2(0, 1)); st.add_vertex(center - u + v)
+	st.set_uv(Vector2(0 * tscale.x, 0 * tscale.y)); st.add_vertex(center - u - v)
+	st.set_uv(Vector2(1 * tscale.x, 0 * tscale.y)); st.add_vertex(center + u - v)
+	st.set_uv(Vector2(1 * tscale.x, 1 * tscale.y)); st.add_vertex(center + u + v)
+	st.set_uv(Vector2(0 * tscale.x, 0 * tscale.y)); st.add_vertex(center - u - v)
+	st.set_uv(Vector2(1 * tscale.x, 1 * tscale.y)); st.add_vertex(center + u + v)
+	st.set_uv(Vector2(0 * tscale.x, 1 * tscale.y)); st.add_vertex(center - u + v)
 
 ## ── _add_quad (shared helper) ────────────────────────────────────────────────
 static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3,

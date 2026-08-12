@@ -198,10 +198,9 @@ func _setup_ui() -> void:
 	_chat_overlay = _ChatOverlay.new()
 	_chat_overlay.message_submitted.connect(_on_chat_submitted)
 	add_child(_chat_overlay)
+	_chat_overlay.visible = true
 	if Net != null:
 		Net.chat_message_received.connect(_on_chat_message)
-		if Net.is_active():
-			_chat_overlay.visible = true
 
 	_build_hint = Label.new()
 	_build_hint.position = Vector2(17, 78)
@@ -293,8 +292,6 @@ func _sync_mouse_visibility() -> void:
 	elif _phone_ui and _phone_ui.visible:
 		ui_open = true
 	elif _library and _library.visible:
-		ui_open = true
-	elif _placement_sys and _placement_sys.is_placing():
 		ui_open = true
 	if ui_open:
 		if Input.get_mouse_mode() != Input.MOUSE_MODE_VISIBLE:
@@ -543,13 +540,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
-			# Chat: mở input bằng Enter (ui_accept) khi đang chơi và có Net active.
-			if _chat_overlay and Net != null and Net.is_active():
+			# Chat: chỉ Enter bật/tắt hộp nhập (không dùng ui_accept vì Space cũng khớp);
+			# trong hộp nhập Enter gửi tin, Esc đóng.
+			var is_enter: bool = k.keycode == KEY_ENTER or k.keycode == KEY_KP_ENTER
+			if _chat_overlay:
 				if _chat_overlay.is_input_open():
-					if k.is_action_pressed("ui_cancel"):
+					if k.is_action_pressed("ui_cancel") or is_enter:
 						_chat_overlay.close_input()
 						return
-				elif k.is_action_pressed("ui_accept"):
+				elif is_enter:
 					_chat_overlay.open_input()
 					return
 
@@ -651,8 +650,12 @@ func _on_chat_message(sender_name: String, sender_color: Color, text: String) ->
 		_chat_overlay.add_message(sender_name, sender_color, text)
 
 func _on_chat_submitted(text: String) -> void:
-	if Net != null:
+	if Net != null and Net.is_active():
 		Net.send_chat_message(text)
+	else:
+		var p := _find_player_character()
+		var name_str := "You" if p == null else p.character_name
+		_on_chat_message(name_str, Color(0.6, 0.9, 0.6), text)
 
 func open_chest(chest) -> void:
 	if _chest_open:

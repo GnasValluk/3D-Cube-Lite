@@ -20,6 +20,13 @@ var _player: Node3D = null
 const MAGNET_RANGE: float = 3.0
 const FLY_SPEED: float = 7.0
 const PICKUP_DISTANCE: float = 1.35
+const FALL_GRAVITY: float = 14.0
+const FALL_EPS: float = 0.02
+const REST_HEIGHT: float = 0.2
+
+var _settled: bool = false
+var _fall_vel: float = 0.0
+var _ground_measured: bool = false
 
 func init(def_: ItemDef, count: int = 1):
 	item_def = def_
@@ -111,12 +118,16 @@ func launch(initial_velocity: Vector3, ground_y: float) -> void:
 	_flying = true
 	_velocity = initial_velocity
 	_ground_y = ground_y
+	_ground_measured = true
+	_settled = false
 
 func fly_straight(initial_velocity: Vector3, ground_y: float, damage: int = 0, attacker: Node3D = null) -> void:
 	_flying = true
 	_straight_flight = true
 	_velocity = initial_velocity
 	_ground_y = ground_y
+	_ground_measured = true
+	_settled = false
 	_throw_damage = damage
 	_throw_attacker = attacker
 
@@ -186,6 +197,8 @@ func _process(delta: float):
 				rotation.x = 0.0
 				rotation.z = 0.0
 	else:
+		if not _settled:
+			_fall(delta)
 		# Magnet: bay về phía người chơi khi đủ gần
 		if can_pickup and _player and is_instance_valid(_player):
 			var to_player := _player.global_position - global_position
@@ -201,6 +214,34 @@ func _process(delta: float):
 		position.y += bob * delta * 2.0
 		var rot := delta * 30.0
 		rotation.y += deg_to_rad(rot)
+
+## Vật phẩm rơi từ trên cao (không có launch): có trọng lực, rớt chạm đất rồi đứng yên.
+func _fall(delta: float) -> void:
+	if not _ground_measured:
+		_ground_measured = true
+		_ground_y = _measure_ground_y()
+	if position.y - REST_HEIGHT > _ground_y + FALL_EPS:
+		_fall_vel -= FALL_GRAVITY * delta
+		position.y += _fall_vel * delta
+	else:
+		position.y = _ground_y + REST_HEIGHT
+		_settled = true
+		_fall_vel = 0.0
+
+## Tìm chiều cao mặt đất ngay dưới vật phẩm (raycast xuống, bỏ qua chính nó).
+func _measure_ground_y() -> float:
+	var space := get_world_3d().direct_space_state
+	if space != null:
+		var q := PhysicsRayQueryParameters3D.new()
+		q.from = global_position
+		q.to = global_position + Vector3(0, -60.0, 0)
+		q.collide_with_areas = false
+		q.collide_with_bodies = true
+		q.exclude = [self]
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			return hit.position.y
+	return global_position.y
 
 func collect(player: Node) -> bool:
 	if not can_pickup:

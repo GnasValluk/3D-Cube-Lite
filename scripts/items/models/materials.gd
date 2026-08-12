@@ -136,6 +136,48 @@ static func ingot_purified(p: Node3D, metal: Color, dark: Color) -> void:
 # palm_wood, log, plank, coins, gem, pile, hide, lump, bone, egg, pearl,
 # feather, paper, stick, essence — unchanged from original
 
+static func coal_lump(p: Node3D) -> void:
+	var base   := Color(0.14, 0.14, 0.16)
+	var base_d := Color(0.08, 0.08, 0.10)
+	var gloss  := Color(0.30, 0.30, 0.34)
+	# Cục than chính (lệch tâm) — nhiều mặt góc cạnh
+	ItemMeshShared.add_cube(p, 0.1, 0.2, 0.1, 2.2, 1.7, 2.2, base)
+	ItemMeshShared.add_cube(p, 0.3, -0.2, 0.3, 1.8, 1.2, 1.8, base_d)
+	ItemMeshShared.add_cube(p, -0.4, 0.0, -0.3, 1.6, 1.2, 1.4, base.lightened(0.05))
+	ItemMeshShared.add_cube(p, 0.5, 0.6, -0.4, 1.2, 0.9, 1.0, base_d.darkened(0.06))
+	ItemMeshShared.add_cube(p, -0.6, 0.7, 0.4, 1.1, 0.8, 0.9, base_d)
+	ItemMeshShared.add_cube(p, 0.0, 1.1, 0.2, 1.0, 0.7, 1.0, base.lightened(0.08))
+	# Cục nhỏ xung quanh
+	ItemMeshShared.add_cube(p, -1.4, -0.4, 0.6, 0.7, 0.6, 0.7, base_d)
+	ItemMeshShared.add_cube(p, 1.3, -0.5, -0.7, 0.7, 0.6, 0.7, base_d)
+	ItemMeshShared.add_cube(p, -0.9, -0.7, -1.2, 0.6, 0.5, 0.6, base_d.darkened(0.08))
+	ItemMeshShared.add_cube(p, 1.1, 0.9, 1.0, 0.6, 0.5, 0.6, base.lightened(0.06))
+	# Điểm bóng loáng
+	ItemMeshShared.add_cube(p, -0.3, 0.7, 0.5, 0.35, 0.2, 0.35, gloss)
+	ItemMeshShared.add_cube(p, 0.7, 0.3, -0.6, 0.3, 0.18, 0.3, gloss.darkened(0.1))
+
+static func charcoal(p: Node3D) -> void:
+	var char   := Color(0.09, 0.08, 0.06)
+	var char_d := Color(0.05, 0.04, 0.03)
+	var char_l := Color(0.16, 0.13, 0.10)
+	# Thanh củi cháy dở — 3 thanh gỗ đen nằm chồng
+	ItemMeshShared.add_cube(p, -0.9, 0.4, 0.0, 2.2, 0.7, 0.7, char)
+	ItemMeshShared.add_cube(p, -1.0, 0.25, 0.35, 1.9, 0.55, 0.55, char_d)
+	ItemMeshShared.add_cube(p, 0.3, -0.15, -0.3, 2.4, 0.6, 0.6, char)
+	ItemMeshShared.add_cube(p, -0.5, -0.55, 0.1, 2.0, 0.55, 0.55, char_d.darkened(0.05))
+	# Đầu thanh vỡ vụn
+	ItemMeshShared.add_cube(p, -1.3, -0.4, -0.5, 0.5, 0.45, 0.5, char_l)
+	ItemMeshShared.add_cube(p, 1.4, -0.5, 0.5, 0.5, 0.45, 0.5, char_l.darkened(0.08))
+	ItemMeshShared.add_cube(p, -1.5, 0.15, 0.5, 0.45, 0.4, 0.45, char_d)
+	ItemMeshShared.add_cube(p, 1.5, 0.1, -0.6, 0.45, 0.4, 0.45, char_d)
+	# Vệt than sáng (lớp tro/muội)
+	ItemMeshShared.add_cube(p, -0.2, 0.75, 0.0, 0.8, 0.12, 0.12, char_l)
+	ItemMeshShared.add_cube(p, 0.2, -0.02, -0.35, 0.9, 0.12, 0.12, char_l.darkened(0.1))
+	# Vụn than nhỏ
+	ItemMeshShared.add_cube(p, -1.9, -0.6, 0.9, 0.3, 0.3, 0.3, char_d)
+	ItemMeshShared.add_cube(p, 1.8, -0.7, -1.0, 0.3, 0.3, 0.3, char_d)
+	ItemMeshShared.add_cube(p, 0.0, -0.9, 1.1, 0.3, 0.25, 0.3, char_l.darkened(0.05))
+
 static func palm_wood(p: Node3D) -> void:
 	var bark := Color(0.45, 0.28, 0.14)
 	var inner := Color(0.62, 0.48, 0.28)
