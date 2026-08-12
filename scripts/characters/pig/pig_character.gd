@@ -47,11 +47,14 @@ var _world_mgr: Node = null
 func _build_character() -> void:
 	_is_player = false
 	character_name = "Pig"
-	max_hp = VARIANT_HP[pig_variant]
+	# Level creature: heo sa mạc khỏe hơn — mặc định lv2, heo thường lv1
+	level = 2 if pig_variant == Variant.SAND else 1
+	var smult: float = get_stat_mult()
+	max_hp = int(VARIANT_HP[pig_variant] * smult)
 	if is_baby:
 		max_hp = maxi(1, max_hp / 2)
 	hp = max_hp
-	move_speed = VARIANT_SPEED[pig_variant] * (0.55 if is_baby else 1.0)
+	move_speed = VARIANT_SPEED[pig_variant] * (0.55 if is_baby else 1.0) * smult
 	sprint_speed = move_speed * FLEE_SPEED_MULT
 	defense = 1 if is_baby else 2
 	attack_power = 0
@@ -406,6 +409,6 @@ func _roll_loot() -> void:
 		return
 	ItemDatabase.ensure_db()
 	var defn: ItemDef = ItemDatabase.items_db.get("raw_pork")
-	if defn and randf() < 0.9:
+	if defn and randf() < 0.9 * get_rate_mult():
 		var vel := Vector3(randf_range(-1.0, 1.0), randf_range(2.0, 3.5), randf_range(-1.0, 1.0))
 		_DroppedItem.spawn(world, defn, global_position, 1, vel, global_position.y)

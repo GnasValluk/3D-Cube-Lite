@@ -50,6 +50,9 @@ const S_BREATH:       Array[String] = ["res://assets/sfx/random/breath.ogg"]
 const S_CAST:         Array[String] = ["res://assets/sfx/entity/bobber/castfast.ogg"]
 const S_RETRIEVE:     Array[String] = ["res://assets/sfx/entity/bobber/retrieve1.ogg","res://assets/sfx/entity/bobber/retrieve2.ogg","res://assets/sfx/entity/bobber/retrieve3.ogg"]
 const S_PLANT_CROP:   Array[String] = ["res://assets/sfx/item/crop1.ogg","res://assets/sfx/item/crop2.ogg","res://assets/sfx/item/crop3.ogg","res://assets/sfx/item/crop4.ogg","res://assets/sfx/item/crop5.ogg","res://assets/sfx/item/crop6.ogg"]
+const S_SLIME_ATTACK: Array[String] = ["res://assets/sfx/mob/slime/attack1.ogg","res://assets/sfx/mob/slime/attack2.ogg"]
+const S_SLIME_BIG:    Array[String] = ["res://assets/sfx/mob/slime/big1.ogg","res://assets/sfx/mob/slime/big2.ogg","res://assets/sfx/mob/slime/big3.ogg","res://assets/sfx/mob/slime/big4.ogg"]
+const S_SLIME_SMALL:  Array[String] = ["res://assets/sfx/mob/slime/small1.ogg","res://assets/sfx/mob/slime/small2.ogg","res://assets/sfx/mob/slime/small3.ogg","res://assets/sfx/mob/slime/small4.ogg","res://assets/sfx/mob/slime/small5.ogg"]
 
 var _cache: Dictionary = {}
 var _players_2d: Array[AudioStreamPlayer] = []
@@ -120,6 +123,9 @@ func play_cast() -> void:          play_arr_var(S_CAST)
 func play_retrieve() -> void:      play_arr_var(S_RETRIEVE)
 func play_paddle_land() -> void:   play_arr_var(S_PADDLE_LAND)
 func play_plant_crop() -> void:    play_arr_var(S_PLANT_CROP)
+func play_slime_attack() -> void:  play_arr_var(S_SLIME_ATTACK)
+func play_slime_big() -> void:     play_arr_var(S_SLIME_BIG, -2.0)
+func play_slime_small() -> void:   play_arr_var(S_SLIME_SMALL, -4.0)
 
 func set_muted(val: bool) -> void:
 	_muted = val

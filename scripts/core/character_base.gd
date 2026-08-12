@@ -312,6 +312,15 @@ func _spawn_splash(entering: bool) -> void:
 
 # ── Level / Exp ───────────────────────────────────────────────────────────────
 const MAX_LEVEL: int = 100
+## Hệ số chỉ số theo level creature: mỗi level trên 1 tăng +2%.
+##   stat_eff = base * get_stat_mult()
+func get_stat_mult() -> float:
+	return 1.0 + 0.02 * float(maxi(level - 1, 0))
+
+## Hệ số tỷ lệ drop theo level creature: mỗi level trên 1 tăng +5% (của rate gốc).
+##   rate_eff = rate * get_rate_mult()
+func get_rate_mult() -> float:
+	return 1.0 + 0.05 * float(maxi(level - 1, 0))
 
 func add_exp(amount: int) -> void:
 	if level >= MAX_LEVEL:
@@ -792,6 +801,26 @@ func _do_melee_hit() -> void:
 						if pc and pc.equipped_weapon:
 							dmg += pc.equipped_weapon.atk_bonus
 					pn.take_damage(dmg, self)
+					landed = true
+
+	# Also hit slimes in SlimeSpawner
+	var slime_nodes := get_tree().get_nodes_in_group("slime")
+	for sn in slime_nodes:
+		if not is_instance_valid(sn) or not sn.get("is_alive"):
+			continue
+		var offset: Vector3 = sn.global_position - global_position
+		offset.y = 0.0
+		var dist: float = offset.length()
+		if dist <= max_dist + sn.hit_radius:
+			var dot: float = fwd.dot(offset / dist)
+			if dot >= angle_threshold:
+					SFXManager.play_damage_hit()
+					var dmg: int = attack_power
+					if _is_player:
+						var pc := self as PlayerCharacter
+						if pc and pc.equipped_weapon:
+							dmg += pc.equipped_weapon.atk_bonus
+					sn.take_damage(dmg, self)
 					landed = true
 
 	# Also hit destroyable props (đèn, cây, v.v.)

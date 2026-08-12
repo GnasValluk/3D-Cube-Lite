@@ -48,6 +48,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"coconut_half": CoconutMesh.half(parent)
 		"coconut_drink": CoconutMesh.drink(parent)
 		"raw_pork": CreaturesMesh.meat(parent)
+		"slime_ball": _build_slime_ball_icon(parent)
 		"water_bucket": _build_water_bucket_icon(parent)
 		"taro": _build_taro_icon(parent)
 		"tropical_seaweed": _build_seaweed_icon(parent)
@@ -921,6 +922,60 @@ static func _build_orange_seed_icon(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, -0.32, -0.84, 0.18, 0.10, 0.08, 0.10, seed_c.darkened(0.08))
 	ItemMeshShared.add_cube(p, 0.12, -0.82, 0.34, 0.10, 0.08, 0.10, seed_c.lightened(0.06))
 	ItemMeshShared.add_cube(p, 0.54, -0.76, 0.24, 0.10, 0.08, 0.10, seed_c.darkened(0.05))
+
+## Quả gel slime — khối thạch xanh lá trong suốt + lõi sáng, dùng làm drop/icon.
+static func _build_slime_ball_icon(p: Node3D) -> void:
+	var shell := StandardMaterial3D.new()
+	shell.albedo_color = Color(0.55, 0.90, 0.50, 0.60)
+	shell.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	shell.roughness = 0.3
+	shell.metallic = 0.1
+	shell.cull_mode = BaseMaterial3D.CULL_DISABLED
+	shell.emission_enabled = true
+	shell.emission = Color(0.40, 0.80, 0.35)
+	var core := StandardMaterial3D.new()
+	core.albedo_color = Color(0.10, 0.45, 0.20)
+	core.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	core.emission_enabled = true
+	core.emission = Color(0.15, 0.70, 0.35)
+	core.emission_energy_multiplier = 2.0
+	# Vỏ gel
+	var body := MeshInstance3D.new()
+	var bm := SphereMesh.new()
+	bm.radius = 0.30
+	bm.height = 0.60
+	bm.radial_segments = 10
+	bm.rings = 6
+	body.mesh = bm
+	body.material_override = shell
+	body.scale = Vector3(0.9, 1.0, 0.9)
+	body.position = Vector3(0, 0.3, 0)
+	p.add_child(body)
+	# Lõi nhân phát sáng
+	var inner := MeshInstance3D.new()
+	var im := SphereMesh.new()
+	im.radius = 0.18
+	im.height = 0.36
+	im.radial_segments = 8
+	im.rings = 4
+	inner.mesh = im
+	inner.material_override = core
+	inner.scale = Vector3(0.8, 1.0, 0.8)
+	inner.position = Vector3(0, 0.3, 0)
+	p.add_child(inner)
+	# Gao sáng trên mặt
+	var hl := MeshInstance3D.new()
+	var hm := SphereMesh.new()
+	hm.radius = 0.06
+	hm.height = 0.12
+	hl.mesh = hm
+	var hl_mat := StandardMaterial3D.new()
+	hl_mat.albedo_color = Color(1.0, 1.0, 0.95, 0.8)
+	hl_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	hl_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	hl.material_override = hl_mat
+	hl.position = Vector3(0.10, 0.48, 0.18)
+	p.add_child(hl)
 
 ## Dựng model trái thật (item drop model) theo bề rộng mục tiêu, đáy quả
 ## áp sát mặt đất (ground_pos.y) — dùng cho quả dưa hấu/bí đỏ 1 block.

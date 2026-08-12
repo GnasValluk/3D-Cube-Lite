@@ -116,17 +116,21 @@ func _build_character() -> void:
 	_is_player = false
 	character_name = VARIANT_NAMES[fish_variant]
 
+	# Level creature: cá la hán săn mồi mạnh hơn — mặc định lv2, còn lại lv1
+	level = 2 if fish_variant == FishVariant.FLOWERHORN else 1
+
 	# Randomize personality
 	_boldness = randf_range(0.3, 1.0)
 	_sociability = randf_range(0.2, 1.0)
 	_speed_mod = randf_range(0.85, 1.15)
 
-	max_hp       = VARIANT_HP[fish_variant]
+	var smult: float = get_stat_mult()
+	max_hp       = maxi(1, int(VARIANT_HP[fish_variant] * smult))
 	hp           = max_hp
-	move_speed   = VARIANT_SPEED[fish_variant] * _speed_mod
+	move_speed   = VARIANT_SPEED[fish_variant] * _speed_mod * smult
 	sprint_speed = move_speed * FLEE_SPEED_MULT
 	defense      = 0
-	attack_power = VARIANT_ATK[fish_variant]
+	attack_power = maxi(0, int(VARIANT_ATK[fish_variant] * smult))
 	# melee_damage đã bỏ — damage tính từ attack_power
 	jump_height  = 0.3
 
@@ -566,7 +570,7 @@ func _roll_loot() -> void:
 	ItemDatabase.ensure_db()
 	var db := ItemDatabase.items_db
 	for entry in table:
-		if randf() < entry.rate:
+		if randf() < entry.rate * get_rate_mult():
 			var defn: ItemDef = db.get(entry.id)
 			if defn:
 				var vel := Vector3(randf_range(-1.0, 1.0), randf_range(2.0, 3.5), randf_range(-1.0, 1.0))

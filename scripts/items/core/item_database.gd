@@ -77,6 +77,9 @@ static func create_item_db() -> Dictionary:
 	# ── Thịt ──────────────────────────────────────────────────────────────────
 	_add(db, "raw_pork", "Thịt Heo Sống", ItemDef.Type.FOOD, Color(0.85, 0.50, 0.45), "🥩", "Thịt heo tươi — nấu chín trước khi ăn", true, 16, 12)
 
+	# ── Slime ─────────────────────────────────────────────────────────────────
+	_add(db, "slime_ball", "Slimeball", ItemDef.Type.MATERIAL, Color(0.45, 0.85, 0.35), "🟢", "Quả gel dính xanh lá — lấy từ slime, chế tạo Piston Dính / Slime Block", true, 64)
+
 	# ── Vật phẩm từ prop ─────────────────────────────────────────────────────
 	_add(db, "taro", "Môn ngọt (Taro)", ItemDef.Type.FOOD, Color(0.25, 0.50, 0.15), "🌿", "Củ môn ngọt — có thể nấu ăn", true, 16, 12)
 	_add(db, "coconut", "Trái Dừa", ItemDef.Type.FOOD, Color(0.50, 0.35, 0.20), "🥥", "Trái dừa tươi — bổ dưỡng, giải khát", true, 16, 16)
