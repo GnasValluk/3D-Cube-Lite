@@ -1006,9 +1006,9 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		# Vệt bùn triều chạy 2 bên mực nước: thềm bùn ngập ăn ra biển, bãi bùn
 		# ăn vào đất liền vài block. Độ cao kéo về mực triều (WATER_Y) → bãi
 		# bùn ngập/nổi xen kẽ theo noise; chỗ terr cao thành mô bùn khô ráo.
-		const MANGROVE_SEA_RANGE: float = 16.0   # ăn ra thềm biển (bùn ngập)
-		const MANGROVE_LAND_RANGE: float = 15.0  # ăn sâu vào đất liền (bãi bùn)
-		const MANGROVE_STRENGTH: float = 0.42    # ngưỡng trở thành rừng đước
+		const MANGROVE_SEA_RANGE: float = 20.0   # ăn ra thềm biển (bùn ngập)
+		const MANGROVE_LAND_RANGE: float = 19.0  # ăn sâu vào đất liền (bãi bùn)
+		const MANGROVE_STRENGTH: float = 0.33    # ngưỡng trở thành rừng đước
 		for ivx in range(cols):
 			var pvx: int = ivx + _Data.PAD
 			for ivz in range(cols):
@@ -1016,7 +1016,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
 				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
 				var mg: float = (nd["mangrove"].get_noise_2d(wx, wz) + 1.0) * 0.5
-				var mg_mask: float = clamp((mg - 0.46) / 0.22, 0.0, 1.0)
+				var mg_mask: float = clamp((mg - 0.42) / 0.28, 0.0, 1.0)
 				if mg_mask <= 0.0: continue
 				var is_oc: bool = oct_small[pvx][pvz]
 				var pos: float
@@ -1519,13 +1519,13 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				var mx: float = -half + (float(vx) + 0.5) * _Data.VOXEL
 				var mz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
 				# Cây đước — bãi bùn gần mực nước, rễ chùm ăn xuống lạch triều
-				if h > _Data.WATER_Y - 0.9 and _cell_hash01(vx, vz) < 0.028:
+				if h > _Data.WATER_Y - 1.1 and _cell_hash01(vx, vz) < 0.045:
 					if _is_on_road(world_ox + mx, world_oz + mz):
 						continue
 					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "mangrove", "pos": Vector3(mx, y, mz), "variant": "coast"})
 				# Thủy trúc (cattail) — bãi bùn ngập nông, mọc thành cụm sát nước
-				if h > _Data.WATER_Y - 1.5 and h <= _Data.WATER_Y + 0.2 and _cell_hash01(vx + 991, vz) < 0.022:
+				if h > _Data.WATER_Y - 1.5 and h <= _Data.WATER_Y + 0.2 and _cell_hash01(vx + 991, vz) < 0.034:
 					var y2 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "cattail", "pos": Vector3(mx, y2, mz), "variant": "mangrove"})
 				# Cua bùn — bãi bùn nhô trên mực nước (mô bùn khô)

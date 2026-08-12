@@ -112,9 +112,12 @@ func try_exit() -> void:
 	if player == null or not is_instance_valid(player) or not player.is_inside_tree():
 		return
 	var spot := _find_exit_spot()
+	spot.y = max(spot.y, global_position.y - 0.5)
 	player.global_position = spot
 	if player is CharacterBody3D:
 		player.velocity = Vector3.ZERO
+	if player.has_method("enable_exit_grace"):
+		player.enable_exit_grace(0.5)
 
 func is_driven() -> bool:
 	return _driver != null and is_instance_valid(_driver)

@@ -113,24 +113,26 @@ func _animate(delta: float) -> void:
 	var chasing := false
 	if _player and is_instance_valid(_player) and _player.get("is_alive"):
 		var to_player := _player.global_position - global_position
-		to_player.y = 0.0
-		var dist := to_player.length()
-		chasing = dist < AGGRO_RANGE
-		if chasing:
-			if dist > 0.01:
-				_target_dir = to_player.normalized()
-			if dist < ATTACK_RANGE and _attack_cd <= 0.0:
-				_attack_cd = ATTACK_COOLDOWN
-				_player.take_damage(attack_power, self)
-				SFXManager.play_slime_attack()
-				attacking = true
-			# Nhảy lò cò đuổi theo
-			if is_on_floor() and _hop_cd <= 0.0:
-				_jbuf = JUMP_BUFFER
-				_coyote = COYOTE_TIME
-				_hop_cd = HOP_COOLDOWN + randf_range(-0.2, 0.2)
-				_sy_tgt = 0.72  # squash trước khi bật
-				attacking = true
+		var dy: float = to_player.y
+		if abs(dy) <= 2.0:
+			to_player.y = 0.0
+			var dist := to_player.length()
+			chasing = dist < AGGRO_RANGE
+			if chasing:
+				if dist > 0.01:
+					_target_dir = to_player.normalized()
+				if dist < ATTACK_RANGE and _attack_cd <= 0.0:
+					_attack_cd = ATTACK_COOLDOWN
+					_player.take_damage(attack_power, self)
+					SFXManager.play_slime_attack()
+					attacking = true
+				# Nhảy lò cò đuổi theo
+				if is_on_floor() and _hop_cd <= 0.0:
+					_jbuf = JUMP_BUFFER
+					_coyote = COYOTE_TIME
+					_hop_cd = HOP_COOLDOWN + randf_range(-0.2, 0.2)
+					_sy_tgt = 0.72  # squash trước khi bật
+					attacking = true
 	move_speed = _base_move_speed * (WANDER_SPEED_MULT if not chasing else 1.0)
 	sprint_speed = move_speed
 	if not chasing:

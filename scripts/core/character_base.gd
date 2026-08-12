@@ -114,6 +114,7 @@ var _state: State = State.IDLE
 # ── Timers ────────────────────────────────────────────────────────────────────
 const COYOTE_TIME: float = 0.12
 const JUMP_BUFFER: float = 0.10
+const FALL_DAMAGE_THRESHOLD: float = 4.0  # rơi xuống đất vượt quá mức cao này → sát thương
 var _coyote:          float  = 0.0
 var _jbuf:            float  = 0.0
 var _dash_timer:      float  = 0.0
@@ -140,6 +141,9 @@ var _grav_rise: float = 0.0
 var _grav_fall: float = 0.0
 var _was_floor: bool  = false
 var _time:      float = 0.0
+var _falling: bool = false
+var _fall_start_y: float = 0.0
+var _safe_fall_timer: float = 0.0  # thời gian bảo vệ rơi từ xe/tượng (không gây sát thương)
 
 
 # ── Squash / stretch ──────────────────────────────────────────────────────────
@@ -359,6 +363,12 @@ func calc_hp_skill_damage(percent: float) -> int:
 # ── HP / Damage ───────────────────────────────────────────────────────────────
 func take_damage(amount: int, attacker: Node3D = null, damage_type: int = 0) -> void:
 	_Damage.take_damage(self, amount, attacker, damage_type)
+
+## Gọi khi lên/xuống xe: bảo vệ rơi ngắn trong thời gian ngắn để không gây
+## falling damage khi chỉ "bước xuống" (trường hợp lỗi heli-exit instant-drop).
+func enable_exit_grace(duration: float = 0.5) -> void:
+	_safe_fall_timer = max(_safe_fall_timer, duration)
+	_falling = false
 
 func add_shield(amount: int) -> void:
 	_Damage.add_shield(self, amount)
@@ -641,7 +651,18 @@ func _physics_process(delta: float) -> void:
 	if on_floor and not _was_floor:
 		_sy_tgt = 0.76
 		SFXManager.play_fall_small()
+		if _falling and _safe_fall_timer <= 0.0:
+			var dist: float = _fall_start_y - global_position.y
+			_falling = false
+			if dist > FALL_DAMAGE_THRESHOLD and not _underwater and is_alive:
+				var dmg: int = maxi(1, int(dist - FALL_DAMAGE_THRESHOLD))
+				_Damage.take_damage(self, dmg, null, 0)
 	_was_floor = on_floor
+	_safe_fall_timer = max(_safe_fall_timer - delta, 0.0)
+	# Track fall start height (takeoff point) for falling-damage computation.
+	if not on_floor and _safe_fall_timer <= 0.0 and not _falling:
+		_falling = true
+		_fall_start_y = global_position.y
 
 	_sy_cur = lerp(_sy_cur, _sy_tgt, delta * 18.0)
 	_sy_tgt = lerp(_sy_tgt, 1.0,     delta * 10.0)
@@ -991,8 +1012,8 @@ func play_spawn_animation() -> void:
 	if parent == null:
 		return
 	var col: Color = Color(0.5, 0.8, 1.0)
-	scale = Vector3.ZERO
 	var pos := global_position
+	visible = false
 	var sphere_mat := StandardMaterial3D.new()
 	sphere_mat.albedo_color = col
 	sphere_mat.albedo_color.a = 0.0
@@ -1019,8 +1040,8 @@ func play_spawn_animation() -> void:
 	sph_tw.parallel().tween_property(sphere, "scale", Vector3(12.0, 12.0, 12.0), 0.3).set_ease(Tween.EASE_OUT)
 	sph_tw.tween_callback(sphere.queue_free)
 	var char_tw := create_tween()
-	char_tw.tween_interval(0.15)
-	char_tw.tween_property(self, "scale", Vector3.ONE, 0.35).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_ELASTIC)
+	char_tw.tween_interval(0.5)
+	char_tw.tween_callback(func() -> void: visible = true)
 	var spark_mat := StandardMaterial3D.new()
 	spark_mat.albedo_color = col
 	spark_mat.emission_enabled = true

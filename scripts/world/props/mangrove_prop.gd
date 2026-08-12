@@ -18,7 +18,7 @@ var _seed_a: float = 0.0
 
 func setup(variant: String = "coast") -> void:
 	_variant = variant
-	_base_h = 2.2 + randf() * 1.3
+	_base_h = 3.2 + randf() * 1.8
 	_seed_a = randf() * TAU
 
 func _birth_span_days() -> float:
@@ -41,13 +41,13 @@ func _get_h() -> float:
 	return _base_h
 
 func _get_base_r() -> float:
-	var r: float = 0.20 if _variant == "coast" else 0.26
+	var r: float = 0.30 if _variant == "coast" else 0.36
 	if _stage == GrowingProp.Stage.SPROUT:
 		r *= 0.40
 	return r
 
 func _get_top_r() -> float:
-	var r: float = 0.09 if _variant == "coast" else 0.11
+	var r: float = 0.12 if _variant == "coast" else 0.15
 	return r
 
 func _setup_collision() -> void:
@@ -65,6 +65,7 @@ func _setup_collision() -> void:
 # ── GRID helpers ──────────────────────────────────────────────────────────────
 var _grid: Dictionary = {}
 var _ordered: Array[Vector3] = []
+var _scales: Array[float] = []
 
 func _key(v: Vector3) -> int:
 	return int(round(v.x / VOXEL)) + int(round(v.y / VOXEL)) * 10000 + int(round(v.z / VOXEL)) * 100000000
@@ -72,16 +73,20 @@ func _key(v: Vector3) -> int:
 func _pos(v: Vector3) -> Vector3:
 	return Vector3(round(v.x / VOXEL) * VOXEL, round(v.y / VOXEL) * VOXEL, round(v.z / VOXEL) * VOXEL)
 
-func _add_voxel(pos: Vector3, col: Color) -> void:
+func _add_voxel(pos: Vector3, col: Color, scale: float = _VoxelShared.TRUNK_SCALE) -> void:
 	var p := _pos(pos)
 	var k := _key(p)
 	if _grid.has(k):
 		return
 	_grid[k] = col
 	_ordered.append(p)
+	_scales.append(scale)
 
-func _fill(px: float, py: float, pz: float, col: Color) -> void:
-	_add_voxel(Vector3(px, py, pz), col * _DARKEN)
+func _fill(px: float, py: float, pz: float, col: Color, scale: float = _VoxelShared.TRUNK_SCALE) -> void:
+	_add_voxel(Vector3(px, py, pz), col * _DARKEN, scale)
+
+func _fill_leaf(px: float, py: float, pz: float, col: Color) -> void:
+	_add_voxel(Vector3(px, py, pz), col * _DARKEN, _VoxelShared.LEAF_SCALE)
 
 func _jitter(col: Color) -> Color:
 	var j := (randf() - 0.5) * 0.05
@@ -94,6 +99,7 @@ func _jitter(col: Color) -> Color:
 func _build_tree() -> void:
 	_grid.clear()
 	_ordered.clear()
+	_scales.clear()
 	if _stage == GrowingProp.Stage.SPROUT:
 		_build_sprout()
 		_commit_visual()
@@ -110,12 +116,9 @@ func _commit_visual() -> void:
 	var positions: Array = []
 	var scales_pack: Array = []
 	var colors_pack: Array = []
-	var s := _VoxelShared.BRANCH_SCALE
-	if _stage == GrowingProp.Stage.SPROUT:
-		s = _VoxelShared.FINE_SCALE
 	for i in range(_ordered.size()):
 		positions.append(_ordered[i])
-		scales_pack.append(s)
+		scales_pack.append(_scales[i])
 		colors_pack.append(_grid[_key(_ordered[i])])
 	var mmi := _VoxelShared.build(positions, scales_pack, colors_pack)
 	mmi.name = "MangroveVisual"
@@ -146,14 +149,14 @@ func _build_sprout() -> void:
 	for vy in range(3):
 		var t := float(vy) / 3.0
 		var mid := Vector3(dir_x * t, (float(vy) + 0.5) * lv * 0.5, dir_z * t)
-		_fill(mid.x, mid.y, mid.z, col_stem)
+		_fill(mid.x, mid.y, mid.z, col_stem, _VoxelShared.FINE_SCALE)
 	var crown := Vector3(dir_x, top_h, dir_z)
 	for li in range(3):
 		var a: float = _seed_a + float(li) / 3.0 * TAU
 		var tip := crown + Vector3(cos(a) * 0.10, 0.12, sin(a) * 0.10)
-		_draw_voxel_segment(crown, tip, col_leaf, 0.5)
+		_draw_voxel_segment(crown, tip, col_leaf, 0.5, _VoxelShared.FINE_SCALE)
 
-func _draw_voxel_segment(a: Vector3, b: Vector3, col: Color, r: float) -> void:
+func _draw_voxel_segment(a: Vector3, b: Vector3, col: Color, r: float, scale: float = _VoxelShared.TRUNK_SCALE) -> void:
 	var lv := VOXEL * 2.0
 	var n := (b - a).length()
 	var steps: int = maxi(2, ceili(n / lv))
@@ -167,7 +170,7 @@ func _draw_voxel_segment(a: Vector3, b: Vector3, col: Color, r: float) -> void:
 				var dx := vx * lv
 				var dz := vz * lv
 				if dx * dx + dz * dz <= rr * rr:
-					_fill(p.x + dx, p.y, p.z + dz, col)
+					_fill(p.x + dx, p.y, p.z + dz, col, scale)
 
 ## Thân đước: hơi cong nhẹ, nhỏ dần, nâu sẫm. Rễ chùm chống từ gốc.
 func _trunk_voxels(h: float, base_r: float, top_r: float) -> void:
@@ -204,8 +207,8 @@ func _prop_root_voxels(h: float) -> void:
 	var col_root_dark := Color(0.22, 0.17, 0.12)
 	for ri in range(root_count):
 		var a: float = _seed_a + float(ri) / float(root_count) * TAU + (randf() - 0.5) * 0.25
-		var reach: float = 0.55 + randf() * 0.55
-		var drop: float = 0.9 + randf() * 1.2
+		var reach: float = 0.75 + randf() * 0.65
+		var drop: float = 1.1 + randf() * 1.5
 		var base_p := Vector3(sin(a) * 0.18, 0.15 + randf() * 0.10, cos(a) * 0.18)
 		var tip_p := Vector3(sin(a) * reach, -drop, cos(a) * reach)
 		var ctrl := base_p.lerp(tip_p, 0.45) + Vector3.UP * 0.18
@@ -226,9 +229,9 @@ func _prop_root_voxels(h: float) -> void:
 ## Tán lá đước — cụm cầu dẹt rậm, xanh đậm bóng; vài cành nhỏ dưới tán.
 func _canopy_voxels(h: float) -> void:
 	var lv := VOXEL * 2.0
-	var crown_y: float = h - 0.25
-	var canopy_r: float = 1.15 + randf() * 0.45
-	var canopy_h: float = 0.9 + randf() * 0.4
+	var crown_y: float = h - 0.32
+	var canopy_r: float = 1.45 + randf() * 0.85
+	var canopy_h: float = 1.1 + randf() * 0.6
 	var col_leaf := Color(0.05, 0.26, 0.10)
 	var col_leaf_dark := Color(0.035, 0.19, 0.075)
 	var col_leaf_light := Color(0.10, 0.34, 0.13)
@@ -261,15 +264,15 @@ func _canopy_voxels(h: float) -> void:
 				col = col_leaf_dark
 			elif r0 > 0.78:
 				col = col_leaf_light
-			_fill(px, yr, pz, _jitter(col))
+			_fill_leaf(px, yr, pz, _jitter(col))
 	# Mầm đước (propagule) — quả mầm nhọn treo rìa tán
-	if _stage == GrowingProp.Stage.MATURE and rng < 0.6:
-		var pod_count: int = 2 + randi() % 3
+	if _stage == GrowingProp.Stage.MATURE and rng < 0.5:
+		var pod_count: int = 3 + randi() % 3
 		for pi in range(pod_count):
 			var a: float = _seed_a + float(pi) / float(pod_count) * TAU
-			var attach := Vector3(cos(a) * canopy_r * 0.55, crown_y - 0.05, sin(a) * canopy_r * 0.55)
-			var tip := attach + Vector3(0, -0.55, 0)
-			_draw_voxel_segment(attach, tip, Color(0.28, 0.35, 0.16), 0.06)
+			var attach := Vector3(cos(a) * canopy_r * 0.60, crown_y - 0.05, sin(a) * canopy_r * 0.60)
+			var tip := attach + Vector3(0, -0.75, 0)
+			_draw_voxel_segment(attach, tip, Color(0.28, 0.35, 0.16), 0.07)
 
 func _quad_bezier(a: Vector3, c: Vector3, b: Vector3, t: float) -> Vector3:
 	var it := 1.0 - t
