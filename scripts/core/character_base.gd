@@ -800,25 +800,27 @@ func _do_melee_hit() -> void:
 							dmg += pc.equipped_weapon.atk_bonus
 					ch.take_damage(dmg, self)
 					landed = true
-	# Also hit fish in FishSpawner
-	var spawner := _find_fish_spawner()
-	if spawner:
-		for f in spawner.get_children():
-			if f is FishCharacter and f.is_alive:
-				var offset: Vector3 = f.global_position - global_position
-				offset.y = 0.0
-				var dist: float = offset.length()
-				if dist <= max_dist + f.hit_radius:
-					var dot: float = fwd.dot(offset / dist)
-					if dot >= angle_threshold:
-						SFXManager.play_damage_hit()
-						var dmg: int = attack_power
-						if _is_player:
-							var pc := self as PlayerCharacter
-							if pc and pc.equipped_weapon:
-								dmg += pc.equipped_weapon.atk_bonus
-						f.take_damage(dmg, self)
-						landed = true
+	# Also hit fish in the "fish" group (cá tự nhiên trong FishSpawner + cá nở
+	# từ trứng đều vào group này — nếu chỉ quét FishSpawner thì cá từ trứng
+	# không thuộc spawner nên không thể bị đánh trúng).
+	var fish_nodes := get_tree().get_nodes_in_group("fish")
+	for f in fish_nodes:
+		if not is_instance_valid(f) or not f.get("is_alive"):
+			continue
+		var offset: Vector3 = f.global_position - global_position
+		offset.y = 0.0
+		var dist: float = offset.length()
+		if dist <= max_dist + f.hit_radius:
+			var dot: float = fwd.dot(offset / dist)
+			if dot >= angle_threshold:
+					SFXManager.play_damage_hit()
+					var dmg: int = attack_power
+					if _is_player:
+						var pc := self as PlayerCharacter
+						if pc and pc.equipped_weapon:
+							dmg += pc.equipped_weapon.atk_bonus
+					f.take_damage(dmg, self)
+					landed = true
 
 	# Also hit pigs in PigSpawner
 	var pig_nodes := get_tree().get_nodes_in_group("pig")
@@ -902,12 +904,6 @@ func _find_character_manager() -> Node:
 			return p
 		p = p.get_parent()
 	return null
-
-func _find_fish_spawner() -> Node:
-	var scene := get_tree().current_scene
-	if scene == null:
-		return null
-	return scene.get_node_or_null("FishSpawner")
 
 # ── Read input direction ──────────────────────────────────────────────────────
 func _read_input() -> Vector3:

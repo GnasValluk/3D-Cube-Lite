@@ -29,7 +29,7 @@ func _ready() -> void:
 	# ── 1. Item database: 7 trứng + không bị ăn (MATERIAL) ──
 	ItemDatabase.ensure_db()
 	var egg_ids := ["egg_carp", "egg_perch", "egg_tilapia", "egg_snakehead",
-		"egg_flowerhorn", "egg_shrimp", "egg_pig"]
+		"egg_flowerhorn", "egg_shrimp", "egg_pig", "egg_death_slime"]
 	var all_ok := true
 	for eid in egg_ids:
 		if not ItemDatabase.items_db.has(eid):
@@ -38,7 +38,7 @@ func _ready() -> void:
 		var defn: ItemDef = ItemDatabase.items_db[eid]
 		if defn.type != ItemDef.Type.MATERIAL or not defn.stackable:
 			all_ok = false
-	_check(all_ok, "db có đủ 7 trứng sinh vật (type MATERIAL, stackable)")
+	_check(all_ok, "db có đủ 8 trứng sinh vật (type MATERIAL, stackable)")
 
 	# ── 2. Nhận diện item trứng ──
 	var fake_egg: ItemDef = ItemDatabase.items_db["egg_carp"]

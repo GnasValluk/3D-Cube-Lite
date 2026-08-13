@@ -126,14 +126,13 @@ static func _apply_throw_damage(player, dir: Vector3, landing_pos: Vector3, dmg:
 				pn.take_damage(dmg, player)
 				_knockback(pn, dir)
 				hit_any = true
-	var spawner: Node = player._find_fish_spawner()
-	if spawner:
-		for f in spawner.get_children():
-			if f is FishCharacter and f.is_alive:
-				if _segment_dist(start, end, f.global_position) <= 0.9 + f.hit_radius:
-					f.take_damage(dmg, player)
-					_knockback(f, dir)
-					hit_any = true
+	var fish_nodes: Array[Node] = player.get_tree().get_nodes_in_group("fish")
+	for f in fish_nodes:
+		if is_instance_valid(f) and f.get("is_alive"):
+			if _segment_dist(start, end, f.global_position) <= 0.9 + f.hit_radius:
+				f.take_damage(dmg, player)
+				_knockback(f, dir)
+				hit_any = true
 	if hit_any:
 		SFXManager.play_damage_hit()
 
@@ -210,11 +209,10 @@ static func check_dash_hit(player) -> void:
 		if is_instance_valid(pn) and pn.get("is_alive"):
 			_try_dash_hit(player, pn as CharacterBase, box_center, right, fwd, half)
 
-	var spawner: Node = player._find_fish_spawner()
-	if spawner:
-		for f in spawner.get_children():
-			if f is FishCharacter and f.is_alive:
-				_try_dash_hit(player, f as CharacterBase, box_center, right, fwd, half)
+	var fish_nodes: Array[Node] = player.get_tree().get_nodes_in_group("fish")
+	for f in fish_nodes:
+		if is_instance_valid(f) and f.get("is_alive"):
+			_try_dash_hit(player, f as CharacterBase, box_center, right, fwd, half)
 
 static func _try_dash_hit(player, ch: CharacterBase, box_center: Vector3, right: Vector3, fwd: Vector3, half: Vector3) -> void:
 	if player._halberd_dash_hit.has(ch.get_instance_id()):

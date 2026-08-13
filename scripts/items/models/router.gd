@@ -66,6 +66,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"egg_flowerhorn": _build_egg_icon(parent, "egg_flowerhorn")
 		"egg_shrimp": _build_egg_icon(parent, "egg_shrimp")
 		"egg_pig": _build_egg_icon(parent, "egg_pig")
+		"egg_death_slime": _build_egg_icon(parent, "egg_death_slime")
 		# ── Ores (dùng BlockMeshes.block_cube để texture khớp world) ──
 		"copper_ore": BlockMeshes.block_cube(parent, "copper_ore")
 		"bauxite_ore": BlockMeshes.block_cube(parent, "bauxite_ore")

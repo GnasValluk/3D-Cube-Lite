@@ -6,7 +6,7 @@ extends Node3D
 
 const EGG_IDS: Array[String] = [
 	"egg_carp", "egg_perch", "egg_tilapia", "egg_snakehead",
-	"egg_flowerhorn", "egg_shrimp", "egg_pig",
+	"egg_flowerhorn", "egg_shrimp", "egg_pig", "egg_death_slime",
 ]
 
 const EGG_COLORS: Dictionary = {
@@ -17,6 +17,7 @@ const EGG_COLORS: Dictionary = {
 	"egg_flowerhorn": Color(0.92, 0.25, 0.15),
 	"egg_shrimp":     Color(0.85, 0.35, 0.20),
 	"egg_pig":        Color(0.87, 0.72, 0.63),
+	"egg_death_slime": Color(0.55, 0.10, 0.95),
 }
 
 # egg id → FishVariant (heo không phải cá — spawn riêng)
@@ -33,6 +34,7 @@ static func egg_color(id: String) -> Color:
 
 const _FishChar = preload("res://scripts/characters/fish/fish_character.gd")
 const _PigChar = preload("res://scripts/characters/pig/pig_character.gd")
+const _DeathSlimeChar = preload("res://scripts/characters/slime/death_slime.gd")
 
 var _egg_id: String = "egg_carp"
 var _direction: Vector3
@@ -149,6 +151,14 @@ func _spawn_creature() -> void:
 		pig.global_position = pos
 		pig.rotation.y = randf_range(0.0, TAU)
 		pig.set("_home", pos)
+	elif _egg_id == "egg_death_slime":
+		var slime := CharacterBody3D.new() as CharacterBody3D
+		slime.set_script(_DeathSlimeChar)
+		slime.name = "DeathSlime_Hatch_%d" % get_instance_id()
+		slime.set("_is_player", false)
+		world.add_child(slime)
+		slime.global_position = pos
+		slime.rotation.y = randf_range(0.0, TAU)
 	else:
 		var fish := CharacterBody3D.new() as CharacterBody3D
 		fish.set_script(_FishChar)
