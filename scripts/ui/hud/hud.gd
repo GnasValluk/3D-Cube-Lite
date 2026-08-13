@@ -51,6 +51,8 @@ var _mini_map: MiniMap
 var _phone_ui: PhoneUI
 var _nearest_hint = null
 var _chat_overlay: ChatOverlay = null
+var _cursor_free: bool = false
+var _screen_panel: Control
 
 enum { LOAD_IDLE, LOAD_LOADING, LOAD_READY, LOAD_FADEOUT }
 var _load_state: int = LOAD_IDLE
@@ -91,6 +93,7 @@ const _Library = preload("res://scripts/ui/library/creature_library.gd")
 const _Debug = preload("debug_menu.gd")
 const _NearestHint = preload("res://scripts/ui/hud/nearest_creature_hint.gd")
 const _ChatOverlay = preload("res://scripts/ui/chat_overlay.gd")
+const _PhoneIcon = preload("res://assets/phone_ui/icon_phone.png")
 
 func _ready() -> void:
 	_setup_ui()
@@ -190,6 +193,7 @@ func _setup_ui() -> void:
 
 	_phone_ui = PhoneUI.new()
 	add_child(_phone_ui)
+	_build_screen_buttons()
 
 	_nearest_hint = _NearestHint.new()
 	_nearest_hint.player_getter = Callable(self, "_find_player_character")
@@ -293,7 +297,8 @@ func _sync_mouse_visibility() -> void:
 		ui_open = true
 	elif _library and _library.visible:
 		ui_open = true
-	if ui_open:
+	# Alt giữ lại con trỏ để thao tác UI / chỉnh nhìn — luôn ưu tiên VISIBLE.
+	if ui_open or _cursor_free:
 		if Input.get_mouse_mode() != Input.MOUSE_MODE_VISIBLE:
 			Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
 		return
@@ -393,6 +398,97 @@ func _toggle_settings() -> void:
 	else:
 		_settings_ui.show_settings()
 
+func _toggle_hand_crafting() -> void:
+	if _crafting_open:
+		close_crafting()
+	else:
+		open_hand_crafting()
+
+func _build_screen_buttons() -> void:
+	# Nút ở góc trái trên: phone (icon) + settings (⚙). Mở phone / settings.
+	_screen_panel = Control.new()
+	_screen_panel.name = "ScreenButtons"
+	_screen_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_screen_panel.anchor_left = 0.0
+	_screen_panel.anchor_top = 0.0
+	_screen_panel.position = Vector2(12, 12)
+	_screen_panel.mouse_filter = Control.MOUSE_FILTER_PASS
+	add_child(_screen_panel)
+
+	# Phone — dùng icon từ assets/phone_ui/icon_phone.png
+	var phone_btn := TextureButton.new()
+	phone_btn.name = "PhoneButton"
+	phone_btn.size = Vector2(40, 40)
+	phone_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	phone_btn.texture_normal = _PhoneIcon
+	phone_btn.add_theme_stylebox_override("normal", _flat_panel(Color(0.06, 0.04, 0.12, 0.55), 10))
+	phone_btn.add_theme_stylebox_override("hover", _flat_panel(Color(0.10, 0.08, 0.18, 0.75), 10))
+	phone_btn.add_theme_stylebox_override("pressed", _flat_panel(Color(0.18, 0.16, 0.26, 0.85), 10))
+	phone_btn.focus_mode = Control.FOCUS_NONE
+	phone_btn.gui_input.connect(func(ev: InputEvent):
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			_on_phone_button_pressed()
+	)
+	_screen_panel.add_child(phone_btn)
+
+	# Settings — nút ⚙ nằm ngay bên phải phone
+	var set_btn := Button.new()
+	set_btn.name = "SettingsButton"
+	set_btn.size = Vector2(40, 40)
+	set_btn.position = Vector2(48, 0)
+	set_btn.text = "\u2699"
+	set_btn.add_theme_font_size_override("font_size", 26)
+	set_btn.add_theme_color_override("font_color", TEXT_BRIGHT)
+	set_btn.add_theme_color_override("font_color_hover", CYAN)
+	set_btn.focus_mode = Control.FOCUS_NONE
+	set_btn.add_theme_stylebox_override("normal", _flat_panel(Color(0.06, 0.04, 0.12, 0.45), 8))
+	set_btn.add_theme_stylebox_override("hover", _flat_panel(Color(0.10, 0.08, 0.18, 0.70), 8))
+	set_btn.add_theme_stylebox_override("pressed", _flat_panel(Color(0.18, 0.16, 0.26, 0.85), 8))
+	set_btn.pressed.connect(_toggle_settings)
+	_screen_panel.add_child(set_btn)
+
+	# Chế tạo — nút 🔨 mở "Chế Tạo Tay" (lưới 2x2). Bàn Chế Tạo (đặt trên
+	# thế giới) mở lưới 3x3 cho các đồ cần lưới lớn hơn.
+	var craft_btn := Button.new()
+	craft_btn.name = "CraftButton"
+	craft_btn.size = Vector2(40, 40)
+	craft_btn.position = Vector2(96, 0)
+	craft_btn.text = "\U0001F528"
+	craft_btn.add_theme_font_size_override("font_size", 22)
+	craft_btn.add_theme_color_override("font_color", TEXT_BRIGHT)
+	craft_btn.add_theme_color_override("font_color_hover", CYAN)
+	craft_btn.focus_mode = Control.FOCUS_NONE
+	craft_btn.add_theme_stylebox_override("normal", _flat_panel(Color(0.06, 0.04, 0.12, 0.45), 8))
+	craft_btn.add_theme_stylebox_override("hover", _flat_panel(Color(0.10, 0.08, 0.18, 0.70), 8))
+	craft_btn.add_theme_stylebox_override("pressed", _flat_panel(Color(0.18, 0.16, 0.26, 0.85), 8))
+	craft_btn.pressed.connect(_toggle_hand_crafting)
+	craft_btn.tooltip_text = tr("CRAFT_HAND_TIP")
+	_screen_panel.add_child(craft_btn)
+
+	# Nhãn nhỏ dưới nút chế tạo để phân biệt "Chế Tạo Tay" vs "Bàn Chế Tạo"
+	var craft_lbl := Label.new()
+	craft_lbl.text = tr("CRAFT_HAND")
+	craft_lbl.position = Vector2(84, 40)
+	craft_lbl.size = Vector2(64, 16)
+	craft_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	craft_lbl.add_theme_font_size_override("font_size", 9)
+	craft_lbl.add_theme_color_override("font_color", TEXT_MUTED)
+	craft_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_screen_panel.add_child(craft_lbl)
+
+func _flat_panel(bg: Color, radius: float) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg
+	s.set_corner_radius_all(int(radius))
+	return s
+
+func _on_phone_button_pressed() -> void:
+	if _phone_ui:
+		if _phone_ui.visible:
+			_phone_ui.close()
+		else:
+			_phone_ui.open()
+
 func _process(delta: float) -> void:
 	if _dummy_tracked:
 		_dummy_label.text = tr("DUMMY_FORMAT") % [_dummy_tracked.hp, _dummy_tracked.max_hp]
@@ -419,6 +515,21 @@ func _process(delta: float) -> void:
 			_crosshair.position = get_viewport().get_visible_rect().size * 0.5
 
 	_sync_mouse_visibility()
+
+	# Nút phone/settings: ẩn khi UI che góc trái / đang load; vẫn hiện khi
+	# đang mở phone/settings để người dùng đóng.
+	if _screen_panel:
+		var cover := false
+		cover = cover or _inventory_open or _chest_open or _crafting_open or _furnace_open
+		if not cover and _build_menu and _build_menu.visible:
+			cover = true
+		if not cover and _explore_map and _explore_map.visible:
+			cover = true
+		if not cover and _library and _library.visible:
+			cover = true
+		if not cover and _load_state != LOAD_IDLE:
+			cover = true
+		_screen_panel.visible = not cover
 
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	_hud_throttle -= delta
@@ -537,6 +648,17 @@ func _process(delta: float) -> void:
 			get_tree().change_scene_to_packed(packed)
 
 func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey:
+		var k := event as InputEventKey
+		if k.pressed and not k.echo:
+			# Alt: bật/tắt con trỏ để quay cùng chuột (xoay cam ngừng khi con trỏ hiện)
+			if k.keycode == KEY_ALT:
+				_cursor_free = true
+				Input.set_mouse_mode(Input.MOUSE_MODE_VISIBLE)
+				return
+		elif not k.pressed and k.keycode == KEY_ALT and _cursor_free:
+			_cursor_free = false
+	_sync_mouse_visibility()
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo:
@@ -684,12 +806,30 @@ func open_crafting(table) -> void:
 		_toggle_inventory()
 	if _chest_open:
 		close_chest()
+	if _furnace_open:
+		close_furnace()
 	_crafting_open = true
 	_current_crafting = table
 	_recipe_library.visible = false
 	var player := _find_player_character()
 	if player:
-		_crafting_ui.open(player)
+		_crafting_ui.open(player, 3)
+
+func open_hand_crafting() -> void:
+	if _crafting_open:
+		return
+	if _inventory_open:
+		_toggle_inventory()
+	if _chest_open:
+		close_chest()
+	if _furnace_open:
+		close_furnace()
+	_crafting_open = true
+	_current_crafting = null
+	_recipe_library.visible = false
+	var player := _find_player_character()
+	if player:
+		_crafting_ui.open(player, 2)
 
 func open_furnace(furnace) -> void:
 	if _furnace_open:

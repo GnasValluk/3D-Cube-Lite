@@ -58,14 +58,9 @@ func _ready() -> void:
 	# ── 2. Recipe ───────────────────────────────────────────────────────────
 	print("-- 2. Recipe bổ đôi + lấy hạt --")
 	_Recipe.ensure()
-	_check(_Recipe.recipes.size() == 27, "tổng 27 recipe (thêm đạn dưa hấu + hạt giống + than/mũi tên/thép + bộ giáp biển)")
-	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "eggplant_slice"),
-		"có recipe bổ đôi cà tím")
-	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "eggplant_seed"),
-		"có recipe lấy hạt giống từ trái")
+	_check(_Recipe.recipes.is_empty(), "toàn bộ công thức chế tạo đã bị xoá (còn %d)" % _Recipe.recipes.size())
 	var slice_r: Dictionary = _Recipe.match_counts({"eggplant_fruit": 1})
-	_check(slice_r.get("id", "") == "eggplant_slice" and slice_r.get("count", 0) == 2,
-		"1 trái → 2 cà tím bổ đôi")
+	_check(slice_r.is_empty(), "không còn recipe bổ đôi cà tím (đã xoá)")
 
 	# ── 3. Gieo trồng ──────────────────────────────────────────────────────
 	print("-- 3. Gieo hạt trên đất tơi xốp --")

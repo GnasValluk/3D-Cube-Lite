@@ -106,6 +106,8 @@ CRAFT_BUTTON,Craft,Chế Tạo
 CRAFT_MATERIALS,Materials,Nguyên Liệu
 CRAFT_RESULT,Result,Kết Quả
 CRAFT_CANNOT,Missing materials,Thiếu nguyên liệu
+CRAFT_HAND,Hand Crafting,Chế Tạo Tay
+CRAFT_HAND_TIP,"Open hand crafting (2x2 grid)","Mở chế tạo tay (lưới 2x2)"
 LIB_CAT_ALL,All,Tất cả
 LIB_CAT_WEAPONS,Weapons,Vũ khí
 LIB_CAT_TOOLS,Tools,Công cụ
@@ -258,6 +260,7 @@ FURNACE_INPUT,Raw Material,Nguyên Liệu
 FURNACE_OUTPUT,Product,Sản Phẩm
 FURNACE_FUEL,Fuel,Chất Đốt
 FURNACE_RECIPES,Recipes,Công Thức
+FURNACE_NO_FUEL,No fuel,Chưa có nhiên liệu
 CREATURE_TYPE_MOB,Creature,Sinh vật
 CREATURE_TYPE_PLANT,Plant,Thực vật
 CREATURE_NEARBY,Distance,Khoảng cách

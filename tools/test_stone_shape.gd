@@ -124,8 +124,7 @@ func _ready() -> void:
 		_check(def != null and def.type == ItemDef.Type.BLOCK,
 			"item %s tồn tại (BLOCK)" % item_id)
 	var r1 := RecipeDatabase.match_counts({ "block_stone": 1 })
-	_check(r1.get("id") == "block_stone_qtr" and r1.get("count") == 4,
-		"recipe: 1 đá → 4 đá tư")
+	_check(r1.is_empty(), "không còn recipe cắt đá (toàn bộ recipe đã xoá)")
 
 	# ── 4. Dựng chunk REAL_WORLD đồng bộ ───────────────────────────────────
 	var chunk := _Chunk.new()

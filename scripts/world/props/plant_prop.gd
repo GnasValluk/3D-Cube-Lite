@@ -163,7 +163,7 @@ func _build_seagrass_sprout(st: SurfaceTool, s: int) -> void:
 			var dir := (nxt - prev).normalized()
 			var perp := Vector3(-dir.z, 0, dir.x).normalized()
 			var col := col_base.lerp(col_tip, t * 0.9)
-			_add_quad(st, mid, perp * w * 0.5, dir * (nxt - prev).length() * 0.5, Vector3(0, 1, 0), col)
+			_add_blade_quad(st, mid, perp * w * 0.5, dir * (nxt - prev).length() * 0.5, Vector3(0, 1, 0), col)
 			prev = nxt
 
 func _build_seagrass(st: SurfaceTool, s: int) -> void:
@@ -198,7 +198,7 @@ func _build_seagrass(st: SurfaceTool, s: int) -> void:
 		var pos_r: float = sqrt(br) * clump_r
 		var origin := Vector3(cos(ba) * pos_r, 0, sin(ba) * pos_r)
 		var blade_h: float = max_h * (0.8 + br * 0.4)
-		var w: float = VOXEL * (0.30 + r2 * 0.25)
+		var w: float = VOXEL * (0.42 + r2 * 0.30)
 		var segs: int = 3 if meadow else 4
 		var prev := origin
 		for seg in range(segs):
@@ -210,7 +210,8 @@ func _build_seagrass(st: SurfaceTool, s: int) -> void:
 			var perp := Vector3(-dir.z, 0, dir.x).normalized()
 			var taper: float = 1.0 - t * 0.8
 			var col := col_base.lerp(col_tip, t * 0.9)
-			_add_quad(st, mid, perp * w * 0.5 * taper, dir * (nxt - prev).length() * 0.5, Vector3(0, 1, 0), col)
+			_add_blade_quad(st, mid, perp * w * 0.5 * taper, dir * (nxt - prev).length() * 0.5,
+				Vector3(0, 1, 0), col)
 			prev = nxt
 
 func _build_taro_sprout(st: SurfaceTool, s: int) -> void:
@@ -479,6 +480,15 @@ static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3, 
 	st.add_vertex(center + u + v)
 	st.add_vertex(center - u + v)
 
+## Thêm 2 quad vuông góc nhau (cross) cùng tâm — lá/cây dễ nhìn từ MỌI góc
+## nhìn (quad đơn thẳng đứng chỉ thấy sườn khi nhìn mép). `u` phải nằm
+## phương ngang; quad thứ hai xoay u 90° quanh trục dọc.
+static func _add_blade_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3, n: Vector3, col: Color) -> void:
+	_add_quad(st, center, u, v, n, col)
+	var u2 := Vector3(u.z, 0.0, -u.x)
+	if u2.length() < 0.0001:
+		u2 = Vector3(-u.z, 0.0, u.x)
+	_add_quad(st, center, u2, v, n, col)
 func _make_aquatic_mat() -> ShaderMaterial:
 	return WorldChunk.make_aquatic_mat()
 
@@ -565,7 +575,7 @@ static func _build_drop_seagrass_mesh(st: SurfaceTool, h1: int, h2: int, s: int)
 		s = s * 16807 + 1; var br := float(s & 0x7FFFFFFF) / 2147483648.0
 		var origin := Vector3(cos(ba) * 0.14 * br, 0, sin(ba) * 0.14 * br)
 		var blade_h: float = 0.45 + r4 * 0.25
-		var w: float = VOXEL * 0.35
+		var w: float = VOXEL * 0.42
 		var prev := origin
 		for seg in range(3):
 			var t := float(seg + 1) / 3.0
@@ -576,7 +586,7 @@ static func _build_drop_seagrass_mesh(st: SurfaceTool, h1: int, h2: int, s: int)
 			var perp := Vector3(-dir.z, 0, dir.x).normalized()
 			var taper: float = 1.0 - t * 0.8
 			var col := col_base.lerp(col_tip, t * 0.9)
-			_add_quad(st, mid, perp * w * 0.5 * taper, dir * (nxt - prev).length() * 0.5,
+			_add_blade_quad(st, mid, perp * w * 0.5 * taper, dir * (nxt - prev).length() * 0.5,
 				Vector3(0, 1, 0), col)
 			prev = nxt
 

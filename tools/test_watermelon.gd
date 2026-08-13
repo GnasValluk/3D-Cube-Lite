@@ -65,20 +65,9 @@ func _ready() -> void:
 	# ── 2. Recipe ───────────────────────────────────────────────────────────
 	print("-- 2. Recipe cắt lát + lấy hạt --")
 	_Recipe.ensure()
-	_check(_Recipe.recipes.size() == 27, "tổng 27 recipe (thêm đạn dưa hấu + hạt giống + than/mũi tên/thép + bộ giáp biển)")
-	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "watermelon_slice"),
-		"có recipe cắt miếng dưa hấu")
-	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "watermelon_seed"),
-		"có recipe lấy hạt giống từ trái")
+	_check(_Recipe.recipes.is_empty(), "toàn bộ công thức chế tạo đã bị xoá (còn %d)" % _Recipe.recipes.size())
 	var slice_r: Dictionary = _Recipe.match_counts({"watermelon": 1})
-	_check(slice_r.get("id", "") == "watermelon_slice" and slice_r.get("count", 0) == 4,
-		"1 trái → 4 miếng dưa hấu")
-	var seed_recipe := {}
-	for r in _Recipe.recipes:
-		if r.get("id", "") == "watermelon_seed":
-			seed_recipe = r
-	_check(seed_recipe.get("count", 0) == 3 and (seed_recipe.get("ingredients", {}) as Dictionary).get("watermelon", 0) == 1,
-		"1 trái → 3 túi hạt giống")
+	_check(slice_r.is_empty(), "không còn recipe cắt miếng dưa hấu (đã xoá)")
 
 	# ── 3. Gieo trồng ──────────────────────────────────────────────────────
 	print("-- 3. Gieo hạt trên đất tơi xốp --")

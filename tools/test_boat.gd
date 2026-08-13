@@ -68,18 +68,9 @@ func _ready() -> void:
 	# ── 1. Recipe chế tạo thuyền ───────────────────────────────────────────
 	print("-- 1. Recipe chế tạo --")
 	_Recipe.ensure()
-	_check(_Recipe.recipes.size() == 27, "có 27 recipe (thuyền, máy kéo, cần câu, xô nước, đá, rau củ, hạt giống, than, mũi tên, thép, bộ giáp biển)")
-	_check(_Recipe.recipes[0].id == "tractor", "recipe[0] = tractor")
+	_check(_Recipe.recipes.is_empty(), "toàn bộ công thức chế tạo đã bị xoá (còn %d)" % _Recipe.recipes.size())
 	var rb: Dictionary = _Recipe.match_counts({"palm_wood": 6, "coconut": 2, "tropical_seaweed": 2})
-	_check(rb.get("id", "") == "fishing_boat", "đủ nguyên liệu → chế được thuyền")
-	_check(_Recipe.match_counts({"palm_wood": 5, "coconut": 2, "tropical_seaweed": 1}).get("id", "") != "fishing_boat",
-		"thiếu nguyên liệu → không khớp recipe thuyền")
-	_check(_Recipe.match_counts({"palm_wood": 6, "coconut": 3, "tropical_seaweed": 2}).get("id", "") == "fishing_boat",
-		"thừa nguyên liệu vẫn khớp recipe")
-	var rrod: Dictionary = _Recipe.match_counts({"palm_wood": 3, "tropical_seaweed": 2})
-	_check(rrod.get("id", "") == "fishing_rod", "recipe cần câu khớp")
-	var rbk: Dictionary = _Recipe.match_counts({"iron_ingot": 2, "palm_wood": 1})
-	_check(rbk.get("id", "") == "water_bucket", "recipe xô nước khớp")
+	_check(rb.is_empty(), "không còn recipe thuyền (đã xoá)")
 
 	ItemDatabase.ensure_db()
 	var boat_def: ItemDef = ItemDatabase.items_db.get("fishing_boat") as ItemDef
@@ -96,7 +87,7 @@ func _ready() -> void:
 	var have: Dictionary = _Recipe.count_grid(grid)
 	_check(have.get("palm_wood", 0) == 6 and have.get("coconut", 0) == 2 and have.get("tropical_seaweed", 0) == 2,
 		"count_grid đếm đúng nguyên liệu")
-	_check(_Recipe.match_grid(grid).get("id", "") == "fishing_boat", "match_grid khớp recipe thuyền")
+	_check(_Recipe.match_grid(grid).is_empty(), "match_grid không khớp (recipe đã xoá)")
 
 	# ── 3. Chunk + ao nước ─────────────────────────────────────────────────
 	print("-- 3. Mực nước --")

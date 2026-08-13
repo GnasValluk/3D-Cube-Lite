@@ -77,6 +77,9 @@ func set_aim(active: bool) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_active:
 		return
+	# Khi con trỏ hiển thị (Alt hoặc UI mở) không dùng chuyển động chuột để xoay cam.
+	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
+		return
 	# Xoay camera bằng chuột phải giữ
 	if event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion

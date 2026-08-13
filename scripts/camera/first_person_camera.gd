@@ -98,15 +98,18 @@ func pinch_zoom(factor: float) -> void:
 	_cur_fov = clamp(_cur_fov * (1.0 / factor), fov_min, fov_max)
 	_camera.fov = _cur_fov
 
+func _cursor_visible() -> bool:
+	return Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not _is_active:
 		return
+	# Khi con trỏ hiển thị (Alt hoặc UI mở) không dùng chuyển động chuột để xoay cam.
+	if event is InputEventMouseMotion and _cursor_visible():
+		return
 	# Xoay camera bằng chuột
 	if event is InputEventMouseMotion:
-		var mm := event as InputEventMouseMotion
-		_yaw   -= mm.relative.x * mouse_sens
-		_pitch += mm.relative.y * mouse_sens
-		_pitch  = clamp(_pitch, pitch_min, pitch_max)
+		_rotate_from_motion(event as InputEventMouseMotion)
 	# Zoom bằng cuộn chuột (đổi FOV)
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -115,6 +118,12 @@ func _unhandled_input(event: InputEvent) -> void:
 				_cur_fov = clamp(_cur_fov - fov_step, fov_min, fov_max)
 			elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 				_cur_fov = clamp(_cur_fov + fov_step, fov_min, fov_max)
+
+func _rotate_from_motion(mm: InputEventMouseMotion) -> void:
+	_yaw   -= mm.relative.x * mouse_sens
+	_pitch += mm.relative.y * mouse_sens
+	_pitch  = clamp(_pitch, pitch_min, pitch_max)
+
 
 func _process(delta: float) -> void:
 	if not _is_active or not is_instance_valid(_target):

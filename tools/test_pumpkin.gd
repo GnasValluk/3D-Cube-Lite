@@ -68,28 +68,9 @@ func _ready() -> void:
 	# ── 2. Recipe ───────────────────────────────────────────────────────────
 	print("-- 2. Recipe cắt lát + lấy hạt + đèn lồng --")
 	_Recipe.ensure()
-	_check(_Recipe.recipes.size() == 27, "tổng 27 recipe (thêm đạn dưa hấu + hạt giống + than/mũi tên/thép + bộ giáp biển)")
-	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "pumpkin_slice"),
-		"có recipe cắt miếng bí đỏ")
-	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "pumpkin_seed"),
-		"có recipe lấy hạt giống từ trái")
-	_check(_Recipe.recipes.any(func(r): return r.get("id", "") == "jack_o_lantern"),
-		"có recipe đục đèn lồng bí đỏ")
+	_check(_Recipe.recipes.is_empty(), "toàn bộ công thức chế tạo đã bị xoá (còn %d)" % _Recipe.recipes.size())
 	var slice_r: Dictionary = _Recipe.match_counts({"pumpkin": 1})
-	_check(slice_r.get("id", "") == "pumpkin_slice" and slice_r.get("count", 0) == 4,
-		"1 trái → 4 miếng bí đỏ")
-	var seed_recipe := {}
-	for r in _Recipe.recipes:
-		if r.get("id", "") == "pumpkin_seed":
-			seed_recipe = r
-	_check(seed_recipe.get("count", 0) == 3 and (seed_recipe.get("ingredients", {}) as Dictionary).get("pumpkin", 0) == 1,
-		"1 trái → 3 túi hạt giống")
-	var jack_recipe := {}
-	for r in _Recipe.recipes:
-		if r.get("id", "") == "jack_o_lantern":
-			jack_recipe = r
-	_check(jack_recipe.get("count", 0) == 1 and (jack_recipe.get("ingredients", {}) as Dictionary).get("pumpkin", 0) == 1,
-		"1 trái → 1 đèn lồng bí đỏ")
+	_check(slice_r.is_empty(), "không còn recipe cắt miếng bí đỏ (đã xoá)")
 
 	# ── 3. Gieo trồng ──────────────────────────────────────────────────────
 	print("-- 3. Gieo hạt trên đất tơi xốp --")

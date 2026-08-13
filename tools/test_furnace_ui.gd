@@ -1,9 +1,10 @@
 extends Node
 
-## test_furnace_ui — Kiểm tra UI lò nung:
-## 3 ô (nguyên liệu + chất đốt → thành phẩm), thanh công thức bên trái,
-## nung tự động tiêu hao nguyên liệu + chất đốt → nhận sản phẩm.
-## Chạy qua tools/test_furnace_ui.tscn.
+## test_furnace_ui — Kiểm tra UI lò nung kiểu mới:
+## 3 ô nguyên liệu / 3 ô thành phẩm / 2 ô nhiên liệu + icon lửa 2D nhấp nháy
+## + thanh nhiên liệu. Mỗi chất đốt có lượng nhiên liệu riêng (giây), đốt dần
+## theo thời gian — không tiêu 1 pcs/mẻ. Công thức nung gốc đã bị xoá → test
+## bằng công thức mẫu chèn tạm.
 
 const _FurnaceUI = preload("res://scripts/items/ui/furnace_ui.gd")
 const _CharManager = preload("res://scripts/core/character_manager.gd")
@@ -41,8 +42,9 @@ func _load_translations() -> void:
 
 func _ready() -> void:
 	_load_translations()
-	print("== test_furnace_ui: lò nung 3 ô + thanh công thức ==")
+	print("== test_furnace_ui: lò nung kiểu mới ==")
 
+	ItemDatabase.ensure_db()
 	var cm := _CharManager.new()
 	cm.name = "CharacterManager"
 	var player := _PlayerChar.new()
@@ -52,10 +54,6 @@ func _ready() -> void:
 	add_child(cm)
 	await get_tree().process_frame
 
-	ItemDatabase.ensure_db()
-	player.inventory.add_item(ItemDatabase.items_db["copper_ore"], 3)
-	player.inventory.add_item(ItemDatabase.items_db["coal"], 2)
-
 	var layer := CanvasLayer.new()
 	add_child(layer)
 	var ui := _FurnaceUI.new()
@@ -64,67 +62,55 @@ func _ready() -> void:
 	await get_tree().process_frame
 
 	_check(ui.visible, "UI hiển thị sau khi mở")
-	_check(ui._recipes.size() == 8, "thanh công thức có đủ %d công thức nung" % ui._recipes.size())
-	_check(ui._recipe_cards.size() == ui._recipes.size(), "mỗi công thức có 1 card")
+	_check(ui._recipes.is_empty(), "công thức nung đã bị xoá (còn %d)" % ui._recipes.size())
+	_check(ui._furnace_inv.slots.size() == 8, "lò có 8 ô (3 nung + 2 nhiên liệu + 3 thành phẩm)")
+	_check(ui._input_panels.size() == 3, "3 ô nguyên liệu")
+	_check(ui._fuel_panels.size() == 2, "2 ô nhiên liệu")
+	_check(ui._output_panels.size() == 3, "3 ô thành phẩm")
+	_check(ui._fire_label != null and ui._fire_glow != null, "có icon lửa 2D + hiệu ứng")
+	_check(ui._fuel_bar != null and ui._fuel_fill != null, "có thanh process nhiên liệu")
+	_check(ui._fuels.has("coal") and ui._fuels["coal"] > ui._fuels["palm_wood"],
+		"mỗi chất đốt có lượng nhiên liệu riêng (coal > gỗ)")
 
-	# Kiểm tra icon của card công thức: TextureRect phải có expand+stretch đúng
-	# (gọn trong khung, không chỉ hiện góc trên-trái) — khớp chuẩn inventory.
-	var card0 := ui._recipe_cards[0]
-	var c0_slots := card0.get_children().filter(func(c): return c is Panel)
-	_check(c0_slots.size() >= 2, "card công thức có 2 ô slot (input + output)")
-	var slot_ok: bool = true
-	for s in c0_slots:
-		if not (s is Panel) or not s.clip_contents:
-			slot_ok = false
-			break
-		for ch in s.get_children():
-			if ch is TextureRect:
-				var tr := ch as TextureRect
-				if tr.position != Vector2(2, 2) or tr.size != Vector2(44, 44):
-					slot_ok = false
-				if tr.expand_mode != TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL:
-					slot_ok = false
-				if tr.stretch_mode != TextureRect.STRETCH_KEEP_ASPECT_CENTERED:
-					slot_ok = false
-	_check(slot_ok, "icon slot công thức: vị trí/size/expand/stretch đúng chuẩn inventory")
+	# Chèn công thức nung mẫu (đồng → thỏi đồng)
+	ui._smelting_items["copper_ore"] = "copper_ingot"
 
-	# Click công thức copper_ore → tự nạp 1 copper_ore vào ô nguyên liệu
-	var copper_idx := -1
-	for i in range(ui._recipes.size()):
-		if ui._recipes[i].get("input", "") == "copper_ore":
-			copper_idx = i
-			break
-	_check(copper_idx >= 0, "tìm thấy công thức copper_ore")
+	# Nạp nguyên liệu vào ô 0, nhiên liệu than vào ô 3
+	ui._furnace_inv.slots[0].item = ItemDatabase.items_db["copper_ore"]
+	ui._furnace_inv.slots[0].count = 3
+	ui._furnace_inv.slots[3].item = ItemDatabase.items_db["coal"]
+	ui._furnace_inv.slots[3].count = 1
 
-	ui._select_recipe(copper_idx)
-	_check(ui._selected_recipe == copper_idx, "đã chọn công thức copper_ore")
-
-	var ore_before := player.inventory.get_item_count("copper_ore")
-	ui._try_fill_input(copper_idx)
-	_check(player.inventory.get_item_count("copper_ore") == ore_before - 1, "click công thức → rút 1 copper_ore từ túi")
-	_check(not ui._furnace_inv.slots[0].is_empty() and ui._furnace_inv.slots[0].item.id == "copper_ore",
-		"ô nguyên liệu chứa copper_ore")
-
-	# Nạp chất đốt vào ô fuel (như kéo thả / click chuyển)
-	var coal_before := player.inventory.get_item_count("coal")
-	ui._transfer_to_furnace(player.inventory.find_slot_of_item(ItemDatabase.items_db["coal"]), "player", 1)
-	_check(player.inventory.get_item_count("coal") == coal_before - 1, "chuyển 1 coal vào lò")
-	_check(not ui._furnace_inv.slots[1].is_empty() and ui._furnace_inv.slots[1].item.id == "coal",
-		"ô chất đốt chứa coal")
-
-	# Đẩy nhanh: hoàn tất 1 mẻ nung
-	ui._smelt_time = 0.01
+	# Bắt đầu nung: coal (80s) chuyển thành năng lượng nhiên liệu → lửa sáng
+	ui._smelt_time = 5.0
 	ui._process(0.02)
-	_check(ui._furnace_inv.slots[0].is_empty(), "sau 1 mẻ: nguyên liệu đã tiêu hao")
-	_check(ui._furnace_inv.slots[1].is_empty(), "sau 1 mẻ: chất đốt đã tiêu hao")
-	_check(not ui._furnace_inv.slots[2].is_empty() and ui._furnace_inv.slots[2].item.id == "copper_ingot",
+	_check(ui._smelt_active, "lửa sáng khi có nguyên liệu + nhiên liệu")
+	_check(not ui._fire_cold, "icon lửa ở trạng thái đốt (không tắt)")
+	_check(ui._fuel_energy > 0.0, "than đã nạp vào nhiên liệu (%.1fs)" % ui._fuel_energy)
+
+	# Sau 1 mẻ (5s): nguyên liệu tiêu 1, thành phẩm có thỏi; than chưa hết
+	ui._process(5.0)
+	_check(ui._furnace_inv.slots[0].count == 2, "sau 1 mẻ: còn 2 copper_ore")
+	_check(not ui._furnace_inv.slots[5].is_empty() and ui._furnace_inv.slots[5].item.id == "copper_ingot",
 		"sau 1 mẻ: thành phẩm copper_ingot trong ô sản phẩm")
+	_check(ui._fuel_energy < 80.0 and ui._fuel_energy > 0.0, "nhiên liệu than giảm dần theo thời gian")
+
+	# Nạp thêm 1 than để đốt cho hết nguyên liệu; đốt hết than → lửa tắt
+	ui._furnace_inv.slots[3].item = ItemDatabase.items_db["coal"]
+	ui._furnace_inv.slots[3].count = 1
+	var smelt_before := ui._furnace_inv.slots[5].count
+	ui._process(90.0)
+	_check(ui._furnace_inv.slots[5].count > smelt_before, "nung tiếp ra thêm thỏi")
+	_check(ui._fuel_energy <= 0.0, "hết nhiên liệu (%.1fs)" % ui._fuel_energy)
+	_check(ui._smelt_active == false, "hết nhiên liệu → ngừng nung")
+	_check(ui._fire_cold, "hết nhiên liệu → lửa tắt")
 
 	# Chuyển sản phẩm về túi
 	var ingot_before := player.inventory.get_item_count("copper_ingot")
-	ui._transfer_from_furnace(2, ui._furnace_inv.slots[2].count)
-	_check(player.inventory.get_item_count("copper_ingot") == ingot_before + 1, "chuyển copper_ingot về túi")
-	_check(ui._furnace_inv.slots[2].is_empty(), "ô sản phẩm trống sau khi chuyển")
+	var out_count: int = ui._furnace_inv.slots[5].count
+	ui._transfer_from_furnace(5, out_count)
+	_check(player.inventory.get_item_count("copper_ingot") == ingot_before + out_count,
+		"chuyển %d copper_ingot về túi" % out_count)
 
 	ui.close()
 	for i in range(40):

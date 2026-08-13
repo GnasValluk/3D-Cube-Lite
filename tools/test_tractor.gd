@@ -79,10 +79,9 @@ func _ready() -> void:
 	_check(tr_def != null and tr_def.type == ItemDef.Type.TOOL, "tractor loại TOOL")
 	_check(tr_def != null and not tr_def.stackable, "máy kéo không stack")
 	_Recipe.ensure()
+	_check(_Recipe.recipes.is_empty(), "toàn bộ công thức chế tạo đã bị xoá (còn %d)" % _Recipe.recipes.size())
 	var rt: Dictionary = _Recipe.match_counts({"steel_ingot": 6, "iron_ingot": 8, "palm_wood": 10})
-	_check(rt.get("id", "") == "tractor", "đủ nguyên liệu → chế được máy kéo")
-	_check(_Recipe.match_counts({"steel_ingot": 6, "iron_ingot": 8, "palm_wood": 9}).get("id", "") != "tractor",
-		"thiếu gỗ → không khớp recipe máy kéo")
+	_check(rt.is_empty(), "không còn recipe máy kéo (đã xoá)")
 
 	# ── 2. Chunk + mặt đất ──────────────────────────────────────────────────
 	print("-- 2. Mặt đất --")

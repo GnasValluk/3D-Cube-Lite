@@ -1,6 +1,12 @@
-## recipe_database.gd — Hệ thống công thức chế tạo (không theo hình dạng).
-## Recipe = { "id", "name", "result", "count", "ingredients": {item_id: số lượng}, "category" }.
-## Ghép khớp dựa trên lưới chế tạo 3x3 (đếm nguyên liệu, không cần đúng ô).
+## recipe_database.gd — Hệ thống công thức chế tạo (kiểu lưới, Minecraft).
+## Recipe = {
+##   "id", "name", "result", "count", "category", "desc",
+##   "grid_size": 2 hoặc 3,
+##   "pattern": [[item_id hoặc "", ...], ...]  # các dòng trên lưới,
+##   "ingredients": {item_id: số lượng}          # tự suy ra từ pattern,
+## }
+## Ghép khớp theo hình dạng ô trên lưới chế tạo (có thể dịch chuyển pattern
+## trong lưới, giống Minecraft).
 class_name RecipeDatabase
 extends RefCounted
 
@@ -15,251 +21,107 @@ static func ensure() -> void:
 	if _built:
 		return
 	_built = true
-	recipes = [
-		{
-			"id": "tractor",
-			"name": "Máy Kéo Nông Nghiệp",
-			"result": "tractor",
-			"count": 1,
-			"ingredients": { "steel_ingot": 6, "iron_ingot": 8, "palm_wood": 10 },
-			"category": CAT_STRUCTURES,
-			"desc": "Máy kéo + rơ-moóc chở hàng — đặt xuống đất, F để lên lái, chở bí dưa về làng.",
-		},
-		{
-			"id": "fishing_boat",
-			"name": "Thuyền Đánh Cá",
-			"result": "fishing_boat",
-			"count": 1,
-			"ingredients": { "palm_wood": 6, "coconut": 2, "tropical_seaweed": 2 },
-			"category": CAT_STRUCTURES,
-			"desc": "Thuyền gỗ dừa — đặt xuống nước, F để lên lái, câu cá ngay trên thuyền.",
-		},
-		{
-			"id": "fishing_rod",
-			"name": "Cần Câu",
-			"result": "fishing_rod",
-			"count": 1,
-			"ingredients": { "palm_wood": 3, "tropical_seaweed": 2 },
-			"category": CAT_TOOLS,
-			"desc": "Cần câu cá — chế từ gỗ dừa và rong biển.",
-		},
-		{
-			"id": "water_bucket",
-			"name": "Xô Nước",
-			"result": "water_bucket",
-			"count": 1,
-			"ingredients": { "iron_ingot": 2, "palm_wood": 1 },
-			"category": CAT_TOOLS,
-			"desc": "Xô đựng nước — đặt khối nước tại vị trí chỉ định.",
-		},
-		{
-			"id": "block_stone_qtr",
-			"name": "Đá Tư",
-			"result": "block_stone_qtr",
-			"count": 4,
-			"ingredients": { "block_stone": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Cắt 1 khối đá thành 4 miếng ¼ — làm bậc, trang trí.",
-		},
-		{
-			"id": "block_stone_eighth",
-			"name": "Đá Vụn",
-			"result": "block_stone_eighth",
-			"count": 8,
-			"ingredients": { "block_stone": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Cắt 1 khối đá thành 8 miếng ⅛ — tấm mỏng.",
-		},
-		{
-			"id": "block_stone_thin",
-			"name": "Đá Phiến",
-			"result": "block_stone_thin",
-			"count": 2,
-			"ingredients": { "block_stone": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Mài 1 khối đá thành 2 tấm mỏng 0.2 thay vì dày 0.5.",
-		},
-		{
-			"id": "eggplant_slice",
-			"name": "Cà Tím Bổ Đôi",
-			"result": "eggplant_slice",
-			"count": 2,
-			"ingredients": { "eggplant_fruit": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Bổ đôi trái cà tím — ruột trắng kem, hạt vàng nâu, nguyên liệu nấu ăn.",
-		},
-		{
-			"id": "eggplant_seed",
-			"name": "Hạt Giống Cà Tím",
-			"result": "eggplant_seed",
-			"count": 2,
-			"ingredients": { "eggplant_fruit": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Lấy hạt từ trái cà tím — gieo trên đất tơi xốp để trồng thêm bụi cà tím.",
-		},
-		{
-			"id": "watermelon_nuke_ammo",
-			"name": "Đạn Hạt Nhân Dưa Hấu",
-			"result": "watermelon_nuke_ammo",
-			"count": 2,
-			"ingredients": { "watermelon": 1, "iron_ingot": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Lắp vỏ sắt bọc hạt nhân vào quả dưa hấu — đạn pháo nổ vùng, cần cho Pháo Dưa Hấu Hạt Nhân.",
-		},
-		{
-			"id": "watermelon_slice",
-			"name": "Miếng Dưa Hấu",
-			"result": "watermelon_slice",
-			"count": 4,
-			"ingredients": { "watermelon": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Cắt quả dưa hấu thành 4 miếng tam giác — ruột đỏ mọng nước, hạt đen tuyền, ăn nhanh hồi máu.",
-		},
-		{
-			"id": "watermelon_seed",
-			"name": "Hạt Giống Dưa Hấu",
-			"result": "watermelon_seed",
-			"count": 3,
-			"ingredients": { "watermelon": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Bổ quả dưa hấu lấy hạt — gieo trên đất tơi xốp để trồng thêm thảm dây dưa.",
-		},
-		{
-			"id": "pumpkin_slice",
-			"name": "Miếng Bí Đỏ",
-			"result": "pumpkin_slice",
-			"count": 4,
-			"ingredients": { "pumpkin": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Cắt quả bí đỏ thành 4 miếng — vỏ cam mỏng, thịt cam tươi mộng nước, lõi xơ vàng với hạt bí ngà, ăn nhanh hồi máu.",
-		},
-		{
-			"id": "pumpkin_seed",
-			"name": "Hạt Giống Bí Đỏ",
-			"result": "pumpkin_seed",
-			"count": 3,
-			"ingredients": { "pumpkin": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Lấy hạt bí ngà dẹt từ quả — gieo trên đất tơi xốp để trồng thêm dây bí đỏ.",
-		},
-		{
-			"id": "jack_o_lantern",
-			"name": "Đèn Lồng Bí Đỏ",
-			"result": "jack_o_lantern",
-			"count": 1,
-			"ingredients": { "pumpkin": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Đục mắt/mũi/miệng tam giác zíc-zắc, đặt nến voxel — đèn lồng tỏa ánh lửa vàng đỏ ấm áp cho đêm hội.",
-		},
-		{
-			"id": "orange_seed",
-			"name": "Hạt Giống Cam",
-			"result": "orange_seed",
-			"count": 2,
-			"ingredients": { "orange": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Lấy hạt từ quả cam chín — gieo trên đất tơi xốp để trồng thêm cây cam.",
-		},
-		{
-			"id": "coconut_seed",
-			"name": "Mầm Dừa",
-			"result": "coconut_seed",
-			"count": 2,
-			"ingredients": { "coconut": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Tách mầm từ trái dừa già — trồng trên đất tơi xốp để có thêm cây dừa.",
-		},
-		{
-			"id": "taro_seed",
-			"name": "Mầm Môn Ngọt",
-			"result": "taro_seed",
-			"count": 2,
-			"ingredients": { "taro": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Tách củ môn làm mầm giống — trồng trên đất tơi xốp để thu hoạch thêm củ.",
-		},
-		{
-			"id": "seaweed_seed",
-			"name": "Mầm Rong Nhiệt Đới",
-			"result": "seaweed_seed",
-			"count": 2,
-			"ingredients": { "tropical_seaweed": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Băm nhánh rong nhiệt đới thành mầm — trồng dưới nước trên cát/bùn.",
-		},
-		{
-			"id": "seagrass_seed",
-			"name": "Hạt Giống Cỏ Biển",
-			"result": "seagrass_seed",
-			"count": 2,
-			"ingredients": { "seagrass": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Lấy hạt từ bụi cỏ biển — gieo xuống biển nông trên nền cát.",
-		},
-		{
-			"id": "charcoal",
-			"name": "Than Củi",
-			"result": "charcoal",
-			"count": 2,
-			"ingredients": { "palm_wood": 2 },
-			"category": CAT_MATERIALS,
-			"desc": "Đốt gỗ dừa trong môi trường kín khí — than củi đốt lò rèn, rẻ hơn than đá.",
-		},
-		{
-			"id": "arrow",
-			"name": "Mũi Tên",
-			"result": "arrow",
-			"count": 8,
-			"ingredients": { "palm_wood": 1, "tropical_seaweed": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Mũi tên gỗ dừa gắn lông rong — đạn cho nỏ, tiêu hao khi bắn.",
-		},
-		{
-			"id": "steel_ingot",
-			"name": "Thỏi Thép",
-			"result": "steel_ingot",
-			"count": 1,
-			"ingredients": { "iron_ingot": 2, "coal": 1 },
-			"category": CAT_MATERIALS,
-			"desc": "Luyện thép từ sắt + cacbon — hợp kim bền, nguyên liệu chế máy kéo & công trình lớn.",
-		},
-		{
-			"id": "sea_helmet",
-			"name": "Mũ Vỏ Sò",
-			"result": "sea_helmet",
-			"count": 1,
-			"ingredients": { "tropical_seaweed": 4, "coconut": 2 },
-			"category": CAT_TOOLS,
-			"desc": "Mũ vỏ sò bão hòa muối biển — chế từ rong biển và dừa. Mặc đủ bộ giáp biển để kháng khí độc rừng ngập mặn.",
-		},
-		{
-			"id": "sea_chestplate",
-			"name": "Giáp San Hô",
-			"result": "sea_chestplate",
-			"count": 1,
-			"ingredients": { "tropical_seaweed": 6, "coconut": 3, "iron_ingot": 1 },
-			"category": CAT_TOOLS,
-			"desc": "Áo giáp san hô đan rong — chế từ rong biển, dừa và sắt. Mặc đủ bộ giáp biển để kháng khí độc rừng ngập mặn.",
-		},
-		{
-			"id": "sea_leggings",
-			"name": "Quần Vảy Cá",
-			"result": "sea_leggings",
-			"count": 1,
-			"ingredients": { "tropical_seaweed": 5, "coconut": 2 },
-			"category": CAT_TOOLS,
-			"desc": "Quần vảy cá — chế từ rong biển và dừa. Mặc đủ bộ giáp biển để kháng khí độc rừng ngập mặn.",
-		},
-		{
-			"id": "sea_boots",
-			"name": "Giày Vây Cá",
-			"result": "sea_boots",
-			"count": 1,
-			"ingredients": { "tropical_seaweed": 3, "coconut": 1 },
-			"category": CAT_TOOLS,
-			"desc": "Giày vây cá lội bùn — chế từ rong biển và dừa. Mặc đủ bộ giáp biển để kháng khí độc rừng ngập mặn.",
-		},
-	]
+	# Toàn bộ công thức đã bị xoá. Danh sách để trống — thêm lại sau.
+	recipes = []
+
+## Trích mảng id item từ lưới chế tạo (grid_size×grid_size), "" = ô trống.
+static func _grid_ids(grid_inventory, grid_size: int) -> Array:
+	var ids: Array = []
+	ids.resize(grid_size * grid_size)
+	for i in range(grid_size * grid_size):
+		ids[i] = ""
+	if grid_inventory == null:
+		return ids
+	var n: int = mini(grid_size * grid_size, grid_inventory.slots.size())
+	for i in range(n):
+		var slot = grid_inventory.slots[i]
+		if slot != null and not slot.is_empty():
+			ids[i] = slot.item.id
+	return ids
+
+## Cắt bỏ viền trống của pattern để lấy khối chứa vật phẩm (bounding box).
+static func _trim_pattern(pattern: Array) -> Array:
+	var rows: Array = pattern
+	var top := 0
+	var bottom := rows.size() - 1
+	while top <= bottom and _row_all_empty(rows[top]):
+		top += 1
+	while bottom >= top and _row_all_empty(rows[bottom]):
+		bottom -= 1
+	if bottom < top:
+		return []
+	var cols := 0
+	for r in range(top, bottom + 1):
+		cols = maxi(cols, (rows[r] as Array).size())
+	var left := cols
+	var right := 0
+	for r in range(top, bottom + 1):
+		var row: Array = rows[r]
+		for c in range(row.size()):
+			if (row[c] as String) != "":
+				left = mini(left, c)
+				right = maxi(right, c)
+	if right < left:
+		return []
+	var trimmed: Array = []
+	for r in range(top, bottom + 1):
+		var row: Array = rows[r]
+		var new_row: Array = []
+		for c in range(left, right + 1):
+			new_row.append(row[c] if c < row.size() else "")
+		trimmed.append(new_row)
+	return trimmed
+
+static func _row_all_empty(row) -> bool:
+	if row == null:
+		return true
+	for cell in row:
+		if (cell as String) != "":
+			return false
+	return true
+
+## So khớp pattern (đã trim) với lưới tại offset (ox, oy). Các ô ngoài vùng
+## pattern phải trống; các ô trong pattern phải khớp id ("" = ô trống).
+static func _pattern_at(ids: Array, pattern: Array, grid_size: int, ox: int, oy: int) -> bool:
+	var rows: int = pattern.size()
+	var cols: int = 0
+	for row in pattern:
+		cols = maxi(cols, (row as Array).size())
+	for r in range(grid_size):
+		for c in range(grid_size):
+			var in_pattern: bool = r >= oy and r < oy + rows and c >= ox and c < ox + cols
+			var want: String = ""
+			if in_pattern:
+				var prow: Array = pattern[r - oy]
+				want = prow[c - ox] if c - ox < prow.size() else ""
+			var have: String = ids[r * grid_size + c]
+			if want == "" and have != "":
+				return false
+			if want != "" and have != want:
+				return false
+	return true
+
+## Tìm recipe khớp theo hình dạng trên lưới grid_size×grid_size.
+static func match_shape(grid_inventory, grid_size: int) -> Dictionary:
+	var ids := _grid_ids(grid_inventory, grid_size)
+	for r in recipes:
+		var pattern: Array = r.get("pattern", [])
+		if pattern.is_empty():
+			continue
+		var trimmed := _trim_pattern(pattern)
+		if trimmed.is_empty():
+			continue
+		var rows: int = trimmed.size()
+		var cols: int = 0
+		for row in trimmed:
+			cols = maxi(cols, (row as Array).size())
+		if rows > grid_size or cols > grid_size:
+			continue
+		for oy in range(grid_size - rows + 1):
+			for ox in range(grid_size - cols + 1):
+				if _pattern_at(ids, trimmed, grid_size, ox, oy):
+					return r
+	return {}
 
 ## Đếm item trong lưới chế tạo → dictionary {item_id: count}.
 static func count_grid(grid_inventory) -> Dictionary:
@@ -272,7 +134,8 @@ static func count_grid(grid_inventory) -> Dictionary:
 		have[slot.item.id] = have.get(slot.item.id, 0) + slot.count
 	return have
 
-## Tìm recipe đầu tiên khớp với lưới chế tạo (trả null nếu không khớp).
+## Tìm recipe đầu tiên khớp với lưới chế tạo (đếm nguyên liệu, không theo hình
+## dạng) — giữ để tương thích ngược.
 static func match_grid(grid_inventory) -> Dictionary:
 	var have := count_grid(grid_inventory)
 	return match_counts(have)

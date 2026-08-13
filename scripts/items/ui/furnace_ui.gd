@@ -1,8 +1,12 @@
 class_name FurnaceUI
 extends Control
 
+## Lò nung kiểu mới: trái = danh sách công thức (nung), phải = vùng lò.
+## Vùng lò: 3 ô nguyên liệu (nung) ở trên — icon lửa 2D (sáng + nhấp nháy khi
+## đốt) — bên dưới 2 ô nhiên liệu + thanh process nhiên liệu (mỗi chất đốt có
+## lượng nhiên liệu riêng, đốt hết theo thời gian). 3 ô thành phẩm ở dưới.
+
 const S: float = 1.6
-const SS: float = 1.4
 
 const BG_DEEP := Color(0.06, 0.04, 0.12)
 const BG_PANEL := Color(0.10, 0.07, 0.18)
@@ -26,6 +30,10 @@ const LIST_W: float = 244.0
 const REC_X: float = PAD
 const RIGHT_X: float = PAD + LIST_W + GAP * 2
 const PANEL_W: float = RIGHT_X + GRID_W + PAD
+
+const FUEL_SLOT_0: int = 3
+const FUEL_SLOT_1: int = 4
+const OUT_SLOT_0: int = 5
 
 var _furnace = null
 var _player_ref: PlayerCharacter = null
@@ -64,18 +72,27 @@ var _recipe_list: VBoxContainer
 var _selected_recipe: int = -1
 var _recipe_card_style: StyleBoxFlat
 var _recipe_sel_style: StyleBoxFlat
+var _empty_label: Label
 
 var _smelting_items: Dictionary = {}
 var _fuels: Dictionary = {}
 var _smelt_active: bool = false
-var _tween: Tween
-var _smelt_progress: float = 0.0
 var _smelt_time: float = 5.0
-var _progress_bar: ColorRect
-var _progress_fill: ColorRect
+var _smelt_progress: Array[float] = [0.0, 0.0, 0.0]
+var _fuel_energy: float = 0.0
+var _fuel_piece_value: float = 80.0
+var _fire_time: float = 0.0
+var _fire_cold: bool = true
+var _tween: Tween
+
+var _fire_glow: Panel
+var _fire_label: Label
+var _fuel_bar: ColorRect
+var _fuel_fill: ColorRect
+var _fuel_bar_label: Label
 
 func _init() -> void:
-	_furnace_inv = Inventory.new(3)
+	_furnace_inv = Inventory.new(8)
 
 func _ready() -> void:
 	_content_h = _build_layout()
@@ -83,6 +100,25 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_KEEP_SIZE)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	_setup_styles()
+	_init_smelting_items()
+	_setup_background()
+	_setup_title()
+	_setup_recipe_bar()
+	_setup_furnace_slots()
+	_setup_fire_area()
+	_setup_player_grid()
+	visible = false
+
+func _build_layout() -> float:
+	var furnace_area_h: float = PAD + 22 + 3 * SLOT_SIZE + 3 * 60 + 8
+	var inv_label_y: float = furnace_area_h + 10
+	var inv_start: float = inv_label_y + 24
+	var grid_bottom: float = inv_start + 3 * (SLOT_SIZE + GAP)
+	var hotbar_bottom: float = grid_bottom + GAP + SLOT_SIZE
+	return hotbar_bottom + PAD
+
+func _setup_styles() -> void:
 	_slot_style = StyleBoxFlat.new()
 	_slot_style.bg_color = BG_PANEL
 	_slot_style.corner_radius_top_left = 6
@@ -140,39 +176,15 @@ func _drop_data(position, data):
 """
 	_slot_script.reload()
 
-	_init_smelting_items()
-	_setup_background()
-	_setup_title()
-	_setup_recipe_bar()
-	_setup_furnace_slots()
-	_setup_player_grid()
-	visible = false
-
-func _build_layout() -> float:
-	var furnace_bottom: float = PAD + 22 + 64 + SLOT_SIZE
-	var inv_label: float = furnace_bottom + 12
-	var inv_start: float = inv_label + 24
-	var grid_bottom: float = inv_start + 3 * (SLOT_SIZE + GAP)
-	var hotbar_bottom: float = grid_bottom + GAP + SLOT_SIZE
-	return hotbar_bottom + PAD
-
 func _init_smelting_items() -> void:
-	_smelting_items = {
-		"copper_ore": "copper_ingot",
-		"bauxite_ore": "aluminium_ingot",
-		"silver_ore": "silver_ingot",
-		"iron_ore": "iron_ingot",
-		"gold_ore": "gold_ingot",
-		"titan_ore": "titan_ingot",
-		"platinum_ore": "platinum_ingot",
-		"coal_ore": "coal",
-	}
-	# Chất đốt: than, than củi, gỗ dừa. 1 đơn vị = 1 mẻ nung.
+	# Toàn bộ công thức nung đã bị xoá. `_smelting_items` để trống — thêm lại sau.
+	_smelting_items = {}
+	# Chất đốt: mỗi loại có lượng nhiên liệu riêng (giây đốt cho 1 đơn vị).
 	_fuels = {
-		"coal": true,
-		"charcoal": true,
-		"palm_wood": true,
-		"block_oak_wood": true,
+		"coal": 80.0,
+		"charcoal": 40.0,
+		"palm_wood": 10.0,
+		"block_oak_wood": 10.0,
 	}
 	for ore in _smelting_items:
 		_recipes.append({ "input": ore, "output": _smelting_items[ore] })
@@ -347,15 +359,24 @@ func _select_recipe(idx: int) -> void:
 		_recipe_cards[i].add_theme_stylebox_override("panel", _recipe_sel_style if i == idx else _recipe_card_style)
 
 func _try_fill_input(idx: int) -> void:
-	if _player_ref == null:
+	if _player_ref == null or idx < 0 or idx >= _recipes.size():
 		return
 	var pi = _player_ref.inventory
 	var fi = _furnace_inv
 	if pi == null or fi == null:
 		return
-	var input: String = _recipes[idx].input
-	var inslot: ItemSlot = fi.slots[0]
-	if not inslot.is_empty() and inslot.item.id != input:
+	var input: String = _recipes[idx].get("input", "")
+	# Tìm ô nguyên liệu trống hoặc cùng loại để nạp
+	var slot_idx := -1
+	for i in range(3):
+		var s: ItemSlot = fi.slots[i]
+		if s.is_empty():
+			slot_idx = i
+			break
+		if s.item.id == input and s.count < s.item.max_stack:
+			slot_idx = i
+			break
+	if slot_idx < 0:
 		return
 	var def: ItemDef = ItemDatabase.items_db.get(input) as ItemDef
 	if def == null:
@@ -397,8 +418,15 @@ func _setup_recipe_bar() -> void:
 	_recipe_list.add_theme_constant_override("separation", 6)
 	scroll.add_child(_recipe_list)
 
+	_empty_label = Label.new()
+	_empty_label.text = tr("NO_RECIPES")
+	_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_empty_label.add_theme_font_size_override("font_size", int(S * 11))
+	_empty_label.add_theme_color_override("font_color", TEXT_MUTED)
+	_recipe_list.add_child(_empty_label)
+
 	for r in _recipes:
-		_recipe_card(r.input, r.output)
+		_recipe_card(r.get("input", ""), r.get("output", ""))
 
 func _label(pos: Vector2, text: String, color: Color, isize: int = 12) -> void:
 	var lbl := Label.new()
@@ -409,58 +437,92 @@ func _label(pos: Vector2, text: String, color: Color, isize: int = 12) -> void:
 	add_child(lbl)
 
 func _setup_furnace_slots() -> void:
-	var base_x: float = RIGHT_X + GRID_W * 0.5 - 120
+	var sx: float = RIGHT_X + (GRID_W - 3 * (SLOT_SIZE + GAP) + GAP) * 0.5
 	var sy: float = PAD + 22
 	var in_y := sy
-	var fuel_y := sy + 64
-	var out_y := sy
+	var fuel_y := sy + SLOT_SIZE + 52
+	var out_y := fuel_y + SLOT_SIZE + 40
 
-	# Input slot (idx 0)
-	_label(Vector2(base_x, in_y - 24), tr("FURNACE_INPUT"), TEXT_DIM)
-	var inp := _make_slot(base_x, in_y, _input_faces, _input_icons, _input_counts, _input_panels, "furnace", 0)
-	inp.gui_input.connect(_on_slot_gui_input.bind("furnace", 0))
+	_label(Vector2(sx, in_y - 22), tr("FURNACE_INPUT"), TEXT_DIM, 10)
+	for i in range(3):
+		var px: float = sx + i * (SLOT_SIZE + GAP)
+		var panel := _make_slot(px, in_y, _input_faces, _input_icons, _input_counts, _input_panels, "furnace", i)
+		panel.gui_input.connect(_on_slot_gui_input.bind("furnace", i))
 
-	# Fuel slot (idx 1)
-	_label(Vector2(base_x + SLOT_SIZE + GAP, fuel_y - 24), tr("FURNACE_FUEL"), TEXT_DIM)
-	var fuel := _make_slot(base_x + SLOT_SIZE + GAP, fuel_y, _fuel_faces, _fuel_icons, _fuel_counts, _fuel_panels, "furnace", 1)
-	fuel.gui_input.connect(_on_slot_gui_input.bind("furnace", 1))
+	_label(Vector2(sx, fuel_y - 22), tr("FURNACE_FUEL"), TEXT_DIM, 10)
+	for i in range(2):
+		var px: float = sx + i * (SLOT_SIZE + GAP)
+		var panel := _make_slot(px, fuel_y, _fuel_faces, _fuel_icons, _fuel_counts, _fuel_panels, "furnace", FUEL_SLOT_0 + i)
+		panel.gui_input.connect(_on_slot_gui_input.bind("furnace", FUEL_SLOT_0 + i))
 
-	# Arrow + progress between input and output
-	var arrow_x: float = base_x + 2 * (SLOT_SIZE + GAP) + 4
-	var arrow_y: float = sy + SLOT_SIZE * 0.5 - 6
+	_label(Vector2(sx, out_y - 22), tr("FURNACE_OUTPUT"), TEXT_DIM, 10)
+	for i in range(3):
+		var px: float = sx + i * (SLOT_SIZE + GAP)
+		var panel := _make_slot(px, out_y, _output_faces, _output_icons, _output_counts, _output_panels, "furnace", OUT_SLOT_0 + i)
+		panel.gui_input.connect(_on_slot_gui_input.bind("furnace", OUT_SLOT_0 + i))
 
-	_progress_bar = ColorRect.new()
-	_progress_bar.position = Vector2(arrow_x - 4, arrow_y - 4)
-	_progress_bar.size = Vector2(40, 28)
-	_progress_bar.color = Color(0.15, 0.10, 0.22, 0.6)
-	add_child(_progress_bar)
+	var fuel_x: float = sx + 2 * (SLOT_SIZE + GAP) + 14
+	_fuel_bar = ColorRect.new()
+	_fuel_bar.position = Vector2(fuel_x, fuel_y + 4)
+	_fuel_bar.size = Vector2(150, 22)
+	_fuel_bar.color = Color(0.15, 0.10, 0.22, 0.6)
+	add_child(_fuel_bar)
+	_fuel_fill = ColorRect.new()
+	_fuel_fill.position = Vector2(fuel_x + 2, fuel_y + 6)
+	_fuel_fill.size = Vector2(0, 18)
+	_fuel_fill.color = Color(0.95, 0.50, 0.10)
+	add_child(_fuel_fill)
+	_fuel_bar_label = Label.new()
+	_fuel_bar_label.position = Vector2(fuel_x, fuel_y + 30)
+	_fuel_bar_label.size = Vector2(150, 18)
+	_fuel_bar_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_fuel_bar_label.add_theme_font_size_override("font_size", int(S * 9))
+	_fuel_bar_label.add_theme_color_override("font_color", TEXT_DIM)
+	add_child(_fuel_bar_label)
 
-	_progress_fill = ColorRect.new()
-	_progress_fill.position = Vector2(arrow_x, arrow_y)
-	_progress_fill.size = Vector2(0, 20)
-	_progress_fill.color = ORANGE
-	add_child(_progress_fill)
+func _setup_fire_area() -> void:
+	var sx: float = RIGHT_X + (GRID_W - 3 * (SLOT_SIZE + GAP) + GAP) * 0.5
+	var sy: float = PAD + 22
+	var fire_y: float = sy + SLOT_SIZE + 4
+	var fire_x: float = sx + (3 * (SLOT_SIZE + GAP) - GAP) * 0.5 - 26
 
-	var arrow := Label.new()
-	arrow.text = "→"
-	arrow.position = Vector2(arrow_x + 12, arrow_y - 8)
-	arrow.add_theme_font_size_override("font_size", int(S * 16))
-	arrow.add_theme_color_override("font_color", TEXT_DIM)
-	add_child(arrow)
+	var glow_style := StyleBoxFlat.new()
+	glow_style.bg_color = Color(0.55, 0.20, 0.05, 0.25)
+	glow_style.corner_radius_top_left = 6
+	glow_style.corner_radius_top_right = 6
+	glow_style.corner_radius_bottom_left = 6
+	glow_style.corner_radius_bottom_right = 6
+	_fire_glow = Panel.new()
+	_fire_glow.position = Vector2(fire_x - 6, fire_y - 4)
+	_fire_glow.size = Vector2(64, 52)
+	_fire_glow.add_theme_stylebox_override("panel", glow_style)
+	_fire_glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fire_glow)
 
-	# Output label + slot (idx 2)
-	var out_lbl := Label.new()
-	out_lbl.text = tr("FURNACE_OUTPUT")
-	out_lbl.position = Vector2(arrow_x + 66, sy - 26)
-	out_lbl.add_theme_font_size_override("font_size", int(S * 12))
-	out_lbl.add_theme_color_override("font_color", TEXT_DIM)
-	add_child(out_lbl)
-	var outp := _make_slot(arrow_x + 70, out_y, _output_faces, _output_icons, _output_counts, _output_panels, "furnace", 2)
-	outp.gui_input.connect(_on_slot_gui_input.bind("furnace", 2))
+	_fire_label = Label.new()
+	_fire_label.text = "🔥"
+	_fire_label.position = Vector2(fire_x, fire_y)
+	_fire_label.size = Vector2(52, 44)
+	_fire_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_fire_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_fire_label.add_theme_font_size_override("font_size", int(S * 24))
+	_fire_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fire_label)
+	_set_fire_cold()
+
+func _set_fire_cold() -> void:
+	_fire_cold = true
+	_fire_label.modulate = Color(0.5, 0.45, 0.4, 0.45)
+	_fire_glow.modulate.a = 0.35
+
+func _set_fire_lit() -> void:
+	_fire_cold = false
+	_fire_label.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	_fire_glow.modulate.a = 0.9
 
 func _setup_player_grid() -> void:
 	var sx: float = RIGHT_X + PAD
-	var inv_label_y: float = PAD + 22 + 64 + SLOT_SIZE + 12
+	var inv_label_y: float = _build_layout() - PAD - SLOT_SIZE - GAP - 3 * (SLOT_SIZE + GAP) - 24 - 24 - 6
 	var sy: float = inv_label_y + 24
 
 	var lbl := Label.new()
@@ -490,14 +552,16 @@ func _get_panel(_type: String, idx: int) -> Panel:
 		"player": return _player_panels[idx] if idx >= 0 and idx < _player_panels.size() else null
 		"hotbar": return _hotbar_panels[idx] if idx >= 0 and idx < _hotbar_panels.size() else null
 		"furnace":
-			match idx:
-				0: return _input_panels[0] if not _input_panels.is_empty() else null
-				1: return _fuel_panels[0] if not _fuel_panels.is_empty() else null
-				_: return _output_panels[0] if not _output_panels.is_empty() else null
+			if idx >= 0 and idx < 3 and idx < _input_panels.size():
+				return _input_panels[idx]
+			if idx >= FUEL_SLOT_0 and idx <= FUEL_SLOT_1 and idx - FUEL_SLOT_0 < _fuel_panels.size():
+				return _fuel_panels[idx - FUEL_SLOT_0]
+			if idx >= OUT_SLOT_0 and idx - OUT_SLOT_0 < _output_panels.size():
+				return _output_panels[idx - OUT_SLOT_0]
 	return null
 
 func _on_slot_gui_input(event: InputEvent, _type: String, idx: int) -> void:
-	if not visible or _furnace == null or _player_ref == null:
+	if not visible or _player_ref == null:
 		return
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
@@ -709,9 +773,11 @@ func _cleanup() -> void:
 		var slot: ItemSlot = _furnace_inv.slots[i]
 		if not slot.is_empty():
 			pi.add_item(slot.item, slot.count)
-	_furnace_inv = Inventory.new(3)
+	_furnace_inv = Inventory.new(8)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_fire_time += delta
+	_update_fire_animation()
 	if not visible or _player_ref == null:
 		return
 	var fi = _furnace_inv
@@ -719,15 +785,15 @@ func _process(_delta: float) -> void:
 	if fi == null or pi == null:
 		return
 
-	var i0: ItemSlot = fi.slots[0]
-	var i1: ItemSlot = fi.slots[1]
-	var i2: ItemSlot = fi.slots[2]
-	if _input_faces.size() > 0:
-		_refresh_slot(i0, _input_faces[0], _input_icons[0], _input_counts[0])
-	if _fuel_faces.size() > 0:
-		_refresh_slot(i1, _fuel_faces[0], _fuel_icons[0], _fuel_counts[0])
-	if _output_faces.size() > 0:
-		_refresh_slot(i2, _output_faces[0], _output_icons[0], _output_counts[0])
+	for i in range(3):
+		if i < _input_faces.size():
+			_refresh_slot(fi.slots[i], _input_faces[i], _input_icons[i], _input_counts[i])
+	for i in range(2):
+		if i < _fuel_faces.size():
+			_refresh_slot(fi.slots[FUEL_SLOT_0 + i], _fuel_faces[i], _fuel_icons[i], _fuel_counts[i])
+	for i in range(3):
+		if i < _output_faces.size():
+			_refresh_slot(fi.slots[OUT_SLOT_0 + i], _output_faces[i], _output_icons[i], _output_counts[i])
 
 	for i in range(27):
 		var pidx: int = 9 + i
@@ -737,7 +803,8 @@ func _process(_delta: float) -> void:
 		if i < pi.slots.size() and i < _hotbar_faces.size():
 			_refresh_slot(pi.slots[i], _hotbar_faces[i], _hotbar_icons[i], _hotbar_counts[i])
 
-	_update_smelting(_delta)
+	_update_smelting(delta)
+	_update_fuel_bar()
 
 func _refresh_slot(slot: ItemSlot, face: ColorRect, icon: TextureRect, cnt: Label) -> void:
 	if slot.is_empty():
@@ -752,67 +819,112 @@ func _refresh_slot(slot: ItemSlot, face: ColorRect, icon: TextureRect, cnt: Labe
 	icon.visible = tex != null
 	cnt.text = str(slot.count) if slot.count > 1 else ""
 
+func _update_fire_animation() -> void:
+	if _fire_label == null:
+		return
+	if _fire_cold:
+		var breath: float = 0.5 + 0.5 * sin(_fire_time * 1.6)
+		_fire_label.modulate = Color(0.5, 0.45, 0.4, 0.35 + breath * 0.12)
+		_fire_glow.modulate.a = 0.30 + breath * 0.06
+		return
+	var flicker: float = sin(_fire_time * 22.0) * 0.5 + sin(_fire_time * 7.3) * 0.5
+	var a: float = 0.82 + flicker * 0.14
+	var s: float = 1.0 + flicker * 0.10
+	_fire_label.modulate = Color(1.0, 0.92, 0.78, a)
+	_fire_label.scale = Vector2(s, s)
+	_fire_label.pivot_offset = Vector2(26, 22)
+	_fire_glow.modulate.a = 0.9 + flicker * 0.08
+
 func _update_smelting(delta: float) -> void:
-	var input_slot: ItemSlot = _furnace_inv.slots[0]
-	var fuel_slot: ItemSlot = _furnace_inv.slots[1]
-	var output_slot: ItemSlot = _furnace_inv.slots[2]
+	# Có ít nhất 1 ô nguyên liệu nung được và thành phẩm không bị chặn?
+	var any_work := false
+	for i in range(3):
+		var in_slot: ItemSlot = _furnace_inv.slots[i]
+		if in_slot.is_empty() or in_slot.item.id not in _smelting_items:
+			continue
+		var output_id: String = _smelting_items[in_slot.item.id]
+		var out_slot: ItemSlot = _furnace_inv.slots[OUT_SLOT_0 + i]
+		if not out_slot.is_empty() and out_slot.item.id != output_id:
+			continue
+		if not out_slot.is_empty() and out_slot.count >= out_slot.item.max_stack:
+			continue
+		any_work = true
 
-	if input_slot.is_empty() or input_slot.item.id not in _smelting_items:
+	if not any_work:
 		_smelt_active = false
-		_smelt_progress = 0.0
-		_progress_fill.size.x = 0
+		for i in range(3):
+			_smelt_progress[i] = 0.0
+		_set_fire_cold()
 		return
 
-	var output_id: String = _smelting_items[input_slot.item.id]
-	if not output_slot.is_empty() and output_slot.item.id != output_id:
-		_smelt_active = false
-		_smelt_progress = 0.0
-		_progress_fill.size.x = 0
+	# Có nhiên liệu để đốt? Nạp 1 đơn vị chất đốt khi hết nhiên liệu.
+	if _fuel_energy <= 0.0:
+		var fuelled := false
+		for f in [FUEL_SLOT_0, FUEL_SLOT_1]:
+			var fs: ItemSlot = _furnace_inv.slots[f]
+			if not fs.is_empty() and _fuels.has(fs.item.id):
+				_fuel_piece_value = _fuels[fs.item.id]
+				_fuel_energy += _fuel_piece_value
+				_furnace_inv.remove_item(f, 1)
+				fuelled = true
+				break
+		if not fuelled:
+			_smelt_active = false
+			for i in range(3):
+				_smelt_progress[i] = 0.0
+			_set_fire_cold()
+			return
+
+	_smelt_active = true
+	_set_fire_lit()
+
+	# Tiêu hao nhiên liệu (tính theo giây refl của từng chất đốt)
+	_fuel_energy = maxf(_fuel_energy - delta, 0.0)
+
+	# Nung từng ô nguyên liệu (3 lò song song)
+	for i in range(3):
+		var in_slot: ItemSlot = _furnace_inv.slots[i]
+		if in_slot.is_empty() or in_slot.item.id not in _smelting_items:
+			continue
+		var output_id: String = _smelting_items[in_slot.item.id]
+		var out_slot: ItemSlot = _furnace_inv.slots[OUT_SLOT_0 + i]
+		if not out_slot.is_empty() and out_slot.item.id != output_id:
+			continue
+		if not out_slot.is_empty() and out_slot.count >= out_slot.item.max_stack:
+			continue
+		_smelt_progress[i] += delta / _smelt_time
+		if _smelt_progress[i] >= 1.0:
+			_complete_smelt(i, output_id)
+			_smelt_progress[i] = 0.0
+		# Nếu hết nhiên liệu trong frame này → ngừng nung, lửa tắt
+		if _fuel_energy <= 0.0:
+			_smelt_active = false
+			_set_fire_cold()
+			for j in range(3):
+				_smelt_progress[j] = 0.0
+			return
+
+func _complete_smelt(i: int, output_id: String) -> void:
+	var fi = _furnace_inv
+	if not fi.remove_item(i, 1):
 		return
-	if not output_slot.is_empty() and output_slot.count >= output_slot.item.max_stack:
-		_smelt_active = false
-		_smelt_progress = 0.0
-		_progress_fill.size.x = 0
-		return
-
-	if fuel_slot.is_empty() or fuel_slot.item.id not in _fuels:
-		_smelt_active = false
-		_smelt_progress = 0.0
-		_progress_fill.size.x = 0
-		return
-
-	if not _smelt_active:
-		_smelt_active = true
-		_smelt_progress = 0.0
-
-	_smelt_progress += delta / _smelt_time
-	_progress_fill.size.x = clampf(_smelt_progress * 32, 0, 32)
-
-	if _smelt_progress >= 1.0:
-		_complete_smelt(output_id)
-
-func _complete_smelt(output_id: String) -> void:
-	var input_slot: ItemSlot = _furnace_inv.slots[0]
-	var output_slot: ItemSlot = _furnace_inv.slots[2]
-
-	if not _furnace_inv.remove_item(0, 1):
-		_smelt_active = false
-		return
-	# Tiêu hao 1 chất đốt / mẻ nung
-	_furnace_inv.remove_item(1, 1)
-
 	var out_def: ItemDef = ItemDatabase.items_db.get(output_id) as ItemDef
+	var out_slot: ItemSlot = fi.slots[OUT_SLOT_0 + i]
 	if out_def == null:
-		_smelt_active = false
 		return
-
-	if output_slot.is_empty():
-		_furnace_inv.slots[2].item = out_def
-		_furnace_inv.slots[2].count = 1
+	if out_slot.is_empty():
+		out_slot.item = out_def
+		out_slot.count = 1
 	else:
-		output_slot.count += 1
+		out_slot.count += 1
 
-	_smelt_progress = 0.0
-
-	if input_slot.is_empty() or input_slot.item.id not in _smelting_items:
-		_smelt_active = false
+func _update_fuel_bar() -> void:
+	if _fuel_bar == null or _fuel_fill == null:
+		return
+	if not _smelt_active or _fuel_piece_value <= 0.0:
+		_fuel_fill.size.x = 0.0
+		_fuel_bar_label.text = tr("FURNACE_NO_FUEL")
+		return
+	var ratio: float = clampf(_fuel_energy / _fuel_piece_value, 0.0, 1.0)
+	_fuel_fill.size.x = 146.0 * ratio
+	_fuel_bar_label.text = "%d / %d s" % [int(_fuel_energy), int(_fuel_piece_value)]

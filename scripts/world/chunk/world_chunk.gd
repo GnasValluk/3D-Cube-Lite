@@ -2648,7 +2648,7 @@ func _process(delta: float) -> void:
 			prop.setup()
 			add_child(prop)
 		elif ptype == "mud_crab":
-			var prop := _MudCrabProp.new(60, DestroyableProp.WeaponReq.NONE, "mud_crab")
+			var prop := _MudCrabProp.new(_MudCrabProp.MAX_HP, DestroyableProp.WeaponReq.NONE, "mud_crab")
 			prop.position = pd["pos"]
 			prop.setup()
 			add_child(prop)

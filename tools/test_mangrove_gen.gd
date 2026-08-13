@@ -5,7 +5,7 @@ extends Node3D
 ##     ven biển trong bán kính khảo sát; find_mangrove() tìm được lõi (>= 0.60).
 ##  2. Block mới (MANGROVE_MUD = 47, MANGROVE_WOOD = 48): mapping id↔tên hai
 ##     chiều khớp nhau, BLOCK_HARDNESS đúng (bùn xẻng 1.3, gỗ rìu 1.5), is_soil/till.
-##  3. Item mới + bộ Giáp Biển tồn tại trong ItemDatabase, recipe sea_* khả dụng.
+## 3. Item mới + recipe (bộ Giáp Biển ĐÃ XÓA — không tồn tại sea_* item/recipe).
 ## Chạy qua tools/test_mangrove_gen.tscn (không chạy trực tiếp .gd).
 
 const _W = preload("res://scripts/world/chunk/world_chunk.gd")
@@ -91,29 +91,13 @@ func _ready() -> void:
 		_check(db.has(kid) and db[kid] != null, "item '%s' có trong ItemDatabase" % kid)
 	_check(db["mud_crab"].type == ItemDef.Type.FOOD, "mud_crab là FOOD (ăn hồi máu)")
 	_check(db["mangrove_seed"].type == ItemDef.Type.MATERIAL, "mangrove_seed là MATERIAL (trồng được)")
+	# Bộ Giáp Biển ĐÃ BỊ XÓA — hệ thống không còn nhận diện sea_*.
 	var sea_items := ["sea_helmet", "sea_chestplate", "sea_leggings", "sea_boots"]
-	for sid2 in sea_items:
-		_check(db.has(sid2) and db[sid2] != null, "giáp biển '%s' có trong ItemDatabase" % sid2)
-	var slots := {
-		"sea_helmet": ItemDef.ArmorSlot.HEAD,
-		"sea_chestplate": ItemDef.ArmorSlot.BODY,
-		"sea_leggings": ItemDef.ArmorSlot.LEGS,
-		"sea_boots": ItemDef.ArmorSlot.FEET,
-	}
-	for sid3 in sea_items:
-		_check(db[sid3].armor_slot == slots[sid3], "giáp biển '%s' đúng slot (%s)" % [sid3, slots[sid3]])
-	# Recipe: 4 món sea_* phải craft được với nguyên liệu ngoài rừng (rong + dừa + sắt).
+	for sid in sea_items:
+		_check(not (db.has(sid) and db[sid] != null), "giáp biển '%s' ĐÃ xóa khỏi ItemDatabase" % sid)
+	# Recipe: toàn bộ công thức đã bị xoá → danh sách trống.
 	var recipe_ids: Array = RecipeDatabase.recipes.map(func(r): return (r as Dictionary).get("id"))
-	for rid in sea_items:
-		_check(rid in recipe_ids, "recipe '%s' tồn tại" % rid)
-	var ingredients_ok := true
-	for r in RecipeDatabase.recipes:
-		var rd: Dictionary = r
-		if String(rd.get("id", "")).begins_with("sea_"):
-			var ing: Dictionary = rd.get("ingredients", {})
-			if not (ing.has("tropical_seaweed") and ing.has("coconut")):
-				ingredients_ok = false
-	_check(ingredients_ok, "mọi recipe sea_* chỉ dùng rong biển + dừa (+ sắt) — craft được trước khi vào rừng")
+	_check(recipe_ids.is_empty(), "toàn bộ công thức đã bị xoá (còn %d)" % recipe_ids.size())
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())
