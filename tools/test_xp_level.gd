@@ -69,29 +69,29 @@ func _ready() -> void:
 	_check(collected, "nhặt hạt exp → collect() trả true")
 	_check(ch.exp == 1, "nhặt 1 hạt → +1 XP (exp=%d)" % ch.exp)
 
-	# ── 4. Fish 5% / Pig 7% — test tỷ lệ (chạy đồng bộ, không await frame) ──
+	# ── 4. Fish 2% / Pig 3% — test tỷ lệ (chạy đồng bộ, không await frame) ──
 	# _roll_exp_drop dùng get_tree().current_scene = self (Node3D) làm cha.
 	var fish := _Fish.new()
 	add_child(fish)
 	await get_tree().process_frame
 	var fish_drops := 0
-	var fish_trials := 4000
+	var fish_trials := 6000
 	for i in range(fish_trials):
 		fish._roll_exp_drop()
 		fish_drops += _count_and_clear_orbs(self)
 	var fish_rate: float = float(fish_drops) / float(fish_trials)
-	_check(absf(fish_rate - 0.05) < 0.03, "cá drop hạt exp ~5%% (thực tế %.2f%%)" % (fish_rate * 100.0))
+	_check(absf(fish_rate - 0.02) < 0.015, "cá drop hạt exp ~2%% (thực tế %.2f%%)" % (fish_rate * 100.0))
 
 	var pig := _Pig.new()
 	add_child(pig)
 	await get_tree().process_frame
 	var pig_drops := 0
-	var pig_trials := 4000
+	var pig_trials := 6000
 	for i in range(pig_trials):
 		pig._roll_exp_drop()
 		pig_drops += _count_and_clear_orbs(self)
 	var pig_rate: float = float(pig_drops) / float(pig_trials)
-	_check(absf(pig_rate - 0.07) < 0.03, "heo drop hạt exp ~7%% (thực tế %.2f%%)" % (pig_rate * 100.0))
+	_check(absf(pig_rate - 0.03) < 0.015, "heo drop hạt exp ~3%% (thực tế %.2f%%)" % (pig_rate * 100.0))
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(0 if _failures == 0 else 1)

@@ -1,6 +1,7 @@
 ## experience_orb.gd
 ## Hạt kinh nghiệm phát sáng — nhặt vào nhận 1 điểm XP.
-## Rớt ra từ sinh vật bị giết (cá 5%, heo 7%).
+## Model: 1 voxel lấp lánh ánh sáng xanh-vàng; rớt ra từ sinh vật bị giết
+## (cá 2%, heo 3%, slime 7% ở cấp cơ bản — tỷ lệ nhân theo level creature).
 
 class_name ExperienceOrb
 extends Area3D
@@ -9,6 +10,7 @@ const MAGNET_RANGE: float = 3.2
 const FLY_SPEED: float = 9.0
 const PICKUP_DISTANCE: float = 1.5
 const XP_VALUE: int = 1
+const VOXEL_SIZE: float = 0.15
 
 var _time_alive: float = 0.0
 var _can_pickup: bool = false
@@ -17,7 +19,12 @@ var _velocity: Vector3 = Vector3.ZERO
 var _ground_y: float = 0.0
 var _player: Node3D = null
 var _mat: StandardMaterial3D = null
+var _glow_mat: StandardMaterial3D = null
 var _mesh: MeshInstance3D = null
+var _voxel: Node3D = null
+
+const CORE_BLUE := Color(0.35, 0.75, 1.0)
+const CORE_YELLOW := Color(1.0, 0.85, 0.30)
 
 func _init() -> void:
 	_setup_mesh()
@@ -42,41 +49,82 @@ func _setup_mesh() -> void:
 	_mat = StandardMaterial3D.new()
 	_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_mat.emission_enabled = true
-	_mat.emission = Color(0.35, 1.0, 0.55)
+	_mat.emission = CORE_BLUE
 	_mat.emission_energy_multiplier = 4.0
-	_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_mat.albedo_color = Color(0.35, 1.0, 0.55, 0.95)
-	_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_mat.vertex_color_use_as_albedo = true
+	_mat.vertex_color_is_srgb = true
 
-	var core := SphereMesh.new()
-	core.radius = 0.12
-	core.height = 0.24
-	_mesh = MeshInstance3D.new()
-	_mesh.mesh = core
-	_mesh.material_override = _mat
-	_mesh.position = Vector3(0, 0.2, 0)
-	add_child(_mesh)
+	# 1 voxel lấp lánh: cube nhỏ, mỗi mặt đốm màu xanh-vàng luân phiên.
+	_voxel = _build_voxel()
+	add_child(_voxel)
 
-	var glow_mat := StandardMaterial3D.new()
-	glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	glow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	glow_mat.albedo_color = Color(0.35, 1.0, 0.55, 0.22)
-	glow_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_glow_mat = StandardMaterial3D.new()
+	_glow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_glow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_glow_mat.albedo_color = Color(0.45, 0.85, 1.0, 0.20)
+	_glow_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	var glow := SphereMesh.new()
-	glow.radius = 0.26
-	glow.height = 0.52
+	glow.radius = 0.24
+	glow.height = 0.48
 	var glow_mi := MeshInstance3D.new()
 	glow_mi.mesh = glow
-	glow_mi.material_override = glow_mat
+	glow_mi.material_override = _glow_mat
 	glow_mi.position = Vector3(0, 0.2, 0)
 	add_child(glow_mi)
 
 	var light := OmniLight3D.new()
-	light.light_color = Color(0.4, 1.0, 0.6)
-	light.light_energy = 1.6
-	light.omni_range = 2.4
+	light.light_color = CORE_BLUE
+	light.light_energy = 1.8
+	light.omni_range = 2.6
 	light.position = Vector3(0, 0.3, 0)
 	add_child(light)
+
+## Voxel: 1 khối nhỏ 8 đỉnh, màu từng đỉnh thay đổi giữa xanh/vàng để lấp lánh.
+func _build_voxel() -> Node3D:
+	var root := Node3D.new()
+	var arr := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	var s := VOXEL_SIZE * 0.5
+	var corners: Array[Vector3] = [
+		Vector3(-s, -s, s), Vector3(s, -s, s), Vector3(s, s, s), Vector3(-s, s, s),
+		Vector3(-s, -s, -s), Vector3(s, -s, -s), Vector3(s, s, -s), Vector3(-s, s, -s),
+	]
+	var face_i: Array = [
+		[0, 1, 2, 3], [4, 5, 6, 7], [0, 1, 5, 4],
+		[2, 3, 7, 6], [0, 3, 7, 4], [1, 2, 6, 5],
+	]
+	var face_n: Array[Vector3] = [
+		Vector3(0, 0, 1), Vector3(0, 0, -1), Vector3(0, 1, 0),
+		Vector3(0, -1, 0), Vector3(-1, 0, 0), Vector3(1, 0, 0),
+	]
+	var verts := 0
+	for f in range(6):
+		for i in [0, 1, 2, 0, 2, 3]:
+			var c: int = face_i[f][i]
+			arr.append(corners[c])
+			normals.append(face_n[f])
+			# Luân phiên xanh/vàng lấp lánh theo từng đỉnh
+			var blue: bool = (c + f) % 2 == 0
+			colors.append(CORE_BLUE if blue else CORE_YELLOW)
+			indices.append(verts)
+			verts += 1
+	var array_mesh := ArrayMesh.new()
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = arr
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_mesh = MeshInstance3D.new()
+	_mesh.mesh = array_mesh
+	_mesh.material_override = _mat
+	_mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(_mesh)
+	root.position = Vector3(0, 0.2, 0)
+	return root
 
 func _setup_collision() -> void:
 	var coll := CollisionShape3D.new()
@@ -133,11 +181,20 @@ func _process(delta: float) -> void:
 		position.y += bob * delta * 2.0
 		rotation.y += delta * 60.0
 
-	# Nhấp nháy phát sáng
+	# Nhấp nháy xanh-vàng lấp lánh + xoay voxel
+	var sparkle: float = 0.6 + (sin(_time_alive * 7.0) * 0.5 + 0.5) * 0.4
+	var mix: float = (sin(_time_alive * 4.0) * 0.5 + 0.5)
+	var c := CORE_BLUE.lerp(CORE_YELLOW, mix)
+	if _voxel:
+		_voxel.rotation.y += delta * 3.0
+		_voxel.rotation.x += delta * 1.5
+		var sc := 0.85 + sin(_time_alive * 9.0) * 0.15
+		_voxel.scale = Vector3.ONE * sc
 	if _mat:
-		var pulse: float = 0.75 + sin(_time_alive * 6.0) * 0.25
-		_mat.albedo_color = Color(0.35, 1.0, 0.55, pulse)
-		_mat.emission = Color(0.35, 1.0, 0.55) * (2.0 + pulse)
+		_mat.emission = c * (2.0 + sparkle)
+	if _glow_mat:
+		var pulse: float = 0.15 + sparkle * 0.15
+		_glow_mat.albedo_color = Color(c.r, c.g, c.b, pulse)
 
 func collect(player: Node) -> bool:
 	if not _can_pickup:

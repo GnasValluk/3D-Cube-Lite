@@ -41,7 +41,7 @@ const HOME_RADIUS: float = 20.0
 
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 const _ExpOrb = preload("res://scripts/items/entities/experience_orb.gd")
-const EXP_DROP_RATE: float = 0.07
+const EXP_DROP_RATE: float = 0.03
 var _world_mgr: Node = null
 
 func _build_character() -> void:
@@ -401,7 +401,7 @@ func _roll_exp_drop() -> void:
 	var world := get_tree().current_scene
 	if world == null:
 		return
-	if randf() < EXP_DROP_RATE:
+	if randf() < EXP_DROP_RATE * get_rate_mult():
 		_ExpOrb.spawn(world, global_position, global_position.y)
 
 func _roll_loot() -> void:

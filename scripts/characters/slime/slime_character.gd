@@ -283,7 +283,7 @@ func _roll_exp_drop() -> void:
 	var world := get_tree().current_scene
 	if world == null:
 		return
-	if randf() < EXP_DROP_RATE:
+	if randf() < EXP_DROP_RATE * get_rate_mult():
 		_ExpOrb.spawn(world, global_position, global_position.y)
 
 func _roll_loot() -> void:

@@ -488,14 +488,18 @@ func _spawn_eat_vfx(item: ItemDef) -> void:
 
 # ── Chết: rương đồ + hồi sinh ────────────────────────────────────────────────
 
-func _spawn_death_chest() -> void:
+func _spawn_death_chest(death_pos: Vector3 = Vector3.INF) -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
+	# player đã hồi sinh (teleport về spawn) trước khi chest được spawn deferred
+	# → lưu trước vị trí chết, không dùng global_position sau khi respawn.
+	if death_pos == Vector3.INF:
+		death_pos = global_position
 	var chest := Chest.new()
 	chest.name = "DeathChest"
 	scene.add_child(chest)
-	chest.global_position = global_position + Vector3(0, 0.6, 0)
+	chest.global_position = death_pos + Vector3(0, 0.6, 0)
 	var chest_inv := Inventory.new(45)
 	var equipped: Array = [equipped_weapon, equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_back, equipped_sub]
 	var eq_dur: Array = [_equipped_durability, -1, -1, -1, -1, -1, -1]
@@ -521,7 +525,7 @@ func _spawn_death_chest() -> void:
 	# Multiplayer: mọi máy spawn death chest giống hệt qua net (host-authoritative).
 	if Net.is_active():
 		chest.queue_free()
-		Net.announce_death_chest(global_position + Vector3(0, 0.6, 0), chest_inv.to_dict())
+		Net.announce_death_chest(death_pos + Vector3(0, 0.6, 0), chest_inv.to_dict())
 	else:
 		chest.inventory = chest_inv
 	if inventory != null:
@@ -1334,8 +1338,9 @@ func _physics_process(delta: float) -> void:
 		velocity.z *= 0.5
 	if not is_alive and _death_timer <= 0.0 and not _death_chest_spawned:
 		_death_chest_spawned = true
+		var death_pos: Vector3 = global_position
 		_do_respawn()
-		call_deferred("_spawn_death_chest")
+		call_deferred("_spawn_death_chest", death_pos)
 		return
 	if _halberd_dashing:
 		if _state == State.DASH:

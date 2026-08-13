@@ -133,6 +133,12 @@ static func _apply_throw_damage(player, dir: Vector3, landing_pos: Vector3, dmg:
 				f.take_damage(dmg, player)
 				_knockback(f, dir)
 				hit_any = true
+	var firefly_nodes: Array[Node] = player.get_tree().get_nodes_in_group("firefly")
+	for ff in firefly_nodes:
+		if is_instance_valid(ff) and ff.get("is_alive"):
+			if _segment_dist(start, end, ff.global_position) <= 0.9 + ff.hit_radius:
+				ff.take_damage(dmg, player)
+				hit_any = true
 	if hit_any:
 		SFXManager.play_damage_hit()
 
@@ -214,12 +220,23 @@ static func check_dash_hit(player) -> void:
 		if is_instance_valid(f) and f.get("is_alive"):
 			_try_dash_hit(player, f as CharacterBase, box_center, right, fwd, half)
 
+	var firefly_nodes: Array[Node] = player.get_tree().get_nodes_in_group("firefly")
+	for ff in firefly_nodes:
+		if not is_instance_valid(ff) or not ff.get("is_alive"):
+			continue
+		if _point_in_hit_box(ff.global_position, box_center, right, fwd, half):
+			ff.take_damage(player.get_total_atk(), player)
+			SFXManager.play_damage_hit()
+
+static func _point_in_hit_box(p: Vector3, box_center: Vector3, right: Vector3, fwd: Vector3, half: Vector3) -> bool:
+	var to_target: Vector3 = p - box_center
+	var local: Vector3 = Vector3(to_target.dot(right), to_target.dot(Vector3.UP), to_target.dot(fwd))
+	return abs(local.x) < half.x and abs(local.y) < half.y and abs(local.z) < half.z
+
 static func _try_dash_hit(player, ch: CharacterBase, box_center: Vector3, right: Vector3, fwd: Vector3, half: Vector3) -> void:
 	if player._halberd_dash_hit.has(ch.get_instance_id()):
 		return
-	var to_target: Vector3 = ch.global_position - box_center
-	var local: Vector3 = Vector3(to_target.dot(right), to_target.dot(Vector3.UP), to_target.dot(fwd))
-	if abs(local.x) < half.x and abs(local.y) < half.y and abs(local.z) < half.z:
+	if _point_in_hit_box(ch.global_position, box_center, right, fwd, half):
 		player._halberd_dash_hit[ch.get_instance_id()] = true
 		var dmg: int = player.get_total_atk()
 		ch.take_damage(dmg, player)

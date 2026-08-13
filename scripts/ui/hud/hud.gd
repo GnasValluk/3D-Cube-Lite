@@ -416,12 +416,12 @@ func _build_screen_buttons() -> void:
 	add_child(_screen_panel)
 
 	# Phone — dùng icon từ assets/phone_ui/icon_phone.png (612px gốc → scale
-	# xuống vừa button nhờ expand_icon = true, KHÔNG giữ kích thước gốc).
+	# xuống vừa button nhờ stretch_mode = STRETCH_KEEP_ASPECT_CENTERED).
 	var phone_btn := TextureButton.new()
 	phone_btn.name = "PhoneButton"
 	phone_btn.size = Vector2(48, 48)
 	phone_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
-	phone_btn.expand_icon = true
+	phone_btn.ignore_texture_size = true
 	phone_btn.texture_normal = _PhoneIcon
 	phone_btn.add_theme_stylebox_override("normal", _flat_panel(Color(0.06, 0.04, 0.12, 0.55), 10))
 	phone_btn.add_theme_stylebox_override("hover", _flat_panel(Color(0.10, 0.08, 0.18, 0.75), 10))

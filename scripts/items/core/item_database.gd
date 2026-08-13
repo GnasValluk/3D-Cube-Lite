@@ -71,7 +71,6 @@ static func create_item_db() -> Dictionary:
 	_add(db, "egg_flowerhorn", "Trứng Cá La Hán",    ItemDef.Type.MATERIAL, Color(0.92, 0.25, 0.15), "🥚", "Trứng cá la hán — giữ chuột trái để ngắm, thả để ném; chạm nước nở cá la hán", true, 16)
 	_add(db, "egg_shrimp",     "Trứng Tôm",          ItemDef.Type.MATERIAL, Color(0.85, 0.35, 0.20), "🥚", "Trứng tôm — giữ chuột trái để ngắm, thả để ném; chạm nước nở tôm", true, 16)
 	_add(db, "egg_pig",        "Trứng Heo",          ItemDef.Type.MATERIAL, Color(0.87, 0.72, 0.63), "🥚", "Trứng heo — giữ chuột trái để ngắm, thả để ném; chạm đất nở heo con", true, 16)
-	_add(db, "egg_death_slime", "Trứng Death Slime",  ItemDef.Type.MATERIAL, Color(0.55, 0.10, 0.95), "🥚", "Trứng Death Slime — giữ chuột trái để ngắm, thả để ném; triệu hồi boss Death Slime cấp 100 (cực nguy hiểm!)", true, 1)
 
 	_add(db, "pumpkin", "Trái Bí Đỏ", ItemDef.Type.FOOD, Color(0.91,0.41,0.21), "🎃", "Trái bí đỏ — cầu dẹp 8-10 múi khía sâu, cam cháy ấm, cuống gỗ 5 góc; chế biến món ăn, trang trí hoặc đục thành đèn lồng", true, 16, 14)
 
