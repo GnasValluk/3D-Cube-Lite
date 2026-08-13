@@ -415,11 +415,13 @@ func _build_screen_buttons() -> void:
 	_screen_panel.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_screen_panel)
 
-	# Phone — dùng icon từ assets/phone_ui/icon_phone.png
+	# Phone — dùng icon từ assets/phone_ui/icon_phone.png (612px gốc → scale
+	# xuống vừa button nhờ expand_icon = true, KHÔNG giữ kích thước gốc).
 	var phone_btn := TextureButton.new()
 	phone_btn.name = "PhoneButton"
-	phone_btn.size = Vector2(40, 40)
+	phone_btn.size = Vector2(48, 48)
 	phone_btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	phone_btn.expand_icon = true
 	phone_btn.texture_normal = _PhoneIcon
 	phone_btn.add_theme_stylebox_override("normal", _flat_panel(Color(0.06, 0.04, 0.12, 0.55), 10))
 	phone_btn.add_theme_stylebox_override("hover", _flat_panel(Color(0.10, 0.08, 0.18, 0.75), 10))
@@ -434,10 +436,10 @@ func _build_screen_buttons() -> void:
 	# Settings — nút ⚙ nằm ngay bên phải phone
 	var set_btn := Button.new()
 	set_btn.name = "SettingsButton"
-	set_btn.size = Vector2(40, 40)
-	set_btn.position = Vector2(48, 0)
+	set_btn.size = Vector2(48, 48)
+	set_btn.position = Vector2(56, 0)
 	set_btn.text = "\u2699"
-	set_btn.add_theme_font_size_override("font_size", 26)
+	set_btn.add_theme_font_size_override("font_size", 30)
 	set_btn.add_theme_color_override("font_color", TEXT_BRIGHT)
 	set_btn.add_theme_color_override("font_color_hover", CYAN)
 	set_btn.focus_mode = Control.FOCUS_NONE
@@ -451,10 +453,10 @@ func _build_screen_buttons() -> void:
 	# thế giới) mở lưới 3x3 cho các đồ cần lưới lớn hơn.
 	var craft_btn := Button.new()
 	craft_btn.name = "CraftButton"
-	craft_btn.size = Vector2(40, 40)
-	craft_btn.position = Vector2(96, 0)
+	craft_btn.size = Vector2(48, 48)
+	craft_btn.position = Vector2(112, 0)
 	craft_btn.text = "\U0001F528"
-	craft_btn.add_theme_font_size_override("font_size", 22)
+	craft_btn.add_theme_font_size_override("font_size", 26)
 	craft_btn.add_theme_color_override("font_color", TEXT_BRIGHT)
 	craft_btn.add_theme_color_override("font_color_hover", CYAN)
 	craft_btn.focus_mode = Control.FOCUS_NONE
@@ -468,7 +470,7 @@ func _build_screen_buttons() -> void:
 	# Nhãn nhỏ dưới nút chế tạo để phân biệt "Chế Tạo Tay" vs "Bàn Chế Tạo"
 	var craft_lbl := Label.new()
 	craft_lbl.text = tr("CRAFT_HAND")
-	craft_lbl.position = Vector2(84, 40)
+	craft_lbl.position = Vector2(100, 48)
 	craft_lbl.size = Vector2(64, 16)
 	craft_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	craft_lbl.add_theme_font_size_override("font_size", 9)
