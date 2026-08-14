@@ -29,7 +29,8 @@ var _lights: Array[OmniLight3D] = []
 
 var _update_timer:  float = 0.0
 var _cleanup_timer: float = 0.0
-var _last_night_t:  float = -1.0
+# Khởi đầu coi là "đang đêm" để lần đầu vào ngày phải tắt visible hết đèn.
+var _last_night_t:  float = 1.0
 var _last_cam_cell: Vector3i = Vector3i(-1, 0, 0)
 
 static var _instance: LotusLightManager = null
@@ -64,6 +65,16 @@ func _process(delta: float) -> void:
 		return
 
 	var night_t: float = _night_factor(_get_hour())
+
+	# Ban ngày hoàn toàn: tắt visible hết (đèn còn energy gần 0 vẫn khiến Godot
+	# tính pass cho từng light). Ngắt sớm — không phải sort/duyệt danh sách.
+	if night_t <= 0.01:
+		if _last_night_t > 0.01:
+			for light in _lights:
+				if is_instance_valid(light):
+					light.visible = false
+		_last_night_t = night_t
+		return
 
 	# Bật đèn mỗi khi night_t đổi HOẶC camera đi sang ô 8m mới (bộ đèn gần đổi
 	# theo người chơi). Nếu bỏ, đèn cố định theo vị trí cũ → cắt sáng khi di chuyển.

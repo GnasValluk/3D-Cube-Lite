@@ -31,7 +31,8 @@ var _crystals: Array[MeshInstance3D] = []
 
 var _update_timer:  float = 0.0
 var _cleanup_timer: float = 0.0
-var _last_night_t:  float = -1.0
+# Khởi đầu coi là "đang đêm" để lần đầu vào ngày phải tắt visible hết đèn.
+var _last_night_t:  float = 1.0
 var _last_cam_cell: Vector3i = Vector3i(-1, 0, 0)
 
 static var _instance: RoadLampManager = null
@@ -81,6 +82,21 @@ func _process(delta: float) -> void:
 		return
 
 	var night_t: float = _night_factor(_get_hour())
+
+	# Ban ngày hoàn toàn: tắt visible hết (đèn vẫn còn energy -> Godot vẫn tốn
+	# pass cho mỗi light dù gần 0). Ngắt sớm để không tốn CPU/GPU vô ích.
+	if night_t <= 0.01:
+		if _last_night_t > 0.01:
+			for light in _lights:
+				if is_instance_valid(light):
+					light.visible = false
+			for mi in _crystals:
+				if is_instance_valid(mi):
+					var mat := mi.material_override as ShaderMaterial
+					if mat != null:
+						mat.set_shader_parameter("emit_energy", 0.0)
+		_last_night_t = night_t
+		return
 
 	# Skip chỉ khi CẢ hai không đổi: độ sáng đêm lẫn vị trí camera (bộ đèn gần
 	# phải đổi theo người chơi, nếu không đèn cố định cứng gây cắt sáng).

@@ -133,7 +133,9 @@ func fly_straight(initial_velocity: Vector3, ground_y: float, damage: int = 0, a
 	_throw_attacker = attacker
 
 func _find_player() -> void:
-	var world := get_tree().current_scene
+	var tree := get_tree()
+	if tree == null: return
+	var world := tree.current_scene
 	if world == null: return
 	var mgr := world.get_node_or_null("CharacterManager") as CharacterManager
 	if mgr:

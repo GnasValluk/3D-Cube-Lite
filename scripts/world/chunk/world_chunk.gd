@@ -1784,15 +1784,16 @@ static func _multimesh_buffer(mm: MultiMesh, xforms: Array, colors: Array) -> vo
 
 static func _build_xform_multimesh(xforms: Array, colors: Array,
 		shadow_on: bool = false, unshaded: bool = true) -> MultiMeshInstance3D:
-	var cube := BoxMesh.new()
-	cube.size = Vector3.ONE
-	var mat := StandardMaterial3D.new()
-	mat.vertex_color_use_as_albedo = true
+	var cube: BoxMesh
+	var mat: StandardMaterial3D
 	if unshaded:
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var res := _get_grass_resources()
+		cube = res[0] as BoxMesh
+		mat = res[1] as StandardMaterial3D
 	else:
-		mat.metallic = 0.0
-		mat.roughness = 0.85
+		var res := _get_village_resources()
+		cube = res[0] as BoxMesh
+		mat = res[1] as StandardMaterial3D
 	cube.material = mat
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -2504,6 +2505,38 @@ void fragment() {
 	return m
 
 static var _mat_cache: Dictionary = {}
+
+## ── Cache dùng chung cho grass/rêu: 1 BoxMesh + 1 StandardMaterial3D ────────
+## Mỗi chunk trước đây tự tạo BoxMesh + material mới → D3D12 phải compile
+## shader pipeline mỗi lần chunk mới stream vào (stutter ~100-300ms). Dùng chung
+## 1 resource cho mọi chunk → GPU pipeline cache hit, giảm hẳn spike khi lướt.
+static var _grass_box: BoxMesh = null
+static var _grass_mat: StandardMaterial3D = null
+
+static func _get_grass_resources() -> Array:
+	if _grass_box == null:
+		_grass_box = BoxMesh.new()
+		_grass_box.size = Vector3.ONE
+	if _grass_mat == null:
+		_grass_mat = StandardMaterial3D.new()
+		_grass_mat.vertex_color_use_as_albedo = true
+		_grass_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	return [_grass_box, _grass_mat]
+
+## ── Cache dùng chung cho làng/cầu voxel (shaded): 1 BoxMesh + 1 material ────
+static var _village_box: BoxMesh = null
+static var _village_mat: StandardMaterial3D = null
+
+static func _get_village_resources() -> Array:
+	if _village_box == null:
+		_village_box = BoxMesh.new()
+		_village_box.size = Vector3.ONE
+	if _village_mat == null:
+		_village_mat = StandardMaterial3D.new()
+		_village_mat.vertex_color_use_as_albedo = true
+		_village_mat.metallic = 0.0
+		_village_mat.roughness = 0.85
+	return [_village_box, _village_mat]
 var _fade_state: bool = false  # per-instance: chunk này có đang dùng terrain_fade không
 
 ## ── Terrain fade (x-ray) khi player ở dưới lòng đất ─────────────────────────
@@ -2678,11 +2711,9 @@ func apply_chunk(data: Dictionary) -> void:
 	var gxforms: Array = gbd.get("xforms", [])
 	var gcolors: Array = gbd.get("colors", [])
 	if gxforms.size() > 0:
-		var cube := BoxMesh.new()
-		cube.size = Vector3.ONE
-		var mat := StandardMaterial3D.new()
-		mat.vertex_color_use_as_albedo = true
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var gres := _get_grass_resources()
+		var cube := gres[0] as BoxMesh
+		var mat := gres[1] as StandardMaterial3D
 		cube.material = mat
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -2939,11 +2970,9 @@ func apply_decorative(data: Dictionary) -> void:
 	var gxforms: Array = gbd.get("xforms", [])
 	var gcolors: Array = gbd.get("colors", [])
 	if gxforms.size() > 0:
-		var cube := BoxMesh.new()
-		cube.size = Vector3.ONE
-		var mat := StandardMaterial3D.new()
-		mat.vertex_color_use_as_albedo = true
-		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var gres := _get_grass_resources()
+		var cube := gres[0] as BoxMesh
+		var mat := gres[1] as StandardMaterial3D
 		cube.material = mat
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
@@ -3326,8 +3355,15 @@ func _scan_has_soil() -> bool:
 	return false
 
 ## ── Aquatic shader ────────────────────────────────────────────────────────────
+## Cache 1 ShaderMaterial dùng chung cho MỌI prop biển (coral/kelp/seaweed...).
+## Trước đây mỗi prop tự tạo Shader + ShaderMaterial mới → D3D12 compile shader
+## pipeline lại từng lần khi prop stream vào → stutter khi lướt qua biển.
+static var _aquatic_mat: ShaderMaterial = null
+
 static func make_aquatic_mat() -> ShaderMaterial:
-	return _build_aquatic_shader()
+	if _aquatic_mat == null:
+		_aquatic_mat = _build_aquatic_shader()
+	return _aquatic_mat
 
 static func _build_aquatic_shader() -> ShaderMaterial:
 	var shader := Shader.new()
