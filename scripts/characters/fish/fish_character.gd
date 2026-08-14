@@ -549,7 +549,7 @@ const LOOT_TABLE: Dictionary = {
 
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 const _ExpOrb = preload("res://scripts/items/entities/experience_orb.gd")
-const EXP_DROP_RATE: float = 0.02
+const EXP_DROP_RATE: float = 0.08
 
 func _die(_attacker: Node3D = null) -> void:
 	super._die(_attacker)

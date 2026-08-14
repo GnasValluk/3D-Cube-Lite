@@ -33,6 +33,7 @@ const PANEL_W: float = RIGHT_X + GRID_W + PAD
 
 var _player_ref: PlayerCharacter = null
 var _grid_size: int = 2
+var _built_grid_size: int = -1
 var _craft_inv: Inventory
 
 var _grid_faces: Array[ColorRect] = []
@@ -74,6 +75,26 @@ func _init() -> void:
 
 func _ready() -> void:
 	_grid_size = 2
+	_built_grid_size = 2
+	_build_ui()
+	visible = false
+
+func _build_ui() -> void:
+	for ch in get_children():
+		ch.free()
+	_grid_faces.clear()
+	_grid_icons.clear()
+	_grid_counts.clear()
+	_grid_panels.clear()
+	_player_faces.clear()
+	_player_icons.clear()
+	_player_counts.clear()
+	_player_panels.clear()
+	_hotbar_faces.clear()
+	_hotbar_icons.clear()
+	_hotbar_counts.clear()
+	_hotbar_panels.clear()
+	_recipe_cards.clear()
 	_build_layout()
 	_setup_styles()
 	_setup_background()
@@ -81,7 +102,6 @@ func _ready() -> void:
 	_setup_recipe_bar()
 	_setup_craft_area()
 	_setup_player_grid()
-	visible = false
 
 func _build_layout() -> void:
 	var grid_w: float = _grid_size * (SLOT_SIZE + GAP) - GAP
@@ -176,7 +196,7 @@ func _setup_background() -> void:
 
 func _setup_title() -> void:
 	var title := Label.new()
-	title.text = tr("CRAFTING_LABEL")
+	title.text = tr("CRAFT_HAND") if _grid_size == 2 else tr("CRAFTING_LABEL")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title.add_theme_font_size_override("font_size", int(S * 15))
 	title.add_theme_color_override("font_color", TEXT_BRIGHT)
@@ -776,7 +796,6 @@ func _craft() -> void:
 
 func open(player: PlayerCharacter, grid_size: int = 2, station_id: String = "") -> void:
 	_player_ref = player
-	_grid_size = grid_size if grid_size == 3 else 2
 	_RecipeDB.ensure()
 	_recipes = _RecipeDB.recipes.duplicate()
 	if station_id != "":
@@ -787,16 +806,18 @@ func open(player: PlayerCharacter, grid_size: int = 2, station_id: String = "") 
 				filtered.append(r)
 		_recipes = filtered
 	_selected_recipe = -1
-	if _craft_inv == null:
-		_craft_inv = Inventory.new(_grid_size * _grid_size)
-	elif _craft_inv.slots.size() != _grid_size * _grid_size:
-		# Đổi kích thước lưới: trả đồ về túi rồi tạo lại
-		if _player_ref:
-			for i in range(_craft_inv.slots.size()):
-				var slot: ItemSlot = _craft_inv.slots[i]
-				if not slot.is_empty():
-					_player_ref.inventory.add_item(slot.item, slot.count)
-		_craft_inv = Inventory.new(_grid_size * _grid_size)
+	var new_size: int = grid_size if grid_size == 3 else 2
+	# Nếu lưới đang chứa đồ và sắp đổi kích thước: trả đồ về túi trước khi build lại
+	if _craft_inv != null and _craft_inv.slots.size() != new_size * new_size and _player_ref:
+		for i in range(_craft_inv.slots.size()):
+			var slot: ItemSlot = _craft_inv.slots[i]
+			if not slot.is_empty():
+				_player_ref.inventory.add_item(slot.item, slot.count)
+	_craft_inv = Inventory.new(new_size * new_size)
+	_grid_size = new_size
+	if _built_grid_size != new_size:
+		_build_ui()
+		_built_grid_size = new_size
 	_rebuild_recipe_list()
 	_play_appear()
 

@@ -306,9 +306,6 @@ func interact_with_nearby() -> void:
 		if child is CraftingTable and child.is_player_nearby():
 			child.open_ui()
 			return
-		if child is CraftingStation and child.is_player_nearby():
-			child.open_ui()
-			return
 		if child is Furnace and child.is_player_nearby():
 			child.open_ui()
 			return
@@ -561,6 +558,10 @@ func _do_respawn() -> void:
 	oxygen_changed.emit(int(oxygen), int(max_oxygen))
 	stamina_changed.emit(stamina, max_stamina)
 	revive()
+	# Miễn nhiễm sau hồi sinh để slime đang canh ở điểm spawn không giết lại
+	# ngay lập tức (death loop vô hạn khi không có i-frame). Timer bị trừ cả
+	# trong _process lẫn _physics_process nên 5.0 ~ 2.5s thực tế.
+	_invul_timer = 5.0
 	_sync_camera()
 	_death_chest_spawned = false
 	_scroll_inventory_message(tr("DEATH_CHEST_MSG"))

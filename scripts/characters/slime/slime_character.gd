@@ -27,7 +27,7 @@ const WANDER_SPEED_MULT: float = 0.35
 
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 const _ExpOrb = preload("res://scripts/items/entities/experience_orb.gd")
-const EXP_DROP_RATE: float = 0.07
+const EXP_DROP_RATE: float = 0.28
 
 var _mesh: SlimeMesh
 var _home: Vector3 = Vector3.ZERO

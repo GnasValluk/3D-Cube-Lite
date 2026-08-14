@@ -41,7 +41,7 @@ const HOME_RADIUS: float = 20.0
 
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
 const _ExpOrb = preload("res://scripts/items/entities/experience_orb.gd")
-const EXP_DROP_RATE: float = 0.03
+const EXP_DROP_RATE: float = 0.12
 var _world_mgr: Node = null
 
 func _build_character() -> void:
