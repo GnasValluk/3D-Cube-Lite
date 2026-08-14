@@ -2329,8 +2329,8 @@ func _make_water_shader(dim_id: int) -> ShaderMaterial:
 		s.code = """
 shader_type spatial;
 render_mode blend_mix;
-uniform vec4 shallow_color : source_color = vec4(0.15, 0.70, 0.60, 0.65);
-uniform vec4 deep_color    : source_color = vec4(0.02, 0.18, 0.45, 0.85);
+uniform vec4 shallow_color : source_color = vec4(0.15, 0.70, 0.60, 0.78);
+uniform vec4 deep_color    : source_color = vec4(0.02, 0.18, 0.45, 0.92);
 uniform float wave_speed = 1.0;
 uniform float wave_height = 0.0;
 uniform float wave_freq = 8.0;
@@ -2372,7 +2372,7 @@ void fragment() {
 		s.code = """
 shader_type spatial;
 render_mode blend_mix, unshaded;
-uniform vec4 water_color : source_color = vec4(0.10, 0.55, 0.45, 0.70);
+uniform vec4 water_color : source_color = vec4(0.10, 0.55, 0.45, 0.88);
 uniform vec4 emit_color  : source_color = vec4(0.08, 0.45, 0.35, 1.0);
 uniform float wave_speed = 1.0;
 uniform float wave_height = 0.0;
