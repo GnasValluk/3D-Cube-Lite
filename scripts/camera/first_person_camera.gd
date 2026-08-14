@@ -120,8 +120,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_cur_fov = clamp(_cur_fov + fov_step, fov_min, fov_max)
 
 func _rotate_from_motion(mm: InputEventMouseMotion) -> void:
-	_yaw   -= mm.relative.x * mouse_sens
-	_pitch += mm.relative.y * mouse_sens
+	var s_h: float = SettingsManager.mouse_sensitivity_h if SettingsManager else 1.0
+	var s_v: float = SettingsManager.mouse_sensitivity_v if SettingsManager else 0.7
+	_yaw   -= mm.relative.x * mouse_sens * s_h
+	_pitch += mm.relative.y * mouse_sens * s_v
 	_pitch  = clamp(_pitch, pitch_min, pitch_max)
 
 

@@ -164,6 +164,8 @@ MASTER_VOLUME,Master Volume,Âm lượng chính
 MUSIC_VOLUME,Music Volume,Âm lượng nhạc
 SFX_VOLUME,SFX Volume,Âm lượng hiệu ứng
 MOUSE_SENSITIVITY,Mouse Sensitivity,Độ nhạy chuột
+SENS_HORIZONTAL,Horizontal,Theo trục ngang (X)
+SENS_VERTICAL,Vertical,Theo trục dọc (Y)
 INVERT_Y,Invert Y,Đảo ngược Y
 BINDING_KEY,Key,Phím
 BINDING_ACTION,Action,Hành động

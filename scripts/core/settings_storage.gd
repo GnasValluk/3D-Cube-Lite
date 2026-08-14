@@ -66,6 +66,23 @@ static func get_mouse_sensitivity() -> float:
 static func set_mouse_sensitivity(v: float) -> void:
 	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_modifier", v)
 	SettingsManager.mouse_sensitivity = v
+	SettingsManager.mouse_sensitivity_h = v
+	SettingsManager.save_settings()
+
+static func get_mouse_sensitivity_h() -> float:
+	return ProjectSettings.get_setting("input/pointing/mouse_sensitivity_h", SettingsManager.mouse_sensitivity_h)
+
+static func set_mouse_sensitivity_h(v: float) -> void:
+	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_h", v)
+	SettingsManager.mouse_sensitivity_h = v
+	SettingsManager.save_settings()
+
+static func get_mouse_sensitivity_v() -> float:
+	return ProjectSettings.get_setting("input/pointing/mouse_sensitivity_v", SettingsManager.mouse_sensitivity_v)
+
+static func set_mouse_sensitivity_v(v: float) -> void:
+	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_v", v)
+	SettingsManager.mouse_sensitivity_v = v
 	SettingsManager.save_settings()
 
 static func is_invert_y() -> bool:

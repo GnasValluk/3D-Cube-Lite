@@ -14,7 +14,7 @@ extends Node3D
 @export var height:       float  = 1.8   # Chiều cao nhìn vào player
 @export var pitch_min:    float  = -30.0 # Góc pitch thấp nhất (độ)
 @export var pitch_max:    float  =  70.0 # Góc pitch cao nhất (độ)
-@export var mouse_sens:   float  = 0.20  # Độ nhạy chuột
+@export var mouse_sens:   float  = 0.20  # Độ nhạy chuột (được nhân với SettingsManager.mouse_sensitivity_h/v)
 @export var zoom_min:     float  = 2.0
 @export var zoom_max: float = 22.0
 @export var zoom_step:    float  = 0.5
@@ -81,12 +81,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
 		return
 	# Xoay camera bằng chuột phải giữ
-	if event is InputEventMouseMotion:
-		var mm := event as InputEventMouseMotion
-		# Cam 3: không cần giữ chuột phải — di chuột là xoay camera luôn.
-		_yaw   -= mm.relative.x * mouse_sens
-		_pitch += mm.relative.y * mouse_sens
-		_pitch  = clamp(_pitch, pitch_min, pitch_max)
+ 	if event is InputEventMouseMotion:
+ 		var mm := event as InputEventMouseMotion
+ 		# Cam 3: không cần giữ chuột phải — di chuột là xoay camera luôn.
+ 		var s_h: float = SettingsManager.mouse_sensitivity_h if SettingsManager else 1.0
+ 		var s_v: float = SettingsManager.mouse_sensitivity_v if SettingsManager else 0.7
+ 		_yaw   -= mm.relative.x * mouse_sens * s_h
+ 		_pitch += mm.relative.y * mouse_sens * s_v
+ 		_pitch  = clamp(_pitch, pitch_min, pitch_max)
 	# Zoom bằng cuộn chuột
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton

@@ -371,22 +371,10 @@ func _build_audio_tab() -> void:
 
 func _build_controls_tab() -> void:
 	_section_label(tr("MOUSE_SENSITIVITY"))
-	var hbox := HBoxContainer.new()
-	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_content_vbox.add_child(hbox)
-	var slider := HSlider.new()
-	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	slider.min_value = 0.1; slider.max_value = 5.0; slider.step = 0.05
-	slider.value = _get_mouse_sensitivity()
-	slider.value_changed.connect(_set_mouse_sensitivity)
-	hbox.add_child(slider)
-	var val_lbl := Label.new()
-	val_lbl.add_theme_font_size_override("font_size", 18)
-	val_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
-	val_lbl.text = str(snapped(slider.value, 0.1))
-	slider.value_changed.connect(func(v): val_lbl.text = str(snapped(v, 0.1)))
-	hbox.add_child(val_lbl)
-
+	_section_label(tr("SENS_HORIZONTAL"))
+	_add_sens_slider(_get_mouse_sensitivity_h(), func(v): _set_mouse_sensitivity_h(v), "X %.2f")
+	_section_label(tr("SENS_VERTICAL"))
+	_add_sens_slider(_get_mouse_sensitivity_v(), func(v): _set_mouse_sensitivity_v(v), "Y %.2f")
 	_add_toggle(tr("INVERT_Y"), _is_invert_y(), func(v): _set_invert_y(v))
 
 	_content_vbox.add_spacer(false)
@@ -472,6 +460,24 @@ func _add_slider(initial: float, cb: Callable) -> void:
 	slider.value_changed.connect(func(v): val_lbl.text = "%d%%" % v)
 	hbox.add_child(val_lbl)
 
+func _add_sens_slider(initial: float, cb: Callable, fmt: String) -> void:
+	var hbox := HBoxContainer.new()
+	hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(hbox)
+	var slider := HSlider.new()
+	slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	slider.min_value = 0.05; slider.max_value = 5.0; slider.step = 0.05
+	slider.value = initial
+	slider.add_theme_color_override("slide_color", Color(0.22, 0.62, 0.28, 0.5))
+	slider.add_theme_color_override("grabber_color", Color(0.22, 0.62, 0.28))
+	hbox.add_child(slider)
+	var val_lbl := Label.new()
+	val_lbl.add_theme_font_size_override("font_size", 18)
+	val_lbl.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.7))
+	val_lbl.text = fmt % snapped(initial, 0.05)
+	slider.value_changed.connect(func(v): val_lbl.text = fmt % snapped(v, 0.05); cb.call(v))
+	hbox.add_child(val_lbl)
+
 # ── Settings storage (delegates to shared module) ──────────────────────────
 
 func _is_fullscreen() -> bool: return _Settings.is_fullscreen()
@@ -487,6 +493,10 @@ func _get_sfx_volume() -> float: return _Settings.get_sfx_volume()
 func _set_sfx_volume(v: float) -> void: _Settings.set_sfx_volume(v)
 func _get_mouse_sensitivity() -> float: return _Settings.get_mouse_sensitivity()
 func _set_mouse_sensitivity(v: float) -> void: _Settings.set_mouse_sensitivity(v)
+func _get_mouse_sensitivity_h() -> float: return _Settings.get_mouse_sensitivity_h()
+func _set_mouse_sensitivity_h(v: float) -> void: _Settings.set_mouse_sensitivity_h(v)
+func _get_mouse_sensitivity_v() -> float: return _Settings.get_mouse_sensitivity_v()
+func _set_mouse_sensitivity_v(v: float) -> void: _Settings.set_mouse_sensitivity_v(v)
 func _is_invert_y() -> bool: return _Settings.is_invert_y()
 func _set_invert_y(v: bool) -> void: _Settings.set_invert_y(v)
 func _get_chunk_view() -> int: return _Settings.get_chunk_view()

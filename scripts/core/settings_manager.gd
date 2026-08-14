@@ -15,7 +15,9 @@ static var vsync: bool = true
 static var master_volume: float = 50.0
 static var music_volume: float = 50.0
 static var sfx_volume: float = 50.0
-static var mouse_sensitivity: float = 1.0
+static var mouse_sensitivity: float = 1.0   # legacy (backward compat)
+static var mouse_sensitivity_h: float = 1.0   # horizontal sensitivity (mouse X)
+static var mouse_sensitivity_v: float = 0.7   # vertical sensitivity (mouse Y — thấp hơn horizontal để điều khiển mượt)
 static var invert_y: bool = false
 static var touch_enabled: bool = false
 static var joystick_sensitivity: float = 1.0
@@ -91,6 +93,8 @@ func load_settings() -> void:
 	music_volume = config.get_value(SECTION, "music_volume", 50.0)
 	sfx_volume = config.get_value(SECTION, "sfx_volume", 50.0)
 	mouse_sensitivity = config.get_value(SECTION, "mouse_sensitivity", 1.0)
+	mouse_sensitivity_h = config.get_value(SECTION, "mouse_sensitivity_h", mouse_sensitivity)
+	mouse_sensitivity_v = config.get_value(SECTION, "mouse_sensitivity_v", 0.7)
 	invert_y = config.get_value(SECTION, "invert_y", false)
 	touch_enabled = config.get_value(SECTION, "touch_enabled", false)
 	joystick_sensitivity = config.get_value(SECTION, "joystick_sensitivity", 1.0)
@@ -121,6 +125,8 @@ static func _apply_all() -> void:
 	if sfx_idx >= 0:
 		AudioServer.set_bus_volume_db(sfx_idx, sfx_volume / 100.0 * 80.0 - 80.0)
 	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_modifier", mouse_sensitivity)
+	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_h", mouse_sensitivity_h)
+	ProjectSettings.set_setting("input/pointing/mouse_sensitivity_v", mouse_sensitivity_v)
 	ProjectSettings.set_setting("controls/invert_y", invert_y)
 	ProjectSettings.set_setting("mobile/touch_controls_enabled", touch_enabled)
 	ProjectSettings.set_setting("mobile/joystick_sensitivity", joystick_sensitivity)
@@ -150,6 +156,8 @@ static func save_settings() -> void:
 	config.set_value(SECTION, "music_volume", music_volume)
 	config.set_value(SECTION, "sfx_volume", sfx_volume)
 	config.set_value(SECTION, "mouse_sensitivity", mouse_sensitivity)
+	config.set_value(SECTION, "mouse_sensitivity_h", mouse_sensitivity_h)
+	config.set_value(SECTION, "mouse_sensitivity_v", mouse_sensitivity_v)
 	config.set_value(SECTION, "invert_y", invert_y)
 	config.set_value(SECTION, "touch_enabled", touch_enabled)
 	config.set_value(SECTION, "joystick_sensitivity", joystick_sensitivity)

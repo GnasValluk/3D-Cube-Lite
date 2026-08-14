@@ -211,24 +211,21 @@ func _build_home_screen() -> void:
 	_add_app_icon(apps_grid, 0, "\u2600", "Weather", Color(0.10, 0.55, 0.90), Color(0.30, 0.70, 1.0), func():
 		show_screen(_weather_screen)
 	)
-	_add_app_icon(apps_grid, 1, "\u2699", "Settings", Color(0.40, 0.35, 0.55), Color(0.55, 0.50, 0.70), func():
-		show_screen(_settings_screen)
-	)
-	_add_app_icon(apps_grid, 2, "\U0001F5FA", "Map", Color(0.55, 0.30, 0.20), Color(0.70, 0.45, 0.30), func():
+	_add_app_icon(apps_grid, 1, "\U0001F5FA", "Map", Color(0.55, 0.30, 0.20), Color(0.70, 0.45, 0.30), func():
 		_show_map_in_phone()
 	)
-	_add_app_icon(apps_grid, 3, "\U0001F4BE", "Save", Color(0.20, 0.50, 0.30), Color(0.35, 0.65, 0.45), func():
+	_add_app_icon(apps_grid, 2, "\U0001F4BE", "Save", Color(0.20, 0.50, 0.30), Color(0.35, 0.65, 0.45), func():
 		if _hud:
 			_hud._on_save_pressed()
 	)
-	_add_app_icon(apps_grid, 4, "\U0001F3A8", "Themes", Color(0.30, 0.25, 0.50), Color(0.45, 0.40, 0.65), func():
+	_add_app_icon(apps_grid, 3, "\U0001F3A8", "Themes", Color(0.30, 0.25, 0.50), Color(0.45, 0.40, 0.65), func():
 		show_screen(_themes_screen)
 	)
-	_add_app_icon(apps_grid, 5, "\u23FB", "Shutdown", Color(0.55, 0.15, 0.15), Color(0.75, 0.30, 0.25), func():
+	_add_app_icon(apps_grid, 4, "\u23FB", "Shutdown", Color(0.55, 0.15, 0.15), Color(0.75, 0.30, 0.25), func():
 		if _hud:
 			_hud.exit_to_main_menu()
 	)
-	_add_app_icon(apps_grid, 6, "\U0001F457", "Thời trang", Color(0.75, 0.35, 0.60), Color(0.90, 0.50, 0.75), func():
+	_add_app_icon(apps_grid, 5, "\U0001F457", "Thời trang", Color(0.75, 0.35, 0.60), Color(0.90, 0.50, 0.75), func():
 		_show_fashion_screen()
 	)
 
