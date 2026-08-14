@@ -33,6 +33,10 @@ static func _is_water_bid(bid: int) -> bool:
 	return bid == _Data.BlockID.WATER \
 		or (bid >= _Data.BlockID.WATER_SOURCE and bid <= _Data.BlockID.WATER_LEVEL_1)
 
+static func _is_lava_bid(bid: int) -> bool:
+	return bid == _Data.BlockID.LAVA_SOURCE \
+		or (bid >= _Data.BlockID.LAVA_LEVEL_7 and bid <= _Data.BlockID.LAVA_LEVEL_1)
+
 ## Mặt địa hình thực (top face khối) được lượng tử hoá theo SLAB:
 ## cy_top = floor(h / SLAB) * SLAB. Cây/đánh phải bám ĐÚNG mặt này,
 ## không gắn theo h thô — nếu không sẽ lơ lửng trên đồi cao.
@@ -116,6 +120,28 @@ static func _water_level_of(bid: int) -> int:
 		return 8 - (bid - _Data.BlockID.WATER_LEVEL_7)
 	return 0
 
+## Fluid (water hoặc lava) level — dùng cho fluid mesh chung.
+static func _is_fluid_bid(bid: int) -> bool:
+	return bid == _Data.BlockID.WATER \
+		or (bid >= _Data.BlockID.WATER_SOURCE and bid <= _Data.BlockID.WATER_LEVEL_1) \
+		or bid == _Data.BlockID.LAVA_SOURCE \
+		or (bid >= _Data.BlockID.LAVA_LEVEL_7 and bid <= _Data.BlockID.LAVA_LEVEL_1)
+
+static func _fluid_level_of(bid: int) -> int:
+	if bid == _Data.BlockID.WATER_SOURCE or bid == _Data.BlockID.WATER:
+		return 8
+	if bid >= _Data.BlockID.WATER_LEVEL_7 and bid <= _Data.BlockID.WATER_LEVEL_1:
+		return 8 - (bid - _Data.BlockID.WATER_LEVEL_7)
+	if bid == _Data.BlockID.LAVA_SOURCE:
+		return 8
+	if bid >= _Data.BlockID.LAVA_LEVEL_7 and bid <= _Data.BlockID.LAVA_LEVEL_1:
+		return 8 - (bid - _Data.BlockID.LAVA_LEVEL_7)
+	return 0
+
+## Fluid nào (water/lava) để chọn màu mesh.
+static func _fluid_kind(bid: int) -> int:
+	return 1 if (bid == _Data.BlockID.LAVA_SOURCE or (bid >= _Data.BlockID.LAVA_LEVEL_7 and bid <= _Data.BlockID.LAVA_LEVEL_1)) else 0
+
 # ── Ocean mask tại 1 world cell — nguồn duy nhất cho đất vs biển ────────────
 # Warp bờ biển + bias vùng spawn (gốc tọa độ luôn là đất). Hud teleport,
 # explore map, fish_spawner và test dùng chung hàm này để không lệch nhau.
@@ -150,6 +176,9 @@ var _collision_pending: bool = false
 var _water_tick_timer: float = 0.0
 var _has_water: bool = false
 var _max_water_ly: int = -1
+var _has_lava: bool = false
+var _max_lava_ly: int = -1
+var _lava_mesh_instance: MeshInstance3D = null
 var _has_ores: bool = false
 var _has_soil: bool = false
 var _top_ly_cache := PackedInt32Array()
@@ -1341,7 +1370,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	_prof("S9 grass+village")
 	var mesh := st.commit()
 	if mesh == null:
-		return { "mesh": null, "water_mesh": null, "biome_grid": biome_grid,
+		return { "mesh": null, "water_mesh": null, "lava_mesh": null, "biome_grid": biome_grid,
 				"cols": cols, "block_data_bytes": bd.to_bytes() }
 
 	# ── 7. Water mesh — from block data ──────────────────────────────────
@@ -1361,6 +1390,34 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				water_skip[wx_ * cols + wz_] = 1 if height_grid[wx_][wz_] > _Data.WATER_Y else 0
 		mesh_water = _build_water_mesh(bd, cols, dim_id, h_vox, half, {}, _gen_water_top_layer(), water_skip)
 	_prof("S10 water_mesh")
+
+	# ── 7b. Lava mesh — lava do người chơi đổ (xô lava). Scan block data
+	# trực tiếp (không dựa height_grid vì lava ngồi ở đáy hố, có thể > WATER_Y).
+	var has_lava: bool = false
+	for vx in range(cols):
+		for vz in range(cols):
+			for ly in range(_BlockData.CHUNK_H):
+				if _is_lava_bid(bd.get_block(vx, ly, vz)):
+					has_lava = true
+					break
+			if has_lava: break
+		if has_lava: break
+	var mesh_lava: ArrayMesh = null
+	if has_lava:
+		var lava_skip := PackedByteArray()
+		lava_skip.resize(cols * cols)
+		lava_skip.fill(0)
+		# max_ly = slab cao nhất có thế là lava (scan nhanh từ trên xuống)
+		var max_lava_ly: int = -1
+		for vx in range(cols):
+			for vz in range(cols):
+				for ly in range(_BlockData.CHUNK_H - 1, -1, -1):
+					if _is_lava_bid(bd.get_block(vx, ly, vz)):
+						max_lava_ly = maxi(max_lava_ly, ly)
+						break
+		mesh_lava = _build_water_mesh(bd, cols, dim_id, h_vox, half, {},
+			maxf(max_lava_ly, 0), lava_skip, 1)
+	_prof("S10 lava_mesh")
 
 	# ── 8. Aquatic mesh — hồ (SAND/SILT) + rong, cỏ biển ở biển nông ──────────
 	var mesh_aquatic = null
@@ -1678,7 +1735,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 	_prof("S13d stone_mask")
 
 	return {
-		"mesh": mesh, "water_mesh": mesh_water, "aquatic_mesh": mesh_aquatic,
+		"mesh": mesh, "water_mesh": mesh_water, "lava_mesh": mesh_lava, "aquatic_mesh": mesh_aquatic,
 		"grass_blade_data": { "xforms": grass_xforms, "colors": grass_colors },
 		"village_data": village_data, "height_grid": height_grid,
 		"ore_hill": ore_hill_info,
@@ -1686,7 +1743,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 		"river_flag": river_flag,
 		"block_data_bytes": bd.to_bytes(), "lamp_positions": lamp_positions,
 		"textured_block_meshes": ore_meshes,
-		"plant_props": plant_props, "has_water": has_water,
+		"plant_props": plant_props, "has_water": has_water, "has_lava": has_lava,
 		"has_ores": not ore_meshes.is_empty(),
 		"top_ly_hint": top_ly_hint,
 		"stone_patch_mask": stone_patch_mask,
@@ -1787,18 +1844,10 @@ static func _tavern_interior_aabb(b: Dictionary) -> Array:
 
 ## ── Dựng MultiMesh quán (shell + nội thất) ────────────────────────────────────
 ## shell = vỏ công trình (nhìn thấy từ ngoài, đổ bóng); interior = nội thất.
-## Trả [shell_mmi, interior_mmi|null]. Shell được gắn group "tavern_shells" +
-## meta "tavern_aabbs" để player làm mờ khi đứng bên trong.
 static func _build_tavern_mesh(vbd: Dictionary) -> Array:
 	var shell := _build_xform_multimesh(vbd.get("xforms", []), vbd.get("colors", []), true, false)
 	var smat: StandardMaterial3D = shell.multimesh.mesh.material as StandardMaterial3D
 	shell.material_override = smat
-	var aabbs: Array = []
-	for b in vbd.get("info", {}).get("buildings", []):
-		aabbs.append(_tavern_interior_aabb(b))
-	shell.set_meta("tavern_aabbs", aabbs)
-	shell.set_meta("tavern_opaque", Color(1, 1, 1, 1))
-	shell.add_to_group("tavern_shells")
 	var ix: Array = vbd.get("ixforms", [])
 	var inner: MultiMeshInstance3D = null
 	if ix.size() > 0:
@@ -2104,9 +2153,10 @@ static func _build_soil_mesh(bd: _BlockData, cols: int, nb_data: Dictionary = {}
 	return st.commit()
 
 ## ── _build_water_mesh: render exposed faces only (skip bottom, correct size) ─
+## fluid_kind: 0=water only, 1=lava only, -1=bất kỳ fluid nào (render both + chọn màu theo từng block).
 static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
 		h_vox: float, half: float, nb_data: Dictionary = {}, max_ly: int = -1,
-		skip_mask: PackedByteArray = PackedByteArray()) -> ArrayMesh:
+		skip_mask: PackedByteArray = PackedByteArray(), fluid_kind: int = -1) -> ArrayMesh:
 	const SLAB := _BlockData.SLAB_HEIGHT
 	const Y_MIN := _BlockData.Y_MIN
 	const CHUNK_H := _BlockData.CHUNK_H
@@ -2125,6 +2175,9 @@ static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
 	tops.fill(-1)
 	var levs := PackedByteArray()
 	levs.resize(nc)
+	var top_bids := PackedInt32Array()
+	top_bids.resize(nc)
+	top_bids.fill(0)
 	var stride_x := CHUNK_H * cols
 	var raw := bd._data
 	# Cột-major: quét từ max_ly xuống, break ngay khi thấy nước (đỉnh cao nhất).
@@ -2137,10 +2190,11 @@ static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
 				continue  # cột chắc chắn không nước (height > WATER_Y) — bỏ scan
 			for y in range(max_ly, -1, -1):
 				var bid: int = raw[bbase + y * cols + z]
-				if _is_water_bid(bid):
+				if _is_fluid_bid(bid) and (fluid_kind < 0 or _fluid_kind(bid) == fluid_kind):
 					var ti := z * cols + x
 					tops[ti] = y
-					levs[ti] = _water_level_of(bid)
+					levs[ti] = _fluid_level_of(bid)
+					top_bids[ti] = bid
 					break
 
 	var st := SurfaceTool.new()
@@ -2157,7 +2211,12 @@ static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
 			if tl < 0:
 				continue
 			var pz := -half + (float(z) + 0.5) * VOXEL
-			var col := Color(float(levs[ti]) / 8.0, 0.0, 0.0)
+			# Màu water = xanh lam theo level; lava = cam/vàng theo level
+			var col: Color
+			if _fluid_kind(top_bids[ti]) == 1:
+				col = Color(0.3 + 0.11 * float(levs[ti]) / 8.0, 0.18 + 0.15 * float(levs[ti]) / 8.0, 0.05)
+			else:
+				col = Color(0.20, 0.55 - 0.12 * float(levs[ti]) / 8.0, 0.80)
 			var top_y := (float(tl + Y_MIN) + 0.5) * SLAB
 
 			# Top face (+y) — luôn có vì tl là đỉnh cao nhất
@@ -2165,10 +2224,10 @@ static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
 
 			# Side faces: band [nb_top+1 .. tl] nếu neighbor thấp hơn (hoặc 0 nước).
 			# NOTE: tops là z-major (ti = z*cols+x) → x-neighbor lệch ±1, z lệch ±cols.
-			var nxm: int = tops[ti - 1] if x > 0 else _nb_water_top(bd, nb_data, cols, x, max_ly, z, -1, 0)
-			var nxp: int = tops[ti + 1] if x + 1 < cols else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 1, 0)
-			var nzm: int = tops[ti - cols] if z > 0 else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 0, -1)
-			var nzp: int = tops[ti + cols] if z + 1 < cols else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 0, 1)
+			var nxm: int = tops[ti - 1] if x > 0 else _nb_water_top(bd, nb_data, cols, x, max_ly, z, -1, 0, fluid_kind)
+			var nxp: int = tops[ti + 1] if x + 1 < cols else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 1, 0, fluid_kind)
+			var nzm: int = tops[ti - cols] if z > 0 else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 0, -1, fluid_kind)
+			var nzp: int = tops[ti + cols] if z + 1 < cols else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 0, 1, fluid_kind)
 
 			if nxp < tl:
 				var ya := (float(maxi(nxp, -1) + 1 + Y_MIN) + 0.5) * SLAB
@@ -2184,15 +2243,17 @@ static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
 				_add_quad(st, Vector3(px, (ya + top_y) * 0.5, pz - hh - EPS), Vector3(hh, 0, 0), Vector3(0, (top_y - ya) * 0.5, 0), Vector3(0, 0, -1), col)
 	return st.commit()
 
-## ── _nb_water_top: top layer nước của ô (x+dx, z+dz), băng qua biên chunk ────
-## Trả -1 nếu không nước. Quét xuống từ y_max (chỉ gọi cho cột biên → rẻ).
+## ── _nb_water_top: top layer fluid của ô (x+dx, z+dz), băng qua biên chunk ──────
+## Trả -1 nếu không có fluid. Quét xuống từ y_max (chỉ gọi cho cột biên → rẻ).
+## kind: 0=water, 1=lava, -1=bất kỳ.
 static func _nb_water_top(bd: _BlockData, nb_data: Dictionary, cols: int,
-		x: int, y_max: int, z: int, dx: int, dz: int) -> int:
+		x: int, y_max: int, z: int, dx: int, dz: int, kind: int = -1) -> int:
 	var nx: int = x + dx
 	var nz: int = z + dz
 	if nx >= 0 and nx < cols and nz >= 0 and nz < cols:
 		for y in range(y_max, -1, -1):
-			if _is_water_bid(bd.get_block(nx, y, nz)):
+			var b: int = bd.get_block(nx, y, nz)
+			if _is_fluid_bid(b) and (kind < 0 or _fluid_kind(b) == kind):
 				return y
 		return -1
 	var dir: String
@@ -2214,7 +2275,7 @@ static func _nb_water_top(bd: _BlockData, nb_data: Dictionary, cols: int,
 	if tx < 0 or tx >= nb_cols or tz < 0 or tz >= nb_cols:
 		return -1
 	for y in range(y_max, -1, -1):
-		if _is_water_bid(nb_bd.get_block(tx, y, tz)):
+		if _is_fluid_bid(nb_bd.get_block(tx, y, tz)):
 			return y
 	return -1
 
@@ -2402,6 +2463,46 @@ void fragment() {
 	m.set_shader_parameter("low_quality", is_mob)
 	return m
 
+## ── Lava shader — cam nóng rực, sóng nhanh, phát sáng mạnh (unshaded) ─────
+func _make_lava_shader(dim_id: int) -> ShaderMaterial:
+	var s := Shader.new()
+	s.code = """
+shader_type spatial;
+render_mode blend_mix, unshaded, depth_prepass_alpha;
+uniform vec4 lava_color : source_color = vec4(0.92, 0.28, 0.08, 1.0);
+uniform vec4 ember_color : source_color = vec4(1.0, 0.62, 0.16, 1.0);
+uniform float wave_speed = 1.6;
+uniform float wave_height = 0.0;
+uniform float wave_freq = 8.0;
+
+void vertex() {
+	if (wave_height > 0.001) {
+		vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		float w1 = sin(TIME * wave_speed + world_pos.x * wave_freq + world_pos.z * wave_freq * 0.7) * wave_height;
+		float w2 = sin(TIME * wave_speed * 1.7 + world_pos.x * wave_freq * 1.3 + world_pos.z * wave_freq * 0.9) * wave_height * 0.5;
+		float w3 = sin(TIME * wave_speed * 2.4 + world_pos.x * wave_freq * 0.6 + world_pos.z * wave_freq * 1.5) * wave_height * 0.3;
+		VERTEX.y += w1 + w2 + w3;
+	}
+}
+
+void fragment() {
+	float density = COLOR.r;
+	vec4 base = mix(vec4(lava_color.rgb * 0.55, lava_color.a), lava_color, density);
+	ALBEDO = base.rgb; ALPHA = base.a;
+	vec3 wp = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	// Đốm đỏ nóng di chuyển theo thời gian — cảm giác dung nham chảy
+	float e1 = sin(TIME * 1.2 + wp.x * 3.0 + wp.z * 2.5);
+	float e2 = sin(TIME * 1.8 + wp.x * 2.2 - wp.z * 3.4);
+	float em = max(0.0, e1 * e2);
+	EMISSION = ember_color.rgb * (2.0 + em * 2.5) + vec3(0.30, 0.08, 0.02) * (1.0 - density);
+}
+"""
+	var m := ShaderMaterial.new()
+	m.shader = s
+	var is_mob: bool = DeviceManager != null and DeviceManager.is_mobile()
+	m.set_shader_parameter("low_quality", is_mob)
+	return m
+
 static var _mat_cache: Dictionary = {}
 var _fade_state: bool = false  # per-instance: chunk này có đang dùng terrain_fade không
 
@@ -2470,14 +2571,16 @@ func _init_materials() -> void:
 		m_t.roughness = 0.9; m_t.metallic_specular = 0.0
 		_mat_cache[_dimension_id] = { "terrain": m_t,
 			"terrain_fade": _make_terrain_fade_mat(_dimension_id),
-			"water": _make_water_shader(_dimension_id) }
+			"water": _make_water_shader(_dimension_id),
+			"lava": _make_lava_shader(_dimension_id) }
 		return
 	var m_t := StandardMaterial3D.new()
 	m_t.vertex_color_use_as_albedo = true
 	m_t.roughness = 1.0; m_t.metallic_specular = 0.0
 	_mat_cache[_dimension_id] = { "terrain": m_t,
 		"terrain_fade": _make_terrain_fade_mat(_dimension_id),
-		"water": _make_water_shader(_dimension_id) }
+		"water": _make_water_shader(_dimension_id),
+		"lava": _make_lava_shader(_dimension_id) }
 
 ## ── apply_chunk: nhận data từ thread, tạo nodes ──────────────────────────────
 func apply_chunk(data: Dictionary) -> void:
@@ -2487,6 +2590,7 @@ func apply_chunk(data: Dictionary) -> void:
 	_biome_grid = data["biome_grid"]
 	_has_water = data.get("has_water", false)
 	_max_water_ly = _gen_water_top_layer() if _has_water else -1
+	_has_lava = data.get("has_lava", false)
 	_has_ores = data.get("has_ores", false)
 	_top_ly_cache = data.get("top_ly_hint", PackedInt32Array())
 
@@ -2512,6 +2616,7 @@ func apply_chunk(data: Dictionary) -> void:
 	_terrain_mesh_instance = null
 	_water_mesh_instance = null
 	_aquatic_mesh_instance = null
+	_lava_mesh_instance = null
 	_textured_block_mesh_instances.clear()
 	for light in _lotus_lights:
 		LotusLightManager.unregister(light)
@@ -2533,6 +2638,16 @@ func apply_chunk(data: Dictionary) -> void:
 		mi_w.material_override = _mat_cache[_dimension_id]["water"]
 		container.add_child(mi_w)
 		_water_mesh_instance = mi_w
+
+	var has_lava: bool = data.get("has_lava", false)
+	_has_lava = has_lava
+	var lava_mesh = data.get("lava_mesh")
+	if lava_mesh:
+		var mi_l := MeshInstance3D.new()
+		mi_l.mesh = lava_mesh
+		mi_l.material_override = _mat_cache[_dimension_id]["lava"]
+		container.add_child(mi_l)
+		_lava_mesh_instance = mi_l
 
 	var aquatic_mesh = data.get("aquatic_mesh")
 	if aquatic_mesh:

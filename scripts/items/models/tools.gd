@@ -770,3 +770,19 @@ static func flashlight_drop(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, 0, 1, 0, 1.4, 0.8, 1.4, body_d)
 	ItemMeshShared.add_cube(p, 0, 1.6, 0, 1.5, 0.5, 1.5, band)
 	ItemMeshShared.add_cube(p, 0, 2.2, 0, 1.2, 0.6, 1.2, lens)
+
+## Xô (bucket) — dùng cho water_bucket / lava_bucket.
+static func bucket_drop(p: Node3D, is_lava: bool = false) -> void:
+	var metal   := Color(0.75, 0.75, 0.78)
+	var metal_d := Color(0.55, 0.55, 0.58)
+	var rim     := Color(0.85, 0.85, 0.88)
+	# Thân xô
+	ItemMeshShared.add_cube(p, 0, -0.8, 0, 1.2, 2.2, 1.2, metal)
+	ItemMeshShared.add_cube(p, 0, -0.9, 0, 1.0, 0.4, 1.0, metal_d)
+	ItemMeshShared.add_cube(p, 0, 1.0, 0, 1.1, 0.3, 1.1, rim)
+	if is_lava:
+		var lava := Color(0.92, 0.28, 0.10)
+		ItemMeshShared.add_cube_shaded(p, 0, -0.3, 0, 0.9, 0.8, 0.9, lava, 0.0, 0.3, Color(1.0, 0.55, 0.15))
+	else:
+		var water := Color(0.15, 0.42, 0.72)
+		ItemMeshShared.add_cube_shaded(p, 0, -0.3, 0, 0.9, 0.8, 0.9, water, 0.0, 0.2, Color(0.0, 0.3, 0.8))

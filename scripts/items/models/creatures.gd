@@ -34,8 +34,16 @@ static func shrimp(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, -2, 1.5, -1.5, 0.3, 0.3, 1.5, dark)
 
 static func experience_orb(p: Node3D) -> void:
-	var core := Color(0.35, 0.75, 1.0)
-	var glow := Color(1.0, 0.85, 0.30)
-	ItemMeshShared.add_cube(p, 0, 0, 0, 2.4, 2.4, 2.4, core)
-	ItemMeshShared.add_cube(p, 0, 0, 0, 1.6, 1.6, 1.6, core.lightened(0.3))
-	ItemMeshShared.add_cube(p, 0, 0, 0, 1.0, 1.0, 1.0, glow)
+	## Giống hạt rớt từ quái (experience_orb.gd): 1 voxel nhỏ lấp lánh xanh-vàng.
+	var blue := Color(0.35, 0.75, 1.0)
+	var yellow := Color(1.0, 0.85, 0.30)
+	var c: float = 0.27
+	var s: float = 0.56
+	var corners := [
+		Vector3(-c, -c, -c), Vector3(c, -c, -c), Vector3(c, c, -c), Vector3(-c, c, -c),
+		Vector3(-c, -c, c), Vector3(c, -c, c), Vector3(c, c, c), Vector3(-c, c, c),
+	]
+	for i in 8:
+		var pos: Vector3 = corners[i]
+		var col: Color = blue if (i % 2 == 0) else yellow
+		ItemMeshShared.add_cube(p, pos.x, pos.y, pos.z, s, s, s, col)

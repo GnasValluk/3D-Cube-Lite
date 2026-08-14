@@ -73,6 +73,7 @@ static func create_item_db() -> Dictionary:
 	_add(db, "tractor", "Máy Kéo Nông Nghiệp", ItemDef.Type.TOOL, Color(0.72, 0.10, 0.08), "🚜", "Máy kéo + rơ-moóc chở hàng — đặt xuống đất, nhấn F để lên lái xe băng qua ruộng", false, 1)
 	_add(db, "rescue_helicopter", "Trực Thăng Cứu Hộ", ItemDef.Type.TOOL, Color(0.82, 0.16, 0.10), "🚁", "Trực thăng cứu hộ đa năng — đặt xuống, nhấn F lên lái, SPACE bay lên / SHIFT hạ xuống / WASD di chuyển", false, 1)
 	_add(db, "water_bucket", "Xô Nước", ItemDef.Type.TOOL, Color(0.15, 0.40, 0.70), "🌊", "Xô đựng nước — đặt khối nước tại vị trí chỉ định", false, 16)
+	_add(db, "lava_bucket", "Xô Lava", ItemDef.Type.TOOL, Color(0.85, 0.25, 0.10), "🔥", "Xô đựng lava nóng — đặt khối lava tại vị trí chỉ định, chảy tự động ra xung quanh", false, 16)
 
 	# ── Cá (thức ăn) ──────────────────────────────────────────────────────────
 	_add(db, "carp", "Carp", ItemDef.Type.FOOD, Color(0.95, 0.70, 0.10), "🐟", "Freshwater carp — rich, firm flesh", true, 16, 30)
@@ -304,6 +305,7 @@ const WEIGHTS: Dictionary = {
 	"block_mangrove_mud": 2.0, "mangrove_wood": 2.0, "mangrove_seed": 0.2,
 	"golden_ring": 0.1, "leather_backpack": 2.0,
 	"flashlight": 0.8,
+	"lava_bucket": 0.9,
 	"cooked_pork": 2.8, "baked_taro": 0.6, "cooked_shrimp": 0.35,
 	"grilled_carp": 0.9, "grilled_perch": 0.7, "grilled_tilapia": 1.1,
 	"grilled_snakehead": 1.3, "grilled_flowerhorn": 1.3, "cooked_crab": 0.5,

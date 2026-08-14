@@ -65,6 +65,14 @@ enum BlockID {
 	SNOW = 49,          # Tuyết — bề mặt bio băng giá (mặt trên tuyết trắng, hông tuyết/đất đóng băng)
 	FROST_DIRT = 50,    # Đất đóng băng — lớp nền bên dưới tuyết bio băng giá
 	SPRUCE_WOOD = 51,   # Gỗ vân sam — chặt từ cây vân sam (thông) bio băng giá
+	LAVA_SOURCE = 52,   # Núi lửa — dung nham nguồn (level 8)
+	LAVA_LEVEL_7 = 53,
+	LAVA_LEVEL_6 = 54,
+	LAVA_LEVEL_5 = 55,
+	LAVA_LEVEL_4 = 56,
+	LAVA_LEVEL_3 = 57,
+	LAVA_LEVEL_2 = 58,
+	LAVA_LEVEL_1 = 59,
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -110,6 +118,14 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.SNOW: "block_snow",
 	BlockID.FROST_DIRT: "block_frost_dirt",
 	BlockID.SPRUCE_WOOD: "spruce_wood",
+	BlockID.LAVA_SOURCE: "lava_bucket",
+	BlockID.LAVA_LEVEL_7: "lava_bucket",
+	BlockID.LAVA_LEVEL_6: "lava_bucket",
+	BlockID.LAVA_LEVEL_5: "lava_bucket",
+	BlockID.LAVA_LEVEL_4: "lava_bucket",
+	BlockID.LAVA_LEVEL_3: "lava_bucket",
+	BlockID.LAVA_LEVEL_2: "lava_bucket",
+	BlockID.LAVA_LEVEL_1: "lava_bucket",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -156,6 +172,7 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"block_snow": BlockID.SNOW,
 	"block_frost_dirt": BlockID.FROST_DIRT,
 	"spruce_wood": BlockID.SPRUCE_WOOD,
+	"lava_bucket": BlockID.LAVA_SOURCE,
 }
 
 const VOXEL: float = 1.0
@@ -244,6 +261,14 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.93, 0.96, 0.99),           # 49 SNOW — tuyết trắng tinh băng giá
 	Color(0.44, 0.38, 0.42),           # 50 FROST_DIRT — đất đóng băng nâu xám lạnh
 	Color(0.38, 0.24, 0.12),           # 51 SPRUCE_WOOD — gỗ vân sam nâu đỏ tối
+	Color(0.95, 0.48, 0.10),           # 52 LAVA_SOURCE — cam nóng rực
+	Color(0.88, 0.42, 0.08),           # 53 LAVA_LEVEL_7
+	Color(0.80, 0.36, 0.06),           # 54 LAVA_LEVEL_6
+	Color(0.72, 0.30, 0.05),           # 55 LAVA_LEVEL_5
+	Color(0.65, 0.26, 0.04),           # 56 LAVA_LEVEL_4
+	Color(0.56, 0.22, 0.03),           # 57 LAVA_LEVEL_3
+	Color(0.48, 0.18, 0.02),           # 58 LAVA_LEVEL_2
+	Color(0.40, 0.14, 0.02),           # 59 LAVA_LEVEL_1
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -299,6 +324,14 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.08, 0.10, 0.12),           # 49 SNOW (TW palette placeholder)
 	Color(0.05, 0.04, 0.04),           # 50 FROST_DIRT (TW palette placeholder)
 	Color(0.05, 0.04, 0.03),           # 51 SPRUCE_WOOD (TW palette placeholder)
+	Color(0.95, 0.48, 0.10),           # 52 LAVA_SOURCE — cam nóng rực
+	Color(0.88, 0.42, 0.08),           # 53 LAVA_LEVEL_7
+	Color(0.80, 0.36, 0.06),           # 54 LAVA_LEVEL_6
+	Color(0.72, 0.30, 0.05),           # 55 LAVA_LEVEL_5
+	Color(0.65, 0.26, 0.04),           # 56 LAVA_LEVEL_4
+	Color(0.56, 0.22, 0.03),           # 57 LAVA_LEVEL_3
+	Color(0.48, 0.18, 0.02),           # 58 LAVA_LEVEL_2
+	Color(0.40, 0.14, 0.02),           # 59 LAVA_LEVEL_1
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -365,9 +398,42 @@ static func water_block_for_level(level: int) -> int:
 		return BlockID.WATER_LEVEL_7 - (level - 7)
 	return BlockID.AIR
 
+## ── Núi lửa — lava ─────────────────────────────────────────────────────────
+static func is_lava(bid: int) -> bool:
+	return bid == BlockID.LAVA_SOURCE \
+		or (bid >= BlockID.LAVA_LEVEL_7 and bid <= BlockID.LAVA_LEVEL_1)
+
+static func lava_level(bid: int) -> int:
+	if bid == BlockID.LAVA_SOURCE:
+		return 8
+	if bid >= BlockID.LAVA_LEVEL_7 and bid <= BlockID.LAVA_LEVEL_1:
+		return 8 - (bid - BlockID.LAVA_LEVEL_7)
+	return 0
+
+static func is_source_lava(bid: int) -> bool:
+	return bid == BlockID.LAVA_SOURCE
+
+static func lava_block_for_level(level: int) -> int:
+	if level >= 8:
+		return BlockID.LAVA_SOURCE
+	if level >= 1:
+		return BlockID.LAVA_LEVEL_7 - (level - 7)
+	return BlockID.AIR
+
+## Fluid chung: water hoặc lava.
+static func is_fluid(bid: int) -> bool:
+	return is_water(bid) or is_lava(bid)
+
+static func fluid_level(bid: int) -> int:
+	if is_water(bid):
+		return water_level(bid)
+	if is_lava(bid):
+		return lava_level(bid)
+	return 0
+
 ## Block nào là solid (player không đi xuyên qua)
 static func is_solid(block_id: int) -> bool:
-	return block_id != BlockID.AIR and not is_water(block_id)
+	return block_id != BlockID.AIR and not is_fluid(block_id)
 
 ## Block nào là indestructible (không thể phá vỡ)
 static func is_indestructible(block_id: int) -> bool:
@@ -375,7 +441,7 @@ static func is_indestructible(block_id: int) -> bool:
 
 ## Block nào là transparent (render both sides / skip face culling)
 static func is_transparent(block_id: int) -> bool:
-	return block_id == BlockID.AIR or is_water(block_id)
+	return block_id == BlockID.AIR or is_fluid(block_id)
 
 ## ── Đất tơi xốp ─────────────────────────────────────────────────────────────
 ## Bán kính nước (block) làm đất tơi xốp chuyển sang trạng thái ẩm.

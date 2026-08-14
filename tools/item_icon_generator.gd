@@ -3,6 +3,19 @@ extends Node
 
 const OUT := "res://assets/icon_items/"
 
+## Icon các loại bàn được render trực tiếp từ ENTITY (model thật trong game)
+## để icon luôn giống hệt model ngoài thế giới.
+const TABLE_ENTITIES := {
+	"crafting_table": preload("res://scripts/items/entities/crafting_table.gd"),
+	"tool_table": preload("res://scripts/items/entities/tool_table.gd"),
+	"mech_table": preload("res://scripts/items/entities/mech_table.gd"),
+	"farm_table": preload("res://scripts/items/entities/farm_table.gd"),
+	"chem_table": preload("res://scripts/items/entities/chem_table.gd"),
+	"magic_table": preload("res://scripts/items/entities/magic_table.gd"),
+	"kitchen_table": preload("res://scripts/items/entities/kitchen_table.gd"),
+	"architecture_table": preload("res://scripts/items/entities/architecture_table.gd"),
+}
+
 func _ready() -> void:
 	if Engine.is_editor_hint():
 		return
@@ -10,11 +23,18 @@ func _ready() -> void:
 
 func _run() -> void:
 	ItemDatabase.ensure_db()
+	var only := {}
+	for a in OS.get_cmdline_user_args():
+		if a.begins_with("only="):
+			for id in a.substr(5).split(",", false):
+				only[id] = true
 	var ids: Array[String] = []
 	for k in ItemDatabase.items_db.keys():
 		ids.append(k)
 	ids.sort()
 	for item_id in ids:
+		if not only.is_empty() and not only.has(item_id):
+			continue
 		await _snap_item(item_id)
 	print("=== All item icons generated ===")
 	get_tree().quit(0)
@@ -49,6 +69,9 @@ func _snap_item(item_id: String) -> void:
 
 	if item_id in held_items:
 		ToolsMesh.build_held(root, item_id)
+	elif TABLE_ENTITIES.has(item_id):
+		root.add_child(TABLE_ENTITIES[item_id].new())
+		await get_tree().process_frame
 	else:
 		ItemMesh.build(root, item_id)
 

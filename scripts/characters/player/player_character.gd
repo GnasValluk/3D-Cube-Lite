@@ -1334,7 +1334,6 @@ func _on_dash() -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
-	_update_tavern_fade()
 	if _eating and is_alive and _active and not _underwater:
 		_state = State.EAT
 		velocity.x *= 0.5
@@ -1350,59 +1349,6 @@ func _physics_process(delta: float) -> void:
 			_Halberd.check_dash_hit(self)
 		else:
 			_halberd_dashing = false
-
-## ── Làm mờ vỏ quán khi đứng bên trong → nhìn thấy nội thất ──────────────────
-var _current_tavern_shell: MultiMeshInstance3D = null
-var _shell_tweens: Dictionary = {}
-const _TAVERN_FADE_TIME: float = 0.45
-const _TAVERN_FADE_A: float = 0.10
-
-func _update_tavern_fade() -> void:
-	var p := global_position
-	var target: MultiMeshInstance3D = null
-	for s in get_tree().get_nodes_in_group("tavern_shells"):
-		var mmi := s as MultiMeshInstance3D
-		if mmi == null or not is_instance_valid(mmi):
-			continue
-		for ab in mmi.get_meta("tavern_aabbs", []) as Array:
-			var a0: Vector3 = ab[0]
-			var a1: Vector3 = ab[1]
-			if p.x >= a0.x and p.x <= a1.x and p.z >= a0.z and p.z <= a1.z \
-					and p.y > a0.y and p.y < a1.y:
-				target = mmi
-				break
-		if target != null:
-			break
-	if target == _current_tavern_shell:
-		return
-	_fade_tavern_shell(_current_tavern_shell, 1.0)
-	_current_tavern_shell = target
-	_fade_tavern_shell(target, _TAVERN_FADE_A)
-
-## Crossfade alpha lượng mờ — mượt vào/ra.
-func _fade_tavern_shell(mmi: MultiMeshInstance3D, target_a: float) -> void:
-	if mmi == null or not is_instance_valid(mmi):
-		return
-	var mat := mmi.material_override as StandardMaterial3D
-	if mat == null:
-		return
-	if _shell_tweens.has(mmi):
-		var old: Tween = _shell_tweens[mmi]
-		if old.is_valid():
-			old.kill()
-		_shell_tweens.erase(mmi)
-	var t := mmi.create_tween()
-	t.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	_shell_tweens[mmi] = t
-	if target_a >= 1.0:
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		t.tween_property(mat, "albedo_color:a", 1.0, _TAVERN_FADE_TIME)
-		t.tween_callback(func():
-			if is_instance_valid(mat) and mat.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA:
-				mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED)
-	else:
-		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		t.tween_property(mat, "albedo_color:a", target_a, _TAVERN_FADE_TIME)
 
 func _raycast_target_block() -> Vector3:
 	var cam := get_viewport().get_camera_3d()

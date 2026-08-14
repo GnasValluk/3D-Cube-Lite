@@ -2,6 +2,7 @@ class_name DroppedItem
 extends Area3D
 
 const PlantProp := preload("res://scripts/world/props/plant_prop.gd")
+const ExperienceOrb := preload("res://scripts/items/entities/experience_orb.gd")
 
 
 
@@ -254,7 +255,18 @@ func collect(player: Node) -> bool:
 		item_count = remaining
 	return false
 
-static func spawn(world: Node, def_: ItemDef, pos: Vector3, count: int = 1, velocity: Vector3 = Vector3.ZERO, ground_y: float = -INF) -> DroppedItem:
+static func spawn(world: Node, def_: ItemDef, pos: Vector3, count: int = 1, velocity: Vector3 = Vector3.ZERO, ground_y: float = -INF) -> Node3D:
+	# Hạt kinh nghiệm: vứt ra sẽ rớt thành hạt thật (khác view 3 khối cũ) —
+	# không quay lại kho khi nhặt lại, mà tiêu hao +1 XP như hạt quái rớt.
+	if def_ != null and def_.id == "experience_orb":
+		var gy: float = ground_y if ground_y > -INF else pos.y
+		var last: Node3D = null
+		for i in range(maxi(count, 1)):
+			var jitter := Vector3(randf_range(-0.25, 0.25), 0, randf_range(-0.25, 0.25))
+			last = ExperienceOrb.spawn(world, pos + jitter, gy)
+			if last == null:
+				break
+		return last
 	var item := DroppedItem.new()
 	item.init(def_, count)
 	item.position = pos + Vector3(0, 0.2, 0)

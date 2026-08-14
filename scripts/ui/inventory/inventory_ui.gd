@@ -63,6 +63,10 @@ var _crit_rate_label: Label
 var _crit_dmg_label: Label
 var _speed_label: Label
 var _count_label: Label
+var _lv_label: Label
+var _exp_label: Label
+var _exp_bar_bg: ColorRect
+var _exp_bar_fill: ColorRect
 var _equip_labels: Array[Label] = []
 var _equip_item_icons: Array[TextureRect] = []
 var _equip_centers: Array[Vector2] = []
@@ -253,6 +257,42 @@ func _setup_title() -> void:
 	_count_label.position = Vector2(ox + PAD + 286, PAD + 1)
 	_count_label.size = Vector2(230, 20)
 	add_child(_count_label)
+
+	# ── LV + EXP (góc phải hàng tiêu đề) ────────────────────────────────
+	var inv_w: float = PAD + GRID_W + 12 + STAT_W + PAD
+	var lv_x: float = ox + inv_w - 250.0
+	_lv_label = Label.new()
+	_lv_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_lv_label.add_theme_font_size_override("font_size", 28)
+	_lv_label.add_theme_color_override("font_color", Color(1.0, 0.85, 0.35))
+	_lv_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	_lv_label.add_theme_constant_override("shadow_offset_x", 1)
+	_lv_label.add_theme_constant_override("shadow_offset_y", 1)
+	_lv_label.position = Vector2(lv_x, PAD - 2)
+	_lv_label.size = Vector2(90, 30)
+	add_child(_lv_label)
+
+	_exp_label = Label.new()
+	_exp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_exp_label.add_theme_font_size_override("font_size", 17)
+	_exp_label.add_theme_color_override("font_color", Color(0.62, 0.85, 1.0, 0.85))
+	_exp_label.position = Vector2(lv_x - 128, PAD + 6)
+	_exp_label.size = Vector2(124, 20)
+	add_child(_exp_label)
+
+	_exp_bar_bg = ColorRect.new()
+	_exp_bar_bg.position = Vector2(lv_x - 148, PAD + 29)
+	_exp_bar_bg.size = Vector2(238, 8)
+	_exp_bar_bg.color = Color(0.05, 0.04, 0.10, 0.85)
+	_exp_bar_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_exp_bar_bg)
+
+	_exp_bar_fill = ColorRect.new()
+	_exp_bar_fill.position = Vector2.ZERO
+	_exp_bar_fill.size = Vector2(0, 8)
+	_exp_bar_fill.color = Color(0.35, 0.75, 1.0)
+	_exp_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_exp_bar_bg.add_child(_exp_bar_fill)
 
 func _setup_grid() -> void:
 	var ox: float = LIB_W + LIB_MARGIN
@@ -994,6 +1034,13 @@ func _process(delta: float) -> void:
 		var eff_speed: float = _player_ref.move_speed * _player_ref.get_speed_multiplier()
 		_speed_label.text = "\u26A1  %.1f m/s" % eff_speed
 		_update_equipment_display(_player_ref)
+
+		if _lv_label:
+			_lv_label.text = "Lv.%d" % _player_ref.level
+			var xpt: int = maxi(_player_ref.exp_to_next, 1)
+			var xpc: int = mini(_player_ref.exp, _player_ref.exp_to_next)
+			_exp_label.text = "✦ %d / %d" % [xpc, xpt]
+			_exp_bar_fill.size.x = 238.0 * clampf(float(xpc) / float(xpt), 0.0, 1.0)
 
 	_Detail.update_detail_panel(self)
 
