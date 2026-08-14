@@ -53,6 +53,10 @@ func _ready() -> void:
 	WorldChunk._noise_for_dim(dimension_id)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.TWILIGHT)
 	WorldChunk._noise_for_dim(_Dim.DimensionID.REAL_WORLD)
+	# Prewarm grass/ore materials trên main trước khi worker build MultiMesh.
+	WorldChunk.prewarm_grass_resources()
+	var _OreTex = preload("res://scripts/items/models/ore_texture.gd")
+	_OreTex.prewarm_all()
 
 	# Generate center chunk synchronously để có ground ngay frame đầu.
 	# Khi load lại hành trình: center = chunk chứa điểm đứng đã lưu, spawn
@@ -133,7 +137,6 @@ func _process(_delta: float) -> void:
 	if _player == null or not is_instance_valid(_player) or not _player.is_inside_tree():
 		_find_player()
 		return
-
 	var ppos := _player.global_position
 	var cx: int = int(floor(ppos.x / CHUNK_SIZE))
 	var cz: int = int(floor(ppos.z / CHUNK_SIZE))

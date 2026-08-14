@@ -185,6 +185,23 @@ static func make_image(block_id: int) -> Image:
 					img.set_pixel(x, y, c)
 	return img
 
+## Prewarm toàn bộ material ore/đất trên MAIN thread lúc boot — tránh mỗi
+## chunk stream phải tạo texture + material lần đầu khi gặp ore (13ms spike trong
+## apply_chunk đoạn `ore_shaped`).
+static func prewarm_all() -> void:
+	var ids: Array[int] = [
+		_Data.BlockID.COPPER_ORE, _Data.BlockID.IRON_ORE,
+		_Data.BlockID.GOLD_ORE, _Data.BlockID.SILVER_ORE,
+		_Data.BlockID.BAUXITE_ORE, _Data.BlockID.TITAN_ORE,
+		_Data.BlockID.PLATINUM_ORE, _Data.BlockID.COAL_ORE,
+		_Data.BlockID.OAK_WOOD, _Data.BlockID.HARD_WOOD,
+		_Data.BlockID.SPRUCE_WOOD, _Data.BlockID.TILLED_SOIL,
+	]
+	for bid in ids:
+		get_material(bid)
+	get_soil_material(false)
+	get_soil_material(true)
+
 ## Material dùng chung cho cả block trong thế giới lẫn item model
 static func get_material(block_id: int, unshaded: bool = false) -> Material:
 	var key := block_id * 2 + (1 if unshaded else 0)

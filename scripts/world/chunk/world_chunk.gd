@@ -149,6 +149,12 @@ const SPAWN_BIAS_AMP: float = 2.2
 const SPAWN_BIAS_SIG2: float = 500000.0
 const SPAWN_BIAS_CUT: float = 2000000.0
 
+## Giới hạn số đèn sen 1 chunk — trước đây tạo 20-40 OmniLight3D/chunk (49 chunk
+## trong tầm = ~1500 node đèn, cày GC + enter/exit tree mỗi lần stream → spike
+## apply_chunk 10-50ms). LotusLightManager chỉ sáng 40 đèn GẦN camera nhất, nên
+## đèn thừa là node chết. Giữ 12 đèn GẦN TÂM chunk nhất cho cảnh quan.
+const MAX_LOTUS_PER_CHUNK: int = 12
+
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	var ow: FastNoiseLite = nd["ocean_warp"]
 	var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
@@ -196,6 +202,7 @@ var _mesh_container: Node3D = null
 var _tavern_built: bool = false
 var _lotus_lights: Array[OmniLight3D] = []
 var _prop_queue: Array = []
+var _prop_idx: int = 0
 
 ## Bật/tắt spawn prop plant (headless benchmark tắt để đo sạch phần chunk;
 ## game thật luôn true).
@@ -218,17 +225,21 @@ static func _prop_reset_budget() -> void:
 	_prop_budget_remaining = _prop_budget_max
 
 ## Chi phí spawn (đơn vị ngân sách) theo loại prop — đắt nhất là cây voxel.
+const _PROP_SPAWN_COST := {
+	"oak": 6,
+	"dense_tree": 4,
+	"palm": 3,
+	"orange_tree": 3,
+	"mangrove": 3,
+	"spruce": 4,
+	"pumpkin": 1,
+	"watermelon": 1,
+	"eggplant": 1,
+	"mud_crab": 2,
+}
+
 static func _prop_cost(ptype: String) -> int:
-	match ptype:
-		"oak": return 6
-		"dense_tree": return 4
-		"palm": return 3
-		"orange_tree": return 3
-		"mangrove": return 3
-		"spruce": return 4
-		"pumpkin", "watermelon", "eggplant": return 1
-		"mud_crab": return 2
-		_: return 1
+	return _PROP_SPAWN_COST.get(ptype, 1)
 
 ## ── Profiler section timing (benchmark test bật; mặc định tắt) ─────────────
 static var _prof_enabled: bool = false
@@ -1723,6 +1734,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 			plant_props = kept
 	_prof("S13c tavern")
 
+	# ── Sắp xếp props theo chi phí spawn (rẻ trước) NGAY TRÊN WORKER ─────────
+	# Trước đây làm trên main thread trong apply_chunk (duplicate + sort_custom
+	# so sánh Dictionary từng cặp) — chunk dày thực vật mất 12-50ms → frame spike.
+	# Sort ở đây chỉ tốn thời gian của worker thread (chạy song song với frame).
+	if plant_props.size() > 1:
+		plant_props.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return _prop_cost(a.get("type", "weed")) < _prop_cost(b.get("type", "weed")))
+
 	# ── Mask bãi đá (STONE_PATCH) — cho test/biết đâu là đá lộ thiên tự nhiên,
 	# không phải đồi quặng (test_ore_hills dùng để loại khi đếm đồi).
 	var stone_patch_mask := PackedByteArray()
@@ -1734,9 +1753,28 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				stone_patch_mask[vx * cols + vz] = 1
 	_prof("S13d stone_mask")
 
+	# ── Grass MultiMesh build NGAY TRÊN WORKER (trước đây main trong apply_chunk:
+	# loop đổ transforms+colors vào set_buffer cho hàng nghìn lá cỏ mất 10-17ms
+	# mỗi chunk → frame spike). Ở đây chạy song song với frame, apply_chunk chỉ
+	# bọc MultiMeshInstance3D.
+	var grass_multimesh: MultiMesh = null
+	if not grass_xforms.is_empty():
+		var gres := _get_grass_resources()
+		var gcube := gres[0] as BoxMesh
+		var gmat := gres[1] as StandardMaterial3D
+		gcube.material = gmat
+		var gmm := MultiMesh.new()
+		gmm.transform_format = MultiMesh.TRANSFORM_3D
+		gmm.use_colors = true
+		gmm.mesh = gcube
+		gmm.instance_count = grass_xforms.size()
+		_multimesh_buffer(gmm, grass_xforms, grass_colors)
+		grass_multimesh = gmm
+
 	return {
 		"mesh": mesh, "water_mesh": mesh_water, "lava_mesh": mesh_lava, "aquatic_mesh": mesh_aquatic,
 		"grass_blade_data": { "xforms": grass_xforms, "colors": grass_colors },
+		"grass_multimesh": grass_multimesh,
 		"village_data": village_data, "height_grid": height_grid,
 		"ore_hill": ore_hill_info,
 		"lotus_lights": lotus_lights, "biome_grid": biome_grid, "cols": cols,
@@ -2307,9 +2345,9 @@ func rebuild_water_mesh() -> void:
 ## ── refresh_boundary_water: rebuild water mesh của chunk + 4 lân cận ────────
 func refresh_boundary_water() -> void:
 	# Thu thập jobs (chunk này + lân cận có nước) trên main thread — chỉ vài
-	# lookup dictionary, rẻ. MESH BUILD CHẠY TRÊN MAIN (rate-limited trong
-	# WaterRebuildQueue._process): build ArrayMesh trên worker thread gây hư
-	# hỏng RenderingServer → crash 0xC0000005 khi process thoát (headless).
+	# lookup dictionary, rẻ. MESH BUILD CHẠY TRÊN WORKER (WaterRebuildQueue dùng
+	# WorkerThreadPool, giống terrain mesh trong compute_chunk); hàm này chỉ đẩy
+	# job với refs dữ liệu — worker giữ reference block_data nên an toàn teardown.
 	var parent := get_parent()
 	var chunks: Dictionary
 	if parent != null and "_chunks" in parent:
@@ -2362,8 +2400,8 @@ static func _build_water_mesh_job(job: Dictionary) -> ArrayMesh:
 	return _build_water_mesh(job["bd"], job["cols"], job["dim_id"],
 		job["h_vox"], job["half"], job["nb"], job["max_ly"])
 
-## Main thread — gán mesh rebuild sẵn lên MeshInstance3D (mesh build trên MAIN
-## bởi WaterRebuildQueue — build ArrayMesh trên worker gây hư hỏng RenderingServer).
+## Main thread — gán mesh rebuild sẵn lên MeshInstance3D (mesh được WaterRebuildQueue
+## build trên worker thread; hàm này chỉ gán, không build).
 func _apply_water_mesh(mesh: ArrayMesh) -> void:
 	if not is_inside_tree() or block_data == null:
 		return
@@ -2522,6 +2560,11 @@ static func _get_grass_resources() -> Array:
 		_grass_mat.vertex_color_use_as_albedo = true
 		_grass_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	return [_grass_box, _grass_mat]
+
+## Khởi tạo grass resources trên MAIN thread trước khi chunk worker chạm tới —
+## tránh race lazy-init static khi nhiều worker cùng gọi _get_grass_resources.
+static func prewarm_grass_resources() -> void:
+	_get_grass_resources()
 
 ## ── Cache dùng chung cho làng/cầu voxel (shaded): 1 BoxMesh + 1 material ────
 static var _village_box: BoxMesh = null
@@ -2707,22 +2750,10 @@ func apply_chunk(data: Dictionary) -> void:
 	# Block hình dạng riêng (đá ¼, đá ⅛, đá phiến) — dữ liệu worker tính sẵn
 	_apply_shaped_block_data(data)
 
-	var gbd: Dictionary = data.get("grass_blade_data", {})
-	var gxforms: Array = gbd.get("xforms", [])
-	var gcolors: Array = gbd.get("colors", [])
-	if gxforms.size() > 0:
-		var gres := _get_grass_resources()
-		var cube := gres[0] as BoxMesh
-		var mat := gres[1] as StandardMaterial3D
-		cube.material = mat
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = cube
-		mm.instance_count = gxforms.size()
-		_multimesh_buffer(mm, gxforms, gcolors)
+	var grass_mm: MultiMesh = data.get("grass_multimesh")
+	if grass_mm:
 		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
+		mmi.multimesh = grass_mm
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		container.add_child(mmi)
 
@@ -2738,6 +2769,11 @@ func apply_chunk(data: Dictionary) -> void:
 		_attach_tavern_features(container, vbd, _cx, _cz, _size)
 
 	var lotus_positions: Array[Vector3] = data.get("lotus_lights", [] as Array[Vector3])
+	if lotus_positions.size() > MAX_LOTUS_PER_CHUNK:
+		lotus_positions = lotus_positions.duplicate()
+		lotus_positions.sort_custom(func(a: Vector3, b: Vector3) -> bool:
+			return a.distance_squared_to(Vector3.ZERO) < b.distance_squared_to(Vector3.ZERO))
+		lotus_positions = lotus_positions.slice(0, MAX_LOTUS_PER_CHUNK)
 	for lpos in lotus_positions:
 		var is_weed_light: bool = lpos.x > 400.0
 		var real_pos := Vector3(lpos.x - (500.0 if is_weed_light else 0.0), lpos.y, lpos.z)
@@ -2786,9 +2822,8 @@ func apply_chunk(data: Dictionary) -> void:
 	# Spawn plant props (taro, seaweed, seagrass) — global budget shared toàn
 	# game để tránh nhiều chunk cùng bắn prop nặng trong 1 frame. Sắp prop rẻ
 	# (weed/seagrass) lên trước để cây nặng spawn sau khi budget còn.
-	_prop_queue = data.get("plant_props", []).duplicate()
-	_prop_queue.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
-		return _prop_cost(a.get("type", "weed")) < _prop_cost(b.get("type", "weed")))
+	_prop_queue = data.get("plant_props", [])
+	_prop_idx = 0
 	if not _prop_queue.is_empty():
 		set_process(true)
 
@@ -2798,19 +2833,21 @@ func apply_chunk(data: Dictionary) -> void:
 ## Budget chia sẻ toàn game; prop rẻ (weed/seagrass) ưu tiên spawn trước.
 func _process(delta: float) -> void:
 	if not props_enabled:
-		_prop_queue.clear()
+		_prop_queue = []
+		_prop_idx = 0
 		set_process(false)
 		return
 	_prop_reset_budget()
 	if _prop_budget_remaining <= 0:
 		return
-	var count: int = mini(3, _prop_queue.size())
+	var count: int = mini(3, _prop_queue.size() - _prop_idx)
 	for _i in range(count):
-		if _prop_queue.is_empty():
+		if _prop_idx >= _prop_queue.size():
 			break
 		if _prop_budget_remaining <= 0:
 			break
-		var pd: Dictionary = _prop_queue.pop_front()
+		var pd: Dictionary = _prop_queue[_prop_idx]
+		_prop_idx += 1
 		var ptype: String = pd.get("type", "weed")
 		_prop_budget_remaining -= _prop_cost(ptype)
 		if ptype == "palm":
@@ -2893,7 +2930,7 @@ func _process(delta: float) -> void:
 				pd.get("has_silt", false), pd.get("water_gap", 1.0),
 				pd.get("meadow", false))
 			add_child(prop)
-	if _prop_queue.is_empty():
+	if _prop_idx >= _prop_queue.size():
 		set_process(false)
 
 	# Water flow tick (disabled — water is static blocks now)
@@ -2952,6 +2989,7 @@ static func _thread_rebuild_decorative(ck: String, cx: int, cz: int, size: int, 
 		return
 	chunk.call_deferred("apply_decorative", {
 		"grass_blade_data": data.get("grass_blade_data", {}),
+		"grass_multimesh": data.get("grass_multimesh"),
 		"village_data": data.get("village_data", {}),
 		"textured_block_meshes": data.get("textured_block_meshes", {}),
 		"lamp_positions": data.get("lamp_positions", [])
@@ -2966,22 +3004,10 @@ func apply_decorative(data: Dictionary) -> void:
 		add_child(container)
 		_mesh_container = container
 
-	var gbd: Dictionary = data.get("grass_blade_data", {})
-	var gxforms: Array = gbd.get("xforms", [])
-	var gcolors: Array = gbd.get("colors", [])
-	if gxforms.size() > 0:
-		var gres := _get_grass_resources()
-		var cube := gres[0] as BoxMesh
-		var mat := gres[1] as StandardMaterial3D
-		cube.material = mat
-		var mm := MultiMesh.new()
-		mm.transform_format = MultiMesh.TRANSFORM_3D
-		mm.use_colors = true
-		mm.mesh = cube
-		mm.instance_count = gxforms.size()
-		_multimesh_buffer(mm, gxforms, gcolors)
+	var grass_mm: MultiMesh = data.get("grass_multimesh")
+	if grass_mm:
 		var mmi := MultiMeshInstance3D.new()
-		mmi.multimesh = mm
+		mmi.multimesh = grass_mm
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		container.add_child(mmi)
 

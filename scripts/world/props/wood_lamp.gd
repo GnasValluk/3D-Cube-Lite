@@ -13,6 +13,12 @@ const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
 # ── Shared materials (tạo 1 lần, tất cả đèn dùng chung) ──────────────────────
 static var _shared_wood_mat:   StandardMaterial3D = null
 static var _shared_glass_mat:  ShaderMaterial     = null
+# Shared meshes — hình học đèn GIỐNG NHAU ở mọi đèn. Build 1 lần, tất cả đèn
+# sau đó chỉ tạo MeshInstance3D tham chiếu mesh (trước đây mỗi đèn tự build
+# SurfaceTool ~12ms trên main thread → drain 2 đèn/frame vẫn làm giật khi
+# băng qua đường có đèn).
+static var _shared_wood_mesh:  ArrayMesh = null
+static var _shared_glass_mesh: ArrayMesh = null
 
 # ── Màu sắc gỗ — đậm hơn để rõ trên unshaded renderer ──────────────────────
 const C_WOOD_DARK:  Color = Color(0.18, 0.10, 0.04)
@@ -71,6 +77,30 @@ func _ready() -> void:
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _build_mesh(arm_dir: Vector3) -> void:
+	# Lần đầu: build geometry thật (SurfaceTool) rồi cache; các đèn sau dùng lại.
+	if _shared_wood_mesh == null or _shared_glass_mesh == null:
+		_build_shared_meshes(arm_dir)
+	var mesh_main := _shared_wood_mesh
+	var mesh_glass := _shared_glass_mesh
+	if mesh_main == null or mesh_glass == null:
+		return
+
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh_main
+	mi.material_override = _get_shared_wood_mat()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi)
+
+	# Kính — QUAN TRỌNG: mỗi đèn cần instance riêng của material để emit_energy độc lập
+	var mi_g := MeshInstance3D.new()
+	mi_g.mesh = mesh_glass
+	mi_g.material_override = _get_shared_glass_mat().duplicate()
+	mi_g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(mi_g)
+	_crystal_mi = mi_g
+	RoadLampManager.register_crystal(mi_g)
+
+func _build_shared_meshes(arm_dir: Vector3) -> void:
 	var st  := SurfaceTool.new()
 	var stg := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -109,26 +139,11 @@ func _build_mesh(arm_dir: Vector3) -> void:
 	var lantern_c: Vector3 = arm_dir * ARM_OUT + Vector3(0, arm_base_y - ARM_H * 0.5 - LANTERN_H * 0.5, 0)
 	_build_lantern(st, stg, lantern_c)
 
-	# Commit mesh gỗ — dùng shared material để giảm draw call
+	# Commit mesh gỗ + kính rồi cache vào shared statics (đèn sau chỉ tham chiếu)
 	var mesh_main := st.commit()
-	if mesh_main:
-		var mi := MeshInstance3D.new()
-		mi.mesh = mesh_main
-		mi.material_override = _get_shared_wood_mat()
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(mi)
-
-	# Commit mesh kính — dùng shared material, emit_energy điều khiển qua uniform
 	var mesh_glass := stg.commit()
-	if mesh_glass:
-		var mi_g := MeshInstance3D.new()
-		mi_g.mesh = mesh_glass
-		# QUAN TRỌNG: mỗi đèn cần instance riêng của material để emit_energy độc lập
-		mi_g.material_override = _get_shared_glass_mat().duplicate()
-		mi_g.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(mi_g)
-		_crystal_mi = mi_g
-		RoadLampManager.register_crystal(mi_g)
+	_shared_wood_mesh = mesh_main
+	_shared_glass_mesh = mesh_glass
 
 # ── Đèn lồng vuông ───────────────────────────────────────────────────────────
 func _build_lantern(st: SurfaceTool, stg: SurfaceTool, c: Vector3) -> void:

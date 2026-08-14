@@ -25,7 +25,11 @@ const CLEANUP_INTERVAL: float = 1.0
 ## chỉ tính đèn trong tầm mắt. Đèn sen/xác rêu cũng nhỏ (range ≤12m) nên đủ.
 const MAX_LIGHTS: int = 40
 
-var _lights: Array[OmniLight3D] = []
+## _lights là Dictionary key=OmniLight3D để register/unregister O(1).
+## Trước đây dùng Array + `not light in _lights` — mỗi register quét toàn bộ
+## danh sách (hàng trăm đèn), 12 register/chunk khi list lớn ~15-40ms (chính là
+## khoản `lotus_reg` trong apply_chunk khi lights_in_list tăng lên vài trăm).
+var _lights: Dictionary = {}
 
 var _update_timer:  float = 0.0
 var _cleanup_timer: float = 0.0
@@ -41,8 +45,7 @@ func _ready() -> void:
 static func register(light: OmniLight3D) -> void:
 	if _instance == null:
 		return
-	if not light in _instance._lights:
-		_instance._lights.append(light)
+	_instance._lights[light] = true
 
 static func unregister(light: OmniLight3D) -> void:
 	if _instance == null:
@@ -55,7 +58,9 @@ func _process(delta: float) -> void:
 
 	if _cleanup_timer >= CLEANUP_INTERVAL:
 		_cleanup_timer = 0.0
-		_lights = _lights.filter(func(l): return is_instance_valid(l))
+		for light in _lights.keys():
+			if not is_instance_valid(light):
+				_lights.erase(light)
 
 	if _update_timer < UPDATE_INTERVAL:
 		return

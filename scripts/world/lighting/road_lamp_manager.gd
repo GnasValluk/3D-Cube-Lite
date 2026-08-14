@@ -26,8 +26,10 @@ const UPDATE_INTERVAL:   float = 0.12  # ~8 lần/giây, mắt không phân bi�
 const CLEANUP_INTERVAL:  float = 1.0
 
 # ── Danh sách đã đăng ký ─────────────────────────────────────────────────────
-var _lights:   Array[OmniLight3D]    = []
-var _crystals: Array[MeshInstance3D] = []
+## Dictionary (key=node) để register/unregister O(1) — trước đây Array + `in`
+## quét toàn bộ list (hàng trăm đèn/crystal) làm mỗi lần đăng ký chậm dần.
+var _lights:   Dictionary = {}
+var _crystals: Dictionary = {}
 
 var _update_timer:  float = 0.0
 var _cleanup_timer: float = 0.0
@@ -44,15 +46,12 @@ func _ready() -> void:
 static func register_light(light: OmniLight3D) -> void:
 	if _instance == null:
 		return
-	if light in _instance._lights:
-		return
-	_instance._lights.append(light)
+	_instance._lights[light] = true
 
 static func register_crystal(mesh_instance: MeshInstance3D) -> void:
 	if _instance == null:
 		return
-	if not mesh_instance in _instance._crystals:
-		_instance._crystals.append(mesh_instance)
+	_instance._crystals[mesh_instance] = true
 
 static func unregister_light(light: OmniLight3D) -> void:
 	if _instance == null:
@@ -71,8 +70,12 @@ func _process(delta: float) -> void:
 
 	if _cleanup_timer >= CLEANUP_INTERVAL:
 		_cleanup_timer = 0.0
-		_lights   = _lights.filter(func(l): return is_instance_valid(l))
-		_crystals = _crystals.filter(func(m): return is_instance_valid(m))
+		for light in _lights.keys():
+			if not is_instance_valid(light):
+				_lights.erase(light)
+		for mi in _crystals.keys():
+			if not is_instance_valid(mi):
+				_crystals.erase(mi)
 
 	if _update_timer < UPDATE_INTERVAL:
 		return
