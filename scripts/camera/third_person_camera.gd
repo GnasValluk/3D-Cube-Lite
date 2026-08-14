@@ -81,14 +81,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_VISIBLE:
 		return
 	# Xoay camera bằng chuột phải giữ
- 	if event is InputEventMouseMotion:
- 		var mm := event as InputEventMouseMotion
- 		# Cam 3: không cần giữ chuột phải — di chuột là xoay camera luôn.
- 		var s_h: float = SettingsManager.mouse_sensitivity_h if SettingsManager else 1.0
- 		var s_v: float = SettingsManager.mouse_sensitivity_v if SettingsManager else 0.7
- 		_yaw   -= mm.relative.x * mouse_sens * s_h
- 		_pitch += mm.relative.y * mouse_sens * s_v
- 		_pitch  = clamp(_pitch, pitch_min, pitch_max)
+	if event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		# Cam 3: không cần giữ chuột phải — di chuột là xoay camera luôn.
+		var s_h: float = SettingsManager.mouse_sensitivity_h if SettingsManager else 1.0
+		var s_v: float = SettingsManager.mouse_sensitivity_v if SettingsManager else 0.7
+		_yaw   -= mm.relative.x * mouse_sens * s_h
+		_pitch += mm.relative.y * mouse_sens * s_v
+		_pitch  = clamp(_pitch, pitch_min, pitch_max)
 	# Zoom bằng cuộn chuột
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
