@@ -1,6 +1,8 @@
 class_name FurnaceUI
 extends Control
 
+const _CookingStove = preload("res://scripts/items/entities/cooking_stove.gd")
+
 ## Lò nung kiểu mới: trái = danh sách công thức (nung), phải = vùng lò.
 ## Vùng lò: 3 ô nguyên liệu (nung) ở trên — icon lửa 2D (sáng + nhấp nháy khi
 ## đốt) — bên dưới 2 ô nhiên liệu + thanh process nhiên liệu (mỗi chất đốt có
@@ -38,6 +40,9 @@ const OUT_SLOT_0: int = 5
 var _furnace = null
 var _player_ref: PlayerCharacter = null
 var _furnace_inv: Inventory
+
+var _furnace_mode: String = "smelt"
+var _title_label: Label
 
 var _input_faces: Array[ColorRect] = []
 var _input_icons: Array[TextureRect] = []
@@ -186,8 +191,21 @@ func _init_smelting_items() -> void:
 		"palm_wood": 10.0,
 		"block_oak_wood": 10.0,
 	}
+
+## Áp thư viện công thức theo chế độ của entity (lò nung / bếp nấu) rồi
+## build lại danh sách thẻ công thức bên trái. `_smelting_items` là nguồn
+## duy nhất cho `_update_smelting` nên chế độ cooking chỉ cần đổi nguồn này.
+func _apply_mode(mode: String) -> void:
+	_furnace_mode = mode
+	_smelting_items = {}
+	if mode == "cooking":
+		_smelting_items = _CookingStove.COOKING_ITEMS
+	_recipes.clear()
 	for ore in _smelting_items:
 		_recipes.append({ "input": ore, "output": _smelting_items[ore] })
+	if _title_label:
+		_title_label.text = tr("COOKING_LABEL") if mode == "cooking" else tr("FURNACE_LABEL")
+	_rebuild_recipe_cards()
 
 func _setup_background() -> void:
 	var bg_style := StyleBoxFlat.new()
@@ -209,17 +227,17 @@ func _setup_background() -> void:
 	add_child(bg)
 
 func _setup_title() -> void:
-	var title := Label.new()
-	title.text = tr("FURNACE_LABEL")
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", int(S * 15))
-	title.add_theme_color_override("font_color", TEXT_BRIGHT)
-	title.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.6))
-	title.add_theme_constant_override("shadow_offset_x", 1)
-	title.add_theme_constant_override("shadow_offset_y", 1)
-	title.position = Vector2(RIGHT_X + PAD, PAD - 4)
-	title.size = Vector2(GRID_W, 30)
-	add_child(title)
+	_title_label = Label.new()
+	_title_label.text = tr("FURNACE_LABEL")
+	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_title_label.add_theme_font_size_override("font_size", int(S * 15))
+	_title_label.add_theme_color_override("font_color", TEXT_BRIGHT)
+	_title_label.add_theme_color_override("font_shadow_color", Color(0.30, 0.15, 0.50, 0.6))
+	_title_label.add_theme_constant_override("shadow_offset_x", 1)
+	_title_label.add_theme_constant_override("shadow_offset_y", 1)
+	_title_label.position = Vector2(RIGHT_X + PAD, PAD - 4)
+	_title_label.size = Vector2(GRID_W, 30)
+	add_child(_title_label)
 
 	var rec_lbl := Label.new()
 	rec_lbl.text = tr("FURNACE_RECIPES")
@@ -418,15 +436,30 @@ func _setup_recipe_bar() -> void:
 	_recipe_list.add_theme_constant_override("separation", 6)
 	scroll.add_child(_recipe_list)
 
+	_rebuild_recipe_cards()
+
+## Build (lại) toàn bộ thẻ công thức từ `_recipes` — dùng chung cho cả
+## chế độ nung lẫn nấu ăn (đổi mode sẽ gọi lại hàm này).
+func _rebuild_recipe_cards() -> void:
+	for card in _recipe_cards:
+		card.queue_free()
+	_recipe_cards.clear()
+	if _empty_label:
+		_empty_label.queue_free()
 	_empty_label = Label.new()
 	_empty_label.text = tr("NO_RECIPES")
 	_empty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_empty_label.add_theme_font_size_override("font_size", int(S * 11))
 	_empty_label.add_theme_color_override("font_color", TEXT_MUTED)
 	_recipe_list.add_child(_empty_label)
-
+	if _recipes.is_empty():
+		_selected_recipe = -1
+		return
+	_empty_label.visible = false
 	for r in _recipes:
 		_recipe_card(r.get("input", ""), r.get("output", ""))
+	_selected_recipe = -1
+	_select_recipe(0)
 
 func _label(pos: Vector2, text: String, color: Color, isize: int = 12) -> void:
 	var lbl := Label.new()
@@ -733,6 +766,10 @@ func _clear_drop_highlights() -> void:
 func open(furnace, player: PlayerCharacter) -> void:
 	_furnace = furnace
 	_player_ref = player
+	var mode: String = "smelt"
+	if furnace != null and furnace.has_method("get_furnace_mode"):
+		mode = furnace.get_furnace_mode()
+	_apply_mode(mode)
 	if _selected_recipe < 0 and not _recipes.is_empty():
 		_select_recipe(0)
 	_play_appear()

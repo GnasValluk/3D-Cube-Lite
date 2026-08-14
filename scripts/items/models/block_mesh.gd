@@ -20,7 +20,9 @@ static func block_cube(p: Node3D, item_id: String) -> void:
 			and block_id != _DATA.BlockID.TWILIGHT_DIRT \
 			and block_id != _DATA.BlockID.DRY_GRASS \
 			and block_id != _DATA.BlockID.SPARSE_GRASS \
-			and block_id != _DATA.BlockID.PALE_SAND:
+			and block_id != _DATA.BlockID.PALE_SAND \
+			and block_id != _DATA.BlockID.SNOW \
+			and block_id != _DATA.BlockID.FROST_DIRT:
 		_build_ore_item(p, block_id)
 	else:
 		var dirt_id: int = _DATA.grass_dirt_id(block_id)

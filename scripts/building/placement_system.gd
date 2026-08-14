@@ -4,9 +4,11 @@ class_name PlacementSystem
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 const _BlockData = preload("res://scripts/world/chunk/chunk_block_data.gd")
 const _FurnaceScript = preload("res://scripts/items/entities/furnace.gd")
+const _CookingStoveScript = preload("res://scripts/items/entities/cooking_stove.gd")
 const _FishingBoat = preload("res://scripts/items/entities/fishing_boat.gd")
 const _Tractor = preload("res://scripts/items/entities/tractor.gd")
 const _RescueHelicopter = preload("res://scripts/items/entities/rescue_helicopter.gd")
+const _ArchitectureTable = preload("res://scripts/items/entities/architecture_table.gd")
 const _EggplantProp = preload("res://scripts/world/props/eggplant_prop.gd")
 const _WatermelonVine = preload("res://scripts/world/props/watermelon_vine_prop.gd")
 const _PumpkinVine = preload("res://scripts/world/props/pumpkin_vine_prop.gd")
@@ -98,6 +100,10 @@ func _make_ghost() -> void:
 		_build_ghost_crafting_table()
 	elif _item_id == "furnace":
 		_build_ghost_furnace()
+	elif _item_id == "cooking_stove":
+		_build_ghost_furnace()
+	elif _is_station_item(_item_id):
+		_build_ghost_crafting_table()
 	elif _is_seed_item(_item_id):
 		_build_ghost_seed()
 	elif _Data.ITEM_TO_BLOCK.has(_item_id):
@@ -109,6 +115,12 @@ const SEED_ITEMS: Array[String] = ["coconut_seed", "taro_seed", "seaweed_seed", 
 
 static func _is_seed_item(item_id: String) -> bool:
 	return item_id in SEED_ITEMS
+
+## Bàn trạm chế tạo chuyên ngành — đặt như Bàn Chế Tạo (entity trong world).
+const STATION_ITEMS: Array[String] = ["tool_table", "mech_table", "farm_table", "chem_table", "magic_table", "kitchen_table", "architecture_table"]
+
+static func _is_station_item(item_id: String) -> bool:
+	return item_id in STATION_ITEMS
 
 func _build_ghost_seed() -> void:
 	var seed_mat := _ghost_mat(Color(0.30, 0.55, 0.20, 0.35), Color(0.15, 0.45, 0.20), 0.3)
@@ -537,6 +549,10 @@ func _make_throw_mesh(item_id: String) -> Node3D:
 		ItemMesh.build(root, item_id)
 	elif item_id == "furnace":
 		ItemMesh.build(root, item_id)
+	elif item_id == "cooking_stove":
+		ItemMesh.build(root, item_id)
+	elif _is_station_item(item_id):
+		ItemMesh.build(root, item_id)
 	elif _Data.ITEM_TO_BLOCK.has(item_id):
 		var pivot := Node3D.new()
 		pivot.scale = Vector3(4.0, 4.0, 4.0)
@@ -666,6 +682,21 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 		furnace_obj.global_position = pos
 		furnace_obj.rotation.y = _placement_rotation
 		SFXManager.play_block_place()
+	elif item_id == "cooking_stove":
+		var stove_obj = _CookingStoveScript.new()
+		stove_obj.name = "CookingStove"
+		parent.add_child(stove_obj)
+		stove_obj.global_position = pos
+		stove_obj.rotation.y = _placement_rotation
+		SFXManager.play_block_place()
+	elif _is_station_item(item_id):
+		var station_obj = _make_station(item_id)
+		if station_obj:
+			station_obj.name = "CraftingStation"
+			parent.add_child(station_obj)
+			station_obj.global_position = pos
+			station_obj.rotation.y = _placement_rotation
+			SFXManager.play_block_place()
 	elif _is_seed_item(item_id):
 		_plant_seed(item_id, pos)
 	elif _Data.ITEM_TO_BLOCK.has(item_id):
@@ -710,6 +741,18 @@ func cancel_placement() -> void:
 	_item_id = ""
 	get_tree().root.set_meta("building_placement_active", false)
 	_remove_ghost()
+
+## Tạo bàn trạm chế tạo theo loại.
+func _make_station(item_id: String) -> CraftingStation:
+	match item_id:
+		"tool_table": return ToolTable.new()
+		"mech_table": return MechTable.new()
+		"farm_table": return FarmTable.new()
+		"chem_table": return ChemTable.new()
+		"magic_table": return MagicTable.new()
+		"kitchen_table": return KitchenTable.new()
+		"architecture_table": return _ArchitectureTable.new()
+	return null
 
 func _find_world_manager() -> Node:
 	var p := get_parent()

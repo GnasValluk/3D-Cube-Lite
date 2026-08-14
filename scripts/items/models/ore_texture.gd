@@ -39,6 +39,8 @@ static func _style(bid: int) -> Dictionary:
 			return { "pattern": Pattern.WOOD,   "base": Color(0.60, 0.47, 0.29), "mineral": Color(0.40, 0.30, 0.17), "emit": 0.02 }
 		_Data.BlockID.HARD_WOOD:
 			return { "pattern": Pattern.WOOD,   "base": Color(0.47, 0.36, 0.20), "mineral": Color(0.29, 0.20, 0.10), "emit": 0.02 }
+		_Data.BlockID.SPRUCE_WOOD:
+			return { "pattern": Pattern.WOOD,   "base": Color(0.38, 0.24, 0.12), "mineral": Color(0.24, 0.14, 0.07), "emit": 0.02 }
 	return { "pattern": Pattern.SPECKLE, "base": Color(0.42, 0.42, 0.46), "mineral": Color(0.70, 0.70, 0.72), "emit": 0.25 }
 
 ## Hash ổn định theo seed — texture giống nhau trên mọi chunk

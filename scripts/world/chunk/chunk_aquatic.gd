@@ -40,9 +40,68 @@ static func add_aquatic_plants(st: SurfaceTool, cx: int, cz: int, size: int,
 		var weed_chance: float = 0.04 if is_river else (0.10 if has_silt else 0.04)
 		if r1 < weed_chance:
 			plant_props.append({ "type": "weed", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
+
+	# ── Đáy biển nông — san hô & cây biển nhiều màu (OCEAN_DEEP) ─────────────
+	if is_ocean and is_deep:
+		_add_ocean_sea_plants(plant_props, wx, wz, pos, water_gap, r1, r2, r3, r4, h1, h2, size)
+		# Rong biển cao (Minecraft kelp) — vùng nước sâu hơn
+		add_ocean_kelp_tall(plant_props, wx, wz, pos, water_gap, r1, r2 * 0.7 + 0.15, r3, r4, h1, h2)
+
 	if is_shore and not is_desert and not is_ocean and (biome == _Data.TileType.SAND or biome == _Data.TileType.MUDDY_SAND or biome == _Data.TileType.SILT or biome == _Data.TileType.DIRT):
 		if r1 < 0.03:
 			plant_props.append({ "type": "taro", "pos": pos, "seed_h1": seed_h1, "seed_h2": seed_h2, "has_silt": has_silt, "water_gap": water_gap })
+
+
+## ── Cây biển đáy đại dương — nhiều loài, màu rực rỡ ──────────────────────────
+static func _add_ocean_sea_plants(plant_props: Array[Dictionary], wx: int, wz: int,
+		pos: Vector3, water_gap: float, r1: float, r2: float, r3: float, r4: float,
+		h1: int, h2: int, size: int) -> void:
+	# Mọc ở biển nông vừa phải (đáy cách mặt nước 1.5-6 khối) — đủ nước che
+	# nhưng người chơi còn nhìn/đi tới được. Xa bờ (đáy sâu) không mọc.
+	if water_gap < 1.5 or water_gap > 6.0:
+		return
+	# Thưa: chỉ ~1 cây biển mỗi 22×22 ô thế giới
+	if r1 >= 0.035:
+		return
+	# Tránh quá dày: thêm gate ô để loài không tụ thành cụm
+	var cell := wx / 16
+	var cz2 := wz / 16
+	var ch: int = cell * 631152931 + cz2 * 493781731 + 998877
+	ch = (ch ^ (ch >> 13)) * 1274126177; ch = ch ^ (ch >> 16)
+	var cr := float(ch & 0x7FFFFFFF) / 2147483648.0
+	if cr >= 0.40:
+		return
+	# Chọn loài theo hash thế giới — đẹp, đa dạng, ổn định giữa các chunk
+	var roll: float = r2 + r3 * 0.5
+	var ptype: String
+	if   roll < 0.15: ptype = "coral"
+	elif roll < 0.23: ptype = "brain_coral"
+	elif roll < 0.31: ptype = "sponge"
+	elif roll < 0.43: ptype = "kelp"
+	elif roll < 0.53: ptype = "sea_fan"
+	elif roll < 0.61: ptype = "anemone"
+	elif roll < 0.74: ptype = "sea_bush"
+	elif roll < 0.88: ptype = "grass_carpet"
+	else:             ptype = "seaweed"
+	plant_props.append({ "type": ptype, "pos": pos, "seed_h1": h1, "seed_h2": h2, "water_gap": water_gap })
+
+## ── Rong biển cao (Minecraft kelp) — vùng nước sâu hơn, mọc vươn tới mặt nước ──
+## Gọi riêng cho đáy OCEAN_DEEP với water_gap lớn (6-20). Cao tỉ lệ độ sâu.
+static func add_ocean_kelp_tall(plant_props: Array[Dictionary], wx: int, wz: int,
+		pos: Vector3, water_gap: float, r1: float, r2: float, r3: float, r4: float,
+		h1: int, h2: int) -> void:
+	if water_gap < 6.0 or water_gap > 22.0:
+		return
+	if r1 >= 0.05:
+		return
+	var cell := wx / 20
+	var cz2 := wz / 20
+	var ch: int = cell * 901234567 + cz2 * 345678901 + 667788
+	ch = (ch ^ (ch >> 13)) * 1274126177; ch = ch ^ (ch >> 16)
+	var cr := float(ch & 0x7FFFFFFF) / 2147483648.0
+	if cr >= 0.45:
+		return
+	plant_props.append({ "type": "kelp_tall", "pos": pos, "seed_h1": h1, "seed_h2": h2, "water_gap": water_gap })
 
 
 # ── Rong nước ngọt nhiệt đới (rong đuôi chó voxel) ──────────────────────────

@@ -246,6 +246,17 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_mangrove_terr.fractal_lacunarity = 2.0
 	n_mangrove_terr.fractal_gain = 0.5
 
+	## n_frost: MASK bio băng giá — cụm lạnh cấp lục địa (ngang desert), ngưỡng
+	## quyết định băng/tuyết + đóng băng nước nằm ở world_chunk / fill_blocks.
+	var n_frost := FastNoiseLite.new()
+	n_frost.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_frost.seed = base_seed + 88011
+	n_frost.frequency = 0.0003
+	n_frost.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_frost.fractal_octaves = 3
+	n_frost.fractal_lacunarity = 2.0
+	n_frost.fractal_gain = 0.5
+
 	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
 		"lake_type": n_lake_type, "ocean": n_ocean,
 		"sea_rough": n_sea_rough, "sea_large": n_sea_large, "sea_biome": n_sea_biome,
@@ -257,19 +268,24 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 		"patch_stone": n_patch_stone, "patch_dirt": n_patch_dirt,
 		"basin": n_basin, "mountain": n_mountain,
 		"mangrove": n_mangrove, "mangrove_inner": n_mangrove_inner,
-		"mangrove_terr": n_mangrove_terr }
+		"mangrove_terr": n_mangrove_terr, "frost": n_frost }
 	_noise_cache[dim_id] = result
 	return result
 
 static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 	var nd: Dictionary = _noise_for_dim(dim_id)
 
-	# REAL_WORLD: chỉ desert noise quyết định — phần còn lại luôn GRASS_DIRT.
+	# REAL_WORLD: chỉ desert/frost noise quyết định — phần còn lại luôn GRASS_DIRT.
 	# Bỏ warp×2 + biome noise (3/4 số noise call) vốn không ảnh hưởng kết quả.
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5
 		if d > 0.55:
 			return _Data.TileType.DESERT
+		# Bio băng giá — không lấn vào khu vực spawn (giữ đồng cỏ khô ráo cho
+		# người chơi mới), vùng còn lại theo mask lạnh cấp lục địa.
+		var fx: float = (nd["frost"].get_noise_2d(wx, wz) + 1.0) * 0.5
+		if wx * wx + wz * wz > 800000.0 and fx > 0.55:
+			return _Data.TileType.FROST
 		return _Data.TileType.GRASS_DIRT
 
 	var n_bio: FastNoiseLite = nd["biome"]

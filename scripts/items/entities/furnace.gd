@@ -10,6 +10,11 @@ func _init() -> void:
 	max_hp = 100
 	drop_item_id = "furnace"
 
+## Phân biệt chế độ lò (nung quặng) — CookingStove ghi đè để bếp nấu dùng
+## FurnaceUI ở chế độ cooking.
+func get_furnace_mode() -> String:
+	return "smelt"
+
 func _ready() -> void:
 	super._ready()
 	_setup_mesh()

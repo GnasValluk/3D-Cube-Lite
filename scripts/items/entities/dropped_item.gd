@@ -46,7 +46,7 @@ func _setup_mesh():
 	root.position.y = 0.15
 
 	var item_id := item_def.id
-	if item_id in ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd"]:
+	if item_id in ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight"]:
 		var scale_node := Node3D.new()
 		scale_node.scale = Vector3(1.8, 1.8, 1.8)
 		root.add_child(scale_node)
@@ -59,7 +59,7 @@ func _setup_mesh():
 		PlantProp.build_drop_mesh(root, "weed")
 	elif item_id == "seagrass":
 		PlantProp.build_drop_mesh(root, "seagrass")
-	elif item_id in ["chest", "twilight_gate", "crafting_table", "furnace"]:
+	elif item_id in ["chest", "twilight_gate", "crafting_table", "furnace", "cooking_stove", "tool_table", "mech_table", "farm_table", "chem_table", "magic_table", "kitchen_table"]:
 		ItemMesh.build(root, item_id)
 	else:
 		var item_scale: float = 1.5

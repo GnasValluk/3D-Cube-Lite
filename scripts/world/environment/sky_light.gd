@@ -171,5 +171,7 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	mat.set_shader_parameter("night_factor", night_factor)
 	mat.set_shader_parameter("weather", weather)
 	# Độ phủ mây: trời quang ~35%, mưa nhẹ ~60%, mưa to ~95%.
-	mat.set_shader_parameter("cloud_cover", lerp(0.35, 0.95, weather))
+	# Mưa/tuyết → KHÔNG có mây (bầu trời quang đãng để thấy hạt rơi rõ hơn).
+	# Trời quang: mây puffy ~35%; khi mưa/tuyết: 0%.
+	mat.set_shader_parameter("cloud_cover", lerp(0.35, 0.0, weather))
 	mat.set_shader_parameter("star_time", Time.get_ticks_msec() / 1000.0)

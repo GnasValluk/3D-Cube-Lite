@@ -26,7 +26,8 @@ const _OreTex = preload("res://scripts/items/models/ore_texture.gd")
 const _MangroveProp = preload("res://scripts/world/props/mangrove_prop.gd")
 const _CattailProp = preload("res://scripts/world/props/cattail_prop.gd")
 const _MudCrabProp = preload("res://scripts/world/props/mud_crab_prop.gd")
-const _FireflyProp = preload("res://scripts/world/props/firefly_prop.gd")
+const _FrostTreeProp = preload("res://scripts/world/props/frost_tree_prop.gd")
+const _SeaPlantProp = preload("res://scripts/world/props/sea_plant_prop.gd")
 
 static func _is_water_bid(bid: int) -> bool:
 	return bid == _Data.BlockID.WATER \
@@ -195,9 +196,9 @@ static func _prop_cost(ptype: String) -> int:
 		"palm": return 3
 		"orange_tree": return 3
 		"mangrove": return 3
+		"spruce": return 4
 		"pumpkin", "watermelon", "eggplant": return 1
 		"mud_crab": return 2
-		"firefly": return 1
 		_: return 1
 
 ## ── Profiler section timing (benchmark test bật; mặc định tắt) ─────────────
@@ -472,6 +473,29 @@ static func find_mangrove(wx: float, wz: float, max_radius: float = 25000.0) -> 
 			var sx: float = origin.x + cos(angle) * r
 			var sz: float = origin.y + sin(angle) * r
 			if _mangrove_strength_at(nd, sx, sz) >= 0.60:
+				return { "ok": true, "x": sx, "z": sz }
+		r += STEP
+	return { "ok": false }
+
+## Tìm điểm thuộc bio băng giá (FROST) gần nhất theo vòng xoắn quanh (wx,wz).
+## Dùng đúng nguồn sự thật `biome_at` (spawn-bias r²>800000, fx>0.55) để tele.
+static func find_frost(wx: float, wz: float, max_radius: float = 25000.0) -> Dictionary:
+	const DIM: int = _Data._Dim.DimensionID.REAL_WORLD
+	var nd: Dictionary = _noise_for_dim(DIM)
+	if nd.is_empty():
+		return { "ok": false }
+	var origin := Vector2(wx, wz)
+	const STEP: float = 150.0
+	var r: float = STEP
+	while r <= max_radius:
+		var samples: int = max(10, int(r / STEP * TAU))
+		for i in range(samples):
+			var angle: float = float(i) / float(samples) * TAU
+			var sx: float = origin.x + cos(angle) * r
+			var sz: float = origin.y + sin(angle) * r
+			if _ocean_mask_at(nd, sx, sz):
+				continue
+			if biome_at(sx, sz, DIM) == _Data.TileType.FROST:
 				return { "ok": true, "x": sx, "z": sz }
 		r += STEP
 	return { "ok": false }
@@ -914,6 +938,28 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 								biome_grid[ivx][ivz] = _Data.TileType.PALE_SAND
 							else:
 								biome_grid[ivx][ivz] = _Data.TileType.DESERT
+					elif base_bio == _Data.TileType.FROST:
+						# ── BĂNG GIÁ: vùng tuyết lạnh ─────────────────────────
+						# Địa hình dùng CHUNG (đồi thoải) như mọi biome đất liền.
+						# Sơn bề mặt: FROST (tuyết nền), FROST_SNOW (đốm tuyết dày
+						# theo patch2). Hồ nội địa vẫn là nước thường (SILT/MUDDY_SAND)
+						# carve xuống mực nước như hồ đồng cỏ — nước KHÔNG đóng băng.
+						var is_frost_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
+						var lake_f: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+						if not is_frost_ocean and lake_f > 0.68 \
+								and (od == _Data.CONST_INF or od > 40):
+							var lake_type_f: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
+							if lake_type_f > 0.50:
+								biome_grid[ivx][ivz] = _Data.TileType.SILT
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+							height_grid[ivx][ivz] = _Data.WATER_Y - (1.0 + (lake_f - 0.68) * 8.0)
+						else:
+							var p2_f: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							if p2_f > 0.78:
+								biome_grid[ivx][ivz] = _Data.TileType.FROST_SNOW
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.FROST
 					else:
 						# ── ĐỒNG BẰNG CỎ: block phân theo HÌNH THẾ địa hình ──
 						#   - Sát bãi biển (cách bờ ≤6) → cỏ ven biển (100% GRASS)
@@ -1282,7 +1328,9 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 			if not fast_mode and not is_road and h >= _Data.VOXEL * 0.9 \
 					and (near_water or hill_foot) \
 					and not (height_grid[vx][vz] <= _Data.WATER_Y) \
-					and biome_grid[vx][vz] != _Data.TileType.DESERT:
+					and biome_grid[vx][vz] != _Data.TileType.DESERT \
+					and biome_grid[vx][vz] != _Data.TileType.FROST \
+					and biome_grid[vx][vz] != _Data.TileType.FROST_SNOW:
 				_Grass.add_voxel_grass(vx, vz, pos, grass_xforms, grass_colors, cols, wdist, hdist)
 
 	# ── 6d. Quán rượu — bên mép đường tại ngã 3 / ngã tư (không trên đường) ──
@@ -1532,10 +1580,27 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				if h > _Data.WATER_Y + 0.1 and _cell_hash01(vx + 1817, vz + 331) < 0.010:
 					var y3 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "mud_crab", "pos": Vector3(mx, y3, mz), "variant": "mud"})
-				# Đom đóm — rải rác trên bãi bùn, hiện sáng về đêm
-				if _cell_hash01(vx + 295, vz + 755) < 0.008:
-					var y4 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625) + 0.4
-					plant_props.append({"type": "firefly", "pos": Vector3(mx, y4, mz), "variant": "mangrove"})
+
+	# ── 8k. Cây vân sam (thông tuyết) — bio băng giá, xa nước ≥2 ────────────
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var fr_bio: int = biome_grid[vx][vz]
+				if fr_bio != _Data.TileType.FROST and fr_bio != _Data.TileType.FROST_SNOW:
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if wdist[vx * cols + vz] <= 2:
+					continue
+				var chance: float = 0.0065 if fr_bio == _Data.TileType.FROST_SNOW else 0.0035
+				if randf() < chance:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					if _is_on_road(world_ox + px, world_oz + pz):
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "spruce", "pos": Vector3(px, y, pz), "variant": "snow"})
 
 	_prof("S12 plant_props")
 
@@ -2652,10 +2717,26 @@ func _process(delta: float) -> void:
 			prop.position = pd["pos"]
 			prop.setup()
 			add_child(prop)
-		elif ptype == "firefly":
-			var prop := _FireflyProp.new()
+		elif ptype == "spruce":
+			var prop := _FrostTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "spruce_wood")
 			prop.position = pd["pos"]
-			prop.setup()
+			prop.setup(pd.get("variant", "snow"))
+			add_child(prop)
+		elif ptype == "kelp_tall":
+			var prop := _SeaPlantProp.new(45, DestroyableProp.WeaponReq.SWORD, ptype)
+			prop.position = pd["pos"]
+			prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0), float(pd.get("water_gap", 6.0)))
+			add_child(prop)
+		elif ptype == "sea_bush" or ptype == "grass_carpet" or ptype == "seaweed":
+			var prop := _SeaPlantProp.new(60, DestroyableProp.WeaponReq.SWORD, ptype)
+			prop.position = pd["pos"]
+			prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0))
+			add_child(prop)
+		elif ptype == "coral" or ptype == "brain_coral" or ptype == "sponge" \
+				or ptype == "kelp" or ptype == "sea_fan" or ptype == "anemone":
+			var prop := _SeaPlantProp.new(45, DestroyableProp.WeaponReq.SWORD, ptype)
+			prop.position = pd["pos"]
+			prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0))
 			add_child(prop)
 		else:
 			var drop_id: String = "tropical_seaweed" if ptype == "weed" \
@@ -3139,9 +3220,9 @@ static func _build_aquatic_shader() -> ShaderMaterial:
 shader_type spatial;
 render_mode blend_mix, cull_disabled, unshaded;
 uniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-uniform float sway_speed  : hint_range(0.1, 5.0) = 2.2;
-uniform float sway_amount : hint_range(0.0, 0.5) = 0.06;
-uniform float sway_freq   : hint_range(0.1, 8.0) = 2.8;
+uniform float sway_speed  : hint_range(0.1, 5.0) = 1.1;
+uniform float sway_amount : hint_range(0.0, 0.5) = 0.035;
+uniform float sway_freq   : hint_range(0.1, 8.0) = 1.9;
 void vertex() {
 	float is_flat = step(0.85, abs(NORMAL.y));
 	float height_factor = max(0.0, VERTEX.y + 0.5) * 0.7;

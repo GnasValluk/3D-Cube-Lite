@@ -127,6 +127,462 @@ static func crafting_table(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, _cs(-0.30, SC), dry + _cs(0.02, SC), td * 0.5 - _cs(0.02, SC), _cs(0.14, SC), _cs(0.02, SC), _cs(0.02, SC), Color(0.25, 0.18, 0.10))
 
 
+# ── TOOL TABLE ──────────────────────────────────────────────────────────────
+static func tool_table(p: Node3D) -> void:
+	const SC: float = 2.78
+
+	var wood       := Color(0.46, 0.28, 0.13)
+	var wood_dark  := Color(0.36, 0.20, 0.09)
+	var wood_light := Color(0.55, 0.36, 0.17)
+	var steel      := Color(0.30, 0.30, 0.35)
+	var steel_hi   := Color(0.50, 0.51, 0.57)
+	var handle     := Color(0.52, 0.36, 0.18)
+
+	var tw := 5.0; var td := 2.36; var th := _cs(0.05, SC)
+	var ty := _cs(0.65, SC)
+
+	ItemMeshShared.add_cube(p, 0, ty - th * 0.5, 0, tw, th, td, wood)
+
+	var lt := _cs(0.05, SC); var lh := ty - th
+	for xv in [-tw * 0.5 + lt * 0.6, tw * 0.5 - lt * 0.6]:
+		for zv in [-td * 0.5 + lt * 0.6, td * 0.5 - lt * 0.6]:
+			ItemMeshShared.add_cube(p, xv, lh * 0.5, zv, lt * 0.7, lh, lt * 0.7, wood_dark)
+
+	ItemMeshShared.add_cube(p, 0, _cs(0.15, SC), -td * 0.5 + lt * 0.6, tw - _cs(0.24, SC), _cs(0.03, SC), _cs(0.04, SC), wood_dark)
+	ItemMeshShared.add_cube(p, 0, _cs(0.15, SC), td * 0.5 - lt * 0.6, tw - _cs(0.24, SC), _cs(0.03, SC), _cs(0.04, SC), wood_dark)
+
+	# Đe mini
+	var ax := _cs(0.72, SC); var az := _cs(-0.12, SC)
+	ItemMeshShared.add_cube(p, ax, ty + _cs(0.07, SC), az, _cs(0.14, SC), _cs(0.05, SC), _cs(0.10, SC), steel)
+	ItemMeshShared.add_cube(p, ax, ty + _cs(0.14, SC), az, _cs(0.09, SC), _cs(0.04, SC), _cs(0.07, SC), steel_hi)
+	ItemMeshShared.add_cube(p, ax, ty + _cs(0.06, SC), az, _cs(0.12, SC), _cs(0.02, SC), _cs(0.08, SC), steel_hi)
+
+	# Búa + cưa trên mặt
+	ItemMeshShared.add_cube(p, _cs(-0.58, SC), ty + _cs(0.02, SC), _cs(0.10, SC), _cs(0.12, SC), _cs(0.04, SC), _cs(0.04, SC), steel_hi)
+	ItemMeshShared.add_cube(p, _cs(-0.58, SC), ty + _cs(0.045, SC), _cs(0.10, SC), _cs(0.04, SC), _cs(0.03, SC), _cs(0.03, SC), handle)
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), ty + _cs(0.02, SC), _cs(0.10, SC), _cs(0.04, SC), _cs(0.05, SC), _cs(0.03, SC), steel)
+
+	# Kẹp chữ C
+	var cx := _cs(0.10, SC); var cz := _cs(-0.30, SC)
+	ItemMeshShared.add_cube(p, cx, ty + _cs(0.03, SC), cz, _cs(0.08, SC), _cs(0.04, SC), _cs(0.04, SC), steel)
+	ItemMeshShared.add_cube(p, cx, ty + _cs(0.07, SC), cz, _cs(0.08, SC), _cs(0.03, SC), _cs(0.04, SC), steel_hi)
+
+	# Kệ treo dụng cụ
+	for s in [-1, 1]:
+		var sx: float = s * _cs(0.45, SC)
+		ItemMeshShared.add_cube(p, sx, ty + _cs(0.06, SC), _cs(-0.30, SC), _cs(0.26, SC), _cs(0.02, SC), _cs(0.03, SC), wood_dark)
+		ItemMeshShared.add_cube(p, sx - _cs(0.08, SC), ty + _cs(0.10, SC), _cs(-0.30, SC), _cs(0.02, SC), _cs(0.07, SC), _cs(0.02, SC), steel)
+		ItemMeshShared.add_cube(p, sx - _cs(0.08, SC), ty + _cs(0.14, SC), _cs(-0.30, SC), _cs(0.07, SC), _cs(0.03, SC), _cs(0.02, SC), steel_hi)
+		ItemMeshShared.add_cube(p, sx + _cs(0.08, SC), ty + _cs(0.13, SC), _cs(-0.30, SC), _cs(0.02, SC), _cs(0.08, SC), _cs(0.02, SC), steel)
+
+	# Ván lót mặt bàn
+	ItemMeshShared.add_cube(p, 0, ty + _cs(0.005, SC), 0, tw - _cs(0.4, SC), _cs(0.008, SC), td - _cs(0.1, SC), wood_light)
+
+	# Va li dụng cụ
+	var ub_y := ty - th - _cs(0.06, SC)
+	ItemMeshShared.add_cube(p, _cs(-0.45, SC), ub_y, _cs(0.10, SC), _cs(0.30, SC), _cs(0.06, SC), _cs(0.20, SC), wood_dark)
+	ItemMeshShared.add_cube(p, _cs(-0.45, SC), ub_y + _cs(0.03, SC), _cs(0.10, SC), _cs(0.31, SC), _cs(0.02, SC), _cs(0.21, SC), steel_hi)
+
+
+# ── MECH TABLE ──────────────────────────────────────────────────────────────
+static func mech_table(p: Node3D) -> void:
+	const SC: float = 2.78
+
+	var steel      := Color(0.32, 0.34, 0.40)
+	var steel_hi   := Color(0.55, 0.56, 0.62)
+	var steel_dark := Color(0.20, 0.21, 0.26)
+	var copper     := Color(0.72, 0.45, 0.20)
+	var rust       := Color(0.40, 0.30, 0.22)
+
+	var tw := 5.0; var td := 2.36; var th := _cs(0.06, SC)
+	var ty := _cs(0.70, SC)
+
+	ItemMeshShared.add_cube(p, 0, ty - th * 0.5, 0, tw, th, td, steel_dark)
+	ItemMeshShared.add_cube(p, 0, ty + _cs(0.005, SC), 0, tw - _cs(0.2, SC), _cs(0.012, SC), td - _cs(0.2, SC), steel)
+
+	var lt := _cs(0.07, SC); var lh := ty - th
+	for xv in [-tw * 0.5 + lt * 0.6, tw * 0.5 - lt * 0.6]:
+		for zv in [-td * 0.5 + lt * 0.6, td * 0.5 - lt * 0.6]:
+			ItemMeshShared.add_cube(p, xv, lh * 0.5, zv, lt, lh, lt, steel_dark)
+
+	ItemMeshShared.add_cube(p, 0, _cs(0.22, SC), -td * 0.5 + lt * 0.6, tw - _cs(0.3, SC), _cs(0.02, SC), lt * 0.8, steel_dark)
+	ItemMeshShared.add_cube(p, 0, _cs(0.22, SC), td * 0.5 - lt * 0.6, tw - _cs(0.3, SC), _cs(0.02, SC), lt * 0.8, steel_dark)
+
+	# Bánh răng lớn
+	var gx := _cs(-0.62, SC); var gz := _cs(0.10, SC)
+	ItemMeshShared.add_cube(p, gx, ty + _cs(0.06, SC), gz, _cs(0.20, SC), _cs(0.05, SC), _cs(0.07, SC), steel_hi)
+	ItemMeshShared.add_cube(p, gx, ty + _cs(0.06, SC), gz, _cs(0.30, SC), _cs(0.05, SC), _cs(0.05, SC), steel_dark)
+	ItemMeshShared.add_cube(p, gx + _cs(0.10, SC), ty + _cs(0.06, SC), gz, _cs(0.07, SC), _cs(0.06, SC), _cs(0.07, SC), copper)
+
+	# Pít-tông
+	var px := _cs(-0.30, SC); var pz := _cs(0.20, SC)
+	ItemMeshShared.add_cube(p, px, ty + _cs(0.02, SC), pz, _cs(0.09, SC), _cs(0.10, SC), _cs(0.07, SC), steel)
+	ItemMeshShared.add_cube(p, px, ty + _cs(0.11, SC), pz, _cs(0.05, SC), _cs(0.16, SC), _cs(0.05, SC), steel_hi)
+	ItemMeshShared.add_cube(p, px, ty + _cs(0.19, SC), pz, _cs(0.06, SC), _cs(0.03, SC), _cs(0.06, SC), copper)
+
+	# Động cơ nhỏ
+	var ex := _cs(0.62, SC); var ez := _cs(0.10, SC)
+	ItemMeshShared.add_cube(p, ex, ty + _cs(0.02, SC), ez, _cs(0.20, SC), _cs(0.12, SC), _cs(0.14, SC), steel_dark)
+	ItemMeshShared.add_cube(p, ex, ty + _cs(0.10, SC), ez, _cs(0.12, SC), _cs(0.04, SC), _cs(0.04, SC), copper)
+	ItemMeshShared.add_cube(p, ex - _cs(0.04, SC), ty + _cs(0.09, SC), ez, _cs(0.06, SC), _cs(0.03, SC), _cs(0.05, SC), copper)
+
+	# Cờ lê + mỏ lết
+	ItemMeshShared.add_cube(p, _cs(0.12, SC), ty + _cs(0.04, SC), _cs(-0.16, SC), _cs(0.02, SC), _cs(0.05, SC), _cs(0.04, SC), steel_hi)
+	var ridx: float = _cs(0.14, SC)
+	for xv in [ridx]:
+		ItemMeshShared.add_cube(p, xv - _cs(0.03, SC), ty + _cs(0.05, SC), _cs(-0.16, SC), _cs(0.06, SC), _cs(0.02, SC), _cs(0.04, SC), steel)
+
+	# Van ống
+	ItemMeshShared.add_cube(p, _cs(0.35, SC), ty + _cs(0.03, SC), _cs(0.18, SC), _cs(0.07, SC), _cs(0.05, SC), _cs(0.07, SC), copper)
+	ItemMeshShared.add_cube(p, _cs(0.35, SC), ty + _cs(0.08, SC), _cs(0.18, SC), _cs(0.04, SC), _cs(0.02, SC), _cs(0.04, SC), steel_hi)
+
+	# Dầu mỡ loang
+	ItemMeshShared.add_cube(p, _cs(0.30, SC), ty + _cs(0.004, SC), _cs(-0.28, SC), _cs(0.08, SC), _cs(0.012, SC), _cs(0.06, SC), rust)
+
+	# Hộp đồ nghề
+	var ub_y := ty - th - _cs(0.06, SC)
+	ItemMeshShared.add_cube(p, _cs(-0.45, SC), ub_y, _cs(0.10, SC), _cs(0.32, SC), _cs(0.08, SC), _cs(0.22, SC), steel_dark)
+	ItemMeshShared.add_cube(p, _cs(-0.45, SC), ub_y + _cs(0.05, SC), _cs(0.10, SC), _cs(0.33, SC), _cs(0.02, SC), _cs(0.23, SC), steel_hi)
+
+
+# ── FARM TABLE ──────────────────────────────────────────────────────────────
+static func farm_table(p: Node3D) -> void:
+	const SC: float = 2.78
+
+	var wood       := Color(0.52, 0.34, 0.16)
+	var wood_dark  := Color(0.40, 0.24, 0.11)
+	var soil       := Color(0.30, 0.22, 0.14)
+	var soil_wet   := Color(0.20, 0.15, 0.10)
+	var leaf       := Color(0.16, 0.45, 0.18)
+	var leaf_dark  := Color(0.10, 0.32, 0.14)
+	var can        := Color(0.38, 0.32, 0.26)
+	var can_hi     := Color(0.62, 0.55, 0.45)
+	var metal      := Color(0.28, 0.28, 0.32)
+	var sack       := Color(0.55, 0.46, 0.32)
+
+	var tw := 5.0; var td := 2.36; var th := _cs(0.05, SC)
+	var ty := _cs(0.62, SC)
+
+	ItemMeshShared.add_cube(p, 0, ty - th * 0.5, 0, tw, th, td, wood)
+
+	var lt := _cs(0.05, SC); var lh := ty - th
+	for xv in [-tw * 0.5 + lt * 0.6, tw * 0.5 - lt * 0.6]:
+		for zv in [-td * 0.5 + lt * 0.6, td * 0.5 - lt * 0.6]:
+			ItemMeshShared.add_cube(p, xv, lh * 0.5, zv, lt * 0.7, lh, lt * 0.7, wood_dark)
+
+	# Khay ươm cây
+	var tx := _cs(-0.60, SC)
+	ItemMeshShared.add_cube(p, tx, ty + _cs(0.015, SC), 0, _cs(0.42, SC), _cs(0.03, SC), _cs(0.26, SC), wood_dark)
+	ItemMeshShared.add_cube(p, tx, ty + _cs(0.03, SC), 0, _cs(0.40, SC), _cs(0.02, SC), _cs(0.24, SC), soil)
+	for i in range(3):
+		var px := tx
+		for j in range(2):
+			var pz := _cs(-0.06, SC) + j * _cs(0.12, SC)
+			ItemMeshShared.add_cube(p, px, ty + _cs(0.055, SC), pz, _cs(0.08, SC), _cs(0.05, SC), _cs(0.08, SC), soil)
+			ItemMeshShared.add_cube(p, px, ty + _cs(0.10, SC), pz, _cs(0.045, SC), _cs(0.05, SC), _cs(0.045, SC), leaf_dark)
+			ItemMeshShared.add_cube(p, px, ty + _cs(0.13, SC), pz, _cs(0.05, SC), _cs(0.025, SC), _cs(0.035, SC), leaf)
+
+	# Bình tưới
+	var cax := _cs(-0.05, SC); var caz := _cs(-0.16, SC)
+	ItemMeshShared.add_cube(p, cax, ty + _cs(0.02, SC), caz, _cs(0.20, SC), _cs(0.12, SC), _cs(0.13, SC), can)
+	ItemMeshShared.add_cube(p, cax, ty + _cs(0.02, SC), caz, _cs(0.18, SC), _cs(0.04, SC), _cs(0.10, SC), soil_wet)
+	ItemMeshShared.add_cube(p, cax + _cs(0.11, SC), ty + _cs(0.06, SC), caz, _cs(0.02, SC), _cs(0.20, SC), _cs(0.02, SC), can_hi)
+
+	# Cuốc + xẻng
+	var hx := _cs(0.28, SC); var hz := _cs(0.24, SC)
+	ItemMeshShared.add_cube(p, hx, ty + _cs(0.02, SC), hz, _cs(0.02, SC), _cs(0.26, SC), _cs(0.02, SC), wood)
+	ItemMeshShared.add_cube(p, hx + _cs(0.08, SC), ty + _cs(0.02, SC), hz, _cs(0.16, SC), _cs(0.05, SC), _cs(0.03, SC), metal)
+	ItemMeshShared.add_cube(p, hx, ty + _cs(0.12, SC), hz, _cs(0.02, SC), _cs(0.06, SC), _cs(0.10, SC), wood)
+
+	# Bao hạt giống
+	var bbx := _cs(-0.10, SC); var bbz := _cs(0.22, SC)
+	ItemMeshShared.add_cube(p, bbx, ty + _cs(0.005, SC), bbz, _cs(0.16, SC), _cs(0.18, SC), _cs(0.12, SC), sack)
+	ItemMeshShared.add_cube(p, bbx, ty + _cs(0.095, SC), bbz, _cs(0.16, SC), _cs(0.04, SC), _cs(0.12, SC), soil_wet)
+
+	# Rổ rau
+	var rb_x := _cs(0.55, SC); var rb_z := _cs(-0.14, SC)
+	ItemMeshShared.add_cube(p, rb_x, ty + _cs(0.005, SC), rb_z, _cs(0.20, SC), _cs(0.08, SC), _cs(0.14, SC), wood)
+	ItemMeshShared.add_cube(p, rb_x, ty + _cs(0.045, SC), rb_z, _cs(0.04, SC), _cs(0.05, SC), _cs(0.03, SC), leaf)
+	ItemMeshShared.add_cube(p, rb_x + _cs(0.05, SC), ty + _cs(0.05, SC), rb_z, _cs(0.04, SC), _cs(0.06, SC), _cs(0.03, SC), leaf_dark)
+
+	# Chậu đất trồng
+	var pzx := _cs(-0.28, SC); var pzz := _cs(0.18, SC)
+	ItemMeshShared.add_cube(p, pzx, ty + _cs(0.005, SC), pzz, _cs(0.10, SC), _cs(0.09, SC), _cs(0.10, SC), wood_dark)
+	ItemMeshShared.add_cube(p, pzx, ty + _cs(0.05, SC), pzz, _cs(0.08, SC), _cs(0.03, SC), _cs(0.08, SC), soil)
+	ItemMeshShared.add_cube(p, pzx, ty + _cs(0.14, SC), pzz, _cs(0.045, SC), _cs(0.02, SC), _cs(0.045, SC), leaf)
+
+
+# ── CHEM TABLE ──────────────────────────────────────────────────────────────
+static func chem_table(p: Node3D) -> void:
+	const SC: float = 2.78
+
+	var wood      := Color(0.50, 0.44, 0.38)
+	var wood_dark := Color(0.38, 0.31, 0.26)
+	var metal     := Color(0.42, 0.42, 0.48)
+	var metal_hi  := Color(0.60, 0.60, 0.66)
+	var glass     := Color(0.75, 0.82, 0.90)
+	var glass_c   := Color(0.70, 0.85, 0.95)
+	var liquid_r  := Color(0.55, 0.35, 0.36)
+	var liquid_b  := Color(0.30, 0.36, 0.55)
+	var liquid_g  := Color(0.28, 0.50, 0.36)
+	var liquid_y  := Color(0.55, 0.50, 0.32)
+
+	var tw := 5.0; var td := 2.36; var th := _cs(0.05, SC)
+	var ty := _cs(0.66, SC)
+
+	ItemMeshShared.add_cube(p, 0, ty - th * 0.5, 0, tw, th, td, wood)
+
+	var lt := _cs(0.05, SC); var lh := ty - th
+	for xv in [-tw * 0.5 + lt * 0.6, tw * 0.5 - lt * 0.6]:
+		for zv in [-td * 0.5 + lt * 0.6, td * 0.5 - lt * 0.6]:
+			ItemMeshShared.add_cube(p, xv, lh * 0.5, zv, lt * 0.7, lh, lt * 0.7, wood_dark)
+
+	ItemMeshShared.add_cube(p, 0, _cs(0.18, SC), -td * 0.5 + lt * 0.6, tw - _cs(0.3, SC), _cs(0.025, SC), _cs(0.04, SC), wood_dark)
+	ItemMeshShared.add_cube(p, 0, _cs(0.18, SC), td * 0.5 - lt * 0.6, tw - _cs(0.3, SC), _cs(0.025, SC), _cs(0.04, SC), wood_dark)
+
+	# Giá ống nghiệm
+	var rx := _cs(-0.58, SC)
+	ItemMeshShared.add_cube(p, rx, ty + _cs(0.015, SC), _cs(-0.18, SC), _cs(0.26, SC), _cs(0.015, SC), _cs(0.05, SC), metal)
+	ItemMeshShared.add_cube(p, rx, ty + _cs(0.06, SC), _cs(-0.18, SC), _cs(0.26, SC), _cs(0.015, SC), _cs(0.05, SC), metal)
+	var tubes := [liquid_r, liquid_b, liquid_g, liquid_y, liquid_b]
+	for i in range(5):
+		var cx := rx - _cs(0.10, SC) + i * _cs(0.05, SC)
+		ItemMeshShared.add_cube(p, cx, ty + _cs(0.04, SC), _cs(-0.18, SC), _cs(0.026, SC), _cs(0.07, SC), _cs(0.026, SC), glass)
+		ItemMeshShared.add_cube(p, cx, ty + _cs(0.005, SC), _cs(-0.18, SC), _cs(0.022, SC), _cs(0.03, SC), _cs(0.022, SC), tubes[i])
+
+	# Bình cầu
+	var fx := _cs(-0.18, SC); var fz := _cs(-0.20, SC)
+	ItemMeshShared.add_cube(p, fx, ty + _cs(0.02, SC), fz, _cs(0.16, SC), _cs(0.12, SC), _cs(0.16, SC), glass)
+	ItemMeshShared.add_cube(p, fx, ty + _cs(0.005, SC), fz, _cs(0.14, SC), _cs(0.06, SC), _cs(0.14, SC), liquid_b)
+	ItemMeshShared.add_cube(p, fx, ty + _cs(0.10, SC), fz, _cs(0.04, SC), _cs(0.10, SC), _cs(0.04, SC), glass_c)
+
+	# Bình tam giác
+	var tx := _cs(-0.40, SC); var tz := _cs(0.24, SC)
+	ItemMeshShared.add_cube(p, tx, ty + _cs(0.015, SC), tz, _cs(0.12, SC), _cs(0.10, SC), _cs(0.12, SC), glass)
+	ItemMeshShared.add_cube(p, tx, ty + _cs(0.003, SC), tz, _cs(0.10, SC), _cs(0.05, SC), _cs(0.10, SC), liquid_g)
+
+	# Ống đong
+	var ox := _cs(0.70, SC); var oz := _cs(0.20, SC)
+	ItemMeshShared.add_cube(p, ox, ty + _cs(0.01, SC), oz, _cs(0.05, SC), _cs(0.12, SC), _cs(0.05, SC), glass_c)
+	ItemMeshShared.add_cube(p, ox, ty + _cs(0.005, SC), oz, _cs(0.035, SC), _cs(0.05, SC), _cs(0.035, SC), liquid_y)
+
+	# Ống nhỏ nằm ngang
+	ItemMeshShared.add_cube(p, _cs(0.28, SC), ty + _cs(0.01, SC), _cs(-0.28, SC), _cs(0.18, SC), _cs(0.025, SC), _cs(0.025, SC), glass)
+
+
+# ── MAGIC TABLE ─────────────────────────────────────────────────────────────
+static func magic_table(p: Node3D) -> void:
+	const SC: float = 2.78
+
+	var wood      := Color(0.16, 0.10, 0.18)
+	var wood_dark := Color(0.10, 0.06, 0.14)
+	var crystal   := Color(0.55, 0.30, 0.88)
+	var crystal_b := Color(0.26, 0.14, 0.45)
+	var orb       := Color(0.75, 0.60, 0.95)
+	var candle    := Color(0.90, 0.88, 0.80)
+	var candle_w  := Color(0.45, 0.32, 0.18)
+	var flame     := Color(0.95, 0.55, 0.15)
+	var book      := Color(0.30, 0.12, 0.30)
+	var book_pg   := Color(0.85, 0.80, 0.65)
+	var gold      := Color(0.75, 0.60, 0.25)
+	var rune      := Color(0.85, 0.45, 0.95)
+
+	var tw := 5.0; var td := 2.36; var th := _cs(0.05, SC)
+	var ty := _cs(0.68, SC)
+
+	ItemMeshShared.add_cube(p, 0, ty - th * 0.5, 0, tw, th, td, wood)
+	ItemMeshShared.add_cube(p, 0, ty + _cs(0.004, SC), 0, tw - _cs(0.3, SC), _cs(0.01, SC), td - _cs(0.3, SC), wood_dark)
+
+	var lt := _cs(0.06, SC); var lh := ty - th
+	for xv in [-tw * 0.5 + lt * 0.6, tw * 0.5 - lt * 0.6]:
+		for zv in [-td * 0.5 + lt * 0.6, td * 0.5 - lt * 0.6]:
+			ItemMeshShared.add_cube(p, xv, lh * 0.5, zv, lt * 0.7, lh, lt * 0.7, wood_dark)
+
+	# Tinh thể
+	var cx := _cs(-0.55, SC); var cz := _cs(0.14, SC)
+	ItemMeshShared.add_cube(p, cx, ty + _cs(0.005, SC), cz, _cs(0.06, SC), _cs(0.02, SC), _cs(0.06, SC), gold)
+	ItemMeshShared.add_cube(p, cx, ty + _cs(0.14, SC), cz, _cs(0.16, SC), _cs(0.16, SC), _cs(0.12, SC), crystal)
+	ItemMeshShared.add_cube(p, cx + _cs(0.03, SC), ty + _cs(0.16, SC), cz + _cs(0.02, SC), _cs(0.16, SC), _cs(0.14, SC), _cs(0.09, SC), crystal_b)
+	ItemMeshShared.add_cube(p, cx - _cs(0.10, SC), ty + _cs(0.24, SC), cz, _cs(0.07, SC), _cs(0.06, SC), _cs(0.06, SC), crystal)
+
+	# Quả cầu
+	var ox := _cs(0.52, SC); var oz := _cs(0.14, SC)
+	ItemMeshShared.add_cube(p, ox, ty + _cs(0.005, SC), oz, _cs(0.06, SC), _cs(0.02, SC), _cs(0.06, SC), gold)
+	ItemMeshShared.add_cube(p, ox, ty + _cs(0.10, SC), oz, _cs(0.13, SC), _cs(0.13, SC), _cs(0.13, SC), orb)
+
+	# Nến
+	for i in range(2):
+		ItemMeshShared.add_cube(p, _cs(-0.20, SC) + i * _cs(0.12, SC), ty + _cs(0.02, SC), _cs(0.24, SC), _cs(0.05, SC), _cs(0.12, SC), _cs(0.05, SC), candle)
+		ItemMeshShared.add_cube(p, _cs(-0.20, SC) + i * _cs(0.12, SC), ty + _cs(0.085, SC), _cs(0.24, SC), _cs(0.02, SC), _cs(0.015, SC), _cs(0.02, SC), flame)
+
+	# Sách phép mở
+	var bx := _cs(-0.20, SC); var bz := _cs(-0.16, SC)
+	ItemMeshShared.add_cube(p, bx, ty + _cs(0.005, SC), bz, _cs(0.14, SC), _cs(0.05, SC), _cs(0.10, SC), book)
+	ItemMeshShared.add_cube(p, bx - _cs(0.02, SC), ty + _cs(0.018, SC), bz, _cs(0.14, SC), _cs(0.03, SC), _cs(0.10, SC), book_pg)
+	ItemMeshShared.add_cube(p, bx + _cs(0.055, SC), ty + _cs(0.005, SC), bz, _cs(0.03, SC), _cs(0.05, SC), _cs(0.012, SC), book)
+	ItemMeshShared.add_cube(p, bx - _cs(0.06, SC), ty + _cs(0.03, SC), bz, _cs(0.03, SC), _cs(0.008, SC), _cs(0.012, SC), rune)
+
+	# Hộp nguyên liệu
+	var hbx := _cs(-0.40, SC); var hbz := _cs(-0.28, SC)
+	ItemMeshShared.add_cube(p, hbx, ty + _cs(0.005, SC), hbz, _cs(0.14, SC), _cs(0.10, SC), _cs(0.10, SC), wood_dark)
+	ItemMeshShared.add_cube(p, hbx - _cs(0.03, SC), ty + _cs(0.07, SC), hbz, _cs(0.05, SC), _cs(0.05, SC), _cs(0.05, SC), crystal_b)
+	ItemMeshShared.add_cube(p, hbx + _cs(0.03, SC), ty + _cs(0.08, SC), hbz, _cs(0.05, SC), _cs(0.05, SC), _cs(0.05, SC), crystal)
+
+	# Rune tròn trên mặt
+	for i in range(3):
+		ItemMeshShared.add_cube(p, _cs(-0.06, SC) + i * _cs(0.05, SC), ty + _cs(0.008, SC), _cs(-0.28, SC), _cs(0.014, SC), _cs(0.003, SC), _cs(0.014, SC), rune)
+
+
+# ── KITCHEN TABLE ───────────────────────────────────────────────────────────
+static func kitchen_table(p: Node3D) -> void:
+	const SC: float = 2.78
+
+	var wood       := Color(0.55, 0.38, 0.20)
+	var wood_dark  := Color(0.42, 0.27, 0.14)
+	var top_stone  := Color(0.55, 0.54, 0.52)
+	var iron       := Color(0.30, 0.30, 0.34)
+	var iron_hi    := Color(0.46, 0.47, 0.52)
+	var copper     := Color(0.65, 0.42, 0.22)
+	var cutting    := Color(0.62, 0.45, 0.24)
+	var plate      := Color(0.90, 0.90, 0.90)
+	var plate_in   := Color(0.92, 0.92, 0.95)
+	var bowl       := Color(0.68, 0.66, 0.62)
+	var tomato     := Color(0.72, 0.22, 0.18)
+	var onion      := Color(0.68, 0.40, 0.22)
+	var leaf       := Color(0.18, 0.48, 0.20)
+	var flour      := Color(0.92, 0.88, 0.80)
+	var sack       := Color(0.62, 0.52, 0.38)
+
+	var tw := 5.0; var td := 2.36; var th := _cs(0.05, SC)
+	var ty := _cs(0.68, SC)
+
+	ItemMeshShared.add_cube(p, 0, ty - th * 0.5, 0, tw, th, td, wood)
+	ItemMeshShared.add_cube(p, 0, ty + _cs(0.005, SC), 0, tw - _cs(0.1, SC), _cs(0.015, SC), td - _cs(0.1, SC), top_stone)
+
+	var lt := _cs(0.05, SC); var lh := ty - th
+	for xv in [-tw * 0.5 + lt * 0.6, tw * 0.5 - lt * 0.6]:
+		for zv in [-td * 0.5 + lt * 0.6, td * 0.5 - lt * 0.6]:
+			ItemMeshShared.add_cube(p, xv, lh * 0.5, zv, lt * 0.7, lh, lt * 0.7, wood_dark)
+
+	ItemMeshShared.add_cube(p, 0, _cs(0.18, SC), -td * 0.5 + lt * 0.6, tw - _cs(0.3, SC), _cs(0.025, SC), _cs(0.04, SC), wood_dark)
+	ItemMeshShared.add_cube(p, 0, _cs(0.18, SC), td * 0.5 - lt * 0.6, tw - _cs(0.3, SC), _cs(0.025, SC), _cs(0.04, SC), wood_dark)
+
+	# Thớt + dao
+	var cxb := _cs(-0.58, SC); var czb := _cs(0.00, SC)
+	ItemMeshShared.add_cube(p, cxb, ty + _cs(0.005, SC), czb, _cs(0.24, SC), _cs(0.025, SC), _cs(0.18, SC), cutting)
+	ItemMeshShared.add_cube(p, cxb + _cs(0.09, SC), ty + _cs(0.018, SC), czb + _cs(0.03, SC), _cs(0.02, SC), _cs(0.025, SC), _cs(0.07, SC), iron)
+	ItemMeshShared.add_cube(p, cxb + _cs(0.09, SC), ty + _cs(0.018, SC), czb + _cs(0.07, SC), _cs(0.02, SC), _cs(0.03, SC), _cs(0.02, SC), wood_dark)
+	ItemMeshShared.add_cube(p, cxb + _cs(0.02, SC), ty + _cs(0.02, SC), czb, _cs(0.03, SC), _cs(0.02, SC), _cs(0.10, SC), iron_hi)
+
+	# Cà chua + hành
+	ItemMeshShared.add_cube(p, cxb - _cs(0.06, SC), ty + _cs(0.025, SC), czb + _cs(0.04, SC), _cs(0.055, SC), _cs(0.045, SC), _cs(0.055, SC), tomato)
+	ItemMeshShared.add_cube(p, cxb - _cs(0.06, SC), ty + _cs(0.05, SC), czb + _cs(0.04, SC), _cs(0.04, SC), _cs(0.01, SC), _cs(0.03, SC), leaf)
+	ItemMeshShared.add_cube(p, cxb - _cs(0.14, SC), ty + _cs(0.022, SC), czb + _cs(0.03, SC), _cs(0.045, SC), _cs(0.035, SC), _cs(0.045, SC), onion)
+
+	# Nồi
+	var nx := _cs(-0.20, SC); var nz := _cs(0.00, SC)
+	ItemMeshShared.add_cube(p, nx, ty + _cs(0.005, SC), nz, _cs(0.20, SC), _cs(0.10, SC), _cs(0.16, SC), iron)
+	ItemMeshShared.add_cube(p, nx, ty + _cs(0.07, SC), nz, _cs(0.21, SC), _cs(0.025, SC), _cs(0.17, SC), iron)
+	ItemMeshShared.add_cube(p, nx, ty + _cs(0.095, SC), nz + _cs(0.05, SC), _cs(0.10, SC), _cs(0.02, SC), _cs(0.03, SC), iron_hi)
+
+	# Chảo
+	var pnx := _cs(0.16, SC); var pnz := _cs(0.00, SC)
+	ItemMeshShared.add_cube(p, pnx, ty + _cs(0.005, SC), pnz, _cs(0.18, SC), _cs(0.03, SC), _cs(0.16, SC), iron_hi)
+	ItemMeshShared.add_cube(p, pnx, ty + _cs(0.025, SC), pnz, _cs(0.17, SC), _cs(0.012, SC), _cs(0.15, SC), iron)
+	ItemMeshShared.add_cube(p, pnx - _cs(0.08, SC), ty + _cs(0.004, SC), pnz + _cs(0.07, SC), _cs(0.03, SC), _cs(0.015, SC), _cs(0.015, SC), copper)
+
+	# Đĩa + bát
+	var dx := _cs(0.50, SC); var dz := _cs(-0.14, SC)
+	ItemMeshShared.add_cube(p, dx, ty + _cs(0.005, SC), dz, _cs(0.10, SC), _cs(0.02, SC), _cs(0.10, SC), plate)
+	ItemMeshShared.add_cube(p, dx, ty + _cs(0.02, SC), dz, _cs(0.07, SC), _cs(0.008, SC), _cs(0.07, SC), plate_in)
+	ItemMeshShared.add_cube(p, dx + _cs(0.16, SC), ty + _cs(0.005, SC), dz + _cs(0.04, SC), _cs(0.08, SC), _cs(0.05, SC), _cs(0.08, SC), bowl)
+
+	# Bao bột
+	var bbx := _cs(0.52, SC); var bbz := _cs(0.20, SC)
+	ItemMeshShared.add_cube(p, bbx, ty + _cs(0.005, SC), bbz, _cs(0.15, SC), _cs(0.14, SC), _cs(0.11, SC), sack)
+	ItemMeshShared.add_cube(p, bbx, ty + _cs(0.08, SC), bbz, _cs(0.15, SC), _cs(0.03, SC), _cs(0.11, SC), flour)
+
+	# Giá treo đồ dùng
+	for s in [-1, 1]:
+		var sx: float = s * _cs(0.45, SC)
+		ItemMeshShared.add_cube(p, sx, ty + _cs(0.055, SC), _cs(-0.36, SC), _cs(0.24, SC), _cs(0.02, SC), _cs(0.03, SC), wood_dark)
+		ItemMeshShared.add_cube(p, sx - _cs(0.05, SC), ty + _cs(0.075, SC), _cs(-0.36, SC), _cs(0.025, SC), _cs(0.012, SC), _cs(0.06, SC), iron_hi)
+		ItemMeshShared.add_cube(p, sx + _cs(0.06, SC), ty + _cs(0.065, SC), _cs(-0.36, SC), _cs(0.02, SC), _cs(0.06, SC), _cs(0.02, SC), copper)
+
+
+# ── ARCHITECTURE TABLE ──────────────────────────────────────────────────────────
+static func architecture_table(p: Node3D) -> void:
+	const SC: float = 2.9
+
+	var wood      := Color(0.48, 0.34, 0.18)
+	var wood_d    := Color(0.36, 0.24, 0.11)
+	var wood_l    := Color(0.58, 0.42, 0.26)
+	var metal     := Color(0.28, 0.29, 0.33)
+	var metal_hi  := Color(0.50, 0.51, 0.56)
+	var steel     := Color(0.34, 0.35, 0.40)
+	var brass     := Color(0.60, 0.46, 0.20)
+	var parchment := Color(0.92, 0.89, 0.80)
+	var paper     := Color(0.88, 0.84, 0.70)
+	var grid      := Color(0.30, 0.26, 0.20)
+	var ink       := Color(0.12, 0.12, 0.16)
+	var house_mat := Color(0.66, 0.42, 0.24)
+	var roof      := Color(0.48, 0.28, 0.20)
+	var window    := Color(0.48, 0.56, 0.62)
+
+	var tw := 5.0; var td := 2.4; var th := _cs(0.12, SC)
+	var ty := _cs(0.72, SC)
+
+	# Thick 3-plank top
+	ItemMeshShared.add_cube(p, 0, ty - th * 0.5, 0, tw, th, td, wood)
+	for i in range(3):
+		var cx := _cs(-0.68, SC) + i * _cs(0.68, SC)
+		ItemMeshShared.add_cube(p, cx, ty - th * 0.5 + _cs(0.034, SC), 0, _cs(0.66, SC), _cs(th * 0.55, SC), td - _cs(0.08, SC), wood_l)
+	for i in range(2):
+		var sx := _cs(-0.68, SC) + i * _cs(1.36, SC)
+		ItemMeshShared.add_cube(p, sx, ty - th * 0.5 + _cs(0.072, SC), 0, _cs(0.06, SC), _cs(0.038, SC), td - _cs(0.08, SC), metal)
+	# gridded drafting surface
+	ItemMeshShared.add_cube(p, 0, ty + _cs(0.068, SC), 0, tw - _cs(0.08, SC), _cs(0.022, SC), td - _cs(0.08, SC), grid)
+	for gx in [_cs(-0.52, SC), _cs(-0.18, SC), _cs(0.16, SC), _cs(0.50, SC)]:
+		ItemMeshShared.add_cube(p, gx, ty + _cs(0.076, SC), _cs(-0.06, SC), _cs(0.008, SC), _cs(0.006, SC), _cs(0.04, SC), ink)
+
+	# Legs + apron
+	var lt := _cs(0.10, SC); var lh := ty - th
+	for xv in [_cs(-0.84, SC), _cs(0.84, SC)]:
+		for zv in [_cs(-0.42, SC), _cs(0.42, SC)]:
+			ItemMeshShared.add_cube(p, xv, lh * 0.5, zv, _cs(0.10, SC), lh, _cs(0.10, SC), wood_d)
+	var arz := _cs(0.46, SC)
+	ItemMeshShared.add_cube(p, 0, _cs(0.30, SC), -arz, tw - _cs(0.3, SC), _cs(0.05, SC), _cs(0.06, SC), wood_d)
+	ItemMeshShared.add_cube(p, 0, _cs(0.30, SC), arz, tw - _cs(0.3, SC), _cs(0.05, SC), _cs(0.06, SC), wood_d)
+
+	# T-square + 45° triangle + compass
+	var rx := _cs(-0.66, SC); var rz := _cs(-0.18, SC)
+	ItemMeshShared.add_cube(p, rx, ty + _cs(0.008, SC), _cs(-0.04, SC), _cs(0.02, SC), _cs(0.022, SC), _cs(0.82, SC), steel)
+	ItemMeshShared.add_cube(p, rx, ty + _cs(0.30, SC), _cs(-0.05, SC), _cs(0.016, SC), _cs(0.62, SC), _cs(0.02, SC), steel)
+	var ax := _cs(-0.52, SC)
+	ItemMeshShared.add_cube(p, ax, ty + _cs(0.008, SC), _cs(-0.08, SC), _cs(0.016, SC), _cs(0.46, SC), _cs(0.016, SC), brass)
+	ItemMeshShared.add_cube(p, ax, ty + _cs(0.008, SC), _cs(0.20, SC), _cs(0.016, SC), _cs(0.46, SC), _cs(0.016, SC), brass)
+	ItemMeshShared.add_cube(p, ax + _cs(0.28, SC), ty + _cs(0.008, SC), _cs(-0.08, SC), _cs(0.016, SC), _cs(0.46, SC), _cs(0.016, SC), brass)
+	# compass
+	var cx := _cs(-0.18, SC)
+	ItemMeshShared.add_cube(p, cx, ty + _cs(0.01, SC), _cs(0.06, SC), _cs(0.09, SC), _cs(0.022, SC), _cs(0.09, SC), metal_hi)
+	ItemMeshShared.add_cube(p, cx, ty + _cs(0.034, SC), _cs(0.06, SC), _cs(0.018, SC), _cs(0.04, SC), _cs(0.018, SC), metal)
+
+	# Rolled plans
+	for k in range(3):
+		var col := parchment if k != 1 else Color(0.60, 0.36, 0.20)
+		ItemMeshShared.add_cube(p, _cs(0.0, SC) + (k - 1) * _cs(0.14, SC), ty + _cs(0.008, SC), _cs(0.24, SC), _cs(0.10, SC), _cs(0.024, SC), _cs(0.036, SC), col)
+
+	# Mini house model (back-right)
+	var mx := _cs(0.46, SC); var mz := _cs(0.22, SC); var mh := _cs(0.16, SC)
+	ItemMeshShared.add_cube(p, mx, ty + _cs(0.042, SC), mz, _cs(0.26, SC), _cs(0.04, SC), _cs(0.20, SC), house_mat)
+	ItemMeshShared.add_cube(p, mx, ty + _cs(0.042, SC) + mh * 0.5, mz + _cs(0.089, SC), _cs(0.26, SC), mh, _cs(0.022, SC), house_mat)
+	ItemMeshShared.add_cube(p, mx, ty + _cs(0.042, SC) + mh * 0.5, mz - _cs(0.089, SC), _cs(0.022, SC), mh, _cs(0.20, SC), house_mat)
+	ItemMeshShared.add_cube(p, mx, ty + _cs(0.042, SC) + mh * 0.5, mz + _cs(0.089, SC), _cs(0.022, SC), mh, _cs(0.20, SC), house_mat)
+	ItemMeshShared.add_cube(p, mx, ty + mh + _cs(0.056, SC), mz, _cs(0.28, SC), _cs(0.032, SC), _cs(0.22, SC), roof)
+	ItemMeshShared.add_cube(p, mx - _cs(0.072, SC), ty + _cs(0.11, SC) + mh * 0.5, mz + _cs(0.089, SC), _cs(0.048, SC), _cs(0.048, SC), _cs(0.004, SC), window)
+	ItemMeshShared.add_cube(p, mx + _cs(0.072, SC), ty + _cs(0.11, SC) + mh * 0.5, mz + _cs(0.089, SC), _cs(0.048, SC), _cs(0.048, SC), _cs(0.004, SC), window)
+
+
 # ── FURNACE ─────────────────────────────────────────────────────────────────
 static func furnace(p: Node3D) -> void:
 	const SC: float = 2.5
@@ -185,6 +641,69 @@ static func furnace(p: Node3D) -> void:
 
 	ItemMeshShared.add_cube(p, _cs(-0.10, SC), fh * 0.25, -fd * 0.5 - _cs(0.02, SC), _cs(0.40, SC), _cs(0.02, SC), _cs(0.08, SC), wood)
 	ItemMeshShared.add_cube(p, _cs(-0.20, SC), fh * 0.28, -fd * 0.5 - _cs(0.02, SC), _cs(0.03, SC), _cs(0.03, SC), _cs(0.03, SC), Color(0.15, 0.40, 0.80))
+
+
+# ── BẾP NẤU (Cooking Stove) ────────────────────────────────────────────────
+static func cooking_stove(p: Node3D) -> void:
+	const SC: float = 3.0
+
+	var body      := Color(0.30, 0.34, 0.38)
+	var body_dark := Color(0.22, 0.25, 0.28)
+	var body_light:= Color(0.42, 0.46, 0.50)
+	var top_mat   := Color(0.25, 0.28, 0.30)
+	var glass     := Color(0.14, 0.18, 0.22)
+	var knob      := Color(0.10, 0.10, 0.12)
+	var pot_metal := Color(0.35, 0.38, 0.42)
+	var pot_dark  := Color(0.24, 0.26, 0.28)
+	var lid       := Color(0.42, 0.46, 0.50)
+	var flame     := Color(0.90, 0.45, 0.10)
+	var flame_core:= Color(0.95, 0.75, 0.25)
+	var foot      := Color(0.18, 0.20, 0.22)
+	var steam     := Color(0.85, 0.88, 0.92)
+
+	var sw := 5.0; var sh := _cs(0.72, SC); var sd := _cs(0.95, SC)
+
+	# Body
+	ItemMeshShared.add_cube(p, 0, sh * 0.5, 0, sw, sh, sd, body)
+	ItemMeshShared.add_cube(p, 0, sh * 0.52, 0, sw - _cs(0.06, SC), sh - _cs(0.06, SC), sd - _cs(0.06, SC), body_dark)
+	# Top surface
+	ItemMeshShared.add_cube(p, 0, sh + _cs(0.02, SC), 0, sw - _cs(0.02, SC), _cs(0.04, SC), sd - _cs(0.02, SC), top_mat)
+	# Front highlight
+	ItemMeshShared.add_cube(p, 0, sh * 0.62, sd * 0.5 + _cs(0.005, SC), sw - _cs(0.10, SC), _cs(0.02, SC), _cs(0.01, SC), body_light)
+	# Oven door + glass
+	ItemMeshShared.add_cube(p, 0, sh * 0.34, sd * 0.5 + _cs(0.01, SC), _cs(0.78, SC), _cs(0.03, SC), _cs(0.02, SC), body_light)
+	ItemMeshShared.add_cube(p, 0, sh * 0.28, sd * 0.5 + _cs(0.018, SC), _cs(0.72, SC), _cs(0.32, SC), _cs(0.015, SC), glass)
+	ItemMeshShared.add_cube(p, 0, sh * 0.46, sd * 0.5 + _cs(0.02, SC), _cs(0.26, SC), _cs(0.02, SC), _cs(0.02, SC), body_light)
+	# Knobs
+	for i in range(4):
+		ItemMeshShared.add_cube(p, _cs(-0.50 + i * 0.30, SC), sh + _cs(0.03, SC), sd * 0.5 - _cs(0.06, SC), _cs(0.10, SC), _cs(0.05, SC), _cs(0.10, SC), knob)
+	# Feet
+	for fx in [-sw * 0.5 + _cs(0.12, SC), sw * 0.5 - _cs(0.12, SC)]:
+		for fz in [-sd * 0.5 + _cs(0.12, SC), sd * 0.5 - _cs(0.12, SC)]:
+			ItemMeshShared.add_cube(p, fx, _cs(0.025, SC), fz, _cs(0.12, SC), _cs(0.05, SC), _cs(0.12, SC), foot)
+	# Burners
+	var bw := _cs(0.40, SC); var bz := _cs(0.06, SC)
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), sh + _cs(0.05, SC), bz, bw, _cs(0.035, SC), bw, top_mat.darkened(0.2))
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), sh + _cs(0.068, SC), bz, bw - _cs(0.06, SC), _cs(0.015, SC), bw - _cs(0.06, SC), flame_core)
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), sh + _cs(0.058, SC), bz, bw - _cs(0.16, SC), _cs(0.02, SC), bw - _cs(0.16, SC), flame)
+	ItemMeshShared.add_cube(p, _cs(0.42, SC), sh + _cs(0.05, SC), bz, bw, _cs(0.035, SC), bw, top_mat.darkened(0.2))
+	ItemMeshShared.add_cube(p, _cs(0.42, SC), sh + _cs(0.068, SC), bz, bw - _cs(0.06, SC), _cs(0.015, SC), bw - _cs(0.06, SC), Color(0.60, 0.62, 0.68))
+	# Pot on left burner
+	var poy := sh + _cs(0.10, SC)
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), poy + _cs(0.10, SC), bz, _cs(0.30, SC), _cs(0.20, SC), _cs(0.30, SC), pot_metal)
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), poy + _cs(0.005, SC), bz, _cs(0.32, SC), _cs(0.02, SC), _cs(0.32, SC), pot_dark)
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), poy + _cs(0.21, SC), bz, _cs(0.26, SC), _cs(0.02, SC), _cs(0.26, SC), pot_dark)
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), poy + _cs(0.225, SC), bz, _cs(0.30, SC), _cs(0.02, SC), _cs(0.30, SC), lid)
+	ItemMeshShared.add_cube(p, _cs(-0.42, SC), poy + _cs(0.255, SC), bz, _cs(0.08, SC), _cs(0.035, SC), _cs(0.08, SC), body_dark)
+	# Steam
+	for i in range(3):
+		var sy2: float = poy + _cs(0.34 + i * 0.05, SC)
+		ItemMeshShared.add_cube(p, _cs(-0.42 + i * 0.010, SC), sy2, bz, _cs(0.10 - i * 0.02, SC), _cs(0.015, SC), _cs(0.10 - i * 0.02, SC), steam)
+	# Smoke vent (back)
+	var vx := _cs(0.16, SC); var vz := -sd * 0.5 + _cs(0.06, SC)
+	ItemMeshShared.add_cube(p, vx, sh + _cs(0.10, SC), vz, _cs(0.16, SC), _cs(0.16, SC), _cs(0.16, SC), body_dark)
+	ItemMeshShared.add_cube(p, vx, sh + _cs(0.20, SC), vz, _cs(0.20, SC), _cs(0.04, SC), _cs(0.20, SC), body_light)
+	ItemMeshShared.add_cube(p, vx, sh + _cs(0.185, SC), vz, _cs(0.10, SC), _cs(0.02, SC), _cs(0.10, SC), Color(0.05, 0.05, 0.06))
 
 
 # ── TWILIGHT GATE ───────────────────────────────────────────────────────────

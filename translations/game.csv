@@ -243,6 +243,7 @@ BIOME_LAKE_RIVER,Lake / River,Hồ / Sông
 BIOME_PLAINS,Plains,Đồng Bằng
 BIOME_GRASSPLAINS,Grass Plains,Đồng Bằng Cỏ
 BIOME_DESERT_PLATEAU,Desert Plateau,Cao Nguyên Sa Mạc
+BIOME_FROST,Frost / Tundra,Đồng Tuyết Băng Giá
 SEASON_SPRING,Spring,Xuân
 SEASON_SUMMER,Summer,Hạ
 SEASON_AUTUMN,Autumn,Thu
@@ -261,6 +262,7 @@ FURNACE_OUTPUT,Product,Sản Phẩm
 FURNACE_FUEL,Fuel,Chất Đốt
 FURNACE_RECIPES,Recipes,Công Thức
 FURNACE_NO_FUEL,No fuel,Chưa có nhiên liệu
+COOKING_LABEL,Cooking Stove,Bếp Nấu
 CREATURE_TYPE_MOB,Creature,Sinh vật
 CREATURE_TYPE_PLANT,Plant,Thực vật
 CREATURE_NEARBY,Distance,Khoảng cách

@@ -774,11 +774,18 @@ func _craft() -> void:
 	if _player_ref.has_method("_scroll_inventory_message"):
 		_player_ref._scroll_inventory_message("+%d %s" % [count, def.name])
 
-func open(player: PlayerCharacter, grid_size: int = 2) -> void:
+func open(player: PlayerCharacter, grid_size: int = 2, station_id: String = "") -> void:
 	_player_ref = player
 	_grid_size = grid_size if grid_size == 3 else 2
 	_RecipeDB.ensure()
 	_recipes = _RecipeDB.recipes.duplicate()
+	if station_id != "":
+		var filtered: Array[Dictionary] = []
+		for r in _recipes:
+			var req: String = r.get("station", "")
+			if req == "" or req == station_id:
+				filtered.append(r)
+		_recipes = filtered
 	_selected_recipe = -1
 	if _craft_inv == null:
 		_craft_inv = Inventory.new(_grid_size * _grid_size)

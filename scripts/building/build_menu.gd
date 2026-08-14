@@ -42,7 +42,7 @@ func _ready() -> void:
 
 func _setup_categories() -> void:
 	_categories = [
-		{"label": "Công Trình", "ids": ["twilight_gate", "chest", "crafting_table", "furnace", "fishing_boat", "tractor", "rescue_helicopter"]},
+		{"label": "Công Trình", "ids": ["twilight_gate", "chest", "crafting_table", "tool_table", "mech_table", "farm_table", "chem_table", "magic_table", "kitchen_table", "architecture_table", "furnace", "cooking_stove", "fishing_boat", "tractor", "rescue_helicopter"]},
 		{"label": "Khối", "ids": []},
 		{"label": "Quặng", "ids": []},
 	]
@@ -50,7 +50,7 @@ func _setup_categories() -> void:
 		var def: ItemDef = ItemDatabase.items_db[item_id] as ItemDef
 		if not def or def.type != ItemDef.Type.BLOCK:
 			continue
-		if item_id in ["chest", "crafting_table", "furnace"]:
+		if item_id in ["chest", "crafting_table", "furnace", "cooking_stove", "tool_table", "mech_table", "farm_table", "chem_table", "magic_table", "kitchen_table", "architecture_table"]:
 			continue
 		if item_id.ends_with("_ore"):
 			_categories[2].ids.append(item_id)

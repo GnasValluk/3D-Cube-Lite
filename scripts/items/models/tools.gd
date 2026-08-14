@@ -20,6 +20,7 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"arrow": _build_mui_ten(pivot)
 		"watermelon_nuke_ammo": _build_dan_hat_nhan_dua_hau(pivot)
 		"pumpkin_mortar": _build_phao_coi(pivot)
+		"flashlight": _build_den_pin(pivot)
 
 static func _mat(col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -703,3 +704,69 @@ static func _build_phao_coi(p: Node3D) -> void:
 	stem.position = Vector3(0.05, 0.31, 0.10)
 	stem.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	p.add_child(stem)
+
+
+# ── Đèn Pin (Flashlight) — model cầm tay + nguồn sáng refl phía trước ────────
+# tool dựng dọc +Y local (giống pickaxe/kiếm); weapon_pivot xoay 90° về X nên
+# +Y local → hướng nhìn. SpotLight quay (90,0,0) để tia -Z trùng +Y local.
+static func _build_den_pin(p: Node3D) -> void:
+	var body    := _mat(Color(0.25, 0.26, 0.30))
+	var body_d  := _mat(Color(0.16, 0.16, 0.20))
+	var grip    := _mat(Color(0.34, 0.36, 0.42))
+	var band    := _mat(Color(0.60, 0.62, 0.70))
+	var lens_r  := _mat(Color(0.95, 0.90, 0.60))
+	var lens_c  := _mat(Color(1.0, 1.0, 0.85))
+	var switch  := _mat(Color(0.15, 0.15, 0.18))
+	var dark    := _mat(Color(0.10, 0.10, 0.12))
+	# Thân chính — dọc +Y, đuôi ở 0
+	_cyl(p, Vector3(0, 0.22, 0), 0.050, 0.30, body)
+	# Đầu đèn — loe rộng hơn
+	_cyl(p, Vector3(0, 0.42, 0), 0.065, 0.16, body_d)
+	_cyl(p, Vector3(0, 0.425, 0), 0.070, 0.06, band)
+	# Tay cầm bọc nhựa có rãnh
+	_cyl(p, Vector3(0, 0.12, 0), 0.056, 0.20, grip)
+	for i in 4:
+		_cyl(p, Vector3(0, 0.07 + i * 0.045, 0), 0.058, 0.010, dark)
+	# Công tắc nâu
+	_box(p, Vector3(0.075, 0.30, 0), Vector3(0.025, 0.05, 0.02), switch)
+	# Mặt thấu kính
+	_cyl(p, Vector3(0, 0.53, 0), 0.062, 0.025, lens_r)
+	_cyl(p, Vector3(0, 0.545, 0), 0.045, 0.015, lens_c)
+	# Vành bảo vệ đầu tai đèn
+	_cyl(p, Vector3(0, 0.50, 0), 0.068, 0.012, band)
+
+	# ── Đèn chiếu sáng — dọc +Y local (hướng nhìn) ──────────────────────
+	var light := SpotLight3D.new()
+	light.name = "FlashlightSpot"
+	light.light_color = Color(1.0, 0.98, 0.88)
+	light.light_energy = 2.4
+	light.light_specular = 0.4
+	light.spot_range = 20.0
+	light.spot_angle = 24.0
+	light.spot_attenuation = 1.2
+	light.shadow_enabled = true
+	light.rotation_degrees = Vector3(90, 0, 0)
+	light.position = Vector3(0, 0.30, 0)
+	p.add_child(light)
+
+	# Đèn áp sáng nhỏ quanh đầu để thấy mặt đất gần chân
+	var omni := OmniLight3D.new()
+	omni.light_color = Color(1.0, 0.97, 0.85)
+	omni.light_energy = 0.5
+	omni.omni_range = 3.0
+	omni.shadow_enabled = false
+	omni.position = Vector3(0, 0.30, 0)
+	p.add_child(omni)
+
+# ── Đèn Pin — model drop / đeo (voxel nhỏ, không nguồn sáng để đỡ chi phí) ───
+static func flashlight_drop(p: Node3D) -> void:
+	var body   := Color(0.30, 0.32, 0.38)
+	var body_d := Color(0.20, 0.20, 0.24)
+	var grip   := Color(0.42, 0.44, 0.50)
+	var band   := Color(0.65, 0.68, 0.75)
+	var lens   := Color(0.95, 0.92, 0.65)
+	ItemMeshShared.add_cube(p, 0, -1, 0, 1.0, 2.2, 1.0, body)
+	ItemMeshShared.add_cube(p, 0, -1, 0, 1.1, 1.4, 1.1, grip)
+	ItemMeshShared.add_cube(p, 0, 1, 0, 1.4, 0.8, 1.4, body_d)
+	ItemMeshShared.add_cube(p, 0, 1.6, 0, 1.5, 0.5, 1.5, band)
+	ItemMeshShared.add_cube(p, 0, 2.2, 0, 1.2, 0.6, 1.2, lens)

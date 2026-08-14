@@ -21,6 +21,17 @@ const EAT_TIMES: Dictionary = {
 	"watermelon_slice": 1.2,
 	"pumpkin_slice": 1.2,
 	"orange": 2.2,
+	"cooked_pork": 3.2,
+	"baked_taro": 2.2,
+	"cooked_shrimp": 1.0,
+	"grilled_carp": 1.8,
+	"grilled_perch": 1.6,
+	"grilled_tilapia": 2.0,
+	"grilled_snakehead": 2.4,
+	"grilled_flowerhorn": 2.6,
+	"cooked_crab": 1.2,
+	"grilled_eggplant": 1.5,
+	"baked_pumpkin": 1.5,
 }
 
 static func ensure_db() -> void:
@@ -31,7 +42,15 @@ static func create_item_db() -> Dictionary:
 	var db: Dictionary = {}
 	_add(db, "chest",         "Rương Gỗ",     ItemDef.Type.BLOCK,  Color(0.50, 0.32, 0.10), "C",  "Rương gỗ chắc chắn",     false, 1)
 	_add(db, "crafting_table", "Bàn Chế Tạo", ItemDef.Type.BLOCK,  Color(0.45, 0.28, 0.15), "W",  "Bàn chế tạo đa năng",     false, 1)
+	_add(db, "tool_table",     "Bàn Công Cụ", ItemDef.Type.BLOCK,  Color(0.55, 0.38, 0.16), "T",  "Bàn công cụ — chế tạo dụng cụ lao động", false, 1)
+	_add(db, "mech_table",     "Bàn Cơ Khí",  ItemDef.Type.BLOCK,  Color(0.45, 0.46, 0.52), "M",  "Bàn cơ khí — chế tạo máy móc, phụ tùng", false, 1)
+	_add(db, "farm_table",     "Bàn Nông Nghiệp", ItemDef.Type.BLOCK, Color(0.34, 0.42, 0.20), "G", "Bàn nông nghiệp — chế tạo dụng cụ, hạt giống", false, 1)
+	_add(db, "chem_table",     "Bàn Hoá Học", ItemDef.Type.BLOCK,  Color(0.18, 0.42, 0.38), "H",  "Bàn hoá học — pha chế dung dịch, hợp chất", false, 1)
+	_add(db, "magic_table",    "Bàn Phép Thuật", ItemDef.Type.BLOCK, Color(0.42, 0.20, 0.55), "P", "Bàn phép thuật — triệu hồi, phù phép", false, 1)
+	_add(db, "kitchen_table",  "Bàn Làm Bếp", ItemDef.Type.BLOCK,  Color(0.52, 0.36, 0.22), "K",  "Bàn làm bếp — chế biến món ăn", false, 1)
+	_add(db, "architecture_table", "Bàn Kiến Trúc", ItemDef.Type.BLOCK, Color(0.48, 0.34, 0.18), "A", "Bàn kiến trúc — xem/bản đồ, chế tạo công cụ đo và cấu trúc", false, 1)
 	_add(db, "furnace",       "Lò Nung",     ItemDef.Type.BLOCK,  Color(0.30, 0.28, 0.26), "F",  "Lò nung quặng — nấu chảy quặng thành thỏi", false, 1)
+	_add(db, "cooking_stove", "Bếp Nấu",     ItemDef.Type.BLOCK,  Color(0.42, 0.45, 0.30), "🍳", "Bếp nấu ăn — đốt lửa nấu chín món ăn, hồi máu cao hơn nguyên liệu thô", false, 1)
 	_add(db, "twilight_gate", "Cổng Twilight", ItemDef.Type.TOOL,   Color(0.10, 0.50, 0.45), "T",  "Đặt cổng Twilight ra thế giới", false, 1)
 
 	# ── Công cụ ────────────────────────────────────────────────────────────────
@@ -74,6 +93,19 @@ static func create_item_db() -> Dictionary:
 
 	_add(db, "pumpkin", "Trái Bí Đỏ", ItemDef.Type.FOOD, Color(0.91,0.41,0.21), "🎃", "Trái bí đỏ — cầu dẹp 8-10 múi khía sâu, cam cháy ấm, cuống gỗ 5 góc; chế biến món ăn, trang trí hoặc đục thành đèn lồng", true, 16, 14)
 
+	# ── Món ăn đã nấu chín (từ Bếp Nấu) ────────────────────────────────────────
+	_add(db, "cooked_pork",     "Thịt Heo Nướng",   ItemDef.Type.FOOD, Color(0.55, 0.30, 0.22), "🥓", "Thịt heo nướng chín vàng — thơm ngon, hồi máu cao hơn thịt sống", true, 16, 26)
+	_add(db, "baked_taro",      "Môn Nướng",        ItemDef.Type.FOOD, Color(0.45, 0.30, 0.15), "🍠", "Củ môn nướng chín mềm — bùi ngọt, hồi máu cao", true, 16, 22)
+	_add(db, "cooked_shrimp",   "Tôm Nướng",        ItemDef.Type.FOOD, Color(0.90, 0.40, 0.20), "🍤", "Tôm nướng chín đỏ — thịt ngọt săn, hồi máu", true, 16, 14)
+	_add(db, "grilled_carp",    "Cá Chép Nướng",    ItemDef.Type.FOOD, Color(0.85, 0.55, 0.20), "🐟", "Cá chép nướng thơm — hồi máu cao hơn cá tươi", true, 16, 44)
+	_add(db, "grilled_perch",   "Cá Rô Nướng",      ItemDef.Type.FOOD, Color(0.70, 0.45, 0.18), "🐟", "Cá rô nướng — thịt trắng ngọt, hồi máu", true, 16, 30)
+	_add(db, "grilled_tilapia", "Cá Điêu Hồng Nướng", ItemDef.Type.FOOD, Color(0.85, 0.45, 0.25), "🐟", "Cá điêu hồng nướng — thịt chắc thơm, hồi máu", true, 16, 50)
+	_add(db, "grilled_snakehead","Cá Lóc Nướng",    ItemDef.Type.FOOD, Color(0.55, 0.38, 0.20), "🐟", "Cá lóc nướng trui — thịt dày săn, hồi máu cao", true, 16, 60)
+	_add(db, "grilled_flowerhorn","Cá La Hán Nướng", ItemDef.Type.FOOD, Color(0.90, 0.40, 0.18), "🐟", "Cá la hán nướng — thịt béo thơm, hồi máu cao nhất", true, 16, 72)
+	_add(db, "cooked_crab",     "Cua Bùn Nướng",    ItemDef.Type.FOOD, Color(0.85, 0.35, 0.15), "🦀", "Cua bùn nướng chín đỏ — thịt ngọt chắc, hồi máu", true, 16, 18)
+	_add(db, "grilled_eggplant","Cà Tím Nướng",     ItemDef.Type.FOOD, Color(0.45, 0.20, 0.40), "🍆", "Cà tím nướng mềm thơm — hồi máu cao hơn cà sống", true, 32, 12)
+	_add(db, "baked_pumpkin",   "Bí Đỏ Nướng",      ItemDef.Type.FOOD, Color(0.95, 0.60, 0.18), "🎃", "Bí đỏ nướng chín — vị ngọt bùi, hồi máu", true, 32, 15)
+
 	# ── Thịt ──────────────────────────────────────────────────────────────────
 	_add(db, "raw_pork", "Thịt Heo Sống", ItemDef.Type.FOOD, Color(0.85, 0.50, 0.45), "🥩", "Thịt heo tươi — nấu chín trước khi ăn", true, 16, 12)
 
@@ -86,6 +118,16 @@ static func create_item_db() -> Dictionary:
 	_add(db, "palm_wood", "Gỗ Dừa", ItemDef.Type.MATERIAL, Color(0.78, 0.70, 0.48), "🪵", "Gỗ dừa chắc — nguyên liệu chế tạo", true, 64)
 	_add(db, "tropical_seaweed", "Rong nhiệt đới", ItemDef.Type.MATERIAL, Color(0.08, 0.55, 0.10), "🌊", "Rong nhiệt đới — nguyên liệu chế tạo", true, 32)
 	_add(db, "seagrass", "Cỏ Biển", ItemDef.Type.MATERIAL, Color(0.10, 0.62, 0.42), "🌿", "Cỏ biển tươi — lá dài mảnh, nguyên liệu chế tạo", true, 32)
+	_add(db, "coral", "San Hô Cành", ItemDef.Type.MATERIAL, Color(1.00, 0.34, 0.55), "🪸", "San hô cành rực rỡ — lấy từ rạn san hô, nguyên liệu chế tạo/trang trí", true, 32)
+	_add(db, "brain_coral", "San Hô Não", ItemDef.Type.MATERIAL, Color(0.35, 0.55, 0.65), "🧠", "San hô não — vòm thận teal/tím, nguyên liệu trang trí", true, 32)
+	_add(db, "sponge", "Hải Miên Ống", ItemDef.Type.MATERIAL, Color(0.98, 0.80, 0.25), "🧽", "Hải miên ống vàng — bọt biển hình ống, nguyên liệu chế tạo", true, 32)
+	_add(db, "kelp", "Tảo Bẹ", ItemDef.Type.MATERIAL, Color(0.22, 0.52, 0.18), "🌾", "Tảo bẹ dài — đu đưa theo dòng nước, nguyên liệu chế tạo", true, 32)
+	_add(db, "kelp_tall", "Rong Biển Cao", ItemDef.Type.MATERIAL, Color(0.15, 0.48, 0.14), "🌊", "Rong biển cao — mọc thành cột vươn tới mặt nước như rong Minecraft", true, 32)
+	_add(db, "sea_fan", "Quạt Biển", ItemDef.Type.MATERIAL, Color(0.70, 0.25, 0.82), "🪭", "Quạt biển (gorgonia) — nan quạt tím/cam, nguyên liệu trang trí", true, 32)
+	_add(db, "anemone", "Hải Quỳ", ItemDef.Type.MATERIAL, Color(0.90, 0.20, 0.75), "🌸", "Hải quỳ neon — chùm xúc tu rực rỡ, trang trí rạn san hô", true, 32)
+	_add(db, "sea_bush", "Bụi Cây Biển", ItemDef.Type.MATERIAL, Color(0.10, 0.52, 0.18), "🌳", "Bụi cây biển lớn — tán lá dày xanh, điểm nhấn đáy đại dương", true, 32)
+	_add(db, "grass_carpet", "Thảm Cỏ Biển", ItemDef.Type.MATERIAL, Color(0.05, 0.48, 0.14), "🍃", "Thảm cỏ xanh biển — lá mảnh rủ sát đáy, phủ thảm xanh dày", true, 32)
+	_add(db, "seaweed", "Tảo Biển", ItemDef.Type.MATERIAL, Color(0.20, 0.40, 0.12), "🌿", "Tảo biển to bản — lá dày xếp tầng, nguyên liệu chế tạo", true, 32)
 
 	# ── Mầm cây trồng ─────────────────────────────────────────────────────────
 	_add(db, "coconut_seed", "Mầm Dừa", ItemDef.Type.MATERIAL, Color(0.45, 0.72, 0.25), "🌱", "Mầm dừa — trồng trên đất tơi xốp, lớn thành cây dừa", true, 16)
@@ -184,6 +226,11 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_oak_wood", "Gỗ Sồi", ItemDef.Type.BLOCK, Color(0.62, 0.47, 0.28), "🧱", "Khối gỗ sồi — vân nâu sáng ấm, chặt từ cây sồi bằng rìu, xây dựng và chế tạo", true, 64)
 	_add(db, "block_hard_wood", "Gỗ Cứng", ItemDef.Type.BLOCK, Color(0.47, 0.36, 0.20), "🧱", "Khối gỗ cứng — vân nâu sẫm chắc chắn, chặt từ cây rừng rậm bằng rìu", true, 64)
 
+	# ── Bio băng giá ─────────────────────────────────────────────────────────
+	_add(db, "block_snow", "Khối Tuyết", ItemDef.Type.BLOCK, Color(0.93, 0.96, 0.99), "🧱", "Khối tuyết trắng tinh — bề mặt vùng đất băng giá, xẻng đào được", true, 64)
+	_add(db, "block_frost_dirt", "Đất Đóng Băng", ItemDef.Type.BLOCK, Color(0.44, 0.38, 0.42), "🧱", "Khối đất đóng băng — lớp nền bên dưới tuyết, xẻng đào được", true, 64)
+	_add(db, "spruce_wood", "Gỗ Vân Sam", ItemDef.Type.BLOCK, Color(0.38, 0.24, 0.12), "🧱", "Khối gỗ vân sam — thớ nâu đỏ, chặt từ cây vân sam vùng băng giá bằng rìu", true, 64)
+
 	# ── Rừng ngập mặn ─────────────────────────────────────────────────────────
 	_add(db, "block_mangrove_mud", "Bùn Ngập Mặn", ItemDef.Type.BLOCK, Color(0.13, 0.11, 0.09), "🧱", "Khối bùn đen đầm lầy — bãi bùn vùng triều rừng ngập mặn, xẻng đào được", true, 64)
 	_add(db, "mangrove_wood", "Gỗ Đước", ItemDef.Type.BLOCK, Color(0.56, 0.26, 0.14), "🧱", "Khối gỗ đước — thớ nâu đỏ chìm trong nước mặn, chặt từ cây đước bằng rìu, xây dựng và chế tạo", true, 64)
@@ -218,6 +265,7 @@ static func create_item_db() -> Dictionary:
 	# ── Trang sức & phụ kiện ─────────────────────────────────────────────────
 	_add(db, "golden_ring",     "Nhẫn Vàng",   ItemDef.Type.ARMOR, Color(0.90, 0.72, 0.12), "💍", "Nhẫn vàng — tăng vận may ẩn (+2 luck), câu được đồ hiếm hơn", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.SUB, 0, 2.0)
 	_add(db, "leather_backpack", "Balo Da Thú", ItemDef.Type.ARMOR, Color(0.45, 0.30, 0.18), "🎒", "Balo da thú chắc chắn — +4 slot kho đồ và +5% giới hạn tải", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.BACK, 0, 0.0, 0.0, 4, 1.05)
+	_add(db, "flashlight",      "Đèn Pin",     ItemDef.Type.ARMOR, Color(0.90, 0.90, 0.75), "🔦", "Đèn pin — chiếu sáng về phía trước khi cầm, luôn bật khi đeo vào slot phụ", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.SUB, 0)
 
 	# ── Cây dầu ───────────────────────────────────────────────────────────────
 
@@ -235,6 +283,9 @@ static func _add(db: Dictionary, id: String, name: String, type: int, color: Col
 ## Trọng lượng riêng theo từng item (override mặc định theo loại).
 const WEIGHTS: Dictionary = {
 	"chest": 8.0, "crafting_table": 6.0, "furnace": 10.0, "twilight_gate": 20.0,
+	"cooking_stove": 9.0,
+	"tool_table": 7.0, "mech_table": 9.0, "farm_table": 7.0, "chem_table": 8.0,
+	"magic_table": 8.0, "kitchen_table": 7.0, "architecture_table": 9.0,
 	"pickaxe": 4.0, "shovel": 4.0, "axe": 5.0, "hoe": 3.0,
 	"iron_sword": 4.0, "iron_greatsword": 8.0, "iron_halberd": 9.0,
 	"crossbow": 6.0, "fishing_rod": 2.0, "watermelon_cannon": 14.0,
@@ -251,6 +302,11 @@ const WEIGHTS: Dictionary = {
 	"iron_leggings": 1.8, "mud_crab": 0.6, "cattail": 0.4,
 	"block_mangrove_mud": 2.0, "mangrove_wood": 2.0, "mangrove_seed": 0.2,
 	"golden_ring": 0.1, "leather_backpack": 2.0,
+	"flashlight": 0.8,
+	"cooked_pork": 2.8, "baked_taro": 0.6, "cooked_shrimp": 0.35,
+	"grilled_carp": 0.9, "grilled_perch": 0.7, "grilled_tilapia": 1.1,
+	"grilled_snakehead": 1.3, "grilled_flowerhorn": 1.3, "cooked_crab": 0.5,
+	"grilled_eggplant": 0.3, "baked_pumpkin": 0.3,
 }
 
 static func _default_weight(type: int) -> float:

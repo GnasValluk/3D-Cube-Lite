@@ -34,7 +34,7 @@ var _inventory_open: bool = false
 var _chest_open: bool = false
 var _current_chest: Chest = null
 var _crafting_open: bool = false
-var _current_crafting: CraftingTable = null
+var _current_crafting = null  # CraftingStation (CraftingTable or specialized station)
 var _furnace_open: bool = false
 @onready var _current_furnace = null
 var _switch_hint: Label
@@ -815,7 +815,10 @@ func open_crafting(table) -> void:
 	_recipe_library.visible = false
 	var player := _find_player_character()
 	if player:
-		_crafting_ui.open(player, 3)
+		var station_id: String = ""
+		if table is CraftingStation:
+			station_id = table.station_id
+		_crafting_ui.open(player, 3, station_id)
 
 func open_hand_crafting() -> void:
 	if _crafting_open:
@@ -1283,6 +1286,15 @@ func _setup_debug_menu() -> void:
 	tp_mangrove_btn.pressed.connect(_on_teleport_biome.bind("mangrove"))
 	_debug_panel.add_child(tp_mangrove_btn)
 
+	y += 34
+	var tp_frost_btn := Button.new()
+	tp_frost_btn.position = Vector2(17, y - 2)
+	tp_frost_btn.size = Vector2(202, 34)
+	tp_frost_btn.add_theme_font_size_override("font_size", 20)
+	tp_frost_btn.text = "❄️ Bio Băng"
+	tp_frost_btn.pressed.connect(_on_teleport_biome.bind("frost"))
+	_debug_panel.add_child(tp_frost_btn)
+
 	# ── Teleport to Công Trình ───────────────────────────────────────────────
 	y += 34
 	var tp_c_lbl := Label.new()
@@ -1421,6 +1433,11 @@ func _on_teleport_biome(biome_type: String) -> void:
 					var mg := WorldChunk.find_mangrove(origin.x, origin.y, MAX_R)
 					if mg.get("ok", false):
 						found = Vector2(mg["x"], mg["z"]); found_ok = true; break
+				"frost":
+					# Bio băng giá — dùng find_frost riêng (khu vực xa spawn, r²>800000)
+					var fs := WorldChunk.find_frost(origin.x, origin.y, MAX_R)
+					if fs.get("ok", false):
+						found = Vector2(fs["x"], fs["z"]); found_ok = true; break
 		r += STEP
 
 	if found_ok:
@@ -1431,6 +1448,8 @@ func _on_teleport_biome(biome_type: String) -> void:
 			biome_name = "Sa Mạc"
 		elif biome_type == "mangrove":
 			biome_name = "Rừng Ngập Mặn"
+		elif biome_type == "frost":
+			biome_name = "Bio Băng Giá"
 		# Build chunk chứa điểm đích đồng bộ → lấy đúng cao độ mặt đất, tránh
 		# thả rơi từ cao hoặc chui xuống đất khi vùng chưa được stream.
 		WorldChunk.ensure_chunk_built(found.x, found.y)
@@ -1519,8 +1538,7 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 		return ""
 
 	# Thứ tự khớp pipeline compute_chunk: sa mạc (DESERT) ghi đè trước;
-	# toàn bộ đất liền còn lại là ĐỒNG BẰNG CỎ (GRASS_DIRT/GRASS/DARK_GRASS/
-	# YOUNG_GRASS) — chỉ còn phân biệt biển/hồ.
+	# bio băng (FROST) kế tiếp; toàn bộ đất liền còn lại là ĐỒNG BẰNG CỎ.
 	var n_desert: FastNoiseLite = nd.get("desert")
 	if n_desert:
 		var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
@@ -1528,6 +1546,9 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 			if WorldChunk._ocean_mask_at(nd, wx, wz):
 				return "🌊 " + tr("BIOME_OCEAN")
 			return "🏜️ " + tr("BIOME_DESERT")
+
+	if WorldChunk.biome_at(wx, wz, 1) == _Data.TileType.FROST:
+		return "❄️ " + tr("BIOME_FROST")
 
 	# Đồng bằng cỏ (đã hợp nhất cao nguyên): toàn bộ đất cỏ còn lại — chỉ phân
 	# biệt biển và hồ.

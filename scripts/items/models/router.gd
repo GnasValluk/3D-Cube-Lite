@@ -1,5 +1,7 @@
 class_name ItemMesh
 
+const SeaPlantProp = preload("res://scripts/world/props/sea_plant_prop.gd")
+
 static func build(parent: Node3D, item_id: String) -> void:
 	match item_id:
 		"carp": _build_fish_icon(parent, "carp")
@@ -15,7 +17,27 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"hoe": ToolsMesh.hoe_drop(parent)
 		"chest": StructuresMesh.chest(parent)
 		"crafting_table": StructuresMesh.crafting_table(parent)
+		"tool_table": StructuresMesh.tool_table(parent)
+		"mech_table": StructuresMesh.mech_table(parent)
+		"farm_table": StructuresMesh.farm_table(parent)
+		"chem_table": StructuresMesh.chem_table(parent)
+		"magic_table": StructuresMesh.magic_table(parent)
+		"kitchen_table": StructuresMesh.kitchen_table(parent)
+		"architecture_table": StructuresMesh.architecture_table(parent)
 		"furnace": StructuresMesh.furnace(parent)
+		"cooking_stove": StructuresMesh.cooking_stove(parent)
+		"flashlight": ToolsMesh.flashlight_drop(parent)
+		"cooked_pork": _build_cooked_pork_icon(parent)
+		"baked_taro": _build_baked_taro_icon(parent)
+		"cooked_shrimp": _build_grilled_shrimp_icon(parent)
+		"grilled_carp": _build_grilled_fish_icon(parent, "carp")
+		"grilled_perch": _build_grilled_fish_icon(parent, "climbing_perch")
+		"grilled_tilapia": _build_grilled_fish_icon(parent, "red_tilapia")
+		"grilled_snakehead": _build_grilled_fish_icon(parent, "snakehead")
+		"grilled_flowerhorn": _build_grilled_fish_icon(parent, "flowerhorn")
+		"cooked_crab": _build_cooked_crab_icon(parent)
+		"grilled_eggplant": _build_grilled_eggplant_icon(parent)
+		"baked_pumpkin": _build_baked_pumpkin_icon(parent)
 		"fishing_rod": ToolsMesh.fishing_rod_drop(parent)
 		"iron_greatsword": ToolsMesh.greatsword_drop(parent)
 		"iron_halberd": ToolsMesh.iron_halberd_drop(parent)
@@ -53,6 +75,16 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"taro": _build_taro_icon(parent)
 		"tropical_seaweed": _build_seaweed_icon(parent)
 		"seagrass": _build_seagrass_icon(parent)
+		"coral": _build_coral_icon(parent)
+		"brain_coral": _build_brain_coral_icon(parent)
+		"sponge": _build_sponge_icon(parent)
+		"kelp": _build_kelp_icon(parent)
+		"kelp_tall": _build_kelp_tall_icon(parent)
+		"sea_fan": _build_sea_fan_icon(parent)
+		"anemone": _build_anemone_icon(parent)
+		"sea_bush": _build_sea_bush_icon(parent)
+		"grass_carpet": _build_grass_carpet_icon(parent)
+		"seaweed": _build_seaweed_algae_icon(parent)
 		"coconut_seed": _build_seed_icon(parent, 0)
 		"taro_seed": _build_seed_icon(parent, 1)
 		"seaweed_seed": _build_seed_icon(parent, 2)
@@ -355,6 +387,140 @@ static func _build_fish_icon(p: Node3D, item_id: String) -> void:
 		p.add_child(child)
 	temp.queue_free()
 
+## ── Cá nướng — dáng cá (giữ màu biến thể) chuyển sắc nâu chín vàng ──────────
+static func _build_grilled_fish_icon(p: Node3D, item_id: String) -> void:
+	var variant: int = 0
+	match item_id:
+		"carp": variant = 0
+		"climbing_perch": variant = 1
+		"red_tilapia": variant = 2
+		"snakehead": variant = 3
+		"flowerhorn": variant = 4
+	var colors: Array = FishCharacter.VARIANT_COLORS[variant]
+	var base: Color = colors[0]
+	var belly_c0: Color = colors[1]
+	var fin_c0: Color = colors[2]
+	# Nướng chín → ấm vàng nâu nhưng vẫn giữ nhận diện loài
+	var body_c: Color = base.darkened(0.05).lerp(Color(0.85, 0.60, 0.25), 0.45)
+	var belly_c: Color = belly_c0.lerp(Color(0.90, 0.72, 0.40), 0.5)
+	var fin_c: Color = fin_c0.lerp(Color(0.70, 0.48, 0.20), 0.5)
+	# Dáng cá nằm ngang: thân thuôn + đuôi chẻ + vây
+	ItemMeshShared.add_cube(p, 0, 0, 0, 1.5, 0.55, 0.95, body_c)
+	ItemMeshShared.add_cube(p, 0, 0.1, 0.4, 1.1, 0.3, 0.3, belly_c)
+	# Đuôi chẻ
+	ItemMeshShared.add_cube(p, 0, 0.1, -0.7, 0.8, 0.35, 0.5, body_c.darkened(0.12))
+	ItemMeshShared.add_cube(p, -0.25, 0.1, -0.85, 0.35, 0.25, 0.4, fin_c)
+	ItemMeshShared.add_cube(p, 0.25, 0.1, -0.85, 0.35, 0.25, 0.4, fin_c)
+	# Vây lưng + vây bụng
+	ItemMeshShared.add_cube(p, 0, 0.45, -0.1, 0.15, 0.4, 0.5, fin_c)
+	ItemMeshShared.add_cube(p, 0.35, 0.1, 0.2, 0.15, 0.35, 0.15, fin_c)
+	ItemMeshShared.add_cube(p, -0.35, 0.1, 0.2, 0.15, 0.35, 0.15, fin_c)
+	# Vệt cháy sém nhẹ
+	ItemMeshShared.add_cube(p, 0.3, 0.0, 0.0, 0.12, 0.1, 0.8, Color(0.35, 0.22, 0.12))
+	ItemMeshShared.add_cube(p, -0.35, 0.0, 0.1, 0.12, 0.1, 0.6, Color(0.32, 0.20, 0.12))
+	if variant == 4:
+		ItemMeshShared.add_cube(p, 0, 0.35, 0.5, 0.35, 0.35, 0.35, base.lightened(0.1))
+	if variant == 5:
+		ItemMeshShared.add_cube(p, 0, 0.05, 0.5, 0.4, 0.35, 0.2, body_c)
+
+## ── Tôm nướng — cong chữ C đỏ cam chín ──────────────────────────────────────
+static func _build_grilled_shrimp_icon(p: Node3D) -> void:
+	var cooked := Color(0.90, 0.45, 0.25)
+	var cooked_d := Color(0.68, 0.28, 0.16)
+	var shell := Color(0.95, 0.62, 0.30)
+	# Thân cong
+	ItemMeshShared.add_cube(p, -0.5, 0.1, 0, 0.7, 0.5, 0.5, cooked)
+	ItemMeshShared.add_cube(p, 0.1, 0.25, 0, 0.7, 0.55, 0.55, cooked)
+	ItemMeshShared.add_cube(p, 0.7, 0.4, 0, 0.6, 0.55, 0.6, cooked_d)
+	# Đuôi xoè
+	ItemMeshShared.add_cube(p, 1.15, 0.25, 0, 0.5, 0.4, 0.35, shell)
+	ItemMeshShared.add_cube(p, -1.0, -0.05, 0, 0.5, 0.3, 0.3, cooked_d)
+	# Mắt
+	ItemMeshShared.add_cube(p, -1.0, 0.35, 0, 0.12, 0.12, 0.12, Color(0.05, 0.05, 0.05))
+	# Râu
+	ItemMeshShared.add_cube(p, -1.2, 0.45, 0.15, 0.5, 0.06, 0.06, shell)
+
+## ── Thịt heo nướng — miếng thịt nâu chín + vân cháy ─────────────────────────
+static func _build_cooked_pork_icon(p: Node3D) -> void:
+	var meat := Color(0.62, 0.38, 0.22)
+	var meat_l := Color(0.75, 0.50, 0.30)
+	var crust := Color(0.40, 0.24, 0.14)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 1.6, 0.8, 1.0, meat)
+	ItemMeshShared.add_cube(p, 0, 0.25, 0.1, 1.4, 0.5, 0.8, meat_l)
+	ItemMeshShared.add_cube(p, 0, 0.1, 0.55, 1.5, 0.7, 0.15, crust)
+	# Vân cháy / đường nướng
+	ItemMeshShared.add_cube(p, 0.3, 0.0, 0.0, 0.12, 0.12, 1.0, crust.darkened(0.1))
+	ItemMeshShared.add_cube(p, -0.35, 0.0, 0.1, 0.12, 0.12, 0.8, crust)
+	ItemMeshShared.add_cube(p, 0.1, 0.45, -0.1, 1.2, 0.1, 0.6, crust.lightened(0.08))
+
+## ── Môn nướng — củ môn nâu vàng chín bở ─────────────────────────────────────
+static func _build_baked_taro_icon(p: Node3D) -> void:
+	var skin := Color(0.52, 0.36, 0.20)
+	var flesh := Color(0.75, 0.55, 0.30)
+	var flesh_l := Color(0.85, 0.68, 0.42)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 1.2, 1.4, 1.2, skin)
+	ItemMeshShared.add_cube(p, 0, 0.2, 0, 0.9, 1.0, 0.9, flesh)
+	ItemMeshShared.add_cube(p, 0, 0.55, 0, 0.6, 0.4, 0.6, flesh_l)
+	# Nứt vỏ
+	ItemMeshShared.add_cube(p, 0, 0.5, 0.62, 0.7, 0.12, 0.08, flesh)
+	ItemMeshShared.add_cube(p, 0.45, -0.1, 0, 0.12, 0.5, 0.12, flesh.darkened(0.08))
+
+## ── Cua nướng — cua đỏ cam chín với càng ────────────────────────────────────
+static func _build_cooked_crab_icon(p: Node3D) -> void:
+	var shell := Color(0.90, 0.40, 0.18)
+	var shell_d := Color(0.68, 0.28, 0.12)
+	var leg := Color(0.85, 0.48, 0.22)
+	# Mai cua
+	ItemMeshShared.add_cube(p, 0, 0.2, 0, 1.6, 0.6, 1.4, shell)
+	ItemMeshShared.add_cube(p, 0, 0.35, 0, 1.3, 0.4, 1.1, shell.lightened(0.06))
+	# Mắt
+	ItemMeshShared.add_cube(p, -0.3, 0.7, 0.45, 0.12, 0.2, 0.12, shell_d)
+	ItemMeshShared.add_cube(p, 0.3, 0.7, 0.45, 0.12, 0.2, 0.12, shell_d)
+	ItemMeshShared.add_cube(p, -0.3, 0.85, 0.45, 0.1, 0.1, 0.1, Color(0.05, 0.05, 0.05))
+	ItemMeshShared.add_cube(p, 0.3, 0.85, 0.45, 0.1, 0.1, 0.1, Color(0.05, 0.05, 0.05))
+	# Càng
+	ItemMeshShared.add_cube(p, -0.95, 0.15, 0.3, 0.35, 0.35, 0.35, shell_d)
+	ItemMeshShared.add_cube(p, -1.25, 0.05, 0.35, 0.3, 0.25, 0.25, shell)
+	ItemMeshShared.add_cube(p, 0.95, 0.15, 0.3, 0.35, 0.35, 0.35, shell_d)
+	ItemMeshShared.add_cube(p, 1.25, 0.05, 0.35, 0.3, 0.25, 0.25, shell)
+	# Chân
+	for i in 3:
+		var cx: float = -0.7 + i * 0.5
+		ItemMeshShared.add_cube(p, cx, -0.05, 0.75, 0.1, 0.1, 0.25, leg)
+		ItemMeshShared.add_cube(p, cx, -0.05, -0.75, 0.1, 0.1, 0.25, leg)
+
+## ── Cà tím nướng — lát cà tím chín mềm + vệt than ───────────────────────────
+static func _build_grilled_eggplant_icon(p: Node3D) -> void:
+	var skin := Color(0.40, 0.13, 0.48)
+	var flesh := Color(0.92, 0.82, 0.66)
+	var char := Color(0.30, 0.22, 0.18)
+	ItemMeshShared.add_cube(p, 0.05, -0.35, -0.10, 0.85, 0.30, 0.30, skin.darkened(0.1))
+	ItemMeshShared.add_cube(p, 0.10, 0.15, -0.12, 0.90, 0.40, 0.30, skin)
+	ItemMeshShared.add_cube(p, 0.05, -0.05, -0.15, 0.95, 0.55, 0.28, skin)
+	ItemMeshShared.add_cube(p, 0.05, 0.00, 0.14, 0.82, 0.62, 0.34, flesh)
+	ItemMeshShared.add_cube(p, 0.05, 0.18, 0.18, 0.68, 0.26, 0.22, flesh.lightened(0.03))
+	# Vệt cháy nướng
+	ItemMeshShared.add_cube(p, 0.1, -0.1, 0.28, 0.6, 0.1, 0.06, char)
+	ItemMeshShared.add_cube(p, 0.1, 0.12, 0.3, 0.5, 0.1, 0.06, char.darkened(0.1))
+	ItemMeshShared.add_cube(p, -0.15, 0.05, 0.28, 0.12, 0.3, 0.06, char)
+
+## ── Bí đỏ nướng — lát bí chín vàng cam + vỏ cháy ────────────────────────────
+static func _build_baked_pumpkin_icon(p: Node3D) -> void:
+	var rind := Color(0.70, 0.34, 0.08)
+	var flesh := Color(0.98, 0.66, 0.20)
+	var flesh_d := Color(0.88, 0.54, 0.14)
+	var char := Color(0.30, 0.18, 0.08)
+	ItemMeshShared.add_cube(p, 0.00, -0.30, -0.24, 0.90, 0.62, 0.20, rind)
+	ItemMeshShared.add_cube(p, 0.00, 0.04, -0.26, 0.98, 0.60, 0.18, rind.darkened(0.08))
+	ItemMeshShared.add_cube(p, 0.00, 0.00, 0.00, 0.86, 0.72, 0.24, flesh)
+	ItemMeshShared.add_cube(p, 0.00, 0.24, 0.02, 0.64, 0.16, 0.18, flesh.lightened(0.04))
+	# Vệt nướng sém
+	ItemMeshShared.add_cube(p, 0.1, 0.0, 0.14, 0.6, 0.08, 0.08, char)
+	ItemMeshShared.add_cube(p, -0.2, -0.15, 0.14, 0.5, 0.08, 0.08, char.darkened(0.08))
+	ItemMeshShared.add_cube(p, 0.0, 0.35, 0.1, 0.3, 0.08, 0.08, char.lightened(0.05))
+	ItemMeshShared.add_cube(p, 0.00, 0.62, 0.00, 0.14, 0.12, 0.14, Color(0.30, 0.26, 0.12))
+
+
 static func _build_seaweed_icon(p: Node3D) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -446,6 +612,39 @@ static func _build_seagrass_icon(p: Node3D) -> void:
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mi.material_override = mat
 		p.add_child(mi)
+
+static func _build_sea_plant_icon(p: Node3D, plant_type: String) -> void:
+	SeaPlantProp.build(p, plant_type, 1234567, 7654321)
+
+static func _build_coral_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "coral")
+
+static func _build_brain_coral_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "brain_coral")
+
+static func _build_sponge_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "sponge")
+
+static func _build_kelp_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "kelp")
+
+static func _build_kelp_tall_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "kelp_tall")
+
+static func _build_sea_fan_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "sea_fan")
+
+static func _build_anemone_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "anemone")
+
+static func _build_sea_bush_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "sea_bush")
+
+static func _build_grass_carpet_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "grass_carpet")
+
+static func _build_seaweed_algae_icon(p: Node3D) -> void:
+	_build_sea_plant_icon(p, "seaweed")
 
 static func _build_taro_icon(p: Node3D) -> void:
 	var st := SurfaceTool.new()

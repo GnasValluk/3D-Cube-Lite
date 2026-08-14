@@ -1,6 +1,13 @@
 class_name RainManager
 extends Node3D
 
+## Quản lý mưa/tuyết theo vùng quanh người chơi.
+## - Mưa bình thường: giọt nước rơi nhanh + splash chạm đất.
+## - Trong BIO BĂNG GIÁ (FROST): mưa biến thành TUYẾT — hạt tròn trắng, rơi
+##   chậm hơn, không có splash.
+## - Không còn đám mây tối trên đầu khi mưa (theo yêu cầu: mưa/tuyết → không
+##   có mây; bầu trời quang đãng nhờ cloud_cover của sky shader bị tắt khi mưa).
+
 class Zone:
 	var center: Vector2
 	var radius: float
@@ -12,6 +19,8 @@ class Zone:
 static var _instance: RainManager = null
 var _local_rain_intensity: float = 0.0
 var _local_rain_intensity_smoothed: float = 0.0
+
+const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 
 ## Trả về cường độ mưa cục bộ tại vị trí người chơi (0 = không mưa, >0 = đang trong vùng mưa)
 static func get_local_rain_intensity() -> float:
@@ -28,13 +37,11 @@ var _splash: GPUParticles3D
 var _splash_mat: StandardMaterial3D
 var _splash_mesh: BoxMesh
 var _splash_pm: ParticleProcessMaterial
-var _clouds: GPUParticles3D
-var _cloud_mat: StandardMaterial3D
-var _cloud_pm: ParticleProcessMaterial
+var _snow: GPUParticles3D
+var _snow_mat: StandardMaterial3D
+var _snow_mesh: SphereMesh
+var _snow_pm: ParticleProcessMaterial
 var _last_ortho: float = -1.0
-var _cloud_alpha: float = 0.0
-var _cloud_alpha_target: float = 0.0
-var _cloud_ortho_alpha: float = 0.95
 
 const BASE_ORTHO: float = 20.0
 
@@ -50,7 +57,7 @@ func _ready() -> void:
 		TimeSystem.weather_changed.connect(_on_weather_changed)
 	_setup_drops()
 	_setup_splash()
-	_setup_clouds()
+	_setup_snow()
 
 func _on_weather_changed(weather: int) -> void:
 	if weather == TimeSystem.Weather.RAIN:
@@ -134,60 +141,47 @@ func _setup_splash() -> void:
 
 	add_child(_splash)
 
-func _setup_clouds() -> void:
-	_clouds = GPUParticles3D.new()
-	_clouds.name = "RainClouds"
-	_clouds.local_coords = false
-	_clouds.one_shot = false
-	_clouds.emitting = true
-	_clouds.amount = 8
-	_clouds.lifetime = 60.0
-	_clouds.fixed_fps = 0
-	_clouds.interpolate = false
+## Tuyết: hạt tròn trắng (SphereMesh), rơi CHẬM hơn mưa, có gió nhẹ đẩy ngang,
+## không splash. Chỉ hiện khi trời mưa trong bio băng giá.
+func _setup_snow() -> void:
+	_snow = GPUParticles3D.new()
+	_snow.name = "SnowFlakes"
+	_snow.local_coords = false
+	_snow.one_shot = false
+	_snow.emitting = false
+	_snow.amount = 900
+	_snow.lifetime = 7.0
+	_snow.fixed_fps = 20
+	_snow.interpolate = false
 
-	_cloud_pm = ParticleProcessMaterial.new()
-	_cloud_pm.direction = Vector3(0.02, 0, -0.01)
-	_cloud_pm.spread = 8.0
-	_cloud_pm.gravity = Vector3.ZERO
-	_cloud_pm.initial_velocity_min = 0.1
-	_cloud_pm.initial_velocity_max = 0.4
-	_cloud_pm.scale_min = 8.0
-	_cloud_pm.scale_max = 18.0
-	_cloud_pm.color = Color(0.35, 0.35, 0.40, 0.75)
-	_cloud_pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	_cloud_pm.emission_box_extents = Vector3(42, 0.4, 42)
-	_cloud_pm.angle_min = 0.0
-	_cloud_pm.angle_max = 360.0
-	_clouds.process_material = _cloud_pm
+	_snow_pm = ParticleProcessMaterial.new()
+	_snow_pm.direction = Vector3.DOWN
+	_snow_pm.spread = 30.0
+	_snow_pm.gravity = Vector3(0.06, -0.55, 0.06)
+	_snow_pm.initial_velocity_min = 0.35
+	_snow_pm.initial_velocity_max = 0.7
+	_snow_pm.scale_min = 1.0
+	_snow_pm.scale_max = 1.6
+	_snow_pm.color = Color(1.0, 1.0, 1.0, 0.85)
+	_snow_pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	_snow_pm.emission_box_extents = Vector3(16, 12, 16)
+	_snow.process_material = _snow_pm
 
-	_cloud_mat = StandardMaterial3D.new()
-	_cloud_mat.albedo_color = Color(0.35, 0.35, 0.40, 0.75)
-	_cloud_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_cloud_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_cloud_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_cloud_mat.render_priority = 127
+	_snow_mesh = SphereMesh.new()
+	_snow_mesh.radius = 0.025
+	_snow_mesh.height = 0.05
+	_snow_mesh.radial_segments = 6
+	_snow_mesh.rings = 3
+	_snow_mat = StandardMaterial3D.new()
+	_snow_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.85)
+	_snow_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_snow_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_snow_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_snow_mesh.material = _snow_mat
+	_snow.draw_pass_1 = _snow_mesh
+	_snow.visibility_aabb = AABB(Vector3(-50, -70, -50), Vector3(100, 90, 100))
 
-	var m1 := BoxMesh.new()
-	m1.size = Vector3(2.5, 0.04, 1.5)
-	m1.material = _cloud_mat
-	var m2 := BoxMesh.new()
-	m2.size = Vector3(1.5, 0.05, 2.0)
-	m2.material = _cloud_mat
-	var m3 := BoxMesh.new()
-	m3.size = Vector3(3.0, 0.03, 1.0)
-	m3.material = _cloud_mat
-	var m4 := BoxMesh.new()
-	m4.size = Vector3(1.0, 0.06, 1.8)
-	m4.material = _cloud_mat
-
-	_clouds.draw_passes = 4
-	_clouds.draw_pass_1 = m1
-	_clouds.draw_pass_2 = m2
-	_clouds.draw_pass_3 = m3
-	_clouds.draw_pass_4 = m4
-	_clouds.visibility_aabb = AABB(Vector3(-200, -1, -200), Vector3(400, 3, 400))
-
-	add_child(_clouds)
+	add_child(_snow)
 
 func _update_ortho_scale(ortho: float) -> void:
 	var s: float = ortho / BASE_ORTHO
@@ -200,12 +194,10 @@ func _update_ortho_scale(ortho: float) -> void:
 	_splash_mesh.size = Vector3(sb, sb, sb)
 	var sext: float = maxf(ortho * 0.9, 18.0)
 	_splash_pm.emission_box_extents = Vector3(sext, 0.5, sext)
-	var cext: float = maxf((ortho - 6.0) * 3.0, 8.0)
-	_cloud_pm.emission_box_extents = Vector3(cext, 0.4, cext)
-	_cloud_pm.scale_min = 8.0
-	_cloud_pm.scale_max = 18.0
-	var zoom_norm: float = (ortho - 45.0) / (55.0 - 45.0)
-	_cloud_ortho_alpha = clamp(zoom_norm, 0.0, 1.0) * 0.95
+	var sr: float = 0.025 * s
+	_snow_mesh.radius = sr
+	_snow_mesh.height = sr * 2.0
+	_snow_pm.emission_box_extents = Vector3(ext, 12 * s, ext)
 
 func _process(delta: float) -> void:
 	for i in range(_zones.size() - 1, -1, -1):
@@ -219,8 +211,8 @@ func _process(delta: float) -> void:
 		_drops.visible = false
 		_splash.emitting = false
 		_splash.visible = false
-		_clouds.emitting = false
-		_clouds.visible = false
+		_snow.emitting = false
+		_snow.visible = false
 		return
 
 	if cam.projection == Camera3D.PROJECTION_ORTHOGONAL:
@@ -234,14 +226,14 @@ func _process(delta: float) -> void:
 		_drop_pm.emission_box_extents = Vector3(16, 12, 16)
 		_splash_mesh.size = Vector3(0.030, 0.030, 0.030)
 		_splash_pm.emission_box_extents = Vector3(18, 0.5, 18)
-		_cloud_pm.emission_box_extents = Vector3(42, 0.4, 42)
-		_cloud_pm.scale_min = 8.0
-		_cloud_pm.scale_max = 18.0
+		_snow_mesh.radius = 0.025
+		_snow_mesh.height = 0.05
+		_snow_pm.emission_box_extents = Vector3(16, 12, 16)
 
 	var cpos: Vector3 = cam.global_position
 	_drops.global_position = Vector3(cpos.x, cpos.y + 10, cpos.z)
 	_splash.global_position = Vector3(cpos.x, 0.5, cpos.z)
-	_clouds.global_position = Vector3(cpos.x, 15.0, cpos.z)
+	_snow.global_position = Vector3(cpos.x, cpos.y + 10, cpos.z)
 
 	var cam_xz := Vector2(cpos.x, cpos.z)
 	var in_rain := false
@@ -252,44 +244,55 @@ func _process(delta: float) -> void:
 			in_rain = true
 			edge_dist = minf(edge_dist, zone.radius - d)
 
+	# Tuyết thay mưa khi đang trong bio băng giá (FROST).
+	var is_frost: bool = WorldChunk.biome_at(cpos.x, cpos.z, _Data._Dim.DimensionID.REAL_WORLD) == _Data.TileType.FROST
+
 	if in_rain:
 		var ratio: float = clamp(edge_dist / 20.0, 0.0, 1.0)
-		_drops.amount_ratio = ratio
-		_splash.amount_ratio = ratio
-		if _drop_mat:
-			var c: Color = _drop_mat.albedo_color
-			_drop_mat.albedo_color = Color(c.r, c.g, c.b, 0.30 * ratio)
-		if _splash_mat:
-			var c: Color = _splash_mat.albedo_color
-			_splash_mat.albedo_color = Color(c.r, c.g, c.b, 0.25 * ratio)
-			_clouds.amount_ratio = minf(ratio + 0.3, 1.0)
-		_cloud_alpha_target = _cloud_ortho_alpha * ratio
-		if not _drops.emitting:
-			_drops.emitting = true
-			_drops.visible = true
-			_splash.emitting = true
-			_splash.visible = true
+		if is_frost:
+			_snow.amount_ratio = ratio
+			if _snow_pm:
+				var sc: Color = _snow_pm.color
+				_snow_pm.color = Color(sc.r, sc.g, sc.b, 0.85 * ratio)
+			if not _snow.emitting:
+				_snow.emitting = true
+				_snow.visible = true
+				_drops.emitting = false
+				_drops.visible = false
+				_splash.emitting = false
+				_splash.visible = false
+		else:
+			_drops.amount_ratio = ratio
+			_splash.amount_ratio = ratio
+			if _drop_mat:
+				var c: Color = _drop_mat.albedo_color
+				_drop_mat.albedo_color = Color(c.r, c.g, c.b, 0.30 * ratio)
+			if _splash_mat:
+				var c: Color = _splash_mat.albedo_color
+				_splash_mat.albedo_color = Color(c.r, c.g, c.b, 0.25 * ratio)
+			if not _drops.emitting:
+				_drops.emitting = true
+				_drops.visible = true
+				_splash.emitting = true
+				_splash.visible = true
+			if _snow.emitting:
+				_snow.emitting = false
+				_snow.visible = false
 		if TimeSystem:
 			_local_rain_intensity = TimeSystem.get_weather_intensity() * ratio
 		else:
 			_local_rain_intensity = ratio
 	else:
 		_local_rain_intensity = 0.0
-		_cloud_alpha_target = 0.0
 		if _drops.emitting:
 			_drops.emitting = false
 			_drops.visible = false
 			_splash.emitting = false
 			_splash.visible = false
+		if _snow.emitting:
+			_snow.emitting = false
+			_snow.visible = false
 
 	_local_rain_intensity_smoothed = lerp(_local_rain_intensity_smoothed, _local_rain_intensity, delta * 4.0)
 	if abs(_local_rain_intensity_smoothed - _local_rain_intensity) < 0.001:
 		_local_rain_intensity_smoothed = _local_rain_intensity
-
-	_cloud_alpha = lerp(_cloud_alpha, _cloud_alpha_target, delta * 2.0)
-	if _cloud_mat:
-		var c: Color = _cloud_mat.albedo_color
-		_cloud_mat.albedo_color = Color(c.r, c.g, c.b, _cloud_alpha)
-	if _cloud_pm:
-		var c2: Color = _cloud_pm.color
-		_cloud_pm.color = Color(c2.r, c2.g, c2.b, _cloud_alpha)

@@ -16,6 +16,10 @@ var _variant: String = "coast"
 var _base_h: float = 2.6
 var _seed_a: float = 0.0
 
+var _sway_phase: float
+var _sway_freq: float
+var _sway_amp: float
+
 func setup(variant: String = "coast") -> void:
 	_variant = variant
 	_base_h = 3.2 + randf() * 1.8
@@ -34,6 +38,19 @@ func _ready() -> void:
 	super._ready()
 	_build_tree()
 	_setup_collision()
+	_sway_phase = randf() * TAU
+	_sway_freq = 1.0 + randf() * 0.6
+	_sway_amp = deg_to_rad(2.2 + randf() * 0.8)
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	var t := Time.get_ticks_usec() * 0.000001
+	var amp := _sway_amp
+	if _stage == GrowingProp.Stage.SPROUT:
+		amp *= 0.4
+	# Rung lắc tự nhiên: harmonic chính + harmonic phụ tần cao (gió giật).
+	rotation.x = (sin(t * _sway_freq + _sway_phase) * 0.7 + sin(t * _sway_freq * 2.7 + _sway_phase * 1.3 + 0.7) * 0.3) * amp
+	rotation.z = (cos(t * _sway_freq * 0.8 + _sway_phase + 1.0) * 0.7 + cos(t * _sway_freq * 2.1 + _sway_phase + 2.2) * 0.3) * amp * 0.75
 
 func _get_h() -> float:
 	if _stage == GrowingProp.Stage.SPROUT:

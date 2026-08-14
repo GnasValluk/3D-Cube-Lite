@@ -306,6 +306,9 @@ func interact_with_nearby() -> void:
 		if child is CraftingTable and child.is_player_nearby():
 			child.open_ui()
 			return
+		if child is CraftingStation and child.is_player_nearby():
+			child.open_ui()
+			return
 		if child is Furnace and child.is_player_nearby():
 			child.open_ui()
 			return
@@ -775,7 +778,7 @@ func _update_weapon_mesh() -> void:
 		if _bow_aiming:
 			_Bow.cancel_aim(self)
 		return
-	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd"]:
+	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight"]:
 		ToolsMesh.build_held(pivot, item_id)
 		if item_id == "crossbow":
 			_bow_string_node = null
