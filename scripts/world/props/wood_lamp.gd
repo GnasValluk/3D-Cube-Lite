@@ -8,6 +8,8 @@
 extends DestroyableProp
 class_name WoodLamp
 
+const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
+
 # ── Shared materials (tạo 1 lần, tất cả đèn dùng chung) ──────────────────────
 static var _shared_wood_mat:   StandardMaterial3D = null
 static var _shared_glass_mat:  ShaderMaterial     = null
@@ -216,7 +218,9 @@ func _notification(what: int) -> void:
 			RoadLampManager.unregister_crystal(_crystal_mi)
 
 func _process(delta: float) -> void:
-	var t := Time.get_ticks_usec() * 0.000001
+	if not _VoxelShared.sway_active(global_position, 50.0):
+		return
+	var t := _VoxelShared.time_sec()
 	rotation = _base_rotation + Vector3(
 		(sin(t * _sway_freq + _sway_phase) * 0.7 + sin(t * _sway_freq * 2.7 + _sway_phase * 1.3 + 0.7) * 0.3) * _sway_amp,
 		0,

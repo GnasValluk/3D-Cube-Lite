@@ -18,6 +18,7 @@ const _DARKEN: float = 0.72
 
 const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
+const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
 
 var _oval: bool = false
 var _fruit_count: int = 1
@@ -494,7 +495,9 @@ func _on_destroy() -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
-	var t := Time.get_ticks_usec() * 0.000001
+	if not _VoxelShared.sway_active(global_position, 40.0):
+		return
+	var t := _VoxelShared.time_sec()
 	# Dây leo rung lắc theo 2 harmonic cho sinh động hơn.
 	rotation.y = (sin(t * _sway_freq + _sway_phase) * 0.7 + sin(t * _sway_freq * 2.6 + _sway_phase * 1.3 + 0.9) * 0.3) * _sway_amp
 

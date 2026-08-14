@@ -20,6 +20,7 @@ const _DARKEN: float = 0.72
 
 const _ItemDatabase = preload("res://scripts/items/core/item_database.gd")
 const _DroppedItem = preload("res://scripts/items/entities/dropped_item.gd")
+const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
 
 var _shape: int = FruitShape.SLENDER
 var _bush_h: float = 1.0
@@ -398,7 +399,9 @@ func _on_destroy() -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
-	var t := Time.get_ticks_usec() * 0.000001
+	if not _VoxelShared.sway_active(global_position, 40.0):
+		return
+	var t := _VoxelShared.time_sec()
 	var amp := _sway_amp
 	if _stage == GrowingProp.Stage.SPROUT:
 		amp *= 0.4

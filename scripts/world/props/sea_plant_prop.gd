@@ -43,7 +43,11 @@ func _ready() -> void:
 	_sway_amp = deg_to_rad(0.6 + (float((s >> 9) & 0x7FFFFFFF) / 2147483648.0) * 0.9)
 
 func _process(delta: float) -> void:
-	var t := Time.get_ticks_usec() * 0.000001
+	# Chỉ sway khi gần camera — hàng trăm cây biển mỗi cây tính sin/cos mỗi frame
+	# là phí CPU vô ích khi ngoài tầm mắt (dưới nước, sau lưng, xa...).
+	if not _VoxelShared.sway_active(global_position, 50.0):
+		return
+	var t := _VoxelShared.time_sec()
 	var amp := _sway_amp
 	rotation.x = (sin(t * _sway_freq + _sway_phase) * 0.7 + sin(t * _sway_freq * 2.3 + _sway_phase * 1.3 + 0.7) * 0.3) * amp
 	rotation.z = (cos(t * _sway_freq * 0.8 + _sway_phase + 1.0) * 0.7 + cos(t * _sway_freq * 1.7 + _sway_phase + 2.2) * 0.3) * amp * 0.7

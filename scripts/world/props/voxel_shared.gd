@@ -66,3 +66,38 @@ static func build(positions: Array, scales: Array, colors: Array) -> MultiMeshIn
 ## Transform cho 1 instance với scale — dùng khi tự điền MultiMesh.
 static func xform(pos: Vector3, s: float) -> Transform3D:
 	return Transform3D(Basis.from_scale(Vector3.ONE * s), pos)
+
+## ── Sway budget: chỉ tính sway cho prop GẦN camera ───────────────────────────
+## Hàng trăm cây/cỏ biển mỗi cây chạy `_process` + vài sin/cos mỗi frame dù ở
+## xa ngoài tầm mắt → tốn CPU trên máy yếu/mobile. Helper này cache vị trí
+## camera + thời gian 1 lần/frame (static), mỗi prop chỉ so khoảng cách rất rẻ.
+static var _cam_pos: Vector3 = Vector3.INF
+static var _cam_frame: int = -1
+static var _time_sec: float = 0.0
+
+static func _refresh_frame() -> void:
+	var f := Engine.get_process_frames()
+	if f == _cam_frame:
+		return
+	_cam_frame = f
+	_time_sec = Time.get_ticks_usec() * 0.000001
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null and tree.root != null:
+		var cam := tree.root.get_camera_3d()
+		_cam_pos = cam.global_position if cam != null else Vector3.INF
+	else:
+		_cam_pos = Vector3.INF
+
+## Thời gian (giây) cache 1 lần/frame — thay Time.get_ticks_usec() mỗi prop.
+static func time_sec() -> float:
+	_refresh_frame()
+	return _time_sec
+
+## Prop có đáng sway không? `max_dist <= 0` (hoặc không có camera) → luôn true.
+static func sway_active(pos: Vector3, max_dist: float) -> bool:
+	if max_dist <= 0.0:
+		return true
+	_refresh_frame()
+	if _cam_pos == Vector3.INF:
+		return true
+	return _cam_pos.distance_squared_to(pos) <= max_dist * max_dist

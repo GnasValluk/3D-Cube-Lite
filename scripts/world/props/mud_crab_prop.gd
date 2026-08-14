@@ -8,6 +8,8 @@ extends DestroyableProp
 
 const MAX_HP := 5
 
+const _VoxelShared = preload("res://scripts/world/props/voxel_shared.gd")
+
 var _bob_phase: float
 var _bob_timer: float = 0.0
 var _move_timer: float = 0.0
@@ -114,7 +116,10 @@ func _add_box(pos: Vector3, size: Vector3, col: Color) -> MeshInstance3D:
 func _process(delta: float) -> void:
 	_bob_timer += delta
 	_walk_phase += delta
-	var t := Time.get_ticks_usec() * 0.000001
+	# Chỉ tính sway/bob khi gần camera — cua ngoài tầm mắt không cần animate chân.
+	if not _VoxelShared.sway_active(global_position, 40.0):
+		return
+	var t := _VoxelShared.time_sec()
 	if _bob_timer > 0.5:
 		_bob_timer = 0.0
 		# Nhịp thở — nghiêng nhẹ thân

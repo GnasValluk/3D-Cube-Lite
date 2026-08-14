@@ -44,7 +44,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	super._process(delta)
-	var t := Time.get_ticks_usec() * 0.000001
+	if not _VoxelShared.sway_active(global_position, 60.0):
+		return
+	var t := _VoxelShared.time_sec()
 	var amp := _sway_amp
 	if _stage == GrowingProp.Stage.SPROUT:
 		amp *= 0.4
