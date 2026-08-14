@@ -32,3 +32,10 @@ static func shrimp(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, -2, 0, 1.8, 3.0, 0.3, 0.5, body)
 	ItemMeshShared.add_cube(p, -2, 1.5, 1.5, 0.3, 0.3, 1.5, dark)
 	ItemMeshShared.add_cube(p, -2, 1.5, -1.5, 0.3, 0.3, 1.5, dark)
+
+static func experience_orb(p: Node3D) -> void:
+	var core := Color(0.35, 0.75, 1.0)
+	var glow := Color(1.0, 0.85, 0.30)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 2.4, 2.4, 2.4, core)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 1.6, 1.6, 1.6, core.lightened(0.3))
+	ItemMeshShared.add_cube(p, 0, 0, 0, 1.0, 1.0, 1.0, glow)

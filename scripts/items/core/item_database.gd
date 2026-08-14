@@ -111,6 +111,7 @@ static func create_item_db() -> Dictionary:
 
 	# ── Slime ─────────────────────────────────────────────────────────────────
 	_add(db, "slime_ball", "Slimeball", ItemDef.Type.MATERIAL, Color(0.45, 0.85, 0.35), "🟢", "Quả gel dính xanh lá — lấy từ slime, chế tạo Piston Dính / Slime Block", true, 64)
+	_add(db, "experience_orb", "Hạt Kinh Nghiệm", ItemDef.Type.MATERIAL, Color(0.35, 0.75, 1.0), "✦", "Hạt kinh nghiệm lấp lánh xanh-vàng — rơi từ sinh vật bị giết, nhặt được nhận 1 điểm XP", true, 64)
 
 	# ── Vật phẩm từ prop ─────────────────────────────────────────────────────
 	_add(db, "taro", "Môn ngọt (Taro)", ItemDef.Type.FOOD, Color(0.25, 0.50, 0.15), "🌿", "Củ môn ngọt — có thể nấu ăn", true, 16, 12)
@@ -307,6 +308,7 @@ const WEIGHTS: Dictionary = {
 	"grilled_carp": 0.9, "grilled_perch": 0.7, "grilled_tilapia": 1.1,
 	"grilled_snakehead": 1.3, "grilled_flowerhorn": 1.3, "cooked_crab": 0.5,
 	"grilled_eggplant": 0.3, "baked_pumpkin": 0.3,
+	"experience_orb": 0.05,
 }
 
 static func _default_weight(type: int) -> float:

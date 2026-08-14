@@ -70,6 +70,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"coconut_half": CoconutMesh.half(parent)
 		"coconut_drink": CoconutMesh.drink(parent)
 		"raw_pork": CreaturesMesh.meat(parent)
+		"experience_orb": CreaturesMesh.experience_orb(parent)
 		"slime_ball": _build_slime_ball_icon(parent)
 		"water_bucket": _build_water_bucket_icon(parent)
 		"taro": _build_taro_icon(parent)
