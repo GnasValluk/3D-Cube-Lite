@@ -199,7 +199,9 @@ func _verify_phase1() -> void:
 	_check(bad == 0, "phân loại chunk đúng (full có block_data / LOD không)")
 
 	_check(_W._mesh_cache.size() == exp_full, "mesh_cache giữ %d dict full (%d)" % [exp_full, _W._mesh_cache.size()])
-	_check(_W._lod_mesh_cache.size() == exp_lod, "lod_mesh_cache giữ %d dict LOD (%d)" % [exp_lod, _W._lod_mesh_cache.size()])
+	# `_lod_mesh_cache` giờ cũng nhận dữ liệu chunk con từ tile build (tái sử
+	# dụng giữa tile/LOD), nên số entry có thể lớn hơn số LOD chunk chính.
+	_check(_W._lod_mesh_cache.size() >= exp_lod, "lod_mesh_cache giữ %d dict LOD (%d)" % [exp_lod, _W._lod_mesh_cache.size()])
 	_check(_T._tile_mesh_cache.size() == exp_tiles, "tile_mesh_cache giữ %d dict tile (%d)" % [exp_tiles, _T._tile_mesh_cache.size()])
 
 func _verify_phase2() -> void:

@@ -165,6 +165,24 @@ const SPAWN_BIAS_CUT: float = 2000000.0
 const MAX_LOTUS_PER_CHUNK: int = 12
 
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
+	# Thread-safe cache theo ô thế giới: lưới ocean stride-2 (42×42) của 2 chunk
+	# kề nhau overlap ~62% số sample — dùng chung bỏ qua FastNoiseLite FBM lặp.
+	var key := Vector2i(floori(wx), floori(wz))
+	_ocean_cache_lock.lock()
+	if _ocean_cache.has(key):
+		var hit: bool = _ocean_cache[key]
+		_ocean_cache_lock.unlock()
+		return hit
+	_ocean_cache_lock.unlock()
+	var val: bool = _ocean_mask_compute(nd, wx, wz)
+	_ocean_cache_lock.lock()
+	if _ocean_cache.size() >= OCEAN_CACHE_MAX:
+		_ocean_cache.clear()
+	_ocean_cache[key] = val
+	_ocean_cache_lock.unlock()
+	return val
+
+static func _ocean_mask_compute(nd: Dictionary, wx: float, wz: float) -> bool:
 	var ow: FastNoiseLite = nd["ocean_warp"]
 	var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
 	var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
@@ -274,6 +292,12 @@ static var _lod_mesh_cache: Dictionary = {}
 static var _pending_chunks: Dictionary = {}
 static var _pending_mutex := Mutex.new()
 
+## Thread-safe cache `_ocean_mask_at` theo ô thế giới — dùng chung giữa các
+## chunk/tile cận kề (lưới ocean stride-2 overlap ~62% giữa chunk kế nhau).
+static var _ocean_cache: Dictionary = {}
+static var _ocean_cache_lock := Mutex.new()
+const OCEAN_CACHE_MAX: int = 262144
+
 ## ── Task tracking: chờ mọi worker task xong trước khi process thoát ─────────
 ## Worker chạy lúc teardown (chunk build, water, collision, decorative, prewarm)
 ## đọc dữ liệu đang bị destroy → crash 0xC0000005 (từng tái hiện tất định ở
@@ -338,6 +362,7 @@ static func clear_noise_cache() -> void:
 	_mat_cache.clear()
 	_river_noise = null
 	_river_bed_noise = null
+	_ocean_cache.clear()
 
 ## ── Pre-warm mạng đường + sông trên worker thread ────────────────────────────
 ## Network gen tốn ~5-6s một lần (cached static). Chạy trên worker trong lúc
@@ -1528,32 +1553,13 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		mesh_water = _build_water_mesh(bd, cols, dim_id, h_vox, half, {}, _gen_water_top_layer(), water_skip)
 	_prof("S10 water_mesh")
 
-	# ── 7b. Lava mesh — lava do người chơi đổ (xô lava). Scan block data
-	# trực tiếp (không dựa height_grid vì lava ngồi ở đáy hố, có thể > WATER_Y).
+	# ── 7b. Lava mesh — lava do người chơi đổ (xô lava), bao giờ cũng áp
+	# SAU khi chunk đã generate (place_block_at → rebuild_mesh). block_data mới
+	# sinh từ fill_blocks/spawn_ore_hills KHÔNG BAO GIỜ chứa lava → không cần
+	# scan 70656 ô (44ms) mỗi lần generate. Lava đổ sau đó render qua terrain
+	# mesh (rebuild_mesh), không qua compute_chunk.
 	var has_lava: bool = false
-	for vx in range(cols):
-		for vz in range(cols):
-			for ly in range(_BlockData.CHUNK_H):
-				if _is_lava_bid(bd.get_block(vx, ly, vz)):
-					has_lava = true
-					break
-			if has_lava: break
-		if has_lava: break
 	var mesh_lava: ArrayMesh = null
-	if has_lava:
-		var lava_skip := PackedByteArray()
-		lava_skip.resize(cols * cols)
-		lava_skip.fill(0)
-		# max_ly = slab cao nhất có thế là lava (scan nhanh từ trên xuống)
-		var max_lava_ly: int = -1
-		for vx in range(cols):
-			for vz in range(cols):
-				for ly in range(_BlockData.CHUNK_H - 1, -1, -1):
-					if _is_lava_bid(bd.get_block(vx, ly, vz)):
-						max_lava_ly = maxi(max_lava_ly, ly)
-						break
-		mesh_lava = _build_water_mesh(bd, cols, dim_id, h_vox, half, {},
-			maxf(max_lava_ly, 0), lava_skip, 1)
 	_prof("S10 lava_mesh")
 
 	# ── 8. Aquatic mesh — hồ (SAND/SILT) + rong, cỏ biển ở biển nông ──────────

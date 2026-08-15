@@ -71,6 +71,9 @@ func setup(tx: int, tz: int, dim: int) -> void:
 
 static func _thread_build(tile: Node, tx: int, tz: int, dim: int, cx: int, cz: int) -> void:
 	var data: Dictionary = _W.compute_chunk(cx, cz, CHUNK_SIZE, dim, false, true)
+	# Lưu kết quả vào `_lod_mesh_cache` để LOD-chunk / tile lân cận (padding) dùng
+	# lại thay vì build 16 chunk con tính xong — giảm re-work khi refresh/teleport.
+	_W._lod_mesh_cache[_W._cache_key(cx, cz, dim)] = data
 	if is_instance_valid(tile):
 		tile.call_deferred("_receive_chunk", cx, cz, data)
 
@@ -154,3 +157,10 @@ func _attach_mesh(am: ArrayMesh) -> void:
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE and _was_setup:
 		_tile_mesh_cache.erase(_tile_key(_tx, _tz, _dim))
+		# Xóa dữ liệu chunk con ta đã lưu vào `_lod_mesh_cache` (chống phình vô
+		# hạn khi lướt thế giới). Tile lân cận còn sống trong cùng frame sẽ hit
+		# cache trước khi free; sau đó behavior về mặc định như LOD chunk.
+		for cy in range(CHUNKS_PER_SIDE):
+			for cxx in range(CHUNKS_PER_SIDE):
+				var ck := Vector2i(_tx * CHUNKS_PER_SIDE + cxx, _tz * CHUNKS_PER_SIDE + cy)
+				_W._lod_mesh_cache.erase(_W._cache_key(ck.x, ck.y, _dim))

@@ -4,9 +4,23 @@ const _Data = preload("chunk_data.gd")
 
 static var _noise_cache: Dictionary = {}
 
+## ── Cache kết quả biome theo ô thế giới (thread-safe) ────────────────────────
+## `_biome_at` là hàm thuần (chỉ phụ thuộc wx,wz,dim) nhưng mỗi chunk gọi nó cho
+## lưới padding (32+2*PAD=42²) — các chunk/tile cận kề RE-DO cùng một ô thế giới
+## ở vùng overlap → tốn FastNoiseLite FBM hàng nghìn lần. Cache theo ô (floor)
+## cắt ~50-80% số sample: chunk kế, tile 16 chunk con, và LOD/full cùng vùng
+## tái dùng chung. Mutex giữ ngắn (chỉ get/set dict); compute ngoài lock.
+const BIOME_CACHE_MAX: int = 262144
+static var _biome_cache: Dictionary = {}
+static var _biome_cache_lock := Mutex.new()
+
+static func _biome_key(dim_id: int, wx: float, wz: float) -> Vector3i:
+	return Vector3i(dim_id, floori(wx), floori(wz))
+
 ## Gọi để buộc tạo lại noise (vd: khi WorldSeed thay đổi)
 static func clear_cache() -> void:
 	_noise_cache.clear()
+	_biome_cache.clear()
 
 static func _noise_for_dim(dim_id: int) -> Dictionary:
 	if _noise_cache.has(dim_id):
@@ -295,6 +309,22 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	return result
 
 static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
+	var key := _biome_key(dim_id, wx, wz)
+	_biome_cache_lock.lock()
+	if _biome_cache.has(key):
+		var hit: int = _biome_cache[key]
+		_biome_cache_lock.unlock()
+		return hit
+	_biome_cache_lock.unlock()
+	var val: int = _biome_at_uncached(wx, wz, dim_id)
+	_biome_cache_lock.lock()
+	if _biome_cache.size() >= BIOME_CACHE_MAX:
+		_biome_cache.clear()
+	_biome_cache[key] = val
+	_biome_cache_lock.unlock()
+	return val
+
+static func _biome_at_uncached(wx: float, wz: float, dim_id: int) -> int:
 	var nd: Dictionary = _noise_for_dim(dim_id)
 
 	# REAL_WORLD: chỉ desert/frost/swamp noise quyết định — còn lại luôn GRASS_DIRT.
