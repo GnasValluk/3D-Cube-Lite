@@ -63,6 +63,7 @@ func setup(tx: int, tz: int, dim: int) -> void:
 			if _W._lod_mesh_cache.has(wk):
 				_chunk_data[wk] = _W._lod_mesh_cache[wk]
 			else:
+				_W._gen_inc()
 				_W._track_task(WorkerThreadPool.add_task(
 					_thread_build.bind(self, tx, tz, dim, ck.x, ck.y), true, "tile"))
 				needed += 1
@@ -76,6 +77,7 @@ static func _thread_build(tile: Node, tx: int, tz: int, dim: int, cx: int, cz: i
 	_W._lod_mesh_cache[_W._cache_key(cx, cz, dim)] = data
 	if is_instance_valid(tile):
 		tile.call_deferred("_receive_chunk", cx, cz, data)
+	_W._gen_dec()
 
 func _receive_chunk(cx: int, cz: int, data: Dictionary) -> void:
 	if _built:

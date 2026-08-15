@@ -292,6 +292,32 @@ static var _lod_mesh_cache: Dictionary = {}
 static var _pending_chunks: Dictionary = {}
 static var _pending_mutex := Mutex.new()
 
+## ── Giới hạn số chunk/tile generation task song song ─────────────────────────
+## WorkerThreadPool mặc định chạy trên MỌI core (max_threads=-1). Boot/stream
+## đẩy đồng thời ~40+ chunk build + 16 sub-task/tile + water rebuild → bão hoà
+## CPU: mỗi chunk compute phình 10-20x (300-1000ms thay vì 25-46ms solo) và
+## main thread bị đói → frame spike 100-180ms (lag khi load chunk mới).
+## Cap concurrency ≡ nửa số core → gen song song vẫn nhanh, main thread còn
+## tài nguyên render/physics. Manager giữ task chưa gửi trong _pending, chỉ
+## gửi tiếp khi in-flight dưới cap.
+static var _gen_in_flight: int = 0
+static var _gen_mutex := Mutex.new()
+static func _gen_inc() -> void:
+	_gen_mutex.lock()
+	_gen_in_flight += 1
+	_gen_mutex.unlock()
+static func _gen_dec() -> void:
+	_gen_mutex.lock()
+	_gen_in_flight = maxi(0, _gen_in_flight - 1)
+	_gen_mutex.unlock()
+static func gen_in_flight() -> int:
+	_gen_mutex.lock()
+	var v := _gen_in_flight
+	_gen_mutex.unlock()
+	return v
+static func _max_gen_in_flight() -> int:
+	return maxi(1, int(floor(float(OS.get_processor_count()) * 0.5)))
+
 ## Thread-safe cache `_ocean_mask_at` theo ô thế giới — dùng chung giữa các
 ## chunk/tile cận kề (lưới ocean stride-2 overlap ~62% giữa chunk kế nhau).
 static var _ocean_cache: Dictionary = {}
@@ -765,6 +791,7 @@ func setup(cx: int, cz: int, size: int,
 	_pending_mutex.lock()
 	_pending_chunks[ck] = self
 	_pending_mutex.unlock()
+	_gen_inc()
 	_track_task(WorkerThreadPool.add_task(
 		_thread_build.bind(ck, cx, cz, size, dimension_id, lod), true, "chunk"))
 
@@ -778,6 +805,7 @@ static func _thread_build(ck: String, cx: int, cz: int, size: int, dim_id: int, 
 		# Không apply_chunk trực tiếp — chỉ lưu data, manager promote 1 chunk/frame
 		# để tránh nhiều worker hoàn thành cùng lúc → node-creation spike trên main
 		chunk.call_deferred("_store_pending_data", data)
+	_gen_dec()
 
 func _store_pending_data(data: Dictionary) -> void:
 	_pending_data = data

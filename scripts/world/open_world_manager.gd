@@ -113,18 +113,24 @@ func _ready() -> void:
 
 	var to_submit: int = mini(MAX_LOADING_PER_FRAME, _pending.size())
 	for _i in range(to_submit):
+		if not _gen_can_submit():
+			break
 		var key: Vector2i = _pending.pop_front()
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading(key, false)
 
 	var to_submit_lod: int = mini(MAX_LOADING_PER_FRAME, _pending_lod.size())
 	for _i in range(to_submit_lod):
+		if not _gen_can_submit():
+			break
 		var key: Vector2i = _pending_lod.pop_front()
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading_lod(key)
 
 	var to_submit_tile: int = mini(MAX_LOADING_PER_FRAME, _pending_tiles.size())
 	for _i in range(to_submit_tile):
+		if not _gen_can_submit():
+			break
 		var key: Vector2i = _pending_tiles.pop_front()
 		if not _tiles.has(key) and not _loading_tiles.has(key):
 			_start_loading_tile(key)
@@ -404,18 +410,24 @@ func _process(_delta: float) -> void:
 
 	var to_submit: int = mini(MAX_LOADING_PER_FRAME, _pending.size())
 	for _i in range(to_submit):
+		if not _gen_can_submit():
+			break
 		var key: Vector2i = _pending.pop_front()
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading(key, false)
 
 	var to_submit_lod: int = mini(MAX_LOADING_PER_FRAME, _pending_lod.size())
 	for _i in range(to_submit_lod):
+		if not _gen_can_submit():
+			break
 		var key: Vector2i = _pending_lod.pop_front()
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading_lod(key)
 
 	var to_submit_tile: int = mini(MAX_LOADING_PER_FRAME, _pending_tiles.size())
 	for _i in range(to_submit_tile):
+		if not _gen_can_submit():
+			break
 		var key: Vector2i = _pending_tiles.pop_front()
 		if not _tiles.has(key) and not _loading_tiles.has(key):
 			_start_loading_tile(key)
@@ -453,6 +465,15 @@ func _evict_chunk(key: Vector2i) -> void:
 	if chunk != null and is_instance_valid(chunk):
 		chunk.queue_free()
 	_chunks.erase(key)
+
+## ── Giới hạn in-flight generation so với cpu ─────────────────────────────────
+## WorkerThreadPool chạy max_threads = toàn bộ core; manager đẩy full+LOD+tile
+## đồng loạt dễ bão hoà CPU → main thread đói → lag. Chỉ submit khi số task
+## generation đang chạy dưới cap (≈ nửa số core).
+func _gen_can_submit() -> bool:
+	if WorldChunk == null:
+		return true
+	return WorldChunk.gen_in_flight() < WorldChunk._max_gen_in_flight()
 
 ## Nạp chunk dạng LOD (mesh thô). Chunk đi qua đúng `_loading`/promote như full
 ## nhưng apply_chunk nhận dict có `"lod": true` → chỉ dựng 1 MeshInstance3D.
