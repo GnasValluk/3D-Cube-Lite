@@ -259,6 +259,9 @@ FPS_UNLIMITED,Unlimited,Không giới hạn
 CHUNK_VIEW,Chunk View Distance,Khoảng cách tải Chunk
 CHUNK_VIEW_DESC,"Controls how many chunks are loaded around you. Higher = see farther (uses more memory).","Điều khiển số chunk tải quanh bạn. Cao hơn = nhìn xa hơn (tốn bộ nhớ hơn)."
 CHUNK_VIEW_DIM,"%d x %d chunks","%d x %d chunk"
+DISTANT_VIEW,Distant View,Chế độ nhìn xa
+DISTANT_VIEW_DESC,"Renders far terrain as merged low-detail meshes (LOD + tile + merged props) beyond your view radius. Disable for lower memory/load.","Hiển thị địa hình xa dưới dạng mesh gộp độ chi tiết thấp (LOD + tile + props gộp) ngoài bán kính tải. Tắt để giảm bộ nhớ/tải."
+DISTANT_VIEW_TOGGLE,Enable Distant View,Bật chế độ nhìn xa
 FURNACE_LABEL,Furnace,Lò Nung
 FURNACE_INPUT,Raw Material,Nguyên Liệu
 FURNACE_OUTPUT,Product,Sản Phẩm

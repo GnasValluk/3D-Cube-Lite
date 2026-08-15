@@ -361,6 +361,16 @@ func _build_graphics_tab() -> void:
 		_set_chunk_view(rv)
 	)
 
+	_section_label(tr("DISTANT_VIEW"))
+	var distant_desc := Label.new()
+	distant_desc.text = tr("DISTANT_VIEW_DESC")
+	distant_desc.add_theme_font_size_override("font_size", 18)
+	distant_desc.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.70))
+	distant_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
+	distant_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_content_vbox.add_child(distant_desc)
+	_add_toggle(tr("DISTANT_VIEW_TOGGLE"), _is_distant_view(), func(v): _set_distant_view(v))
+
 func _build_audio_tab() -> void:
 	_section_label(tr("MASTER_VOLUME"))
 	_add_slider(_get_master_volume(), func(v): _set_master_volume(v))
@@ -484,6 +494,8 @@ func _is_fullscreen() -> bool: return _Settings.is_fullscreen()
 func _set_fullscreen(v: bool) -> void: _Settings.set_fullscreen(v)
 func _is_vsync() -> bool: return _Settings.is_vsync()
 func _set_vsync(v: bool) -> void: _Settings.set_vsync(v)
+func _is_distant_view() -> bool: return _Settings.is_distant_view()
+func _set_distant_view(v: bool) -> void: _Settings.set_distant_view(v)
 func _set_framerate(mode: int) -> void: _Settings.set_framerate(mode)
 func _get_master_volume() -> float: return _Settings.get_master_volume()
 func _set_master_volume(v: float) -> void: _Settings.set_master_volume(v)

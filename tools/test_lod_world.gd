@@ -9,6 +9,8 @@ extends Node3D
 ##  (D) manager thật: full (≤vr) + LOD thô (ngoài vr, tile không phủ) + tile 4×4
 ##      (vùng xa) — đủ 529 chunk-slot không hở/không trùng, cache đếm khớp
 ##      want-set, teleport → full giữ nguyên (chống thrash), vùng mới nạp đúng.
+##  (E) distant_view toggle lúc chạy: tắt → thả toàn bộ LOD/tile, chỉ còn full
+##      trong view_radius; bật lại → nạp lại LOD + tile, phủ đủ chân trời.
 
 const _W = preload("res://scripts/world/chunk/world_chunk.gd")
 const _D = preload("res://scripts/world/chunk/chunk_data.gd")
@@ -128,6 +130,34 @@ func _process(_delta: float) -> void:
 			if _f < 40:
 				return
 			_verify_phase2()
+			print("[stage E] tắt distant_view...")
+			SettingsManager.set_distant_view(false)
+			_phase = "phase3_off"
+			_f = 0
+		"phase3_off":
+			if not _wm_stable():
+				if _f % 200 == 0:
+					print("[phase3_off] chờ... frames=%d loading=%d pending=%d lod=%d tiles=%d" % [
+						_f, _wm._loading.size(), _wm._pending.size(),
+						_wm._pending_lod.size(), _wm._pending_tiles.size()])
+				return
+			if _f < 40:
+				return
+			_verify_phase3()
+			print("[stage E] bật lại distant_view...")
+			SettingsManager.set_distant_view(true)
+			_phase = "phase4_on"
+			_f = 0
+		"phase4_on":
+			if not _wm_stable():
+				if _f % 200 == 0:
+					print("[phase4_on] chờ... frames=%d loading=%d pending=%d lod=%d tiles=%d" % [
+						_f, _wm._loading.size(), _wm._pending.size(),
+						_wm._pending_lod.size(), _wm._pending_tiles.size()])
+				return
+			if _f < 40:
+				return
+			_verify_phase4()
 			_phase = "done"
 			_finish.call_deferred()
 
@@ -224,6 +254,44 @@ func _verify_phase2() -> void:
 	var total_slots: int = (2 * hi + 1) * (2 * hi + 1)
 	_check(_wm._chunks.size() + 16 * _wm._tiles.size() == total_slots,
 		"vùng mới phủ đủ %d chunk-slot" % total_slots)
+
+func _verify_phase3() -> void:
+	var vr: int = _wm.view_radius
+	_check(not _wm._distant_view_enabled(), "distant_view đã TẮT (helper false)")
+	_check(_wm._horizon() == vr, "horizon thu về view_radius khi tắt (%d == %d)" % [_wm._horizon(), vr])
+	_check(_wm._lod_view_radius() == vr, "lod_view_radius thu về view_radius (%d == %d)" % [_wm._lod_view_radius(), vr])
+	_check(_wm._tiles.is_empty() and _wm._loading_tiles.is_empty(),
+		"tile đã thả hết khi tắt (tiles=%d loading=%d)" % [_wm._tiles.size(), _wm._loading_tiles.size()])
+	var exp_full: int = (2 * vr + 1) * (2 * vr + 1)
+	_check(_wm._chunks.size() == exp_full,
+		"số chunk bằng đúng full trong view_radius (%d == %d)" % [_wm._chunks.size(), exp_full])
+	var all_full: bool = true
+	var any_lod: bool = false
+	for key in _wm._chunks:
+		var c: Node = _wm._chunks[key]
+		if bool(c._is_lod) or c.block_data == null:
+			all_full = false
+		if bool(c._is_lod):
+			any_lod = true
+	_check(all_full, "mọi chunk còn lại đều FULL (có block_data)")
+	_check(not any_lod, "không còn chunk LOD nào khi tắt")
+
+func _verify_phase4() -> void:
+	var cur := Vector2i(_wm.view_radius + 2, 0)
+	var hi: int = _wm._horizon()
+	var want: Dictionary = _wm._build_want_sets(cur)
+	var exp_full: int = (want["full"] as Array).size()
+	var exp_lod: int = (want["lod"] as Array).size()
+	var exp_tiles: int = (want["tile"] as Dictionary).size()
+	var total_slots: int = (2 * hi + 1) * (2 * hi + 1)
+	_check(_wm._distant_view_enabled(), "distant_view đã BẬT lại")
+	_check(_wm._chunks.size() == exp_full + exp_lod,
+		"sau khi bật lại: chunk khớp want-set full+LOD (%d == %d+%d)" % [_wm._chunks.size(), exp_full, exp_lod])
+	_check(_wm._tiles.size() == exp_tiles,
+		"sau khi bật lại: tile khớp want-set (%d == %d)" % [_wm._tiles.size(), exp_tiles])
+	_check(_wm._chunks.size() + 16 * _wm._tiles.size() == total_slots,
+		"sau khi bật lại: phủ đủ %d chunk-slot (chunks=%d tiles=%d)" % [
+			total_slots, _wm._chunks.size(), _wm._tiles.size()])
 
 func _finish() -> void:
 	await _W.wait_for_tasks_async(get_tree())

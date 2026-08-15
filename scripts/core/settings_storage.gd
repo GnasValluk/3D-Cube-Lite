@@ -155,3 +155,10 @@ static func get_chunk_view() -> int:
 
 static func set_chunk_view(v: int) -> void:
 	SettingsManager.set_chunk_view(v)
+
+static func is_distant_view() -> bool:
+	return true if SettingsManager == null else SettingsManager.distant_view
+
+static func set_distant_view(v: bool) -> void:
+	if SettingsManager:
+		SettingsManager.set_distant_view(v)

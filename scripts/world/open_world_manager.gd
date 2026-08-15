@@ -58,6 +58,7 @@ func _ready() -> void:
 
 	if SettingsManager:
 		SettingsManager.on_chunk_view_changed(queue_chunk_view_refresh)
+		SettingsManager.on_distant_view_changed(queue_distant_view_refresh)
 	view_radius = _current_view_radius()
 	_last_view_radius = view_radius
 
@@ -134,10 +135,17 @@ func _ready() -> void:
 func _current_view_radius() -> int:
 	return SettingsManager.chunk_view if SettingsManager else 3
 
+## Distant view (LOD ring thô + tile merge + FarPropPool) có bật không. Tắt → nạp
+## đúng view_radius chunk FULL, không nạp LOD/tile/xa props — horizon thu về vr.
+func _distant_view_enabled() -> bool:
+	return true if SettingsManager == null else SettingsManager.distant_view
+
 func _lod_view_radius() -> int:
-	return view_radius + LOD_RING_EXTRA
+	return view_radius + LOD_RING_EXTRA if _distant_view_enabled() else view_radius
 
 func _horizon() -> int:
+	if not _distant_view_enabled():
+		return view_radius
 	return view_radius + LOD_RING_EXTRA + MERGE_RING_EXTRA
 
 func _tile_of(ck: Vector2i) -> Vector2i:
@@ -201,6 +209,13 @@ func _build_want_sets(cur: Vector2i) -> Dictionary:
 func queue_chunk_view_refresh() -> void:
 	if SettingsManager:
 		view_radius = SettingsManager.chunk_view
+
+## Distant view đổi lúc chạy → ép refresh keep-set trong frame tới: khi tắt phải
+## thả mọi LOD/tile/xa-prop đang có, khi bật phải nạp lại. Muốn cả `_last_chunk`
+## và `_last_view_radius` invalid thì phá radius (đổi sang -1) để `_process` thấy
+## lệch và rebuild want-set mới.
+func queue_distant_view_refresh() -> void:
+	_last_view_radius = -1
 
 func _find_player() -> void:
 	var mgr := get_node("../CharacterManager") as CharacterManager
@@ -298,11 +313,11 @@ func _process(_delta: float) -> void:
 	# đưa toàn bộ proxy vào FarPropPool (gộp multi-chunk → 1 MultiMesh/loại).
 	# set_props_near early-return nếu cờ không đổi → chạy mỗi frame rẻ, đúng cho
 	# cả chunk vừa promote trong frame này. Flush dựng MultiMesh lazy 1 lần/frame.
-	var ring: int = WorldChunk.PROP_MERGE_RING
+	var ring: int = WorldChunk.PROP_MERGE_RING if _distant_view_enabled() else -1
 	for key in _chunks.keys():
 		var c: WorldChunk = _chunks[key] as WorldChunk
 		if c != null and is_instance_valid(c):
-			c.set_props_near(maxi(absi(key.x - cx), absi(key.y - cz)) <= ring)
+			c.set_props_near(ring < 0 or maxi(absi(key.x - cx), absi(key.y - cz)) <= ring)
 	_FarPropPool.flush()
 
 	# ── Lazy collision ────────────────────────────────────────────────────────

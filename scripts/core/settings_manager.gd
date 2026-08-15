@@ -25,6 +25,7 @@ static var button_scale: float = 1.0
 static var device_mode: int = 0
 static var player_skin: String = "cora"
 static var chunk_view: int = 3
+static var distant_view: bool = true
 static var key_bindings: Dictionary = {
 	"controls/interact": KEY_F,
 	"controls/inventory": KEY_E,
@@ -35,6 +36,7 @@ static var key_bindings: Dictionary = {
 
 static var _preset_changed_callbacks: Array[Callable] = []
 static var _chunk_view_changed_callbacks: Array[Callable] = []
+static var _distant_view_changed_callbacks: Array[Callable] = []
 
 func _ready() -> void:
 	_load_translations()
@@ -80,6 +82,13 @@ static func _notify_chunk_view_changed() -> void:
 	for cb in _chunk_view_changed_callbacks:
 		cb.call()
 
+static func on_distant_view_changed(cb: Callable) -> void:
+	_distant_view_changed_callbacks.append(cb)
+
+static func _notify_distant_view_changed() -> void:
+	for cb in _distant_view_changed_callbacks:
+		cb.call()
+
 func load_settings() -> void:
 	var config := ConfigFile.new()
 	if config.load(SETTINGS_PATH) != OK:
@@ -102,6 +111,7 @@ func load_settings() -> void:
 	device_mode = config.get_value(SECTION, "device_mode", 0)
 	player_skin = config.get_value(SECTION, "player_skin", "cora")
 	chunk_view = config.get_value(SECTION, "chunk_view", 3)
+	distant_view = config.get_value(SECTION, "distant_view", true)
 	var saved_keys: Dictionary = config.get_value(SECTION, "key_bindings", {})
 	for action in key_bindings:
 		if saved_keys.has(action):
@@ -165,6 +175,7 @@ static func save_settings() -> void:
 	config.set_value(SECTION, "device_mode", device_mode)
 	config.set_value(SECTION, "player_skin", player_skin)
 	config.set_value(SECTION, "chunk_view", chunk_view)
+	config.set_value(SECTION, "distant_view", distant_view)
 	config.set_value(SECTION, "key_bindings", key_bindings)
 	config.save(SETTINGS_PATH)
 
@@ -185,6 +196,12 @@ static func set_chunk_view(value: int) -> void:
 	if SettingsData:
 		SettingsData.save_settings()
 	_notify_chunk_view_changed()
+
+static func set_distant_view(value: bool) -> void:
+	distant_view = value
+	if SettingsData:
+		SettingsData.save_settings()
+	_notify_distant_view_changed()
 
 static func apply_viewport_settings(viewport: Viewport) -> void:
 	var is_mob: bool = DeviceManager != null and DeviceManager.is_mobile()

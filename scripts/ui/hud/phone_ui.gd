@@ -421,6 +421,7 @@ func _build_settings_graphics(parent: VBoxContainer, _sw: float) -> void:
 
 	_settings_section_label(parent, "Chunk View")
 	_settings_add_chunk_view_slider(parent, "Render Distance", _get_chunk_view(), 2, 8, func(v): _set_chunk_view(v))
+	_settings_add_toggle(parent, "Distant View", _is_distant_view(), func(v): _set_distant_view(v))
 
 func _settings_add_chunk_view_slider(parent: VBoxContainer, label: String, initial: int, min_v: float, max_v: float, cb: Callable) -> void:
 	var hbox := HBoxContainer.new()
@@ -588,6 +589,8 @@ func _set_device_mode(v: int) -> void:
 
 func _get_chunk_view() -> int: return _Settings.get_chunk_view()
 func _set_chunk_view(v: int) -> void: _Settings.set_chunk_view(v)
+func _is_distant_view() -> bool: return _Settings.is_distant_view()
+func _set_distant_view(v: bool) -> void: _Settings.set_distant_view(v)
 
 func _get_keybinding(action: String, default_key: int) -> int: return _Settings.get_keybinding(action, default_key)
 
