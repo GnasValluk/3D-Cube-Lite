@@ -10,6 +10,13 @@ const MAX_LOADING_PER_FRAME: int = 1
 ## Số vòng thêm, mỗi vòng = CHUNK_SIZE khối. Đổi được lúc chạy.
 const LOD_RING_EXTRA: int = 4
 
+## Tile merge (Distant-Horizons mở rộng): ngoài ring LOD thô, gộp 4×4 chunk xa
+## thành 1 mesh (1 node) thay vì 16 chunk riêng → cắt node/draw call vùng
+## rất xa. Chân trời cuối = view_radius + LOD_RING_EXTRA + MERGE_RING_EXTRA.
+const MERGE_RING_EXTRA: int = 4
+
+const _WorldTile = preload("res://scripts/world/chunk/world_tile.gd")
+
 ## Bán kính tải chunk (ô vuông quanh player). Đọc từ SettingsManager để có thể
 ## chỉnh trong lúc chơi và áp dụng ngay (rebuild giữ nguyên các chunk trong
 ## phạm vi mới, chỉ nạp thêm phần mở rộng).
@@ -31,6 +38,9 @@ var _last_chunk: Vector2i = Vector2i(99999, 99999)
 var _last_pos: Vector3 = Vector3(99999, 99999, 99999)
 var _pending: Array[Vector2i] = []
 var _pending_lod: Array[Vector2i] = []
+var _tiles: Dictionary = {}
+var _loading_tiles: Dictionary = {}
+var _pending_tiles: Array[Vector2i] = []
 
 var _initial_generated: bool = false
 var _loading_ready: bool = false
@@ -84,12 +94,20 @@ func _ready() -> void:
 
 	_start_loading(Vector2i(cx, cz), true)
 
-	for dx in range(-view_radius, view_radius + 1):
-		for dz in range(-view_radius, view_radius + 1):
-			var key := Vector2i(cx + dx, cz + dz)
-			if key != Vector2i(cx, cz) and not _loading.has(key) and not _chunks.has(key):
-				_pending.append(key)
-	_pending.sort_custom(_sort_chunks)
+	# Vòng nạp ban đầu (full + LOD + tile) — để player đứng yên vẫn có đủ thế
+	# giới hiển thị, không phải đợi refresh khi mới băng qua chunk.
+	var ws := _build_want_sets(Vector2i(cx, cz))
+	_pending = (ws["full"] as Array[Vector2i]).duplicate()
+	_pending.erase(Vector2i(cx, cz))
+	_pending_lod = (ws["lod"] as Array[Vector2i]).duplicate()
+	for tk in (ws["tile"] as Dictionary).keys():
+		if not _loading_tiles.has(tk) and not _tiles.has(tk):
+			_pending_tiles.append(tk)
+	_pending_tiles.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var ca := Vector2i(a.x * 4 + 2, a.y * 4 + 2)
+		var cb := Vector2i(b.x * 4 + 2, b.y * 4 + 2)
+		return (ca - Vector2i(cx, cz)).length_squared() \
+				< (cb - Vector2i(cx, cz)).length_squared())
 
 	var to_submit: int = mini(MAX_LOADING_PER_FRAME, _pending.size())
 	for _i in range(to_submit):
@@ -97,23 +115,17 @@ func _ready() -> void:
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading(key, false)
 
-	# Vòng LOD ban đầu: nạp luôn phần ring ngoài view_radius để player đứng yên
-	# vẫn có hình dáng thế giới xa (không phải đợi refresh khi băng qua chunk).
-	var lod_r: int = _lod_view_radius()
-	for dx in range(-lod_r, lod_r + 1):
-		for dz in range(-lod_r, lod_r + 1):
-			if maxi(absi(dx), absi(dz)) <= view_radius:
-				continue
-			var key := Vector2i(cx + dx, cz + dz)
-			if not _loading.has(key) and not _chunks.has(key):
-				_pending_lod.append(key)
-	_pending_lod.sort_custom(_sort_chunks)
-
 	var to_submit_lod: int = mini(MAX_LOADING_PER_FRAME, _pending_lod.size())
 	for _i in range(to_submit_lod):
 		var key: Vector2i = _pending_lod.pop_front()
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading_lod(key)
+
+	var to_submit_tile: int = mini(MAX_LOADING_PER_FRAME, _pending_tiles.size())
+	for _i in range(to_submit_tile):
+		var key: Vector2i = _pending_tiles.pop_front()
+		if not _tiles.has(key) and not _loading_tiles.has(key):
+			_start_loading_tile(key)
 
 	_initial_generated = true
 	_check_initial_ready()
@@ -123,6 +135,65 @@ func _current_view_radius() -> int:
 
 func _lod_view_radius() -> int:
 	return view_radius + LOD_RING_EXTRA
+
+func _horizon() -> int:
+	return view_radius + LOD_RING_EXTRA + MERGE_RING_EXTRA
+
+func _tile_of(ck: Vector2i) -> Vector2i:
+	return Vector2i(floori(ck.x / 4.0), floori(ck.y / 4.0))
+
+## Chebyshev của chunk GẦN NHẤT trong tile so với (x, y) — dùng để loại tile nằm
+## lấn vào vùng full (mind ≤ view_radius → tile bị loại, chunk phủ lại riêng).
+func _tile_dist_inner(tx: int, tz: int, x: int, y: int) -> int:
+	var cx: int = clampi(x, tx * 4, tx * 4 + 3)
+	var cz: int = clampi(y, tz * 4, tz * 4 + 3)
+	return maxi(absi(cx - x), absi(cz - y))
+
+func _tile_dist_outer(tx: int, tz: int, x: int, y: int) -> int:
+	var dx := maxi(absi(tx * 4 - x), absi(tx * 4 + 3 - x))
+	var dz := maxi(absi(tz * 4 - y), absi(tz * 4 + 3 - y))
+	return maxi(dx, dz)
+
+## Tile được giữ nếu MỌI chunk của nó nằm ngoài ring LOD thô (mind > lo) và trong
+## chân trời (maxd ≤ hi). Ring LOD thô (view_radius..lo] và chunk do tile phủ là
+## 2 tập rời nhau → không z-fight, không hở.
+func _compute_tile_keep(cur: Vector2i) -> Dictionary:
+	var lo: int = _lod_view_radius()
+	var hi: int = _horizon()
+	var keep: Dictionary = {}
+	var tx0 := floori((cur.x - hi) / 4.0) - 2
+	var tx1 := floori((cur.x + hi) / 4.0) + 2
+	var tz0 := floori((cur.y - hi) / 4.0) - 2
+	var tz1 := floori((cur.y + hi) / 4.0) + 2
+	for tx in range(tx0, tx1 + 1):
+		for tz in range(tz0, tz1 + 1):
+			var d_in := _tile_dist_inner(tx, tz, cur.x, cur.y)
+			var d_out := _tile_dist_outer(tx, tz, cur.x, cur.y)
+			if d_in > lo and d_out <= hi:
+				keep[Vector2i(tx, tz)] = true
+	return keep
+
+## Want-set cho chunk: 2 = full (rv ≤ vr), 1 = LOD thô (rv ≤ hi & tile không phủ),
+## tile phủ → không cần chunk-node. Trả về { full: Array[Vector2i], lod: Array,
+## tile: Dictionary(tile_key → true) } đã sort full/lod theo khoảng cách đến cur.
+func _build_want_sets(cur: Vector2i) -> Dictionary:
+	var hi: int = _horizon()
+	var tile_keep := _compute_tile_keep(cur)
+	var full_arr: Array[Vector2i] = []
+	var lod_arr: Array[Vector2i] = []
+	for dx in range(-hi, hi + 1):
+		for dz in range(-hi, hi + 1):
+			var rv := maxi(absi(dx), absi(dz))
+			var key := Vector2i(cur.x + dx, cur.y + dz)
+			if rv <= view_radius:
+				full_arr.append(key)
+			elif not tile_keep.has(_tile_of(key)):
+				lod_arr.append(key)
+	full_arr.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return (a - cur).length_squared() < (b - cur).length_squared())
+	lod_arr.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return (a - cur).length_squared() < (b - cur).length_squared())
+	return { "full": full_arr, "lod": lod_arr, "tile": tile_keep }
 
 ## Callback khi setting chunk_view đổi — đổi view_radius ngay; _process sẽ thấy
 ## radius đổi và refresh keep-set (nạp phần mở rộng / thả phần ngoài) trong frame tới.
@@ -207,6 +278,20 @@ func _process(_delta: float) -> void:
 		chunk.refresh_boundary_water()
 		_check_initial_ready()
 
+	# ── Promote tile đã build ──────────────────────────────────────────────────
+	# Tile gộp đủ 16 chunk (worker) → sang `_tiles` + gỡ các LOD chunk bên trong
+	# (chuyển sang tile) để không hiển thị 2 mesh cùng vị trí.
+	var tiles_ready: Array[Vector2i] = []
+	for tk in _loading_tiles.keys():
+		var t: Node = _loading_tiles[tk]
+		if t != null and t.get("_built") == true:
+			tiles_ready.append(tk)
+	for tk in tiles_ready:
+		var tile: Node = _loading_tiles[tk]
+		_loading_tiles.erase(tk)
+		_tiles[tk] = tile
+		_evict_lod_inside(tk)
+
 	# ── Lazy collision ────────────────────────────────────────────────────────
 	# Chunk mới chỉ đánh dấu _collision_pending (không dựng trimesh ngay — mỗi
 	# trimesh ~6-12ms, cost theo body). Chỉ push shape cho chunk gần player
@@ -222,7 +307,7 @@ func _process(_delta: float) -> void:
 		view_radius = r
 
 	if dist_moved < 0.25 and _pending.is_empty() and _pending_lod.is_empty() \
-			and cur == _last_chunk and r == _last_view_radius:
+			and _pending_tiles.is_empty() and cur == _last_chunk and r == _last_view_radius:
 		return
 
 	_last_pos = ppos
@@ -231,63 +316,63 @@ func _process(_delta: float) -> void:
 	if refresh_keep:
 		_last_chunk = cur
 		_last_view_radius = view_radius
-		var keep: Array[Vector2i] = []
-		for dx in range(-view_radius, view_radius + 1):
-			for dz in range(-view_radius, view_radius + 1):
-				keep.append(Vector2i(cx + dx, cz + dz))
-		var lod_r: int = _lod_view_radius()
-		var keep_lod: Array[Vector2i] = []
-		for dx in range(-lod_r, lod_r + 1):
-			for dz in range(-lod_r, lod_r + 1):
-				keep_lod.append(Vector2i(cx + dx, cz + dz))
-
-		# want_full = chunk trong bán kính đầy đủ; want_lod = chỉ nằm vòng LOD.
-		# Mode: 0 = không cần, 1 = LOD (mesh thô), 2 = full. Nguyên tắc:
-		#   - ngoài toàn bộ phạm vi (want 0) → gỡ.
-		#   - đang LOD mà cần full (want > mode) → gỡ để nạp lại full.
-		#   - đang full mà chỉ cần LOD (want < mode) → GIỮ NGUYÊN (tránh thrash
-		#     nạp/thả 2 lần liên tiếp quanh biên; chunk full thừa vẫn nhẹ hơn việc
-		#     đổi qua lại mỗi frame).
+		var ws := _build_want_sets(cur)
 		var want_full := {}
-		for k in keep:
+		for k in ws["full"]:
 			want_full[k] = true
 		var want_lod := {}
-		for k in keep_lod:
-			if not want_full.has(k):
-				want_lod[k] = true
+		for k in ws["lod"]:
+			want_lod[k] = true
+		var tile_keep: Dictionary = ws["tile"]
 
+		# ── Evict chunk ────────────────────────────────────────────────────
+		# Bỏ khi ngoài chân trời (want 0) hoặc cần nâng cấp lên full (want 2 >
+		# mode). Chunk do tile phủ (want 0 nhưng tile_keep) thì GIỮ — tile sẽ
+		# tiếp quản sau khi build xong (tránh hở + z-fight lúc đổi lớp).
+		# Full mà chỉ còn cần LOD/tile (want < mode) → giữ nguyên để khỏi thrash.
 		for key in _chunks.keys():
 			var chunk: WorldChunk = _chunks[key] as WorldChunk
 			var mode: int = 1 if chunk._is_lod else 2
 			var want: int = 2 if want_full.has(key) else (1 if want_lod.has(key) else 0)
+			if want == 0 and tile_keep.has(_tile_of(key)):
+				continue
 			if want == 0 or want > mode:
 				_evict_chunk(key)
 		for key in _loading.keys():
 			var chunk: WorldChunk = _loading[key] as WorldChunk
 			var mode: int = 1 if chunk._is_lod else 2
 			var want: int = 2 if want_full.has(key) else (1 if want_lod.has(key) else 0)
+			if want == 0 and tile_keep.has(_tile_of(key)):
+				continue
 			if want == 0 or want > mode:
-				var ck_pending: String = "%d,%d,%d" % [key.x, key.y, dimension_id]
-				WorldChunk._pending_chunks.erase(ck_pending)
-				_loading[key].queue_free()
-				_loading.erase(key)
+				_evict_loading_chunk(key)
+
+		# ── Evict tile ra ngoài vùng cần ──────────────────────────────────
+		for tk in _tiles.keys():
+			if not tile_keep.has(tk):
+				(_tiles[tk] as Node).queue_free()
+				_tiles.erase(tk)
+		for tk in _loading_tiles.keys():
+			if not tile_keep.has(tk):
+				(_loading_tiles[tk] as Node).queue_free()
+				_loading_tiles.erase(tk)
 
 		_pending = []
 		_pending_lod = []
-		for key in keep:
-			if not _chunks.has(key) and not _loading.has(key):
-				_pending.append(key)
-		for key in keep_lod:
-			if want_lod.has(key) and not _chunks.has(key) and not _loading.has(key):
-				_pending_lod.append(key)
-		_pending.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-			var da := (a - cur).length_squared()
-			var db := (b - cur).length_squared()
-			return da < db)
-		_pending_lod.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
-			var da := (a - cur).length_squared()
-			var db := (b - cur).length_squared()
-			return da < db)
+		_pending_tiles = []
+		for k in ws["lod"]:
+			if not _chunks.has(k) and not _loading.has(k):
+				_pending_lod.append(k)
+		for k in ws["full"]:
+			if not _chunks.has(k) and not _loading.has(k):
+				_pending.append(k)
+		for tk in tile_keep:
+			if not _tiles.has(tk) and not _loading_tiles.has(tk):
+				_pending_tiles.append(tk)
+		_pending_tiles.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			var ca := Vector2i(a.x * 4 + 2, a.y * 4 + 2)
+			var cb := Vector2i(b.x * 4 + 2, b.y * 4 + 2)
+			return (ca - cur).length_squared() < (cb - cur).length_squared())
 
 	var to_submit: int = mini(MAX_LOADING_PER_FRAME, _pending.size())
 	for _i in range(to_submit):
@@ -300,6 +385,12 @@ func _process(_delta: float) -> void:
 		var key: Vector2i = _pending_lod.pop_front()
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading_lod(key)
+
+	var to_submit_tile: int = mini(MAX_LOADING_PER_FRAME, _pending_tiles.size())
+	for _i in range(to_submit_tile):
+		var key: Vector2i = _pending_tiles.pop_front()
+		if not _tiles.has(key) and not _loading_tiles.has(key):
+			_start_loading_tile(key)
 
 ## ── Lazy collision scan ─────────────────────────────────────────────────────
 ## Push trimesh đến CollisionQueue cho các chunk đã built nhưng còn
@@ -343,6 +434,40 @@ func _start_loading_lod(key: Vector2i) -> void:
 	chunk.setup(key.x, key.y, CHUNK_SIZE, dimension_id, false, true)
 	add_child(chunk)
 	_loading[key] = chunk
+
+## Nạp tile 4×4: 1 node gộp 16 mesh chunk thô. Tile tự đặt position (setup).
+func _start_loading_tile(key: Vector2i) -> void:
+	var tile: Node = _WorldTile.new()
+	add_child(tile)
+	tile.setup(key.x, key.y, dimension_id)
+	_loading_tiles[key] = tile
+
+## Gỡ chunk đang LOAD (hủy worker pending + free). Dùng khi refresh thả chunk.
+func _evict_loading_chunk(key: Vector2i) -> void:
+	var chunk: WorldChunk = _loading.get(key, null) as WorldChunk
+	if chunk != null and is_instance_valid(chunk):
+		WorldChunk._pending_chunks.erase(WorldChunk._cache_key(key.x, key.y, dimension_id))
+		chunk.queue_free()
+	_loading.erase(key)
+
+## Tile build xong → tiếp quản các chunk bên trong: gỡ mọi chunk-node
+## (LOD thô hoặc full cũ sót lại sau teleport) để không có 2 mesh cùng vị trí
+## (z-fight). Chunk full trong tile chỉ tồn tại khi player vừa nhảy xa (thrash
+## protection); khi bị gỡ, `_mesh_cache` vẫn giữ dict → lần sau phục hồi nhanh.
+func _evict_lod_inside(tk: Vector2i) -> void:
+	for cy in range(4):
+		for cxx in range(4):
+			_evict_lod_chunk(Vector2i(tk.x * 4 + cxx, tk.y * 4 + cy))
+
+func _evict_lod_chunk(ck: Vector2i) -> void:
+	if _chunks.has(ck):
+		var c: WorldChunk = _chunks[ck] as WorldChunk
+		if c != null and is_instance_valid(c):
+			c.queue_free()
+		_chunks.erase(ck)
+		return
+	if _loading.has(ck):
+		_evict_loading_chunk(ck)
 
 func _start_loading(key: Vector2i, sync: bool) -> void:
 	var chunk := WorldChunk.new()
