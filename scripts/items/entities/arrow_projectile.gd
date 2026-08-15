@@ -1,6 +1,8 @@
 class_name ArrowProjectile
 extends Area3D
 
+signal arrow_hit(pos: Vector3)
+
 var _damage: int = 10
 var _shooter: Node = null
 var _speed: float = 30.0
@@ -10,6 +12,10 @@ var _dist_traveled: float = 0.0
 var _hit_something: bool = false
 var _trail_timer: float = 0.0
 
+## Shape dùng cho sweep liên tục (cast_motion) — tránh discrete body_entered
+## làm mũi tên "dính" sớm ~1 block khi bay nhanh (step/skin > bán kính).
+var _sweep_shape: SphereShape3D = null
+
 func setup(dir: Vector3, dmg: int, spd: float, max_rng: float, shooter: Node) -> void:
 	_direction = dir
 	_damage = dmg
@@ -17,7 +23,6 @@ func setup(dir: Vector3, dmg: int, spd: float, max_rng: float, shooter: Node) ->
 	_max_range = max_rng
 	_shooter = shooter
 	look_at(global_position + dir, Vector3.UP)
-	body_entered.connect(_on_hit)
 
 func _ready() -> void:
 	var col := CollisionShape3D.new()
@@ -25,6 +30,8 @@ func _ready() -> void:
 	shape.radius = 0.20
 	col.shape = shape
 	add_child(col)
+	_sweep_shape = shape
+	monitoring = false
 
 	var mi := MeshInstance3D.new()
 	mi.mesh = CylinderMesh.new()
@@ -78,7 +85,38 @@ func _physics_process(delta: float) -> void:
 	if _hit_something:
 		return
 	var step := _direction * _speed * delta
-	global_position += step
+	var space := get_world_3d().direct_space_state
+	if space != null:
+		var q := PhysicsShapeQueryParameters3D.new()
+		q.shape = _sweep_shape
+		q.transform = Transform3D(Basis.IDENTITY, global_position)
+		q.motion = step
+		q.collide_with_areas = false
+		q.collide_with_bodies = true
+		if _shooter is CollisionObject3D:
+			q.exclude = [_shooter.get_rid()]
+		var motion := space.cast_motion(q)
+		if motion.size() >= 2:
+			var unsafe: float = motion[1]
+			if unsafe < 1.0:
+				var contact_step: float = step.length() * maxf(unsafe, 0.0)
+				if _spawn_dist + contact_step < 0.3:
+					# Bỏ qua va chạm ngay lúc mới bắn (spawn lùi trước nòng),
+					# tiếp tục bay — tránh dính sát người bắn.
+					global_position += step
+				else:
+					# Dừng CHÍNH XÁC tại điểm chạm (sweep) thay vì để discrete
+					# overlap ăn sâu hàng chục cm → nhìn như dính sớm 1 block.
+					global_position += step * maxf(unsafe, 0.0)
+					_dist_traveled += contact_step
+					_spawn_dist += contact_step
+					_hit_something = true
+					arrow_hit.emit(global_position)
+					_resolve_hit(space)
+					queue_free()
+					return
+			else:
+				global_position += step
 	_dist_traveled += step.length()
 	_spawn_dist += step.length()
 	_trail_timer -= delta
@@ -89,20 +127,25 @@ func _physics_process(delta: float) -> void:
 		_drop_arrow()
 		queue_free()
 
-func _on_hit(body: Node) -> void:
-	if _hit_something:
-		return
-	if _spawn_dist < 0.3:
-		return
-	if body == _shooter:
-		return
-	_hit_something = true
-	if body is CharacterBase and body.is_alive:
-		body.take_damage(_damage, _shooter, 0) # PHYSICAL
-		queue_free()
+func _resolve_hit(space: PhysicsDirectSpaceState3D) -> void:
+	var q := PhysicsShapeQueryParameters3D.new()
+	q.shape = _sweep_shape
+	q.transform = Transform3D(Basis.IDENTITY, global_position)
+	q.collide_with_areas = false
+	q.collide_with_bodies = true
+	if _shooter is CollisionObject3D:
+		q.exclude = [_shooter.get_rid()]
+	var hits := space.intersect_shape(q, 8)
+	for h in hits:
+		var body: Node = h.get("collider")
+		if body == null or body == _shooter:
+			continue
+		if body is CharacterBase and body.is_alive:
+			body.take_damage(_damage, _shooter, 0)
+		else:
+			_drop_arrow()
 		return
 	_drop_arrow()
-	queue_free()
 
 func _spawn_trail() -> void:
 	var parent := get_parent()

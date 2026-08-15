@@ -115,8 +115,6 @@ static func create_item_db() -> Dictionary:
 	_add(db, "experience_orb", "Hạt Kinh Nghiệm", ItemDef.Type.MATERIAL, Color(0.35, 0.75, 1.0), "✦", "Hạt kinh nghiệm lấp lánh xanh-vàng — rơi từ sinh vật bị giết, nhặt được nhận 1 điểm XP", true, 64)
 
 	# ── Quái đồng bằng (đêm) ─────────────────────────────────────────────────
-	_add(db, "straw_ribbon", "Mảnh Rơm Bù Nhìn", ItemDef.Type.MATERIAL, Color(0.55, 0.48, 0.28), "🌾", "Mảnh rơm khô quấn quanh bù nhìn ác quỷ — rơi khi tiêu diệt bù nhìn, nguyên liệu chế tạo", true, 64)
-	_add(db, "wolf_fang", "Nanh Sói Đồng", ItemDef.Type.MATERIAL, Color(0.80, 0.80, 0.78), "🦴", "Nanh sói đồng sắc lẹm — chiến lợi phẩm từ sói đồng đêm, nguyên liệu chế tạo vũ khí", true, 64)
 	_add(db, "wraith_tear", "Giọt Lệ Bóng Đêm", ItemDef.Type.MATERIAL, Color(0.45, 0.60, 0.95), "💧", "Giọt lệ ma quái ngưng tụ từ bóng đêm — rơi khi tiêu diệt hồn ma, nguyên liệu chế tạo phép thuật", true, 64)
 
 	# ── Vật phẩm từ prop ─────────────────────────────────────────────────────
@@ -318,7 +316,7 @@ const WEIGHTS: Dictionary = {
 	"block_mangrove_mud": 2.0, "mangrove_wood": 2.0, "mangrove_seed": 0.2,
 	"block_swamp_mud": 2.0, "block_swamp_dirt": 2.0, "swamp_wood": 2.0,
 	"swamp_seed": 0.2, "swamp_sedge": 0.4, "duckweed": 0.2,
-	"straw_ribbon": 0.3, "wolf_fang": 0.4, "wraith_tear": 0.3,
+	"wraith_tear": 0.3,
 	"golden_ring": 0.1, "leather_backpack": 2.0,
 	"flashlight": 0.8,
 	"lava_bucket": 0.9,

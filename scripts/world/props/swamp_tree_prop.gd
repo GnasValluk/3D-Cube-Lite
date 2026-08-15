@@ -204,39 +204,70 @@ func _trunk_voxels(h: float) -> void:
 				if dx * dx + dz * dz <= r * r:
 					_fill(dx, y, dz, _jitter(col_band))
 
-## Tán tràm: chùm chổi thưa xanh ngả xám trên ngọn, vài nhánh vươn đều.
+## Tán tràm: chùm lá DÀY và RỘNG theo chiều ngang trên ngọn, vươn xa khỏi thân,
+## thêm dây leo thả từ mép tán xuống tận đất.
 func _canopy_voxels(h: float) -> void:
 	var lv := VOXEL * 2.0
 	var crown_y: float = h - 0.55
-	var canopy_r: float = 1.15 + randf() * 0.6
-	var canopy_h: float = 1.4 + randf() * 0.8
+	var canopy_r: float = 2.1 + randf() * 0.9
+	var canopy_h: float = 1.9 + randf() * 0.9
 	var col_leaf := Color(0.13, 0.30, 0.15)
 	var col_leaf_dark := Color(0.10, 0.22, 0.12)
 	var col_leaf_gray := Color(0.24, 0.34, 0.20)
 	var col_branch := Color(0.56, 0.54, 0.49)
-	# Nhánh chính vươn từ thân ra mép tán
-	for bi in range(4):
-		var a: float = _seed_a + float(bi) / 4.0 * TAU + 0.4
-		var from_p := Vector3(sin(a) * 0.10, h - 0.5, cos(a) * 0.10)
-		var to_p := Vector3(sin(a) * (canopy_r * 0.7), crown_y + 0.15, cos(a) * (canopy_r * 0.7))
-		_draw_voxel_segment(from_p, to_p, col_branch, 0.07)
-	# Chùm lá hình chổi, các nhánh con chia nhỏ rìa tán
-	var tip_positions: Array[Vector3] = []
+	# Nhánh chính vươn xa từ thân ra mép tán — đỡ tán rộng
 	for bi in range(6):
-		var a: float = _seed_a + float(bi) / 6.0 * TAU
-		var pr: float = canopy_r * (0.55 + randf() * 0.45)
-		tip_positions.append(Vector3(cos(a) * pr, crown_y + (randf() - 0.5) * canopy_h * 0.6, sin(a) * pr))
+		var a: float = _seed_a + float(bi) / 6.0 * TAU + 0.4
+		var from_p := Vector3(sin(a) * 0.10, h - 0.5, cos(a) * 0.10)
+		var to_p := Vector3(sin(a) * (canopy_r * 0.85), crown_y + 0.15, cos(a) * (canopy_r * 0.85))
+		_draw_voxel_segment(from_p, to_p, col_branch, 0.08)
+	# Lớp tán dày: nhiều cụm lá quanh vòng, bán kính gần mép tán
+	var tip_positions: Array[Vector3] = []
+	var ring_count: int = 14
+	for bi in range(ring_count):
+		var a: float = _seed_a + float(bi) / float(ring_count) * TAU
+		var pr: float = canopy_r * (0.45 + randf() * 0.55)
+		tip_positions.append(Vector3(cos(a) * pr, crown_y + (randf() - 0.5) * canopy_h * 0.5, sin(a) * pr))
 	for tp in tip_positions:
-		for li in range(3):
-			var a2: float = _seed_a + float(li) / 3.0 * TAU + tp.length() * 0.7
-			var ptip := tp + Vector3(cos(a2) * 0.18, 0.28, sin(a2) * 0.18)
+		for li in range(4):
+			var a2: float = _seed_a + float(li) / 4.0 * TAU + tp.length() * 0.7
+			var ptip := tp + Vector3(cos(a2) * 0.22, 0.30, sin(a2) * 0.22)
 			var col: Color = col_leaf
 			var r0 := randf()
 			if r0 < 0.20:
 				col = col_leaf_dark
 			elif r0 > 0.80:
 				col = col_leaf_gray
-			_draw_voxel_segment(tp, ptip, _jitter(col), 0.12, _VoxelShared.LEAF_SCALE)
+			_draw_voxel_segment(tp, ptip, _jitter(col), 0.13, _VoxelShared.LEAF_SCALE)
+	# Lớp lá lấp kín giữa tán (không chỉ rìa) — tán đặc
+	for bi in range(8):
+		var a: float = _seed_a + float(bi) / 8.0 * TAU + 1.9
+		var pr: float = canopy_r * (0.15 + randf() * 0.4)
+		var inner := Vector3(cos(a) * pr, crown_y + (randf() - 0.5) * canopy_h * 0.35, sin(a) * pr)
+		_draw_voxel_segment(inner, inner + Vector3(0.0, 0.22, 0.0), _jitter(col_leaf_dark), 0.15, _VoxelShared.LEAF_SCALE)
+	# Dây leo — thả từ mép tán xuống tận đất, mềm cong
+	var vine_count: int = 5 + randi() % 3
+	for vi in range(vine_count):
+		var a: float = _seed_a + float(vi) / float(vine_count) * TAU + 1.3
+		var pr: float = canopy_r * (0.35 + randf() * 0.65)
+		var top_p := Vector3(cos(a) * pr, crown_y + (randf() - 0.5) * canopy_h * 0.4, sin(a) * pr)
+		_draw_vine(top_p)
+
+## Dây leo rủ từ tán xuống đỉnh — vẽ thành nhiều đoạn cong theo sway ngẫu nhiên.
+func _draw_vine(top: Vector3) -> void:
+	var bot_y: float = 0.25 + randf() * 0.45
+	var segs: int = 4
+	var prev: Vector3 = top
+	var angle: float = _seed_a + randf() * TAU
+	var drift: float = 0.14 + randf() * 0.26
+	var col_vine := Color(0.20, 0.32, 0.16)
+	for si in range(1, segs + 1):
+		var t: float = float(si) / float(segs)
+		var sway := sin(t * TAU + angle) * drift
+		var p := Vector3(top.x + sway * 0.6, lerpf(top.y, bot_y, t), top.z + sway)
+		var r: float = lerpf(0.05, 0.03, t)
+		_draw_voxel_segment(prev, p, _jitter(col_vine), r, _VoxelShared.BRANCH_SCALE)
+		prev = p
 
 ## Chặt trưởng thành → rơi gỗ tràm + đôi khi mầm tràm để trồng lại.
 func _on_destroy() -> void:

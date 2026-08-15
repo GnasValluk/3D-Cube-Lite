@@ -181,6 +181,7 @@ var _tiles_per_chunk: int = 0
 var _biome_grid: Array[Array] = []
 var _dimension_id: int = _Data._Dim.DimensionID.TWILIGHT
 var _built: bool = false
+var _is_lod: bool = false  # chunk xa: mesh thô, không block_data/props/water
 var _collision_pending: bool = false
 var _water_tick_timer: float = 0.0
 var _has_water: bool = false
@@ -258,6 +259,10 @@ static func _prof(tag: String) -> void:
 	_prof_last_usec = now
 
 static var _mesh_cache: Dictionary = {}
+## Cache LOD (mesh thô + height/biome/road) — tách riêng để `_mesh_cache` luôn
+## giữ dữ liệu FULL cho sample_ground_height/is_tavern_built_at/ensure_chunk_built,
+## tránh LOD phủ đè nguồn sự thật. Xoá khi chunk LOD bị free (PREDELETE).
+static var _lod_mesh_cache: Dictionary = {}
 static var _pending_chunks: Dictionary = {}
 static var _pending_mutex := Mutex.new()
 
@@ -321,6 +326,7 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 static func clear_noise_cache() -> void:
 	_Noise.clear_cache()
 	_mesh_cache.clear()
+	_lod_mesh_cache.clear()
 	_mat_cache.clear()
 	_river_noise = null
 	_river_bed_noise = null
@@ -681,37 +687,44 @@ static func _unregister_chunk(cx: int, cz: int, dim: int) -> void:
 	_chunk_registry.erase(_cache_key(cx, cz, dim))
 
 func setup(cx: int, cz: int, size: int,
-		dimension_id: int = _Data._Dim.DimensionID.TWILIGHT, sync: bool = false) -> void:
+		dimension_id: int = _Data._Dim.DimensionID.TWILIGHT, sync: bool = false,
+		lod: bool = false) -> void:
 	# Đồng bộ SeedSnapshot với WorldSeed hiện tại (main thread) — test/flow có
 	# thể set WorldSeed.seed_value trực tiếp; worker chỉ đọc snapshot.
 	SeedSnapshot.set_seed(WorldSeed.seed_value)
 	_cx = cx; _cz = cz; _size = size
 	_dimension_id = dimension_id
+	_is_lod = lod
 	_was_setup = true
 	_cols = int(_size / _Data.VOXEL)
 	_tiles_per_chunk = int(_cols / _Data.TILE_W)
 	_init_materials()
 	_water_tick_timer = randf_range(0.0, 0.5)
-	WorldChunk._register_chunk(cx, cz, dimension_id, self)
+	if not lod:
+		WorldChunk._register_chunk(cx, cz, dimension_id, self)
 
 	var ck: String = _cache_key(cx, cz, dimension_id)
-	if _mesh_cache.has(ck):
+	if not lod and _mesh_cache.has(ck):
 		apply_chunk(_mesh_cache[ck])
+		return
+	if lod and _lod_mesh_cache.has(ck):
+		apply_chunk(_lod_mesh_cache[ck])
 		return
 
 	if sync:
-		apply_chunk(compute_chunk(cx, cz, size, dimension_id, true))
-		call_deferred("_schedule_decorative_rebuild")
+		apply_chunk(compute_chunk(cx, cz, size, dimension_id, true, lod))
+		if not lod:
+			call_deferred("_schedule_decorative_rebuild")
 		return
 
 	_pending_mutex.lock()
 	_pending_chunks[ck] = self
 	_pending_mutex.unlock()
 	_track_task(WorkerThreadPool.add_task(
-		_thread_build.bind(ck, cx, cz, size, dimension_id), true, "chunk"))
+		_thread_build.bind(ck, cx, cz, size, dimension_id, lod), true, "chunk"))
 
-static func _thread_build(ck: String, cx: int, cz: int, size: int, dim_id: int) -> void:
-	var data: Dictionary = compute_chunk(cx, cz, size, dim_id)
+static func _thread_build(ck: String, cx: int, cz: int, size: int, dim_id: int, lod: bool) -> void:
+	var data: Dictionary = compute_chunk(cx, cz, size, dim_id, false, lod)
 	_pending_mutex.lock()
 	var chunk = _pending_chunks.get(ck)
 	_pending_chunks.erase(ck)
@@ -725,7 +738,8 @@ func _store_pending_data(data: Dictionary) -> void:
 	_pending_data = data
 
 ## ── compute_chunk: tạo block data + build mesh ───────────────────────────────
-static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: bool = false) -> Dictionary:
+static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
+		fast_mode: bool = false, lod_mode: bool = false) -> Dictionary:
 	var cols: int = int(size / _Data.VOXEL)
 	var world_ox: float = cx * size
 	var world_oz: float = cz * size
@@ -1042,7 +1056,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 						var sw_t: float = clamp((sw_v - 0.57) / 0.22, 0.0, 1.0)
 						sw_t = sw_t * sw_t * (3.0 - 2.0 * sw_t)
 						var orig_h: float = height_grid[ivx][ivz]
-						var swamp_flat: float = _Data.WATER_Y + 0.30 + (sw_terr - 0.5) * 1.8
+						# Hạ nền bãi lầy xuống sát mực nước → vũng nước đen HIỆN RÕ
+						# khắp đầm (trước đây nền +0.30 cao hơn mực nước nên khó thấy hồ).
+						var swamp_flat: float = _Data.WATER_Y + 0.10 + (sw_terr - 0.5) * 2.0
+						# Hồ đầm lầy — carve sâu thành vũng nước đứng; ngưỡng n_lake THẤP
+						# hơn hồ đồng cỏ (0.58) → số lượng hồ ở đầm lầy nhiều hơn hẳn.
+						var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+						if lv > 0.58:
+							swamp_flat = _Data.WATER_Y - (1.1 + (lv - 0.58) * 7.0)
 						height_grid[ivx][ivz] = lerp(orig_h, swamp_flat, sw_t)
 						# Vũng ngập: mực nước đứng trên bùn; chỉ mô cao mới nhô lên
 						if swamp_flat <= _Data.WATER_Y:
@@ -1333,6 +1354,33 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 						or biome_grid[ivx][ivz] == _Data.TileType.SWAMP_DIRT:
 					road_grid[ivx * cols + ivz] = 0
 	_prof("S6a road_grid")
+
+	# ── LOD MODE: dừng sau height/biome/river/road → mesh THÔ ─────────────────
+	# Chunk xa chỉ cần hình dáng mặt đất: quads thô theo `step`, không block
+	# data, không nước/cỏ/props/làng/quặng/đèn/shaped. Bỏ luôn BFS + fill_blocks
+	# → worker xử lý nhanh hơn hẳn, main chỉ dựng 1 MeshInstance3D.
+	if lod_mode:
+		var st_lod := SurfaceTool.new()
+		st_lod.begin(Mesh.PRIMITIVE_TRIANGLES)
+		_Terrain.build_lod_mesh(st_lod, biome_grid, height_grid, road_grid, cols, dim_id)
+		return {
+			"lod": true,
+			"mesh": st_lod.commit(),
+			"biome_grid": biome_grid,
+			"height_grid": height_grid,
+			"river_flag": river_flag,
+			"road_grid": road_grid,
+			"cols": cols,
+			"block_data_bytes": PackedByteArray(),
+			"has_water": false, "has_lava": false, "has_ores": false,
+			"village_data": { "has": false, "xforms": [], "colors": [], "info": {} },
+			"plant_props": [], "lamp_positions": [],
+			"lotus_lights": [] as Array[Vector3],
+			"grass_blade_data": {},
+			"top_ly_hint": PackedInt32Array(),
+			"stone_patch_mask": PackedByteArray(),
+			"shaped_mesh": null, "shaped_pos": [], "shaped_size": [],
+		}
 
 	# ── 4b. BFS bán kính Chebyshev: nước / đường / đất sa mạc ────────────────
 	# Thay các cửa sổ quét 7×7 lặp lại cho cỏ, cây, môn ngọt bằng tra O(1).
@@ -1740,14 +1788,18 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 				var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
 				if _is_on_road(world_ox + px, world_oz + pz):
 					continue
-				# Cây tràm — mô bùn nhô khỏi mặt nước (cao hơn mực nước)
-				if h > _Data.WATER_Y + 0.15 and _cell_hash01(vx, vz) < 0.026:
+				# Cây tràm — mô bùn nhô khỏi mặt nước (cao hơn mực nước); tán lớn nên thưa
+				if h > _Data.WATER_Y + 0.15 and _cell_hash01(vx, vz) < 0.012:
 					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "swamp_tree", "pos": Vector3(px, y, pz), "variant": "marsh"})
 				# Lác nước — bãi bùn ngập nông tới khô, cụm thành bụi
 				if h > _Data.WATER_Y - 0.8 and h <= _Data.WATER_Y + 0.7 and _cell_hash01(vx + 131, vz + 77) < 0.045:
 					var y2 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "swamp_sedge", "pos": Vector3(px, y2, pz), "variant": "marsh"})
+				# Cua bùn — mô bùn khô nhô trên mực nước (như rừng ngập mặn)
+				if h > _Data.WATER_Y + 0.1 and _cell_hash01(vx + 2089, vz + 167) < 0.012:
+					var y3 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "mud_crab", "pos": Vector3(px, y3, pz), "variant": "mud"})
 				# Bèo — vũng nước đứng (thấp hơn mực nước nên ngập), nổi trên mặt
 				if h < _Data.WATER_Y - 0.05 and _cell_hash01(vx + 977, vz + 313) < 0.016:
 					plant_props.append({"type": "duckweed", "pos": Vector3(px, _Data.WATER_Y + 0.03125, pz), "variant": "marsh"})
@@ -2744,6 +2796,24 @@ func _init_materials() -> void:
 func apply_chunk(data: Dictionary) -> void:
 	if _built:
 		return
+	if data.get("lod", false):
+		# ── LOD chunk: 1 mesh thô duy nhất, cache riêng (không đè _mesh_cache) ──
+		_is_lod = true
+		_biome_grid = data["biome_grid"]
+		_has_water = false
+		_max_water_ly = -1
+		_has_lava = false
+		_has_ores = false
+		_lod_mesh_cache[_cache_key(_cx, _cz, _dimension_id)] = data
+		var mesh: ArrayMesh = data["mesh"]
+		if mesh != null:
+			var mi := MeshInstance3D.new()
+			mi.mesh = mesh
+			mi.material_override = _mat_cache[_dimension_id]["terrain"]
+			add_child(mi)
+			_terrain_mesh_instance = mi
+		_built = true
+		return
 	_mesh_cache[_cache_key(_cx, _cz, _dimension_id)] = data
 	_biome_grid = data["biome_grid"]
 	_has_water = data.get("has_water", false)
@@ -3053,8 +3123,11 @@ func _notification(what: int) -> void:
 		# Evict mesh cache khi chunk bị free — chống phình bộ nhớ vô hạn khi
 		# lướt thế giới (cache chỉ giữ dữ liệu chunk đang/đã load).
 		if _was_setup:
-			_mesh_cache.erase(_cache_key(_cx, _cz, _dimension_id))
-			WorldChunk._unregister_chunk(_cx, _cz, _dimension_id)
+			if _is_lod:
+				_lod_mesh_cache.erase(_cache_key(_cx, _cz, _dimension_id))
+			else:
+				_mesh_cache.erase(_cache_key(_cx, _cz, _dimension_id))
+				WorldChunk._unregister_chunk(_cx, _cz, _dimension_id)
 
 func _apply_collision(shape: Shape3D) -> void:
 	if not is_inside_tree(): return

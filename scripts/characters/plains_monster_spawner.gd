@@ -1,22 +1,19 @@
 ## plains_monster_spawner.gd
 ## Spawn bầy quái đồng bằng quanh player về đêm (17h–6h). Mỗi pack chọn
-## ngẫu nhiên một loài: Bù Nhìn Ác Quỷ (trâu, đập mạnh), Sói Đồng Đêm
-## (nhanh, cắn liên hồi), Bóng Đêm (bắn tia tối từ xa). Chỉ spawn trên đất
+## ngẫu nhiên một loài: Bóng Đêm (bắn tia tối từ xa). Chỉ spawn trên đất
 ## đồng bằng GRASS_DIRT — không trong sa mạc/hồ tuyết/đầm lầy/biển.
 ## Despawn khi xa player, respawn sau khi bị tiêu diệt.
 
 extends Node3D
 class_name PlainsMonsterSpawner
 
-const _Scarecrow = preload("res://scripts/characters/scarecrow/scarecrow_character.gd")
-const _Wolf = preload("res://scripts/characters/wolf/wolf_character.gd")
 const _Wraith = preload("res://scripts/characters/wraith/wraith_character.gd")
 const _Data = preload("res://scripts/world/chunk/chunk_data.gd")
 
-enum MonsterType { SCARECROW, WOLF, WRAITH }
+enum MonsterType { WRAITH }
 
 ## Type được chọn theo tỷ lệ (tổng = 1.0)
-const TYPE_CHANCES: Array[float] = [0.40, 0.35, 0.25]
+const TYPE_CHANCES: Array[float] = [1.0]
 
 class MonsterPack:
 	var home: Vector3
@@ -176,13 +173,7 @@ func _try_generate_packs(player_pos: Vector3) -> void:
 				_spawn_monster(spawn_pos, pack)
 
 func _roll_type() -> int:
-	var r := _rng.randf()
-	var acc: float = 0.0
-	for i in range(TYPE_CHANCES.size()):
-		acc += TYPE_CHANCES[i]
-		if r < acc:
-			return i
-	return MonsterType.SCARECROW
+	return MonsterType.WRAITH
 
 func _pick_spawn_in_pack(pack: MonsterPack) -> Variant:
 	for _i in range(8):
@@ -202,15 +193,8 @@ func _pick_spawn_in_pack(pack: MonsterPack) -> Variant:
 	return null
 
 func _spawn_monster(pos: Vector3, pack: MonsterPack) -> void:
-	var script: Script
-	match pack.mtype:
-		MonsterType.SCARECROW: script = _Scarecrow
-		MonsterType.WOLF:      script = _Wolf
-		_:
-			script = _Wraith
-
 	var mob := CharacterBody3D.new()
-	mob.set_script(script)
+	mob.set_script(_Wraith)
 	mob.set("bio_bonus_lv", WorldChunk.roll_bio_bonus_at(pos.x, pos.z)["bonus"])
 	mob.name = "PlainsMonster_%d_%d" % [_packs.find(pack), pack.monsters.size()]
 	mob.set("_is_player", false)

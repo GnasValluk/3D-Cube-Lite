@@ -111,17 +111,20 @@ func _ready() -> void:
 	_check(found_mud_top, "có cột SWAMP_MUD với block top SWAMP_MUD")
 	_check(found_dirt_under, "có lớp SWAMP_DIRT ngay dưới SWAMP_MUD")
 
-	# Cây tràm + lác trong plant_props của chunk
+	# Cây tràm + lác + bèo + cua bùn trong plant_props của chunk
 	var tree_props := 0
 	var sedge_props := 0
 	var duckweed_props := 0
+	var crab_props := 0
 	for p in data.get("plant_props", []):
 		match p.get("type", ""):
 			"swamp_tree": tree_props += 1
 			"swamp_sedge": sedge_props += 1
 			"duckweed": duckweed_props += 1
+			"mud_crab": crab_props += 1
 	_check(tree_props > 0, "plant_props có cây tràm (%d cây)" % tree_props)
-	print("PASS | cây tràm=%d lác=%d bèo=%d" % [tree_props, sedge_props, duckweed_props])
+	_check(crab_props > 0, "rừng đầm lầy có cua bùn (%d con)" % crab_props)
+	print("PASS | cây tràm=%d lác=%d bèo=%d cua=%d" % [tree_props, sedge_props, duckweed_props, crab_props])
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())

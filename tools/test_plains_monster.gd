@@ -1,8 +1,8 @@
 extends Node3D
 
-## Test spawn quái đồng bằng (Bù Nhìn Ác Quỷ / Sói Đồng / Bóng Đêm) về đêm.
+## Test spawn quái đồng bằng (Bóng Đêm) về đêm.
 ## Kiểm chứng: spawner sinh pack quanh player trong giờ đêm trên biome
-## GRASS_DIRT, quái nằm đúng 3 group để bị cận chiến, drop item có trong DB.
+## GRASS_DIRT, quái nằm đúng group để bị cận chiến, drop item có trong DB.
 ## Ngày → không spawn.
 
 var _failures: int = 0
@@ -26,10 +26,8 @@ func _ready() -> void:
 	for i in range(300):
 		await tree.process_frame
 
-	# ── 1. DB có 3 loot item ──
+	# ── 1. DB có loot item ──
 	ItemDatabase.ensure_db()
-	_check(ItemDatabase.items_db.has("straw_ribbon"), "DB có straw_ribbon")
-	_check(ItemDatabase.items_db.has("wolf_fang"), "DB có wolf_fang")
 	_check(ItemDatabase.items_db.has("wraith_tear"), "DB có wraith_tear")
 
 	# ── 2. Spawner tồn tại ──
@@ -61,15 +59,13 @@ func _ready() -> void:
 	_check(alive > 0, "quái đã spawn (alive=%d)" % alive)
 
 	# ── 5. Quái nằm trong group cận chiến ──
-	var scarecrow_nodes := tree.get_nodes_in_group("scarecrow")
-	var wolf_nodes := tree.get_nodes_in_group("wolf")
 	var wraith_nodes := tree.get_nodes_in_group("wraith")
-	print("DEBUG groups scarecrow=%d wolf=%d wraith=%d" % [scarecrow_nodes.size(), wolf_nodes.size(), wraith_nodes.size()])
-	_check(scarecrow_nodes.size() + wolf_nodes.size() + wraith_nodes.size() > 0, "ít nhất 1 quái trong 3 group")
+	print("DEBUG groups wraith=%d" % wraith_nodes.size())
+	_check(wraith_nodes.size() > 0, "ít nhất 1 quái trong group wraith")
 
 	# ── 6. Mỗi quái là CharacterBase hợp lệ, có group đúng ──
 	var any_valid := 0
-	for grp in ["scarecrow", "wolf", "wraith"]:
+	for grp in ["wraith"]:
 		for mn in tree.get_nodes_in_group(grp):
 			if is_instance_valid(mn) and mn.get("is_alive") and mn is CharacterBase:
 				any_valid += 1
@@ -77,7 +73,7 @@ func _ready() -> void:
 
 	# ── 7. Drop roll tạo item (gọi trực tiếp _roll_loot, kiểm tra spawn item) ──
 	var before := _count_ground_items(world)
-	var m := tree.get_nodes_in_group("wolf")
+	var m := tree.get_nodes_in_group("wraith")
 	if m.size() > 0:
 		m[0]._roll_loot()
 		for i in range(30):

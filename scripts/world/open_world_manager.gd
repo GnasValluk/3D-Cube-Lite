@@ -4,6 +4,12 @@ class_name OpenWorldManager
 const CHUNK_SIZE: int = 32
 const MAX_LOADING_PER_FRAME: int = 1
 
+## ── LOD ring (Distant-Horizons style) ────────────────────────────────────────
+## Ngoài bán kính `view_radius`, các chunk vẫn được nạp nhưng dưới dạng THÔ:
+## 1 mesh duy nhất (không block_data, không cỏ/nước/props) qua build_lod_mesh.
+## Số vòng thêm, mỗi vòng = CHUNK_SIZE khối. Đổi được lúc chạy.
+const LOD_RING_EXTRA: int = 4
+
 ## Bán kính tải chunk (ô vuông quanh player). Đọc từ SettingsManager để có thể
 ## chỉnh trong lúc chơi và áp dụng ngay (rebuild giữ nguyên các chunk trong
 ## phạm vi mới, chỉ nạp thêm phần mở rộng).
@@ -24,6 +30,7 @@ var _player: Node3D = null
 var _last_chunk: Vector2i = Vector2i(99999, 99999)
 var _last_pos: Vector3 = Vector3(99999, 99999, 99999)
 var _pending: Array[Vector2i] = []
+var _pending_lod: Array[Vector2i] = []
 
 var _initial_generated: bool = false
 var _loading_ready: bool = false
@@ -90,11 +97,32 @@ func _ready() -> void:
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading(key, false)
 
+	# Vòng LOD ban đầu: nạp luôn phần ring ngoài view_radius để player đứng yên
+	# vẫn có hình dáng thế giới xa (không phải đợi refresh khi băng qua chunk).
+	var lod_r: int = _lod_view_radius()
+	for dx in range(-lod_r, lod_r + 1):
+		for dz in range(-lod_r, lod_r + 1):
+			if maxi(absi(dx), absi(dz)) <= view_radius:
+				continue
+			var key := Vector2i(cx + dx, cz + dz)
+			if not _loading.has(key) and not _chunks.has(key):
+				_pending_lod.append(key)
+	_pending_lod.sort_custom(_sort_chunks)
+
+	var to_submit_lod: int = mini(MAX_LOADING_PER_FRAME, _pending_lod.size())
+	for _i in range(to_submit_lod):
+		var key: Vector2i = _pending_lod.pop_front()
+		if not _chunks.has(key) and not _loading.has(key):
+			_start_loading_lod(key)
+
 	_initial_generated = true
 	_check_initial_ready()
 
 func _current_view_radius() -> int:
 	return SettingsManager.chunk_view if SettingsManager else 3
+
+func _lod_view_radius() -> int:
+	return view_radius + LOD_RING_EXTRA
 
 ## Callback khi setting chunk_view đổi — đổi view_radius ngay; _process sẽ thấy
 ## radius đổi và refresh keep-set (nạp phần mở rộng / thả phần ngoài) trong frame tới.
@@ -193,7 +221,8 @@ func _process(_delta: float) -> void:
 	if r != _last_view_radius:
 		view_radius = r
 
-	if dist_moved < 0.25 and _pending.is_empty() and cur == _last_chunk and r == _last_view_radius:
+	if dist_moved < 0.25 and _pending.is_empty() and _pending_lod.is_empty() \
+			and cur == _last_chunk and r == _last_view_radius:
 		return
 
 	_last_pos = ppos
@@ -206,23 +235,56 @@ func _process(_delta: float) -> void:
 		for dx in range(-view_radius, view_radius + 1):
 			for dz in range(-view_radius, view_radius + 1):
 				keep.append(Vector2i(cx + dx, cz + dz))
+		var lod_r: int = _lod_view_radius()
+		var keep_lod: Array[Vector2i] = []
+		for dx in range(-lod_r, lod_r + 1):
+			for dz in range(-lod_r, lod_r + 1):
+				keep_lod.append(Vector2i(cx + dx, cz + dz))
+
+		# want_full = chunk trong bán kính đầy đủ; want_lod = chỉ nằm vòng LOD.
+		# Mode: 0 = không cần, 1 = LOD (mesh thô), 2 = full. Nguyên tắc:
+		#   - ngoài toàn bộ phạm vi (want 0) → gỡ.
+		#   - đang LOD mà cần full (want > mode) → gỡ để nạp lại full.
+		#   - đang full mà chỉ cần LOD (want < mode) → GIỮ NGUYÊN (tránh thrash
+		#     nạp/thả 2 lần liên tiếp quanh biên; chunk full thừa vẫn nhẹ hơn việc
+		#     đổi qua lại mỗi frame).
+		var want_full := {}
+		for k in keep:
+			want_full[k] = true
+		var want_lod := {}
+		for k in keep_lod:
+			if not want_full.has(k):
+				want_lod[k] = true
 
 		for key in _chunks.keys():
-			if not key in keep:
-				_chunks[key].queue_free()
-				_chunks.erase(key)
+			var chunk: WorldChunk = _chunks[key] as WorldChunk
+			var mode: int = 1 if chunk._is_lod else 2
+			var want: int = 2 if want_full.has(key) else (1 if want_lod.has(key) else 0)
+			if want == 0 or want > mode:
+				_evict_chunk(key)
 		for key in _loading.keys():
-			if not key in keep:
+			var chunk: WorldChunk = _loading[key] as WorldChunk
+			var mode: int = 1 if chunk._is_lod else 2
+			var want: int = 2 if want_full.has(key) else (1 if want_lod.has(key) else 0)
+			if want == 0 or want > mode:
 				var ck_pending: String = "%d,%d,%d" % [key.x, key.y, dimension_id]
 				WorldChunk._pending_chunks.erase(ck_pending)
 				_loading[key].queue_free()
 				_loading.erase(key)
 
 		_pending = []
+		_pending_lod = []
 		for key in keep:
 			if not _chunks.has(key) and not _loading.has(key):
 				_pending.append(key)
+		for key in keep_lod:
+			if want_lod.has(key) and not _chunks.has(key) and not _loading.has(key):
+				_pending_lod.append(key)
 		_pending.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			var da := (a - cur).length_squared()
+			var db := (b - cur).length_squared()
+			return da < db)
+		_pending_lod.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
 			var da := (a - cur).length_squared()
 			var db := (b - cur).length_squared()
 			return da < db)
@@ -232,6 +294,12 @@ func _process(_delta: float) -> void:
 		var key: Vector2i = _pending.pop_front()
 		if not _chunks.has(key) and not _loading.has(key):
 			_start_loading(key, false)
+
+	var to_submit_lod: int = mini(MAX_LOADING_PER_FRAME, _pending_lod.size())
+	for _i in range(to_submit_lod):
+		var key: Vector2i = _pending_lod.pop_front()
+		if not _chunks.has(key) and not _loading.has(key):
+			_start_loading_lod(key)
 
 ## ── Lazy collision scan ─────────────────────────────────────────────────────
 ## Push trimesh đến CollisionQueue cho các chunk đã built nhưng còn
@@ -260,6 +328,21 @@ func _push_lazy_collision(cur: Vector2i, r: int = 2) -> void:
 	for chunk in pending:
 		CollisionQueue.push_mesh(chunk, chunk._terrain_mesh_instance.mesh)
 		chunk._collision_pending = false
+
+func _evict_chunk(key: Vector2i) -> void:
+	var chunk: WorldChunk = _chunks[key] as WorldChunk
+	if chunk != null and is_instance_valid(chunk):
+		chunk.queue_free()
+	_chunks.erase(key)
+
+## Nạp chunk dạng LOD (mesh thô). Chunk đi qua đúng `_loading`/promote như full
+## nhưng apply_chunk nhận dict có `"lod": true` → chỉ dựng 1 MeshInstance3D.
+func _start_loading_lod(key: Vector2i) -> void:
+	var chunk := WorldChunk.new()
+	chunk.position = Vector3(key.x * CHUNK_SIZE, 0.0, key.y * CHUNK_SIZE)
+	chunk.setup(key.x, key.y, CHUNK_SIZE, dimension_id, false, true)
+	add_child(chunk)
+	_loading[key] = chunk
 
 func _start_loading(key: Vector2i, sync: bool) -> void:
 	var chunk := WorldChunk.new()

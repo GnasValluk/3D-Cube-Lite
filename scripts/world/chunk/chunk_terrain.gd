@@ -544,6 +544,141 @@ static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 					x, z, run_lo, run_hi, cx_f, cz_f, colors, side_mul, bot_mul)
 	_p("column_runs")
 
+## ── _lod_surface_block: block đại diện của ô biome cho mesh LOD ─────────────
+## Bản rút gọn của match trong fill_blocks — chỉ cho màu, không ghi block data.
+static func _lod_surface_block(biome: int) -> int:
+	const B := _Data.BlockID
+	match biome:
+		_Data.TileType.GRASS_DIRT:          return B.GRASS_DIRT
+		_Data.TileType.DARK_GRASS:          return B.DARK_GRASS
+		_Data.TileType.TWILIGHT_GRASS:      return B.TWILIGHT_GRASS
+		_Data.TileType.TWILIGHT_DIRT:       return B.TWILIGHT_DIRT
+		_Data.TileType.YOUNG_GRASS:         return B.YOUNG_GRASS
+		_Data.TileType.DRY_GRASS:           return B.DRY_GRASS
+		_Data.TileType.SPARSE_GRASS:        return B.SPARSE_GRASS
+		_Data.TileType.GRASS:               return B.GRASS
+		_Data.TileType.SAND:                return B.SAND
+		_Data.TileType.SAND_WHITE:          return B.OCEAN_SAND
+		_Data.TileType.SAND_DEEP:           return B.SAND_DEEP
+		_Data.TileType.PALE_SAND:           return B.PALE_SAND
+		_Data.TileType.DIRT:                return B.DIRT
+		_Data.TileType.DESERT:              return B.SAND
+		_Data.TileType.STONE_PATCH:         return B.STONE
+		_Data.TileType.SILT:                return B.SILT
+		_Data.TileType.MUDDY_SAND:          return B.MUDDY_SAND
+		_Data.TileType.MANGROVE_MUD:        return B.MANGROVE_MUD
+		_Data.TileType.FROST:               return B.SNOW
+		_Data.TileType.FROST_SNOW:          return B.SNOW
+		_Data.TileType.SWAMP_MUD:           return B.SWAMP_MUD
+		_Data.TileType.SWAMP_DIRT:          return B.SWAMP_DIRT
+		_Data.TileType.SWAMP:               return B.SWAMP_MUD
+		_Data.TileType.OCEAN_DEEP:          return B.OCEAN_FLOOR
+	return B.GRASS_DIRT
+
+## ── build_lod_mesh: mesh THÔ cho chunk xa (Distant-Horizons style) ───────────
+## Không cần block data: chỉ đọc biome_grid + height_grid + road_grid rồi vẽ
+## quads trên lưới thô `step`. Cột nước → mặt phẳng ở WATER_Y (đại dương/hồ
+## xa trông như mặt nước). Mặt bên vẽ nơi mẫu lân cận thấp hơn → địa hình
+## không có lỗ nhìn/đổ sụt khi nhìn từ xa. Rẻ: 1 MeshInstance3D thay vì cả tá.
+static func build_lod_mesh(st: SurfaceTool, biome_grid: Array, height_grid: Array,
+		road_grid: PackedByteArray, cols: int, dim_id: int, step: int = 4) -> void:
+	const WATER_Y  := _Data.WATER_Y
+	const B        := _Data.BlockID
+	const ROUTE    := B.TRAIL
+	var use_rw: bool = dim_id == _Data._Dim.DimensionID.REAL_WORLD
+	var colors: Array[Color] = _Data.BLOCK_COLORS_RW if use_rw else _Data.BLOCK_COLORS_TW
+	var half: float = float(cols) * 0.5
+	var hw: float = float(step) * 0.5
+	var water_col: Color = colors[B.WATER_SOURCE]
+	var water_c: Color = Color(water_col.r, water_col.g, water_col.b, 1.0)
+
+	var n: int = ceili(float(cols) / float(step))
+	var surf_y := PackedFloat32Array()
+	var surf_land := PackedByteArray()
+	var surf_c := PackedColorArray()
+	surf_y.resize(n * n)
+	surf_land.resize(n * n)
+	surf_c.resize(n * n)
+	for k in range(n):
+		var ci: int = mini(k * step, cols - 1)
+		for l in range(n):
+			var cz_i: int = mini(l * step, cols - 1)
+			var i: int = k * n + l
+			var h: float = height_grid[ci][cz_i]
+			if h <= WATER_Y:
+				surf_y[i] = WATER_Y
+				surf_land[i] = 0
+				surf_c[i] = water_c
+			else:
+				surf_y[i] = h
+				surf_land[i] = 1
+				var blk: int = _lod_surface_block(biome_grid[ci][cz_i])
+				if road_grid.size() > 0 and road_grid[ci * cols + cz_i] != 0:
+					blk = ROUTE
+				surf_c[i] = colors[blk]
+
+	# Top quads — lưới thô phủ trọn chunk (ô tâm lệch nửa step → khớp biên giữa
+	# 2 chunk láng giềng mà không đè đôi/không hở: ô cuối dừng tại biên khoảng).
+	for k in range(n):
+		for l in range(n):
+			var i: int = k * n + l
+			var cx: float = -half + (float(k) * step + 0.5)
+			var cz: float = -half + (float(l) * step + 0.5)
+			_add_quad(st, Vector3(cx, surf_y[i], cz),
+				Vector3(hw, 0, 0), Vector3(0, 0, hw), Vector3(0, 1, 0), surf_c[i])
+
+	# Mặt bên: tường dọc tại mặt phẳng chung của 2 mẫu kề (+x và +z), chỉ khi
+	# một bên cao hơn; nước bên dưới coi như nền mực nước (WATER_Y).
+	var side_mul: float = 0.62
+	for k in range(n):
+		for l in range(n):
+			var i0: int = k * n + l
+			# +x
+			if k + 1 < n:
+				var i1: int = i0 + n
+				_emit_lod_wall(st,
+					-half + (float(k) * step + 0.5) + hw,
+					-half + (float(l) * step + 0.5), hw,
+					surf_y[i0], surf_y[i1], surf_land[i0], surf_land[i1],
+					surf_c[i0], surf_c[i1], Vector3(1, 0, 0), side_mul)
+			# +z
+			if l + 1 < n:
+				var i1: int = i0 + 1
+				_emit_lod_wall(st,
+					-half + (float(k) * step + 0.5),
+					-half + (float(l) * step + 0.5) + hw, hw,
+					surf_y[i0], surf_y[i1], surf_land[i0], surf_land[i1],
+					surf_c[i0], surf_c[i1], Vector3(0, 0, 1), side_mul)
+
+## ── _emit_lod_wall: tường dọc giữa 2 mẫu surface (yo bên thấp → yo bên cao) ─
+## Vẽ trên mặt phẳng chung xp (hoặc zp). Bên cao tô màu của nó; nếu cả hai cùng
+## nước (ngang nhau) thì không vẽ. `normal` là hướng về phía bên thấp hơn.
+static func _emit_lod_wall(st: SurfaceTool, xp: float, zp: float, hw: float,
+		ya: float, yb: float, land_a: int, land_b: int,
+		ca: Color, cb: Color, n: Vector3, side_mul: float) -> void:
+	# v_axis: trục dọc theo mặt tường (vuông góc với pháp tuyến trong mặt phẳng xz)
+	var v_axis := Vector3(1, 0, 0) if absf(n.z) > 0.5 else Vector3(0, 0, 1)
+	if absf(ya - yb) < 0.001:
+		return
+	if ya > yb:
+		if land_a == 0:
+			return
+		var c := Color(ca.r * side_mul, ca.g * side_mul, ca.b * side_mul, ca.a)
+		_emit_lod_wall_band(st, xp, zp, hw, v_axis, yb, ya, n, c)
+	else:
+		if land_b == 0:
+			return
+		var c := Color(cb.r * side_mul, cb.g * side_mul, cb.b * side_mul, cb.a)
+		var nn: Vector3 = -n
+		_emit_lod_wall_band(st, xp, zp, hw, v_axis, ya, yb, nn, c)
+
+static func _emit_lod_wall_band(st: SurfaceTool, xp: float, zp: float, hw: float,
+		v_axis: Vector3, y_lo: float, y_hi: float, n: Vector3, col: Color) -> void:
+	var cy: float = (y_lo + y_hi) * 0.5
+	var hy: float = (y_hi - y_lo) * 0.5
+	_add_quad(st, Vector3(xp, cy, zp),
+		Vector3(0, hy, 0), v_axis * hw, n, col)
+
 ## ── _emit_solid_column: FAST PATH mặt bên cho cột đặc liền [0..top] ────────
 ## Mặt bên chỉ lộ thiên ở các layer TRÊN đỉnh hàng xóm (chunk biên: cả cột).
 ## Trục u luôn theo hướng mặt; block thay đổi giữa span thì tách span màu.

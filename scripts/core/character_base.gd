@@ -862,8 +862,8 @@ func _do_melee_hit() -> void:
 					sn.take_damage(dmg, self)
 					landed = true
 
-	# Also hit plains monsters (Bù Nhìn Ác Quỷ, Sói Đồng, Bóng Đêm) trong đêm
-	for grp in ["scarecrow", "wolf", "wraith"]:
+	# Also hit plains monsters (Bóng Đêm) trong đêm
+	for grp in ["wraith"]:
 		var pm_nodes := get_tree().get_nodes_in_group(grp)
 		for mn in pm_nodes:
 			if not is_instance_valid(mn) or not mn.get("is_alive"):
