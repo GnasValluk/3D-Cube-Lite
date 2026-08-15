@@ -16,6 +16,7 @@ const LOD_RING_EXTRA: int = 4
 const MERGE_RING_EXTRA: int = 4
 
 const _WorldTile = preload("res://scripts/world/chunk/world_tile.gd")
+const _FarPropPool = preload("res://scripts/world/props/far_prop_pool.gd")
 
 ## Bán kính tải chunk (ô vuông quanh player). Đọc từ SettingsManager để có thể
 ## chỉnh trong lúc chơi và áp dụng ngay (rebuild giữ nguyên các chunk trong
@@ -291,6 +292,18 @@ func _process(_delta: float) -> void:
 		_loading_tiles.erase(tk)
 		_tiles[tk] = tile
 		_evict_lod_inside(tk)
+
+	# ── Đồng bộ chế độ props ──────────────────────────────────────────────────
+	# Chunk trong vòng PROP_MERGE_RING giữ node tương tác (chặt/đập); ngoài vòng
+	# đưa toàn bộ proxy vào FarPropPool (gộp multi-chunk → 1 MultiMesh/loại).
+	# set_props_near early-return nếu cờ không đổi → chạy mỗi frame rẻ, đúng cho
+	# cả chunk vừa promote trong frame này. Flush dựng MultiMesh lazy 1 lần/frame.
+	var ring: int = WorldChunk.PROP_MERGE_RING
+	for key in _chunks.keys():
+		var c: WorldChunk = _chunks[key] as WorldChunk
+		if c != null and is_instance_valid(c):
+			c.set_props_near(maxi(absi(key.x - cx), absi(key.y - cz)) <= ring)
+	_FarPropPool.flush()
 
 	# ── Lazy collision ────────────────────────────────────────────────────────
 	# Chunk mới chỉ đánh dấu _collision_pending (không dựng trimesh ngay — mỗi

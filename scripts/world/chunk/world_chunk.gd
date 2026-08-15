@@ -31,6 +31,12 @@ const _SeaPlantProp = preload("res://scripts/world/props/sea_plant_prop.gd")
 const _SwampTreeProp = preload("res://scripts/world/props/swamp_tree_prop.gd")
 const _SwampSedgeProp = preload("res://scripts/world/props/swamp_sedge_prop.gd")
 const _DuckweedProp = preload("res://scripts/world/props/duckweed_prop.gd")
+const _FarPropPool = preload("res://scripts/world/props/far_prop_pool.gd")
+
+## Bán kính Chebyshev (chunk) giới hạn vòng prop tương tác: chunk TRONG vòng này
+## vẫn spawn node DestroyableProp (chặt/đập/rung cây khi đứng gần); chunk NGOÀI
+## vòng render qua FarPropPool (1 MultiMesh/loại toàn cục) để cắt mạnh số node.
+const PROP_MERGE_RING: int = 2
 
 static func _is_water_bid(bid: int) -> bool:
 	return bid == _Data.BlockID.WATER \
@@ -207,6 +213,8 @@ var _tavern_built: bool = false
 var _lotus_lights: Array[OmniLight3D] = []
 var _prop_queue: Array = []
 var _prop_idx: int = 0
+var _spawned_props: Array[Node] = []
+var _props_via_pool: bool = false
 
 ## Bật/tắt spawn prop plant (headless benchmark tắt để đo sạch phần chunk;
 ## game thật luôn true).
@@ -3010,6 +3018,24 @@ func _process(delta: float) -> void:
 		_prop_idx = 0
 		set_process(false)
 		return
+	# Chunk xa (Chebyshev > PROP_MERGE_RING): không dựng node DestroyableProp
+	# mà đẩy toàn bộ proxy vào FarPropPool (data rẻ, 1 lần/frame). Gộp nhiều chunk
+	# cùng loại vào 1 MultiMesh → cắt mạnh số node ở vòng ngoài (Bước 3).
+	if _props_via_pool:
+		var entries: Array = []
+		# pd pos là LOCAL (gốc chunk) — pool render toàn cục (holder ở gốc thế
+		# giới), phải dịch sang world: chunk.position = (cx*size, 0, cz*size).
+		var wo := Vector3(_cx * _size, 0.0, _cz * _size)
+		while _prop_idx < _prop_queue.size():
+			var pd: Dictionary = _prop_queue[_prop_idx]
+			_prop_idx += 1
+			var proxy: Dictionary = _FarPropPool.proxy_for(
+				pd.get("type", "weed"), String(pd.get("variant", "")), pd["pos"] + wo)
+			entries.append(proxy)
+		if not entries.is_empty():
+			_FarPropPool.add_chunk(_cache_key(_cx, _cz, _dimension_id), entries)
+		set_process(false)
+		return
 	_prop_reset_budget()
 	if _prop_budget_remaining <= 0:
 		return
@@ -3027,88 +3053,88 @@ func _process(delta: float) -> void:
 			var prop := _PalmProp.new(150, DestroyableProp.WeaponReq.AXE, "palm_wood")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "river"))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "oak":
 			var prop := _OakProp.new(250, DestroyableProp.WeaponReq.AXE, "block_oak_wood")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "plains"))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "orange_tree":
 			var prop := _OrangeTreeProp.new(150, DestroyableProp.WeaponReq.AXE, "orange")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "plains"))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "dense_tree":
 			var prop := _DenseTreeProp.new(200, DestroyableProp.WeaponReq.AXE, "block_hard_wood")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "plains"))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "eggplant":
 			var prop := _EggplantProp.new(40, DestroyableProp.WeaponReq.SWORD, "eggplant_fruit")
 			prop.position = pd["pos"]
 			prop.setup()
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "watermelon":
 			var prop := _WatermelonVine.new(40, DestroyableProp.WeaponReq.SWORD, "watermelon")
 			prop.position = pd["pos"]
 			prop.setup()
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "pumpkin":
 			var prop := _PumpkinVine.new(40, DestroyableProp.WeaponReq.SWORD, "pumpkin")
 			prop.position = pd["pos"]
 			prop.setup()
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "mangrove":
 			var prop := _MangroveProp.new(220, DestroyableProp.WeaponReq.AXE, "mangrove_wood")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "coast"))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "cattail":
 			var prop := _CattailProp.new(30, DestroyableProp.WeaponReq.SWORD, "cattail")
 			prop.position = pd["pos"]
 			prop.setup()
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "mud_crab":
 			var prop := _MudCrabProp.new(_MudCrabProp.MAX_HP, DestroyableProp.WeaponReq.NONE, "mud_crab")
 			prop.position = pd["pos"]
 			prop.setup()
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "spruce":
 			var prop := _FrostTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "spruce_wood")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "snow"))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "swamp_tree":
 			var prop := _SwampTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "swamp_wood")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "marsh"))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "swamp_sedge":
 			var prop := _SwampSedgeProp.new(30, DestroyableProp.WeaponReq.NONE, "swamp_sedge")
 			prop.position = pd["pos"]
 			prop.setup()
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "duckweed":
 			var prop := _DuckweedProp.new(10, DestroyableProp.WeaponReq.NONE, "duckweed")
 			prop.position = pd["pos"]
 			prop.setup()
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "kelp_tall":
 			var prop := _SeaPlantProp.new(45, DestroyableProp.WeaponReq.SWORD, ptype)
 			prop.position = pd["pos"]
 			prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0), float(pd.get("water_gap", 6.0)))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "sea_bush" or ptype == "grass_carpet" or ptype == "seaweed":
 			var prop := _SeaPlantProp.new(60, DestroyableProp.WeaponReq.SWORD, ptype)
 			prop.position = pd["pos"]
 			prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		elif ptype == "coral" or ptype == "brain_coral" or ptype == "sponge" \
 				or ptype == "kelp" or ptype == "sea_fan" or ptype == "anemone":
 			var prop := _SeaPlantProp.new(45, DestroyableProp.WeaponReq.SWORD, ptype)
 			prop.position = pd["pos"]
 			prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0))
-			add_child(prop)
+			_spawn_prop_child(prop)
 		else:
 			var drop_id: String = "tropical_seaweed" if ptype == "weed" \
 				else ("taro" if ptype == "taro" else "seagrass")
@@ -3117,7 +3143,7 @@ func _process(delta: float) -> void:
 			prop.setup(ptype, pd.get("seed_h1", 0), pd.get("seed_h2", 0),
 				pd.get("has_silt", false), pd.get("water_gap", 1.0),
 				pd.get("meadow", false))
-			add_child(prop)
+			_spawn_prop_child(prop)
 	if _prop_idx >= _prop_queue.size():
 		set_process(false)
 
@@ -3128,6 +3154,32 @@ func _process(delta: float) -> void:
 	#	var nb_data := _get_neighbor_water_data()
 	#	if _WaterFlow.tick_flow(self, nb_data):
 	#		rebuild_water_mesh()
+
+## Ghi nhận node prop đã spawn vào _spawned_props để set_props_near(false) có thể
+## hủy khi chunk chuyển sang pool, rồi mới add vào tree.
+func _spawn_prop_child(prop: Node) -> void:
+	_spawned_props.append(prop)
+	add_child(prop)
+
+## Chuyển chế độ props của chunk: `near==true` → spawn node tương tác; `false`
+## → đưa toàn bộ proxy vào FarPropPool (gộp multi-chunk). Gọi bởi manager khi
+## player băng qua vòng PROP_MERGE_RING. Chunk chưa có _prop_queue chỉ ghi cờ.
+func set_props_near(near: bool) -> void:
+	var want_pool: bool = not near
+	if want_pool == _props_via_pool:
+		return
+	_props_via_pool = want_pool
+	_prop_idx = 0
+	# Hủy node props cũ (nếu đang near) — proxy sẽ được build lại ở _process.
+	for p in _spawned_props:
+		if is_instance_valid(p):
+			p.queue_free()
+	_spawned_props.clear()
+	# Chuyển pool → near: bỏ proxy chunk này khỏi pool (chunk sẽ spawn node).
+	if not want_pool:
+		_FarPropPool.remove_chunk(_cache_key(_cx, _cz, _dimension_id))
+	if not _prop_queue.is_empty():
+		set_process(true)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
@@ -3149,6 +3201,10 @@ func _notification(what: int) -> void:
 			else:
 				_mesh_cache.erase(_cache_key(_cx, _cz, _dimension_id))
 				WorldChunk._unregister_chunk(_cx, _cz, _dimension_id)
+		# Gỡ proxy chunk khỏi FarPropPool (nếu đã đưa vào) khi chunk bị free —
+		# tránh pool giữ data chunk đã mất, phình vô hạn khi lướt thế giới.
+		if _props_via_pool and not _prop_queue.is_empty():
+			_FarPropPool.remove_chunk(_cache_key(_cx, _cz, _dimension_id))
 
 func _apply_collision(shape: Shape3D) -> void:
 	if not is_inside_tree(): return
