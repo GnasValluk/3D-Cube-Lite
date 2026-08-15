@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://djyu1kxm5cdu1"]
 
 [ext_resource type="Script" path="res://scripts/camera/first_person_camera.gd" id="1"]
-[ext_resource type="Script" uid="uid://cgk83lsgccw4s" path="res://scripts/player/neon_pulse.gd" id="2"]
 [ext_resource type="Script" uid="uid://dwjrs840c6r84" path="res://scripts/world/environment/twilight_environment.gd" id="3"]
 [ext_resource type="Script" uid="uid://ex08qqw2wr71" path="res://scripts/camera/third_person_camera.gd" id="4"]
 [ext_resource type="Script" uid="uid://lovun7bimwf2" path="res://scripts/core/character_manager.gd" id="5"]
@@ -26,9 +25,6 @@ script = ExtResource("5")
 [node name="Player" type="CharacterBody3D" parent="CharacterManager" unique_id=507030068]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
 script = ExtResource("14")
-
-[node name="NeonPulse" type="Node" parent="CharacterManager/Player" unique_id=990835318]
-script = ExtResource("2")
 
 [node name="PlayerLight" type="OmniLight3D" parent="CharacterManager/Player" unique_id=1739135953]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
