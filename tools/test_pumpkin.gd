@@ -192,8 +192,8 @@ func _ready() -> void:
 	var found := 0
 	var total_pk := 0
 	var scans := 0
-	for x in range(-1600, 1601, SIZE * 8):
-		for z in range(-1600, 1601, SIZE * 8):
+	for x in range(-4000, 4001, SIZE * 8):
+		for z in range(-4000, 4001, SIZE * 8):
 			if found > 0 or scans >= 6:
 				break
 			var wx := float(x) + 0.5

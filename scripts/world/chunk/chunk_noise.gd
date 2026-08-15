@@ -56,13 +56,14 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_lake_type.seed = base_seed + 8888
 	n_lake_type.frequency = 0.008
 
-	## n_ocean: mask lục địa vs biển — tần số thấp, nhiều lục địa cỡ
-	## ~800-1600 block xen kẽ bồn biển (λ ≈ 1670 block). Đi biển ~1.5-3k block
-	## là gặp đất liền mới (trước đây λ 4000 → một bồn biển dài >5000 block).
+	## n_ocean: mask lục địa vs biển — tần số vừa để lục địa thành QUẦN ĐẢO:
+	## nhiều đảo nhỏ ~300-500 block xen kẽ bồn biển (λ ≈ 1000 block), thay vì
+	## một lục địa lớn ~800-1600 block với vài bồn biển hiếm (cũ λ 1660). Đi biển
+	## ~300-800 block là gặp đảo/đất liền mới.
 	var n_ocean := FastNoiseLite.new()
 	n_ocean.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_ocean.seed = base_seed + 77777
-	n_ocean.frequency = 0.0006
+	n_ocean.frequency = 0.0010
 	n_ocean.fractal_type = FastNoiseLite.FRACTAL_FBM
 	n_ocean.fractal_octaves = 4
 	n_ocean.fractal_lacunarity = 2.0
@@ -102,7 +103,7 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	var n_ocean_warp := FastNoiseLite.new()
 	n_ocean_warp.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
 	n_ocean_warp.seed = base_seed + 45678
-	n_ocean_warp.frequency = 0.0006
+	n_ocean_warp.frequency = 0.0010
 	n_ocean_warp.fractal_type = FastNoiseLite.FRACTAL_FBM
 	n_ocean_warp.fractal_octaves = 2
 	n_ocean_warp.fractal_lacunarity = 2.0

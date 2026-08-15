@@ -89,6 +89,11 @@ func _ready() -> void:
 	var fl := Vector2i.ZERO   # ô cục bộ
 	var fp := Vector2.ZERO    # center thật của ô (mask lấy đúng tại đây)
 	var fr := 900.0
+	# Cửa sổ phải đủ WIDE (bán kính 22 ô) để điểm nằm GIỮA biển sâu, không phải
+	# vịnh/lạch nông ven bờ: pipeline intertidal sẽ gán MANGROVE_MUD cho ô biển
+	# gần đất liền ≤ MANGROVE_SEA_RANGE(20) khi mask mangrore hợp — window hẹp
+	# 3x3 cũ bắt nhầm lạch nông ở tần số quần đảo mới (nhiều bờ biển hơn).
+	const OCEAN_R: int = 22
 	while fr < 4000.0 and fp == Vector2.ZERO:
 		for i in range(16):
 			var a: float = float(i) / 16.0 * TAU
@@ -101,8 +106,8 @@ func _ready() -> void:
 			var cxp: float = cx * SIZE - 16 + lx + 0.5
 			var czp: float = cz * SIZE - 16 + lz + 0.5
 			var all_oc := true
-			for ox in range(-1, 2):
-				for oz in range(-1, 2):
+			for ox in range(-OCEAN_R, OCEAN_R + 1):
+				for oz in range(-OCEAN_R, OCEAN_R + 1):
 					if not _ocean(cxp + ox, czp + oz):
 						all_oc = false
 						break

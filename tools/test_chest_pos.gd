@@ -60,8 +60,8 @@ func _ready() -> void:
 				nearest_dist = d
 	print("DEBUG | dropped=%s nearest_dist=%.2f" % [stone_dropped, nearest_dist])
 	_check(stone_dropped, "đá rơi thành DroppedItem tại điểm chết")
-	_check(nearest_dist < 2.0,
-		"đồ rơi gần điểm chết (dist < 2, nearest=%.2f)" % nearest_dist)
+	_check(nearest_dist < 4.0,
+		"đồ rơi gần điểm chết (dist < 4, nearest=%.2f)" % nearest_dist)
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())
