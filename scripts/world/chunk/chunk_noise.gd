@@ -257,6 +257,27 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 	n_frost.fractal_lacunarity = 2.0
 	n_frost.fractal_gain = 0.5
 
+	## n_swamp: MASK rừng đầm lầy cấp lục địa — cụm ẩm thấp (ngang desert/frost),
+	## ngưỡng quyết định + flatten địa hình nằm ở world_chunk (paint SWAMP).
+	var n_swamp := FastNoiseLite.new()
+	n_swamp.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_swamp.seed = base_seed + 77017
+	n_swamp.frequency = 0.0003
+	n_swamp.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_swamp.fractal_octaves = 3
+	n_swamp.fractal_lacunarity = 2.0
+	n_swamp.fractal_gain = 0.5
+
+	## n_swamp_terr: độ lồi lõm đáy đầm — mô bùn nổi/nước vũng đan xen.
+	var n_swamp_terr := FastNoiseLite.new()
+	n_swamp_terr.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	n_swamp_terr.seed = base_seed + 77018
+	n_swamp_terr.frequency = 0.03
+	n_swamp_terr.fractal_type = FastNoiseLite.FRACTAL_FBM
+	n_swamp_terr.fractal_octaves = 2
+	n_swamp_terr.fractal_lacunarity = 2.0
+	n_swamp_terr.fractal_gain = 0.5
+
 	var result := { "biome": n_bio, "warp": n_warp, "lake": n_lake,
 		"lake_type": n_lake_type, "ocean": n_ocean,
 		"sea_rough": n_sea_rough, "sea_large": n_sea_large, "sea_biome": n_sea_biome,
@@ -268,15 +289,15 @@ static func _noise_for_dim(dim_id: int) -> Dictionary:
 		"patch_stone": n_patch_stone, "patch_dirt": n_patch_dirt,
 		"basin": n_basin, "mountain": n_mountain,
 		"mangrove": n_mangrove, "mangrove_inner": n_mangrove_inner,
-		"mangrove_terr": n_mangrove_terr, "frost": n_frost }
+		"mangrove_terr": n_mangrove_terr, "frost": n_frost,
+		"swamp": n_swamp, "swamp_terr": n_swamp_terr }
 	_noise_cache[dim_id] = result
 	return result
 
 static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 	var nd: Dictionary = _noise_for_dim(dim_id)
 
-	# REAL_WORLD: chỉ desert/frost noise quyết định — phần còn lại luôn GRASS_DIRT.
-	# Bỏ warp×2 + biome noise (3/4 số noise call) vốn không ảnh hưởng kết quả.
+	# REAL_WORLD: chỉ desert/frost/swamp noise quyết định — còn lại luôn GRASS_DIRT.
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5
 		if d > 0.55:
@@ -286,6 +307,11 @@ static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 		var fx: float = (nd["frost"].get_noise_2d(wx, wz) + 1.0) * 0.5
 		if wx * wx + wz * wz > 800000.0 and fx > 0.55:
 			return _Data.TileType.FROST
+		# Rừng đầm lầy — cũng tránh vùng spawn (gần gốc tọa độ giữ đồng cỏ khô
+		# cho người chơi mới), mask ẩm cấp lục địa, không đè lên desert/frost.
+		var sw: float = (nd["swamp"].get_noise_2d(wx, wz) + 1.0) * 0.5
+		if wx * wx + wz * wz > 600000.0 and sw > 0.57:
+			return _Data.TileType.SWAMP
 		return _Data.TileType.GRASS_DIRT
 
 	var n_bio: FastNoiseLite = nd["biome"]

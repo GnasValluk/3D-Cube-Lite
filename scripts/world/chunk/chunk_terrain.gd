@@ -69,6 +69,9 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 				_Data.TileType.MANGROVE_MUD: top_block = B.MANGROVE_MUD
 				_Data.TileType.FROST:      top_block = B.SNOW
 				_Data.TileType.FROST_SNOW: top_block = B.SNOW
+				_Data.TileType.SWAMP_MUD:      top_block = B.SWAMP_MUD
+				_Data.TileType.SWAMP_DIRT:     top_block = B.SWAMP_DIRT
+				_Data.TileType.SWAMP:      top_block = B.SWAMP_MUD
 				_Data.TileType.OCEAN_DEEP:
 					if nd.is_empty() or not nd.has("sea_biome"):
 						top_block = B.OCEAN_FLOOR
@@ -118,6 +121,10 @@ static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
 						blk = B.STONE
 					elif top_block == B.MANGROVE_MUD:
 						blk = B.MANGROVE_MUD  # bùn sâu bên dưới bãi bùn triều
+					elif top_block == B.SWAMP_MUD:
+						blk = B.SWAMP_DIRT  # đất đầm lầy bên dưới bùn sình
+					elif top_block == B.SWAMP_DIRT:
+						blk = B.SWAMP_DIRT  # mô bùn cao: đất đầm lầy xuống sâu
 					elif top_block == B.DARK_GRASS or top_block == B.YOUNG_GRASS or top_block == B.DIRT \
 							or top_block == B.GRASS_DIRT or top_block == B.GRASS \
 							or top_block == B.DRY_GRASS or top_block == B.SPARSE_GRASS \

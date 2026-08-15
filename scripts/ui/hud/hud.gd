@@ -1295,6 +1295,14 @@ func _setup_debug_menu() -> void:
 	tp_frost_btn.pressed.connect(_on_teleport_biome.bind("frost"))
 	_debug_panel.add_child(tp_frost_btn)
 
+	var tp_swamp_btn := Button.new()
+	tp_swamp_btn.position = Vector2(234, y - 2)
+	tp_swamp_btn.size = Vector2(202, 34)
+	tp_swamp_btn.add_theme_font_size_override("font_size", 20)
+	tp_swamp_btn.text = "🪷 Rừng Đầm Lầy"
+	tp_swamp_btn.pressed.connect(_on_teleport_biome.bind("swamp"))
+	_debug_panel.add_child(tp_swamp_btn)
+
 	# ── Teleport to Công Trình ───────────────────────────────────────────────
 	y += 34
 	var tp_c_lbl := Label.new()
@@ -1438,6 +1446,11 @@ func _on_teleport_biome(biome_type: String) -> void:
 					var fs := WorldChunk.find_frost(origin.x, origin.y, MAX_R)
 					if fs.get("ok", false):
 						found = Vector2(fs["x"], fs["z"]); found_ok = true; break
+				"swamp":
+					# Rừng đầm lầy — dùng find_swamp riêng (khu vực xa spawn, r²>600000)
+					var swp := WorldChunk.find_swamp(origin.x, origin.y, MAX_R)
+					if swp.get("ok", false):
+						found = Vector2(swp["x"], swp["z"]); found_ok = true; break
 		r += STEP
 
 	if found_ok:
@@ -1450,6 +1463,8 @@ func _on_teleport_biome(biome_type: String) -> void:
 			biome_name = "Rừng Ngập Mặn"
 		elif biome_type == "frost":
 			biome_name = "Bio Băng Giá"
+		elif biome_type == "swamp":
+			biome_name = "Rừng Đầm Lầy"
 		# Build chunk chứa điểm đích đồng bộ → lấy đúng cao độ mặt đất, tránh
 		# thả rơi từ cao hoặc chui xuống đất khi vùng chưa được stream.
 		WorldChunk.ensure_chunk_built(found.x, found.y)
@@ -1549,6 +1564,9 @@ func _get_biome_name_at(wx: float, wz: float) -> String:
 
 	if WorldChunk.biome_at(wx, wz, 1) == _Data.TileType.FROST:
 		return "❄️ " + tr("BIOME_FROST")
+
+	if WorldChunk.biome_at(wx, wz, 1) == _Data.TileType.SWAMP:
+		return "🪷 " + tr("BIOME_SWAMP")
 
 	# Đồng bằng cỏ (đã hợp nhất cao nguyên): toàn bộ đất cỏ còn lại — chỉ phân
 	# biệt biển và hồ.

@@ -28,6 +28,9 @@ const _CattailProp = preload("res://scripts/world/props/cattail_prop.gd")
 const _MudCrabProp = preload("res://scripts/world/props/mud_crab_prop.gd")
 const _FrostTreeProp = preload("res://scripts/world/props/frost_tree_prop.gd")
 const _SeaPlantProp = preload("res://scripts/world/props/sea_plant_prop.gd")
+const _SwampTreeProp = preload("res://scripts/world/props/swamp_tree_prop.gd")
+const _SwampSedgeProp = preload("res://scripts/world/props/swamp_sedge_prop.gd")
+const _DuckweedProp = preload("res://scripts/world/props/duckweed_prop.gd")
 
 static func _is_water_bid(bid: int) -> bool:
 	return bid == _Data.BlockID.WATER \
@@ -232,6 +235,7 @@ const _PROP_SPAWN_COST := {
 	"orange_tree": 3,
 	"mangrove": 3,
 	"spruce": 4,
+	"swamp_tree": 4,
 	"pumpkin": 1,
 	"watermelon": 1,
 	"eggplant": 1,
@@ -536,6 +540,29 @@ static func find_frost(wx: float, wz: float, max_radius: float = 25000.0) -> Dic
 			if _ocean_mask_at(nd, sx, sz):
 				continue
 			if biome_at(sx, sz, DIM) == _Data.TileType.FROST:
+				return { "ok": true, "x": sx, "z": sz }
+		r += STEP
+	return { "ok": false }
+
+## Tìm điểm thuộc rừng đầm lầy (SWAMP) gần nhất theo vòng xoắn quanh (wx,wz).
+## Dùng đúng nguồn sự thật `biome_at` (spawn-bias r²>600000, sw>0.57) để tele.
+static func find_swamp(wx: float, wz: float, max_radius: float = 25000.0) -> Dictionary:
+	const DIM: int = _Data._Dim.DimensionID.REAL_WORLD
+	var nd: Dictionary = _noise_for_dim(DIM)
+	if nd.is_empty():
+		return { "ok": false }
+	var origin := Vector2(wx, wz)
+	const STEP: float = 150.0
+	var r: float = STEP
+	while r <= max_radius:
+		var samples: int = max(10, int(r / STEP * TAU))
+		for i in range(samples):
+			var angle: float = float(i) / float(samples) * TAU
+			var sx: float = origin.x + cos(angle) * r
+			var sz: float = origin.y + sin(angle) * r
+			if _ocean_mask_at(nd, sx, sz):
+				continue
+			if biome_at(sx, sz, DIM) == _Data.TileType.SWAMP:
 				return { "ok": true, "x": sx, "z": sz }
 		r += STEP
 	return { "ok": false }
@@ -1000,6 +1027,30 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 								biome_grid[ivx][ivz] = _Data.TileType.FROST_SNOW
 							else:
 								biome_grid[ivx][ivz] = _Data.TileType.FROST
+					elif base_bio == _Data.TileType.SWAMP:
+						# ── RỪNG ĐẦM LẦY: đầm lầy ngập nước nông ──────────────────
+						# Địa hình KHÔNG dùng chung đồi thoải: hạ dần xuống sát mực
+						# nước (WATER_Y ±) → bãi lầy ngập/nổi xen kẽ. Bề mặt bùn
+						# sình (SWAMP_MUD); mô bùn cao khô ráo (SWAMP_DIRT) chỗ
+						# swamp_terr cao; hố thấp hơn mặt nước thành vũng nước đen
+						# (nước vẫn fill theo WATER_Y — đầm lầy có nước đứng).
+						# Blending biên theo swamp noise: rìa đầm (sw vừa qua ngưỡng)
+						# vẫn giữ địa hình đồi dần lún xuống, lõi đầm (sw cao) dẹt
+						# bằng mặt nước → ranh giới không còn vách đứng.
+						var sw_v: float = (nd["swamp"].get_noise_2d(wx, wz) + 1.0) * 0.5
+						var sw_terr: float = (nd["swamp_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
+						var sw_t: float = clamp((sw_v - 0.57) / 0.22, 0.0, 1.0)
+						sw_t = sw_t * sw_t * (3.0 - 2.0 * sw_t)
+						var orig_h: float = height_grid[ivx][ivz]
+						var swamp_flat: float = _Data.WATER_Y + 0.30 + (sw_terr - 0.5) * 1.8
+						height_grid[ivx][ivz] = lerp(orig_h, swamp_flat, sw_t)
+						# Vũng ngập: mực nước đứng trên bùn; chỉ mô cao mới nhô lên
+						if swamp_flat <= _Data.WATER_Y:
+							biome_grid[ivx][ivz] = _Data.TileType.SWAMP_MUD
+						elif sw_terr > 0.66:
+							biome_grid[ivx][ivz] = _Data.TileType.SWAMP_DIRT
+						else:
+							biome_grid[ivx][ivz] = _Data.TileType.SWAMP_MUD
 					else:
 						# ── ĐỒNG BẰNG CỎ: block phân theo HÌNH THẾ địa hình ──
 						#   - Sát bãi biển (cách bờ ≤6) → cỏ ven biển (100% GRASS)
@@ -1277,6 +1328,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					road_grid[ivx * cols + ivz] = 0
 				elif river_flag[ivx * cols + ivz] == 1:
 					road_grid[ivx * cols + ivz] = 0
+				elif biome_grid[ivx][ivz] == _Data.TileType.SWAMP \
+						or biome_grid[ivx][ivz] == _Data.TileType.SWAMP_MUD \
+						or biome_grid[ivx][ivz] == _Data.TileType.SWAMP_DIRT:
+					road_grid[ivx * cols + ivz] = 0
 	_prof("S6a road_grid")
 
 	# ── 4b. BFS bán kính Chebyshev: nước / đường / đất sa mạc ────────────────
@@ -1370,7 +1425,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 					and not (height_grid[vx][vz] <= _Data.WATER_Y) \
 					and biome_grid[vx][vz] != _Data.TileType.DESERT \
 					and biome_grid[vx][vz] != _Data.TileType.FROST \
-					and biome_grid[vx][vz] != _Data.TileType.FROST_SNOW:
+					and biome_grid[vx][vz] != _Data.TileType.FROST_SNOW \
+					and biome_grid[vx][vz] != _Data.TileType.SWAMP \
+					and biome_grid[vx][vz] != _Data.TileType.SWAMP_MUD \
+					and biome_grid[vx][vz] != _Data.TileType.SWAMP_DIRT:
 				_Grass.add_voxel_grass(vx, vz, pos, grass_xforms, grass_colors, cols, wdist, hdist)
 
 	# ── 6d. Quán rượu — bên mép đường tại ngã 3 / ngã tư (không trên đường) ──
@@ -1669,6 +1727,30 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int, fast_mode: b
 						continue
 					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "spruce", "pos": Vector3(px, y, pz), "variant": "snow"})
+
+	# ── 8l. RỪNG ĐẦM LẦY — cây tràm + lác nước + bèo ──────────────────────────
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var sw_bio: int = biome_grid[vx][vz]
+				if sw_bio != _Data.TileType.SWAMP_MUD and sw_bio != _Data.TileType.SWAMP_DIRT:
+					continue
+				var h: float = height_grid[vx][vz]
+				var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+				var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+				if _is_on_road(world_ox + px, world_oz + pz):
+					continue
+				# Cây tràm — mô bùn nhô khỏi mặt nước (cao hơn mực nước)
+				if h > _Data.WATER_Y + 0.15 and _cell_hash01(vx, vz) < 0.026:
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "swamp_tree", "pos": Vector3(px, y, pz), "variant": "marsh"})
+				# Lác nước — bãi bùn ngập nông tới khô, cụm thành bụi
+				if h > _Data.WATER_Y - 0.8 and h <= _Data.WATER_Y + 0.7 and _cell_hash01(vx + 131, vz + 77) < 0.045:
+					var y2 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "swamp_sedge", "pos": Vector3(px, y2, pz), "variant": "marsh"})
+				# Bèo — vũng nước đứng (thấp hơn mực nước nên ngập), nổi trên mặt
+				if h < _Data.WATER_Y - 0.05 and _cell_hash01(vx + 977, vz + 313) < 0.016:
+					plant_props.append({"type": "duckweed", "pos": Vector3(px, _Data.WATER_Y + 0.03125, pz), "variant": "marsh"})
 
 	_prof("S12 plant_props")
 
@@ -2904,6 +2986,21 @@ func _process(delta: float) -> void:
 			var prop := _FrostTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "spruce_wood")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "snow"))
+			add_child(prop)
+		elif ptype == "swamp_tree":
+			var prop := _SwampTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "swamp_wood")
+			prop.position = pd["pos"]
+			prop.setup(pd.get("variant", "marsh"))
+			add_child(prop)
+		elif ptype == "swamp_sedge":
+			var prop := _SwampSedgeProp.new(30, DestroyableProp.WeaponReq.NONE, "swamp_sedge")
+			prop.position = pd["pos"]
+			prop.setup()
+			add_child(prop)
+		elif ptype == "duckweed":
+			var prop := _DuckweedProp.new(10, DestroyableProp.WeaponReq.NONE, "duckweed")
+			prop.position = pd["pos"]
+			prop.setup()
 			add_child(prop)
 		elif ptype == "kelp_tall":
 			var prop := _SeaPlantProp.new(45, DestroyableProp.WeaponReq.SWORD, ptype)

@@ -233,6 +233,14 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_frost_dirt", "Đất Đóng Băng", ItemDef.Type.BLOCK, Color(0.44, 0.38, 0.42), "🧱", "Khối đất đóng băng — lớp nền bên dưới tuyết, xẻng đào được", true, 64)
 	_add(db, "spruce_wood", "Gỗ Vân Sam", ItemDef.Type.BLOCK, Color(0.38, 0.24, 0.12), "🧱", "Khối gỗ vân sam — thớ nâu đỏ, chặt từ cây vân sam vùng băng giá bằng rìu", true, 64)
 
+	# ── Rừng đầm lầy ──────────────────────────────────────────────────────────
+	_add(db, "block_swamp_mud", "Bùn Đầm Lầy", ItemDef.Type.BLOCK, Color(0.14, 0.18, 0.10), "🧱", "Khối bùn sình nâu sậm pha xanh rêu — nền rừng đầm lầy ẩm thấp, xẻng đào được", true, 64)
+	_add(db, "block_swamp_dirt", "Đất Đầm Lầy", ItemDef.Type.BLOCK, Color(0.19, 0.16, 0.09), "🧱", "Khối đất đầm lầy nâu xám ẩm — lớp nền bên dưới bùn đầm lầy, xẻng đào được", true, 64)
+	_add(db, "swamp_wood", "Gỗ Tràm", ItemDef.Type.BLOCK, Color(0.42, 0.38, 0.30), "🧱", "Khối gỗ tràm — vân nâu xám nhạt ngâm nước lâu năm, chặt từ cây tràm rừng đầm lầy bằng rìu", true, 64)
+	_add(db, "swamp_seed", "Mầm Tràm", ItemDef.Type.MATERIAL, Color(0.22, 0.30, 0.18), "🌱", "Mầm tràm — rơi từ cây tràm trưởng thành, trồng trên bùn đầm lầy", true, 16)
+	_add(db, "swamp_sedge", "Nắm Lác Nước", ItemDef.Type.MATERIAL, Color(0.24, 0.38, 0.10), "🌾", "Lác nước đầm lầy — bụi lá kiếm xanh rêu, nguyên liệu chế tạo", true, 32)
+	_add(db, "duckweed", "Bèo Tấm", ItemDef.Type.MATERIAL, Color(0.12, 0.36, 0.14), "🍀", "Bèo tấm xanh lục nổi trên mặt nước đầm lầy, nguyên liệu chế tạo", true, 64)
+
 	# ── Rừng ngập mặn ─────────────────────────────────────────────────────────
 	_add(db, "block_mangrove_mud", "Bùn Ngập Mặn", ItemDef.Type.BLOCK, Color(0.13, 0.11, 0.09), "🧱", "Khối bùn đen đầm lầy — bãi bùn vùng triều rừng ngập mặn, xẻng đào được", true, 64)
 	_add(db, "mangrove_wood", "Gỗ Đước", ItemDef.Type.BLOCK, Color(0.56, 0.26, 0.14), "🧱", "Khối gỗ đước — thớ nâu đỏ chìm trong nước mặn, chặt từ cây đước bằng rìu, xây dựng và chế tạo", true, 64)
@@ -303,6 +311,8 @@ const WEIGHTS: Dictionary = {
 	"iron_helmet": 1.5, "iron_chestplate": 4.5, "iron_boots": 1.0,
 	"iron_leggings": 1.8, "mud_crab": 0.6, "cattail": 0.4,
 	"block_mangrove_mud": 2.0, "mangrove_wood": 2.0, "mangrove_seed": 0.2,
+	"block_swamp_mud": 2.0, "block_swamp_dirt": 2.0, "swamp_wood": 2.0,
+	"swamp_seed": 0.2, "swamp_sedge": 0.4, "duckweed": 0.2,
 	"golden_ring": 0.1, "leather_backpack": 2.0,
 	"flashlight": 0.8,
 	"lava_bucket": 0.9,
