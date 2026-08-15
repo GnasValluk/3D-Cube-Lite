@@ -37,7 +37,13 @@ func _ready() -> void:
 	_check(player._active, "player active lại (_active=%s)" % player._active)
 
 	var chest: Node = get_tree().current_scene.get_node_or_null("DeathChest")
-	_check(chest != null, "rương đồ spawn trong world thật")
+	_check(chest == null, "không còn rương đồ (đồ rơi thành DroppedItem)")
+	var has_drop := false
+	for ch in get_tree().current_scene.get_children():
+		if ch is DroppedItem:
+			has_drop = true
+			break
+	print("DEBUG | has_drop=%s" % has_drop)
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())

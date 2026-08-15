@@ -18,6 +18,13 @@ var _flying: bool = false
 var _velocity: Vector3 = Vector3.ZERO
 var _ground_y: float = 0.0
 var _player: Node3D = null
+var _settled: bool = false
+var _fall_vel: float = 0.0
+var _ground_measured: bool = false
+
+const FALL_GRAVITY: float = 14.0
+const FALL_EPS: float = 0.02
+const REST_HEIGHT: float = 0.2
 var _mat: StandardMaterial3D = null
 var _glow_mat: StandardMaterial3D = null
 var _mesh: MeshInstance3D = null
@@ -153,6 +160,10 @@ func launch(initial_velocity: Vector3, ground_y: float) -> void:
 	_flying = true
 	_velocity = initial_velocity
 	_ground_y = ground_y
+	# ground_y call-site là hint để kết thúc pha bay; sau khi bay xong phải đo
+	# lại mặt đất thật (sinh vật có thể chết giữa không trung → hạt nổi trên trời).
+	_ground_measured = false
+	_settled = false
 
 func _process(delta: float) -> void:
 	if not is_instance_valid(self):
@@ -166,6 +177,8 @@ func _process(delta: float) -> void:
 			position.y = _ground_y
 			_flying = false
 	else:
+		if not _settled:
+			_fall(delta)
 		# Nam châm hút về phía người chơi khi đủ gần
 		if _can_pickup and _player and is_instance_valid(_player):
 			var to_player := _player.global_position - global_position
@@ -180,7 +193,6 @@ func _process(delta: float) -> void:
 		var bob := sin(_time_alive * 3.0) * 0.07
 		position.y += bob * delta * 2.0
 		rotation.y += delta * 60.0
-
 	# Nhấp nháy xanh-vàng lấp lánh + xoay voxel
 	var sparkle: float = 0.6 + (sin(_time_alive * 7.0) * 0.5 + 0.5) * 0.4
 	var mix: float = (sin(_time_alive * 4.0) * 0.5 + 0.5)
@@ -195,6 +207,39 @@ func _process(delta: float) -> void:
 	if _glow_mat:
 		var pulse: float = 0.15 + sparkle * 0.15
 		_glow_mat.albedo_color = Color(c.r, c.g, c.b, pulse)
+
+## Hạt kinh nghiệm rơi từ trên cao: có trọng lực, chạm đất thật rồi nổi lơ lửng
+## (không định cư ở độ cao chỗ sinh vật chết giữa trời).
+func _fall(delta: float) -> void:
+	if not _ground_measured:
+		var gy := _measure_ground_y()
+		if gy <= -1.0e9:
+			_fall_vel -= FALL_GRAVITY * delta
+			position.y += _fall_vel * delta
+			return
+		_ground_measured = true
+		_ground_y = gy
+	if position.y - REST_HEIGHT > _ground_y + FALL_EPS:
+		_fall_vel -= FALL_GRAVITY * delta
+		position.y += _fall_vel * delta
+	else:
+		position.y = _ground_y + REST_HEIGHT
+		_settled = true
+		_fall_vel = 0.0
+
+func _measure_ground_y() -> float:
+	var space := get_world_3d().direct_space_state
+	if space != null:
+		var q := PhysicsRayQueryParameters3D.new()
+		q.from = global_position
+		q.to = global_position + Vector3(0, -60.0, 0)
+		q.collide_with_areas = false
+		q.collide_with_bodies = true
+		q.exclude = [self]
+		var hit := space.intersect_ray(q)
+		if not hit.is_empty():
+			return hit.position.y
+	return -1.0e9
 
 func collect(player: Node) -> bool:
 	if not _can_pickup:

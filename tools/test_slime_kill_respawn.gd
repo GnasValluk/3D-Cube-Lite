@@ -41,7 +41,7 @@ func _ready() -> void:
 		if not player.is_alive:
 			died = true
 			print("DEBUG player died at frame", i, " state=", player._state,
-				" dtimer=", player._death_timer, " chest=", player._death_chest_spawned)
+				" dtimer=", player._death_timer, " drops=", player._death_items_spawned)
 			break
 	_check(died, "player bị slime giết")
 	if not died:
@@ -64,7 +64,14 @@ func _ready() -> void:
 	_check(player.is_processing_unhandled_input(), "input bật lại sau hồi sinh")
 
 	var chest: Node = get_tree().current_scene.get_node_or_null("DeathChest")
-	_check(chest != null, "rương đồ spawn tại điểm chết")
+	_check(chest == null, "không còn rương đồ (đồ rơi thành DroppedItem)")
+	# Player chết không mang đồ → không có drop nào phải spawn.
+	var drop_count := 0
+	for ch in get_tree().current_scene.get_children():
+		if ch is DroppedItem:
+			drop_count += 1
+	print("DEBUG | drop_count=%d" % drop_count)
+	_check(player.inventory == null or player.inventory.is_empty(), "kho rỗng sau khi chết")
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())

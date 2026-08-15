@@ -34,13 +34,22 @@ func _ready() -> void:
 	_check(p._active, "player active sau hồi sinh (_active=%s)" % p._active)
 	_check(p.is_physics_processing(), "physics bật lại sau hồi sinh")
 	_check(p.is_processing_unhandled_input(), "input bật lại sau hồi sinh")
-	_check(not p._death_chest_spawned, "death_chest flag reset (val=%s)" % p._death_chest_spawned)
-	var has_chest := false
+	_check(not p._death_items_spawned, "death drop flag reset (val=%s)" % p._death_items_spawned)
+	# Đồ rơi vương vãi thay rương: player chết không còn node DeathChest,
+	# nhưng nếu có mang theo đồ thì drop thành DroppedItem tại điểm chết.
+	var has_drop := false
+	for ch in get_children():
+		if ch is DroppedItem:
+			has_drop = true
+			break
+	print("DEBUG | inventory empty=%s has_drop=%s" % [p.inventory.is_empty() if p.inventory else true, has_drop])
+	_check(not has_drop, "kho rỗng → không có DroppedItem (thay rương)")
+	var no_chest := true
 	for ch in get_children():
 		if ch.name == "DeathChest":
-			has_chest = true
+			no_chest = false
 			break
-	_check(has_chest, "spawn rương đồ tại điểm chết")
+	_check(no_chest, "không còn node DeathChest")
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())

@@ -75,25 +75,28 @@ func _ready() -> void:
 	_check(player.equipped_weapon == null, "vũ khí đã tháo khi chết")
 
 	var chest: Node = get_tree().current_scene.get_node_or_null("DeathChest")
-	_check(chest != null, "rương đồ spawn")
-	if chest != null and chest.get("inventory") != null:
-		var ids: Array[String] = []
-		for slot in chest.inventory.slots:
-			if slot.item != null:
-				ids.append("%s(%d)" % [slot.item.id, slot.count])
-		print("CHEST_ITEMS | " + "|".join(ids))
-		var has_sword := false
-		var has_helmet := false
-		for slot in chest.inventory.slots:
-			if slot.item == null:
-				continue
-			if slot.item.id == "iron_sword":
+	_check(chest == null, "không còn rương đồ (đồ rơi thành DroppedItem)")
+	var has_sword := false
+	var has_helmet := false
+	var drop_ids: Array[String] = []
+	for ch in current_scene_children_drops():
+		if ch.item_def != null:
+			drop_ids.append("%s(%d)" % [ch.item_def.id, ch.item_count])
+			if ch.item_def.id == "iron_sword":
 				has_sword = true
-			if slot.item.id == "iron_helmet":
+			if ch.item_def.id == "iron_helmet":
 				has_helmet = true
-		_check(has_sword, "rương giữ kiếm")
-		_check(has_helmet, "rương giữ giáp")
+	print("DROP_IDS | " + "|".join(drop_ids))
+	_check(has_sword, "rơi ra DroppedItem chứa kiếm")
+	_check(has_helmet, "rơi ra DroppedItem chứa giáp")
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())
 	get_tree().quit(0 if _failures == 0 else 1)
+
+func current_scene_children_drops() -> Array:
+	var out: Array = []
+	for ch in get_tree().current_scene.get_children():
+		if ch is DroppedItem:
+			out.append(ch)
+	return out

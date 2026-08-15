@@ -195,7 +195,7 @@ FISH_REEL,"Line retrieved","Đã thu cần"
 FISH_MISS,"No bite — cast again","Cá chưa cắn câu"
 INVENTORY_FULL,"Inventory full!","Túi đồ đầy!"
 GAME_SAVED,Game saved!,Đã lưu game!
-DEATH_CHEST_MSG,"You died! Your items are in a chest at your death point.","Bạn đã chết! Đồ đạc nằm trong rương tại điểm chết."
+DEATH_CHEST_MSG,"You died! Your items dropped scattered on the ground at your death point.","Bạn đã chết! Đồ đạc rơi vương vãi quanh điểm chết."
 FEAT_CHUNK_LOW,Reduced view distance for performance,Giảm tầm nhìn để tăng hiệu suất
 FEAT_WASD,WASD / Arrow keys movement,Di chuyển WASD / phím mũi tên
 FEAT_MOUSE_CAM,Mouse to rotate camera,Chuột xoay camera

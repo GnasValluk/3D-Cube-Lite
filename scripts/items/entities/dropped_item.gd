@@ -119,7 +119,9 @@ func launch(initial_velocity: Vector3, ground_y: float) -> void:
 	_flying = true
 	_velocity = initial_velocity
 	_ground_y = ground_y
-	_ground_measured = true
+	# ground_y call-site chỉ là HINT để kết thúc pha bay — sau đó phải đo lại
+	# mặt đất thật bằng raycast (sinh vật có thể chết giữa không trung).
+	_ground_measured = false
 	_settled = false
 
 func fly_straight(initial_velocity: Vector3, ground_y: float, damage: int = 0, attacker: Node3D = null) -> void:
@@ -127,7 +129,7 @@ func fly_straight(initial_velocity: Vector3, ground_y: float, damage: int = 0, a
 	_straight_flight = true
 	_velocity = initial_velocity
 	_ground_y = ground_y
-	_ground_measured = true
+	_ground_measured = false
 	_settled = false
 	_throw_damage = damage
 	_throw_attacker = attacker
@@ -219,10 +221,17 @@ func _process(delta: float):
 		rotation.y += deg_to_rad(rot)
 
 ## Vật phẩm rơi từ trên cao (không có launch): có trọng lực, rớt chạm đất rồi đứng yên.
+## Nếu lúc đo chưa raycast trúng đất thật (chunk chưa có collider), cứ rơi tiếp theo
+## trọng lực và đo lại frame sau — không định cư lơ lửng trên không.
 func _fall(delta: float) -> void:
 	if not _ground_measured:
+		var gy := _measure_ground_y()
+		if gy <= -1.0e9:
+			_fall_vel -= FALL_GRAVITY * delta
+			position.y += _fall_vel * delta
+			return
 		_ground_measured = true
-		_ground_y = _measure_ground_y()
+		_ground_y = gy
 	if position.y - REST_HEIGHT > _ground_y + FALL_EPS:
 		_fall_vel -= FALL_GRAVITY * delta
 		position.y += _fall_vel * delta
@@ -232,6 +241,8 @@ func _fall(delta: float) -> void:
 		_fall_vel = 0.0
 
 ## Tìm chiều cao mặt đất ngay dưới vật phẩm (raycast xuống, bỏ qua chính nó).
+## Trả về -1e9 khi KHÔNG trúng gì — caller tự quyết định (tiếp tục rơi) chứ
+## không được coi vị trí hiện tại là "mặt đất" (gây lơ lửng giữa trời).
 func _measure_ground_y() -> float:
 	var space := get_world_3d().direct_space_state
 	if space != null:
@@ -244,7 +255,7 @@ func _measure_ground_y() -> float:
 		var hit := space.intersect_ray(q)
 		if not hit.is_empty():
 			return hit.position.y
-	return global_position.y
+	return -1.0e9
 
 func collect(player: Node) -> bool:
 	if not can_pickup:

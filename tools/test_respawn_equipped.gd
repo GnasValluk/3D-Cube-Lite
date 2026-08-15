@@ -52,20 +52,19 @@ func _ready() -> void:
 	if has_fp_rig:
 		_check(p._rig == null or p._rig.visible == false, "FP: rig vẫn ẩn sau respawn (visible=%s)" % (p._rig.visible if p._rig else "no-rig"))
 
-	# Death chest chứa vũ khí đã trang bị
-	var chest: Node = null
+	# Đồ rơi vương vãi thay rương: vũ khí đã trang bị phải drop thành DroppedItem.
+	var sword_dropped := false
+	for ch in get_children():
+		if ch is DroppedItem and ch.item_def != null and ch.item_def.id == "iron_sword":
+			sword_dropped = true
+			break
+	_check(sword_dropped, "vũ khí đã trang bị rơi thành DroppedItem sau khi chết")
+	var no_chest := true
 	for ch in get_children():
 		if ch.name == "DeathChest":
-			chest = ch
+			no_chest = false
 			break
-	_check(chest != null, "rương đồ spawn")
-	if chest != null and chest.get("inventory") != null:
-		var has_sword := false
-		for slot in chest.inventory.slots:
-			if slot.item != null and slot.item.id == "iron_sword":
-				has_sword = true
-				break
-		_check(has_sword, "rương giữ vũ khí đã trang bị")
+	_check(no_chest, "không còn rương đồ")
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())

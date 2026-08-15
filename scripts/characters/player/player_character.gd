@@ -42,8 +42,8 @@ var _eat_timer: float = 0.0
 var _eat_slot: int = -1
 var _eat_item: ItemDef = null
 
-## Respawn khi chết: rương tại điểm chết + hồi sinh tại điểm xuất phát
-var _death_chest_spawned: bool = false
+## Respawn khi chết: đồ rơi vương vãi tại điểm chết + hồi sinh tại điểm xuất phát
+var _death_items_spawned: bool = false
 const WORLD_SPAWN_POS := Vector3(0, 3, 0)
 
 ## Đói: 1 điểm / 60s khi đứng yên; nhanh hơn 75% khi di chuyển; nhanh hơn 100% khi bơi
@@ -486,48 +486,43 @@ func _spawn_eat_vfx(item: ItemDef) -> void:
 	vfx.global_position = global_position + Vector3(0, 1.15, 0.3)
 	vfx.finished.connect(vfx.queue_free)
 
-# ── Chết: rương đồ + hồi sinh ────────────────────────────────────────────────
+# ── Chết: đồ rơi vương vãi + hồi sinh ─────────────────────────────────────────
 
-func _spawn_death_chest(death_pos: Vector3 = Vector3.INF) -> void:
+## Thay thế rương đồ cũ: đồ (trang bị + kho) rơi rải rác quanh điểm chết thành
+## các DroppedItem. Nhờ gravity fix, chúng tự rơi chạm đất thật. Multiplayer vẫn
+## host-authoritative qua Net relay (mọi máy rải giống hệt payload từ host).
+func _spawn_scattered_drops(death_pos: Vector3 = Vector3.INF) -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
-	# player đã hồi sinh (teleport về spawn) trước khi chest được spawn deferred
+	# player đã hồi sinh (teleport về spawn) trước khi function được deferred
 	# → lưu trước vị trí chết, không dùng global_position sau khi respawn.
 	if death_pos == Vector3.INF:
 		death_pos = global_position
-	var chest := Chest.new()
-	chest.name = "DeathChest"
-	scene.add_child(chest)
-	chest.global_position = death_pos + Vector3(0, 0.6, 0)
-	var chest_inv := Inventory.new(45)
+	# Gom đồ: trang bị 7 slot + toàn bộ kho (bỏ qua vũ khí đang cầm trong hotbar
+	# vì slot đó sẽ được thêm qua equipped loop — tránh drop trùng 2 lần).
+	var drop_entries: Array[Dictionary] = []
 	var equipped: Array = [equipped_weapon, equipped_head, equipped_body, equipped_legs, equipped_feet, equipped_back, equipped_sub]
-	var eq_dur: Array = [_equipped_durability, -1, -1, -1, -1, -1, -1]
-	for i in equipped.size():
-		var it: ItemDef = equipped[i]
+	for it in equipped:
 		if it == null:
 			continue
-		chest_inv.add_item(it, 1)
-		if eq_dur[i] >= 0:
-			var idx := chest_inv.find_slot_of_item(it)
-			if idx >= 0:
-				chest_inv.slots[idx].durability = eq_dur[i]
+		drop_entries.append({"def": it, "count": 1})
 	if inventory != null:
 		for i in range(inventory.slots.size()):
 			var slot: ItemSlot = inventory.slots[i]
 			if slot.is_empty() or slot.item == null:
 				continue
-			# Vũ khí đang cầm nằm trong hotbar → đã được thêm qua equipped loop,
-			# bỏ qua để tránh trùng item khi chết.
 			if i == _equipped_slot_idx and slot.item == equipped_weapon:
 				continue
-			chest_inv.add_item(slot.item, slot.count)
-	# Multiplayer: mọi máy spawn death chest giống hệt qua net (host-authoritative).
+			drop_entries.append({"def": slot.item, "count": slot.count})
 	if Net.is_active():
-		chest.queue_free()
-		Net.announce_death_chest(death_pos + Vector3(0, 0.6, 0), chest_inv.to_dict())
+		# Net: mọi máy rải đồ giống hệt từ payload của host.
+		var inv_data: Array = []
+		for e in drop_entries:
+			inv_data.append({"id": e.def.id, "count": e.count})
+		Net.announce_death_chest(death_pos + Vector3(0, 0.6, 0), inv_data)
 	else:
-		chest.inventory = chest_inv
+		_scatter_drop_entries(drop_entries, death_pos + Vector3(0, 0.6, 0))
 	if inventory != null:
 		for slot in inventory.slots:
 			slot.clear()
@@ -543,6 +538,21 @@ func _spawn_death_chest(death_pos: Vector3 = Vector3.INF) -> void:
 	_equipped_durability = -1
 	_update_weapon_mesh()
 	_update_armor_mesh()
+
+## Spawn các DroppedItem vương vãi quanh một điểm. Velocity tung lên + văng ra
+## theo phương ngang ngẫu nhiên → nhờ gravity fix sẽ tự rơi chạm đất thật.
+func _scatter_drop_entries(entries: Array[Dictionary], around: Vector3) -> void:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	for e in entries:
+		var def_: ItemDef = e.def
+		var count: int = e.count
+		var ang := randf() * TAU
+		var radius := randf_range(0.2, 0.9)
+		var scatter_pos := around + Vector3(cos(ang) * radius, 0.0, sin(ang) * radius)
+		var vel := Vector3(cos(ang) * randf_range(1.5, 3.0), randf_range(2.5, 4.0), sin(ang) * randf_range(1.5, 3.0))
+		DroppedItem.spawn(scene, def_, scatter_pos, count, vel, around.y)
 
 func _do_respawn() -> void:
 	_stop_mining()
@@ -564,7 +574,7 @@ func _do_respawn() -> void:
 	# (trước đây bị trừ cả _process lẫn _physics_process nên chỉ ~2.5s).
 	_invul_timer = 5.0
 	_sync_camera()
-	_death_chest_spawned = false
+	_death_items_spawned = false
 	_scroll_inventory_message(tr("DEATH_CHEST_MSG"))
 	if Net.is_active():
 		Net.announce_respawn(global_position)
@@ -1340,11 +1350,11 @@ func _physics_process(delta: float) -> void:
 		_state = State.EAT
 		velocity.x *= 0.5
 		velocity.z *= 0.5
-	if not is_alive and _death_timer <= 0.0 and not _death_chest_spawned:
-		_death_chest_spawned = true
+	if not is_alive and _death_timer <= 0.0 and not _death_items_spawned:
+		_death_items_spawned = true
 		var death_pos: Vector3 = global_position
 		_do_respawn()
-		call_deferred("_spawn_death_chest", death_pos)
+		call_deferred("_spawn_scattered_drops", death_pos)
 		return
 	if _halberd_dashing:
 		if _state == State.DASH:
@@ -1381,16 +1391,20 @@ func _ready() -> void:
 		Net.death_chest_spawned.connect(_on_net_death_chest_spawned)
 
 func _on_net_death_chest_spawned(_owner_peer: int, pos: Vector3, inv_data: Array) -> void:
-	var scene := get_tree().current_scene
-	if scene == null:
-		return
-	var chest := Chest.new()
-	chest.name = "NetDeathChest"
-	scene.add_child(chest)
-	chest.global_position = pos
-	var chest_inv := Inventory.new(45)
-	chest_inv.from_dict(inv_data)
-	chest.inventory = chest_inv
+	var entries: Array[Dictionary] = []
+	for entry in inv_data:
+		if entry == null:
+			continue
+		var item_id: String = str(entry.get("id", ""))
+		var def_: ItemDef = ItemDatabase.items_db.get(item_id) if ItemDatabase.items_db.has(item_id) else null
+		if def_ == null:
+			# Legacy payload từ Inventory.to_dict(): slot rỗng = null, item = có "id".
+			continue
+		var count: int = int(entry.get("count", 1))
+		if count <= 0:
+			continue
+		entries.append({"def": def_, "count": count})
+	_scatter_drop_entries(entries, pos)
 
 func _animate(delta: float) -> void:
 	_anim.animate(delta)
