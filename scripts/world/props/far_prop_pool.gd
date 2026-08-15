@@ -145,6 +145,7 @@ static func remove_chunk(chunkkey: String) -> void:
 static func flush() -> void:
 	if _dirty.is_empty():
 		return
+	var f0 := Time.get_ticks_usec()
 	var to_build: Array = _dirty.keys()
 	_dirty.clear()
 	for type in to_build:
@@ -188,6 +189,9 @@ static func flush() -> void:
 			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_holder.add_child(mmi)
 			_mmi[type] = mmi
+	var fcost := float(Time.get_ticks_usec() - f0) * 0.001
+	if fcost > 5.0:
+		print("[fpp] flush cost=%.1fms types=%d chunks=%d" % [fcost, to_build.size(), _by_chunk.size()])
 
 static func clear_all() -> void:
 	for t in _mmi:

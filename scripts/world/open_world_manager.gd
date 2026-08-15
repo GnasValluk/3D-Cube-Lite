@@ -262,6 +262,7 @@ func _process(_delta: float) -> void:
 	var cx: int = int(floor(ppos.x / CHUNK_SIZE))
 	var cz: int = int(floor(ppos.z / CHUNK_SIZE))
 	var cur := Vector2i(cx, cz)
+	var _proc_t0 := Time.get_ticks_usec()
 
 	_update_underground_fade(ppos)
 
@@ -431,6 +432,9 @@ func _process(_delta: float) -> void:
 		var key: Vector2i = _pending_tiles.pop_front()
 		if not _tiles.has(key) and not _loading_tiles.has(key):
 			_start_loading_tile(key)
+	var _proc_ms := float(Time.get_ticks_usec() - _proc_t0) * 0.001
+	if _proc_ms > 20.0:
+		print("[mgr] frame %.1fms" % _proc_ms)
 
 ## ── Lazy collision scan ─────────────────────────────────────────────────────
 ## Push trimesh đến CollisionQueue cho các chunk đã built nhưng còn
