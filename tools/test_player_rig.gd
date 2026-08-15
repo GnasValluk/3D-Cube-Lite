@@ -45,15 +45,16 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 
-	_check(mesh.bones.size() >= 60, "bones >= 60 (thực tế %d)" % mesh.bones.size())
-	_check(mesh.box_count >= 150, "boxes >= 150 (thực tế %d)" % mesh.box_count)
+	_check(mesh.bones.size() >= 40, "bones >= 40 (thực tế %d)" % mesh.bones.size())
+	_check(mesh.box_count >= 120, "boxes >= 120 (thực tế %d)" % mesh.box_count)
 	_check(mesh.bones.has("pelvis") and mesh.bones.has("spine_03") and mesh.bones.has("head"),
 		"chuỗi Pelvis→Spine→Head đầy đủ")
 	_check(mesh.bones.has("jaw") and mesh.bones.has("eye_l") and mesh.bones.has("eyelid_up_l"),
 		"facial rig đầy đủ (jaw/eye/eyelid)")
-	_check(mesh.bones.has("thumb_01_r") and mesh.bones.has("pinky_03_r"),
-		"14 đốt ngón tay phải đầy đủ")
-	_check(mesh.bones.has("cape_01") and mesh.bones.has("cape_06"), "cape chain 6 đốt")
+	_check(mesh.bones.has("hand_l") and mesh.bones.has("hand_r"),
+		"bàn tay đơn khối đầy đủ")
+	_check(not mesh.bones.has("cape_01") and not mesh.bones.has("thumb_01_r"),
+		"đã loại bỏ ngón tay + cape")
 
 	for p in ["weapon_pivot", "helmet_pivot", "chestplate_pivot", "gauntlet_l_pivot",
 			"gauntlet_r_pivot", "boot_l_pivot", "boot_r_pivot", "leg_armor_l_pivot",

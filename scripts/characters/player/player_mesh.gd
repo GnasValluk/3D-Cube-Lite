@@ -1,8 +1,8 @@
 ## PlayerMesh – Block-out siêu chi tiết phong cách soulslike (gần voxel).
-## Cơ thể = ~170 khối BoxMesh + ~74 xương Node3D theo hierarchy:
+## Cơ thể = ~131 khối BoxMesh + ~42 xương Node3D theo hierarchy:
 ##   Pelvis→Spine_01/02/03→Neck_01/02→Head (jaw/eye/lid/brow/cheek/lip/ear)
-##   Clavicle→UpperArm→Forearm→Hand→14 đốt ngón (thumb×2 + 4 ngón×3)
-##   Thigh→Calf→Foot→Toe ; Cape_01..06 (chuỗi vật lý sau lưng)
+##   Clavicle→UpperArm→Forearm→Hand (bàn tay đơn khối — không đốt ngón)
+##   Thigh→Calf→Foot→Toe (không cape)
 ## Pivot cũ (weapon/helmet/armor...) giữ tên để hệ equipment chạy nguyên vẹn.
 class_name PlayerMesh
 
@@ -82,7 +82,6 @@ func build(root: CharacterBody3D) -> void:
 	_build_torso()
 	_build_arms()
 	_build_head_face()
-	_build_cape()
 	_build_armor()
 
 # ── Materials ──────────────────────────────────────────────────────────────
@@ -104,8 +103,6 @@ var _me:  StandardMaterial3D
 var _med: StandardMaterial3D
 var _mel: StandardMaterial3D
 var _gd:  StandardMaterial3D
-var _cp:  StandardMaterial3D
-var _cpd: StandardMaterial3D
 var _sol: StandardMaterial3D
 
 func _make_materials() -> void:
@@ -126,16 +123,13 @@ func _make_materials() -> void:
 	_med = MeshBuilder.emit_mat(_c("metal_dark", Color(0.42, 0.44, 0.47)), Color(0,0,0), 0)
 	_mel = MeshBuilder.emit_mat(_c("metal_light", Color(0.78, 0.80, 0.83)), Color(0,0,0), 0)
 	_gd  = MeshBuilder.emit_mat(_c("gold", Color(0.85, 0.66, 0.30)), Color(0,0,0), 0)
-	_cp  = MeshBuilder.emit_mat(_c("cape", Color(0.55, 0.10, 0.10)), Color(0,0,0), 0)
-	_cpd = MeshBuilder.emit_mat(_c("cape_dark", Color(0.38, 0.07, 0.07)), Color(0,0,0), 0)
 	_sol = MeshBuilder.emit_mat(_c("sole", Color(0.22, 0.16, 0.12)), Color(0,0,0), 0)
 	_mats = {
 		"skin": _sk, "hair": _hr, "hair_dark": _hd, "eye_white": _ew,
 		"eye_iris": _ei, "eye_pupil": _ep, "eye_glint": _eg, "brow": _br,
 		"mouth": _mth, "cloth": _cl, "cloth_dark": _cld, "leather": _le,
 		"leather_dark": _led, "metal": _me, "metal_dark": _med,
-		"metal_light": _mel, "gold": _gd, "cape": _cp, "cape_dark": _cpd,
-		"sole": _sol,
+		"metal_light": _mel, "gold": _gd, "sole": _sol,
 	}
 
 # ── Skeleton hierarchy ─────────────────────────────────────────────────────
@@ -190,11 +184,6 @@ func _build_skeleton() -> void:
 	_build_leg_chain(leg_l, "l")
 	leg_r = _bone(pelvis, "thigh_r", Vector3( 0.10, -0.045, 0))
 	_build_leg_chain(leg_r, "r")
-	# Cape chain (vật lý sau lưng)
-	var cape_prev: Node3D = spine_03
-	for i in range(6):
-		var cn := "cape_%02d" % (i + 1)
-		cape_prev = _bone(cape_prev, cn, Vector3(-0.04, -0.06, -0.14))
 	# Pivot thiết bị (compat) — weapon theo tay phải, ring theo tay trái
 	weapon_pivot = MeshBuilder.pivot(bones["hand_r"], Vector3(0.02, -0.04, 0.10))
 	weapon_pivot.name = "WeaponPivot"
@@ -221,23 +210,12 @@ func _build_arm_chain(parent: Node3D, side: String) -> void:
 		elbow_l = fo
 	else:
 		elbow_r = fo
-	_build_finger(ha, side, "thumb", 2)
-	_build_finger(ha, side, "index", 3)
-	_build_finger(ha, side, "middle", 3)
-	_build_finger(ha, side, "ring", 3)
-	_build_finger(ha, side, "pinky", 3)
 	var g_pivot := MeshBuilder.pivot(fo, Vector3(0, -0.04, 0))
 	g_pivot.name = "Gauntlet%sPivot" % ("L" if side == "l" else "R")
 	if side == "l":
 		gauntlet_l_pivot = g_pivot
 	else:
 		gauntlet_r_pivot = g_pivot
-
-func _build_finger(hand: Node3D, side: String, fname: String, segs: int) -> void:
-	var p: Node3D = hand
-	for s in range(segs):
-		var bn := "%s_%02d_%s" % [fname, s + 1, side]
-		p = _bone(p, bn, Vector3(0, -0.05, 0.025))
 
 func _build_leg_chain(parent: Node3D, side: String) -> void:
 	var ca := _bone(parent, "calf_%s" % side, Vector3(0, -0.33, 0))
@@ -332,28 +310,6 @@ func _build_arms() -> void:
 		var ha: Node3D = bones["hand_%s" % side]
 		_box(ha, Vector3(0, -0.015, 0.025), Vector3(0.135, 0.09, 0.145), _sk)
 		_box(ha, Vector3(0, -0.05, -0.055), Vector3(0.125, 0.07, 0.07), _led)
-		_build_finger_blocks(ha, side)
-
-func _build_finger_blocks(hand: Node3D, side: String) -> void:
-	var specs := {
-		"thumb":  {"segs": 2, "sz": Vector3(0.032, 0.065, 0.038), "x": 0.055},
-		"index":  {"segs": 3, "sz": Vector3(0.034, 0.075, 0.034), "x": -0.038},
-		"middle": {"segs": 3, "sz": Vector3(0.034, 0.08, 0.034), "x": -0.013},
-		"ring":   {"segs": 3, "sz": Vector3(0.032, 0.075, 0.032), "x": 0.013},
-		"pinky":  {"segs": 3, "sz": Vector3(0.028, 0.065, 0.028), "x": 0.038},
-	}
-	for fname in specs:
-		var sp: Dictionary = specs[fname]
-		var sz: Vector3 = sp["sz"]
-		var xo: float = sp["x"]
-		for s in range(int(sp["segs"])):
-			var bn := "%s_%02d_%s" % [fname, s + 1, side]
-			var bone_n: Node3D = bones.get(bn)
-			if bone_n == null:
-				continue
-			var py: float = -0.025 + s * -0.045
-			var pz: float = 0.03 - s * 0.008
-			_box(bone_n, Vector3(xo, py, pz), sz, _sk)
 
 # __CHUNK_GEOM_END__
 
@@ -414,20 +370,6 @@ func _build_head_face() -> void:
 	_box(neck_01, Vector3(0, 0.0, 0.01), Vector3(0.135, 0.08, 0.135), _sk)
 	_box(neck_02, Vector3(0, 0.0, 0.005), Vector3(0.125, 0.075, 0.125), _sk)
 	_box(neck_02, Vector3(0, 0.0, 0.035), Vector3(0.09, 0.035, 0.035), _hd)
-
-# ── Geometry: cape ─────────────────────────────────────────────────────────
-func _build_cape() -> void:
-	for i in range(6):
-		var bn: Node3D = bones.get("cape_%02d" % (i + 1))
-		if bn == null:
-			continue
-		var scale_f: float = 1.0 - i * 0.05
-		var w: float = 0.40 * scale_f
-		var dark := i % 2 == 1
-		var mat := _cpd if dark else _cp
-		_box(bn, Vector3(0.10, 0.0, 0.0), Vector3(0.20 * scale_f, 0.055, 0.030), mat)
-		_box(bn, Vector3(-0.10, 0.0, 0.0), Vector3(0.20 * scale_f, 0.055, 0.030), mat)
-		_box(bn, Vector3(0, 0.0, -0.02), Vector3(0.40 * scale_f, 0.035, 0.022), _cpd)
 
 # ── Geometry: giáp trụ ─────────────────────────────────────────────────────
 func _build_armor() -> void:

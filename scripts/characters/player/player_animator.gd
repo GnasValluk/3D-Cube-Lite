@@ -1,8 +1,8 @@
 ## PlayerAnimator – Layered procedural animation cho PlayerMesh blockout soulslike.
-## Lớp Base: locomotion (pelvis lead, thigh/calf so le, foot plant, spine counter-rotation).
-## Lớp Upper: attack whip-chain qua Pelvis→Spine→Clavicle→UpperArm→Forearm→Hand→Weapon.
+## Lớp Base: locomotion (pelvis lead, thigh/calf so le, foot roles, spine counter-rotation).
+## Lớp Upper: attack whip-chain qua Pelvis→Spine→Clavicle→UpperArm→Forearm→Hand→Weapon
+##           với choreography xoay hông/thân theo nhịp chém.
 ## Lớp Additive: hit reaction, breathing, blink, gaze, jaw.
-## Lớp Physics: cape chain trễ pha + trọng lực.
 ## Giữ nguyên API setup()/animate() và toàn bộ curve vũ khí cũ (cảm giác chơi không đổi).
 class_name PlayerAnimator
 
@@ -17,25 +17,14 @@ var player: PlayerCharacter
 var _slash_spawned: bool = false
 var _last_remaining: float = 0.0
 
-# Cape chain physics state
-var _cape_ang: Array = []
-var _cape_target: Array = []
-var _cape_lag: Array = []
+# State tracking cho dash (thời điểm bắt đầu roll)
+var _last_state: CharacterBase.State = CharacterBase.State.IDLE
+var _dash_t0: float = 0.0
 
 func setup(m: PlayerMesh, b: CharacterBase) -> void:
 	mesh = m
 	base = b
 	player = b as PlayerCharacter
-	_cape_reset()
-
-func _cape_reset() -> void:
-	_cape_ang.clear()
-	_cape_target.clear()
-	_cape_lag.clear()
-	for i in range(6):
-		_cape_ang.append(0.0)
-		_cape_target.append(0.0)
-		_cape_lag.append(0.0)
 
 func _bone(name: String) -> Node3D:
 	if mesh == null:
@@ -56,6 +45,10 @@ func animate(delta: float) -> void:
 	if mesh == null or base == null:
 		return
 	var t: float = base._time
+	if base._state != _last_state:
+		if base._state == CharacterBase.State.DASH:
+			_dash_t0 = t
+		_last_state = base._state
 	match base._state:
 		CharacterBase.State.IDLE:
 			_idle(delta, t)
@@ -83,7 +76,6 @@ func animate(delta: float) -> void:
 			_eat(delta, t)
 		_:
 			_idle(delta, t)
-	_cape_physics(delta, t)
 	_facial_loop(delta, t)
 
 # ── Layers: arm chain (whip) ────────────────────────────────────────────────
@@ -102,30 +94,6 @@ func _arm_chain(side: String, pitch: float, roll: float, rate: float, delta: flo
 	_lerp_rot(cl, 2, roll * 0.70, rate * 0.8, delta)
 	_lerp_rot(up, 2, roll * 0.45, rate * 1.2, delta)
 
-func _grip(fingers: Array, curl: float, rate: float, delta: float) -> void:
-	for bn in fingers:
-		var n: Node3D = _bone(bn)
-		if n == null:
-			continue
-		_lerp_rot(n, 0, curl, rate, delta)
-
-func _grip_idle(delta: float, t: float) -> void:
-	var f := 0.16 + 0.05 * sin(t * 1.3)
-	_grip(["thumb_01_l", "thumb_02_l"], f, 4.0, delta)
-	_grip(["thumb_01_r", "thumb_02_r"], f, 4.0, delta)
-	for fname in ["index", "middle", "ring", "pinky"]:
-		_grip(["%s_01_l" % fname, "%s_02_l" % fname], f * 0.8, 4.0, delta)
-		_grip(["%s_03_l" % fname], f * 1.2, 4.0, delta)
-		_grip(["%s_01_r" % fname, "%s_02_r" % fname], f * 0.8, 4.0, delta)
-		_grip(["%s_03_r" % fname], f * 1.2, 4.0, delta)
-
-func _grip_swing(delta: float, _t: float) -> void:
-	_grip(["thumb_01_r", "thumb_02_r"], 0.35, 12.0, delta)
-	for fname in ["index", "middle", "ring", "pinky"]:
-		_grip(["%s_01_r" % fname], 0.40, 12.0, delta)
-		_grip(["%s_02_r" % fname], 0.62, 12.0, delta)
-		_grip(["%s_03_r" % fname], 0.85, 12.0, delta)
-
 # ── Layers: legs (foot plant + knee bend) ───────────────────────────────────
 func _leg_cycle(side: String, swing: float, bend: float, foot_plant: float, rate: float, delta: float) -> void:
 	var th: Node3D = _bone("thigh_%s" % side)
@@ -137,12 +105,6 @@ func _leg_cycle(side: String, swing: float, bend: float, foot_plant: float, rate
 	_lerp_rot(fo, 0, foot_plant, rate * 1.3, delta)
 	_lerp_rot(to, 0, foot_plant * 0.4, rate * 1.3, delta)
 
-func _cape_puff(t: float, amp: float) -> Array:
-	var out: Array = []
-	for i in range(6):
-		out.append(sin(t * 1.6 + i * 0.55) * amp)
-	return out
-
 # ── Base locomotion ─────────────────────────────────────────────────────────
 func _idle(delta: float, t: float) -> void:
 	var b: float = sin(t * idle_breathe_speed)
@@ -150,7 +112,7 @@ func _idle(delta: float, t: float) -> void:
 	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 6.0)
 	mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, b * 0.010, delta * 4.0)
 	_lerp_rot(_bone("pelvis"), 0, -b * 0.012, 5.0, delta)
-	_lerp_rot(_bone("pelvis"), 2, b * 0.008, 4.0, delta)
+	_lerp_rot(_bone("pelvis"), 2, sin(t * 0.5) * 0.02 + b * 0.008, 4.0, delta)
 	_lerp_rot(_bone("spine_01"), 0, b * 0.018, 5.0, delta)
 	_lerp_rot(_bone("spine_03"), 0, -b * 0.022, 5.0, delta)
 	_lerp_rot(_bone("spine_02"), 2, b * 0.012, 4.0, delta)
@@ -160,76 +122,104 @@ func _idle(delta: float, t: float) -> void:
 	var arm_bob: float = 1.0
 	if player and player.equipped_weapon and player.equipped_weapon.id == "watermelon_cannon":
 		arm_bob = 0.3
-	_arm_chain("l", (-0.05 + b * 0.02) * arm_bob, (0.02 + b * 0.01) * arm_bob, 5.0, delta)
-	_arm_chain("r", (-0.05 + b * 0.02) * arm_bob, (-0.02 - b * 0.01) * arm_bob, 5.0, delta)
-	_leg_cycle("l", 0.015, -0.04, 0.0, 6.0, delta)
-	_leg_cycle("r", 0.015, -0.04, 0.0, 6.0, delta)
-	_cape_target = _cape_puff(t, 0.05)
-	_grip_idle(delta, t)
+	# Tay nghỉ: khuỷu hơi gập, vai khép nhẹ
+	_arm_chain("l", (-0.10 + b * 0.02) * arm_bob, (0.10 + b * 0.01) * arm_bob, 5.0, delta)
+	_arm_chain("r", (-0.10 + b * 0.02) * arm_bob, (-0.10 - b * 0.01) * arm_bob, 5.0, delta)
+	_lerp_rot(_bone("forearm_l"), 0, -0.35 * arm_bob, 5.0, delta)
+	_lerp_rot(_bone("forearm_r"), 0, -0.35 * arm_bob, 5.0, delta)
+	_leg_cycle("l", 0.015, -0.06, 0.0, 6.0, delta)
+	_leg_cycle("r", 0.015, -0.06, 0.0, 6.0, delta)
 
 func _walk(delta: float, t: float, mult: float) -> void:
 	var cyc: float = t * walk_cycle_speed * mult
-	var amp: float = 0.55 + mult * 0.10
-	mesh.rig.position.y = 0.004 + abs(sin(cyc)) * (0.025 + mult * 0.012)
-	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.03 * mult, delta * 8.0)
-	_lerp_rot(_bone("pelvis"), 2, sin(cyc) * 0.07, 10.0, delta)
+	var amp: float = 0.52 + mult * 0.10
+	var lean: float = 0.015 + 0.05 * mult
+	# Nhún theo nhịp + ngả người theo tốc độ (sprint ngả sâu hơn)
+	mesh.rig.position.y = 0.004 + abs(sin(cyc)) * (0.022 + mult * 0.012)
+	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -lean, delta * 8.0)
+	# Hông dẫn nhịp: roll + xoay theo chân trụ
+	_lerp_rot(_bone("pelvis"), 2, sin(cyc) * 0.075, 10.0, delta)
+	_lerp_rot(_bone("pelvis"), 1, sin(cyc) * 0.06, 10.0, delta)
 	_lerp_rot(_bone("pelvis"), 0, sin(cyc * 0.5) * 0.03, 8.0, delta)
-	_lerp_rot(_bone("spine_01"), 0, sin(cyc * 0.5) * 0.05, 8.0, delta)
-	_lerp_rot(_bone("spine_02"), 1, -sin(cyc) * 0.10, 8.0, delta)
-	_lerp_rot(_bone("spine_03"), 1, -sin(cyc) * 0.08, 8.0, delta)
-	_lerp_rot(_bone("spine_03"), 0, sin(cyc * 0.5) * 0.04, 7.0, delta)
+	# Spine counter-rotation: lưng xoay ngược vai, thân giữ thẳng
+	_lerp_rot(_bone("spine_01"), 0, sin(cyc * 0.5) * 0.06 + 0.02 * mult, 8.0, delta)
+	_lerp_rot(_bone("spine_02"), 1, -sin(cyc) * 0.12, 8.0, delta)
+	_lerp_rot(_bone("spine_03"), 1, -sin(cyc) * 0.09, 8.0, delta)
+	_lerp_rot(_bone("spine_03"), 0, sin(cyc * 0.5) * 0.035, 7.0, delta)
+	# Đầu giữ hướng nhìn, bù nhẹ theo bước
 	_lerp_rot(_bone("neck_02"), 0, -sin(cyc * 0.5) * 0.04, 6.0, delta)
-	_lerp_rot(_bone("head"), 0, sin(cyc * 0.5) * 0.03, 6.0, delta)
-	_lerp_rot(_bone("head"), 1, sin(cyc * 0.5) * 0.05 * mult, 6.0, delta)
-	var arm_swing: float = 0.30 + mult * 0.10
+	_lerp_rot(_bone("head"), 0, sin(cyc * 0.5) * 0.03 + 0.02 * mult, 6.0, delta)
+	_lerp_rot(_bone("head"), 1, -sin(cyc) * 0.04, 6.0, delta)
+	# Tay: vai đánh nhịp + khuỷu gập quả lắc (sprint bơi mạnh hơn)
+	var arm_swing: float = 0.34 + mult * 0.14
 	if player and player.equipped_weapon and player.equipped_weapon.id == "watermelon_cannon":
 		arm_swing *= 0.35
-	_arm_chain("l", sin(cyc + PI) * arm_swing, 0.03, 10.0, delta)
-	_arm_chain("r", sin(cyc) * arm_swing, -0.03, 10.0, delta)
-	_leg_cycle("l", sin(cyc) * amp, -0.18 - abs(sin(cyc + PI * 0.5)) * 0.28, 0.12 + sin(cyc + PI * 0.5) * 0.10, 11.0, delta)
-	_leg_cycle("r", sin(cyc + PI) * amp, -0.18 - abs(sin(cyc - PI * 0.5)) * 0.28, 0.12 + sin(cyc - PI * 0.5) * 0.10, 11.0, delta)
-	_cape_target = _cape_puff(t, 0.10 + mult * 0.05)
-	_grip_idle(delta, t)
+	_arm_chain("l", sin(cyc + PI) * arm_swing, 0.05, 10.0, delta)
+	_arm_chain("r", sin(cyc) * arm_swing, -0.05, 10.0, delta)
+	_lerp_rot(_bone("forearm_l"), 0, -0.45 - sin(cyc + PI) * arm_swing * 0.55, 12.0, delta)
+	_lerp_rot(_bone("forearm_r"), 0, -0.45 - sin(cyc) * arm_swing * 0.55, 12.0, delta)
+	_lerp_rot(_bone("hand_l"), 0, 0.08, 10.0, delta)
+	_lerp_rot(_bone("hand_r"), 0, 0.08, 10.0, delta)
+	# Chân: heel strike → toe off; gối gập ở pha đong đưa
+	var flex_l: float = max(0.0, -sin(cyc))
+	var flex_r: float = max(0.0, sin(cyc))
+	_leg_cycle("l", sin(cyc) * amp, -0.22 - flex_l * 0.55, 0.08 - sin(cyc + PI * 0.5) * 0.14, 11.0, delta)
+	_leg_cycle("r", sin(cyc + PI) * amp, -0.22 - flex_r * 0.55, 0.08 - sin(cyc - PI * 0.5) * 0.14, 11.0, delta)
 
 func _crouch(delta: float, t: float) -> void:
-	var cyc: float = t * walk_cycle_speed * 0.5
-	mesh.rig.position.y = lerp(mesh.rig.position.y, -0.14, delta * 10.0)
-	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.10, delta * 8.0)
-	_lerp_rot(_bone("pelvis"), 0, 0.34, 10.0, delta)
-	_lerp_rot(_bone("spine_01"), 0, 0.22, 10.0, delta)
-	_lerp_rot(_bone("spine_02"), 0, 0.16, 10.0, delta)
-	_lerp_rot(_bone("spine_03"), 0, 0.10, 10.0, delta)
-	_lerp_rot(_bone("neck_02"), 0, -0.10, 8.0, delta)
-	_lerp_rot(_bone("head"), 0, 0.06, 8.0, delta)
-	_arm_chain("l", -0.30, 0.14, 10.0, delta)
-	_arm_chain("r", -0.30, -0.14, 10.0, delta)
-	var step: float = sin(cyc) * 0.16
-	_leg_cycle("l", 0.34 + step, -0.62 - abs(step) * 0.4, 0.30, 10.0, delta)
-	_leg_cycle("r", 0.34 - step, -0.62 - abs(step) * 0.4, 0.30, 10.0, delta)
-	_cape_target = _cape_puff(t, 0.04)
-	_grip_idle(delta, t)
+	# Rón rén: hạ trọng tâm, lưng xuôi, mũi chân bám — bước chậm, âm thầm
+	var cyc: float = t * walk_cycle_speed * 0.55
+	mesh.rig.position.y = lerp(mesh.rig.position.y, -0.15, delta * 10.0)
+	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.08, delta * 8.0)
+	# Ngồi xổm sâu: hông chìm xuống, đùi gần ngang
+	_lerp_rot(_bone("pelvis"), 0, 0.42, 10.0, delta)
+	_lerp_rot(_bone("pelvis"), 2, sin(cyc) * 0.05, 8.0, delta)
+	# Lưng cuộn ngang (thấp — khó bị phát hiện)
+	_lerp_rot(_bone("spine_01"), 0, 0.26, 10.0, delta)
+	_lerp_rot(_bone("spine_02"), 0, 0.20, 10.0, delta)
+	_lerp_rot(_bone("spine_03"), 0, 0.13, 10.0, delta)
+	_lerp_rot(_bone("neck_02"), 0, -0.14, 8.0, delta)
+	_lerp_rot(_bone("head"), 0, 0.10 + sin(cyc) * 0.02, 8.0, delta)
+	# Tay kẹp trước ngực, khuỷu gập, vai khép
+	_arm_chain("l", -0.55, 0.22, 10.0, delta)
+	_arm_chain("r", -0.55, -0.22, 10.0, delta)
+	_lerp_rot(_bone("forearm_l"), 0, -0.90, 12.0, delta)
+	_lerp_rot(_bone("forearm_r"), 0, -0.90, 12.0, delta)
+	# Chân: gối gập sâu, gót nhấc (đi mũi chân)
+	var step: float = sin(cyc) * 0.14
+	_leg_cycle("l", 0.42 + step, -1.05 - abs(step) * 0.5, -0.28, 10.0, delta)
+	_leg_cycle("r", 0.42 - step, -1.05 - abs(step) * 0.5, -0.28, 10.0, delta)
+	_lerp_rot(_bone("toe_l"), 0, -0.30, 10.0, delta)
+	_lerp_rot(_bone("toe_r"), 0, -0.30, 10.0, delta)
 
-func _dash(delta: float, _t: float) -> void:
-	# Roll: pelvis dẫn đầu, spine cuộn theo, tay thu, chân gập, cape quất
-	mesh.rig.position.y = lerp(mesh.rig.position.y, 0.0, delta * 18.0)
-	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.06, delta * 12.0)
-	_lerp_rot(_bone("pelvis"), 0, 0.62, 18.0, delta)
-	_lerp_rot(_bone("spine_01"), 0, 0.42, 16.0, delta)
-	_lerp_rot(_bone("spine_02"), 0, 0.30, 16.0, delta)
-	_lerp_rot(_bone("spine_03"), 0, 0.18, 16.0, delta)
-	_lerp_rot(_bone("pelvis"), 2, -0.10, 14.0, delta)
-	_lerp_rot(_bone("neck_02"), 0, -0.22, 14.0, delta)
-	_lerp_rot(_bone("head"), 0, -0.12, 14.0, delta)
-	_arm_chain("l", -0.85, 0.55, 16.0, delta)
-	_arm_chain("r", -0.95, -0.42, 16.0, delta)
-	_lerp_rot(_bone("hand_l"), 2, -0.45, 16.0, delta)
-	_lerp_rot(_bone("hand_r"), 2, 0.38, 16.0, delta)
-	_leg_cycle("l", -0.78, -1.05, 0.42, 18.0, delta)
-	_leg_cycle("r", -0.78, -1.05, 0.42, 18.0, delta)
-	for i in range(6):
-		_cape_target[i] = 0.7 - i * 0.025
-		_cape_lag[i] = 0.9
-	_grip_idle(delta, 0.0)
+func _dash(delta: float, t: float) -> void:
+	# Roll lăn: tuck bó gọn → đổ người → bật dậy (pelvis dẫn, spine/đầu theo sau)
+	var dp: float = clamp((t - _dash_t0) / 0.45, 0.0, 1.0)
+	var k: float = clamp(dp / 0.55, 0.0, 1.0)
+	var u: float = clamp((dp - 0.55) / 0.45, 0.0, 1.0)
+	var roll: float = 0.30 + 0.85 * k - 0.55 * u
+	mesh.rig.position.y = lerp(mesh.rig.position.y, -0.02 - 0.03 * k + 0.02 * u, delta * 18.0)
+	mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.05 * (1.0 - k) + 0.10 * u, delta * 12.0)
+	# Sóng đổ xuôi chuỗi: pelvis → spine → cổ → đầu
+	_lerp_rot(_bone("pelvis"), 0, roll, 18.0, delta)
+	_lerp_rot(_bone("spine_01"), 0, roll * 0.72, 17.0, delta)
+	_lerp_rot(_bone("spine_02"), 0, roll * 0.52, 16.0, delta)
+	_lerp_rot(_bone("spine_03"), 0, roll * 0.34, 15.0, delta)
+	_lerp_rot(_bone("neck_02"), 0, -roll * 0.30, 15.0, delta)
+	_lerp_rot(_bone("head"), 0, -roll * 0.42 - 0.10 * u, 16.0, delta)
+	_lerp_rot(_bone("pelvis"), 2, -0.08 - 0.05 * u, 14.0, delta)
+	# Tay bó gọn: vai khép, khuỷu gập sát người
+	_arm_chain("l", -0.55 - 0.45 * k, 0.62, 16.0, delta)
+	_arm_chain("r", -0.65 - 0.50 * k, -0.50, 16.0, delta)
+	_lerp_rot(_bone("forearm_l"), 0, -1.05 * k, 16.0, delta)
+	_lerp_rot(_bone("forearm_r"), 0, -1.05 * k, 16.0, delta)
+	_lerp_rot(_bone("hand_l"), 2, -0.30, 16.0, delta)
+	_lerp_rot(_bone("hand_r"), 2, 0.30, 16.0, delta)
+	# Chân gập tối đa lúc tuck → duỗi khi bật dậy
+	var leg_rx: float = -0.55 - 0.55 * k + 0.30 * u
+	var leg_bend: float = -0.70 - 0.55 * k + 0.45 * u
+	_leg_cycle("l", leg_rx, leg_bend, -0.25 * k, 18.0, delta)
+	_leg_cycle("r", leg_rx, leg_bend, -0.25 * k, 18.0, delta)
 
 func _air(delta: float, t: float, rising: bool) -> void:
 	var tuck: float
@@ -247,10 +237,6 @@ func _air(delta: float, t: float, rising: bool) -> void:
 	_arm_chain("r", -0.55 - tuck * 0.25, -0.42 - tuck * 0.25, 9.0, delta)
 	_leg_cycle("l", -0.42 - tuck * 0.35, -0.30 - tuck * 0.25, 0.10, 10.0, delta)
 	_leg_cycle("r", -0.42 - tuck * 0.35, -0.30 - tuck * 0.25, 0.10, 10.0, delta)
-	_cape_target = _cape_puff(t, 0.35 + tuck * 0.15)
-	for i in range(6):
-		_cape_lag[i] = 1.0
-	_grip_idle(delta, t)
 
 func _swim(delta: float, t: float) -> void:
 	var cyc: float = t * swim_cycle_speed
@@ -267,8 +253,6 @@ func _swim(delta: float, t: float) -> void:
 	_leg_cycle("r", sin(cyc - PI * 0.5) * 0.35, sin(cyc - PI * 0.5) * 0.85, sin(cyc * 2.0) * 0.12, 14.0, delta)
 	var kick: float = abs(sin(cyc * 1.5))
 	mesh.rig.position.y += kick * 0.015
-	_cape_target = _cape_puff(t, 0.15)
-	_grip_idle(delta, t)
 
 func _eat(delta: float, t: float) -> void:
 	var chew: float = abs(sin(t * 9.0))
@@ -285,8 +269,6 @@ func _eat(delta: float, t: float) -> void:
 	_lerp_rot(_bone("jaw"), 0, 0.22 + chew * 0.18, 14.0, delta)
 	_leg_cycle("l", 0.02, -0.04, 0.0, 6.0, delta)
 	_leg_cycle("r", 0.02, -0.04, 0.0, 6.0, delta)
-	_cape_target = _cape_puff(t, 0.04)
-	_grip_idle(delta, t)
 
 func _hit(delta: float, _t: float) -> void:
 	var p: float = 1.0 - clamp(base._hit_timer / 0.18, 0.0, 1.0)
@@ -302,9 +284,6 @@ func _hit(delta: float, _t: float) -> void:
 	_lerp_rot(_bone("jaw"), 0, 0.10 * p, 18.0, delta)
 	_leg_cycle("l", -0.06, -0.08, 0.04, 14.0, delta)
 	_leg_cycle("r", -0.10, -0.08, 0.04, 14.0, delta)
-	for i in range(6):
-		_cape_lag[i] = 0.7
-	_grip_idle(delta, 0.0)
 
 func _dead(delta: float, _t: float) -> void:
 	# Wave collapse: pelvis mất đỡ trước → spine đổ → head cuối, tay rũ, chân gục
@@ -353,9 +332,6 @@ func _dead(delta: float, _t: float) -> void:
 		_arm_chain("r", 1.65, -0.40, 10.0, delta)
 		_leg_cycle("l", 0.42, -1.40, 0.15, 10.0, delta)
 		_leg_cycle("r", 0.42, -1.40, 0.15, 10.0, delta)
-	for i in range(6):
-		_cape_target[i] = 0.35 + i * 0.05
-		_cape_lag[i] = 1.0
 
 # ── Upper layer: attack (curve vũ khí cũ giữ nguyên, đẩy chuyển động qua chuỗi khớp) ─
 func _attack(delta: float, _t: float) -> void:
@@ -375,7 +351,6 @@ func _attack(delta: float, _t: float) -> void:
 	var is_halberd: bool = player and player.equipped_weapon != null and player.equipped_weapon.id == "iron_halberd"
 
 	# Trụ: chân hơi gập, tay phải nắm chặt, tay trái chống
-	_grip_swing(delta, 0.0)
 	_leg_cycle("l", 0.10, -0.22, 0.06, 14.0, delta)
 	_leg_cycle("r", -0.10, -0.18, 0.10, 14.0, delta)
 
@@ -692,28 +667,6 @@ func _spawn_slash(step: int) -> void:
 		var vfx := PunchVFX.new(1.0, Color(0.85, 0.72, 0.40))
 		wp.add_child(vfx)
 		vfx.position = Vector3(0, 0.25, 0.08)
-
-# ── Lớp Physics: cape chain trễ pha + trọng lực ─────────────────────────────
-func _cape_physics(delta: float, _t: float) -> void:
-	if _cape_ang.size() != 6:
-		return
-	# Trọng lực + đàn hồi: mỗi đốt trễ hơn đốt trước
-	var prev_x: float = 0.0
-	for i in range(6):
-		var bn := _bone("cape_%02d" % (i + 1))
-		if bn == null:
-			continue
-		var target: float = _cape_target[i]
-		if _cape_lag[i] > 0.0:
-			target += _cape_lag[i] * 0.6
-		var spring := 6.0 + i * 0.8
-		_cape_ang[i] = lerp(_cape_ang[i], target - 0.10, clamp(spring * delta * 0.5, 0.0, 1.0))
-		_cape_ang[i] = clamp(_cape_ang[i], -0.9, 0.9)
-		var wobble: float = sin(_t * 2.2 + i * 1.1) * 0.02 - i * 0.012
-		bn.rotation.x = _cape_ang[i] + wobble + prev_x * 0.25
-		bn.rotation.z = sin(_t * 1.7 + i * 0.9) * 0.03
-		prev_x = bn.rotation.x
-	_cape_lag.fill(0.0)
 
 # ── Lớp Additive: blink + gaze + thở ────────────────────────────────────────
 func _facial_loop(delta: float, t: float) -> void:
