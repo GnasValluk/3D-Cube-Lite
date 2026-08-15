@@ -436,7 +436,19 @@ static func ensure_chunk_built(wx: float, wz: float) -> void:
 	var ck: String = _cache_key(cx, cz, _Data._Dim.DimensionID.REAL_WORLD)
 	if _mesh_cache.has(ck):
 		return
-	_mesh_cache[ck] = compute_chunk(cx, cz, SIZE, _Data._Dim.DimensionID.REAL_WORLD)
+	var data: Dictionary = compute_chunk(cx, cz, SIZE, _Data._Dim.DimensionID.REAL_WORLD)
+	compress_block_data(data)
+	_mesh_cache[ck] = data
+
+## Nén `block_data_bytes` của 1 dict chunk (chỉ 1 lần, đánh dấu bd_compressed).
+## Gọi trước khi cache; runtime chỉ dùng live `block_data` nên không cần giải nén.
+static func compress_block_data(data: Dictionary) -> void:
+	if data.get("bd_compressed", false):
+		return
+	var src: PackedByteArray = data.get("block_data_bytes", PackedByteArray())
+	if not src.is_empty():
+		data["block_data_bytes"] = src.compress(FileAccess.COMPRESSION_DEFLATE)
+		data["bd_compressed"] = true
 
 ## Lấy biome (TileType) tại world pos — CÙNG nguồn sự thật với địa hình
 ## (có spawn-bias, ưu tiên sa mạc cao nguyên...). Dùng cho teleport biome
@@ -2814,6 +2826,12 @@ func apply_chunk(data: Dictionary) -> void:
 			_terrain_mesh_instance = mi
 		_built = true
 		return
+# ── Cache full chunk với block_data NÉN ──────────────────────────────────
+	# `block_data_bytes` raw là 70656 B/chunk (32×69×32). Lưu bản nén (Deflate
+	# ~600-1400 B, x50) vào `_mesh_cache` để cắt memory tồn — chunk có thể được
+	# tải lại từ cache (setup cache-hit) nên vẫn cần bản bytes để dựng block_data.
+	# Live `block_data` của chunk đang hiển thị giữ bản raw (gameplay đọc nhanh).
+	compress_block_data(data)
 	_mesh_cache[_cache_key(_cx, _cz, _dimension_id)] = data
 	_biome_grid = data["biome_grid"]
 	_has_water = data.get("has_water", false)
@@ -2822,9 +2840,12 @@ func apply_chunk(data: Dictionary) -> void:
 	_has_ores = data.get("has_ores", false)
 	_top_ly_cache = data.get("top_ly_hint", PackedInt32Array())
 
-	# Khôi phục block_data
+	# Khôi phục block_data (giải nén nếu là bản nén trong cache)
 	var bdbytes: PackedByteArray = data.get("block_data_bytes", PackedByteArray())
 	if not bdbytes.is_empty():
+		if data.get("bd_compressed", false):
+			bdbytes = bdbytes.decompress(
+				_cols * _cols * _BlockData.CHUNK_H, FileAccess.COMPRESSION_DEFLATE)
 		block_data = _BlockData.new()
 		block_data.from_bytes(bdbytes, _cols, _cols)
 
