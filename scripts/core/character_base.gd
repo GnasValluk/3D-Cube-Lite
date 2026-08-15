@@ -197,8 +197,6 @@ func _add_world_hp_bar() -> void:
 	bar.setup(self)
 
 func _process(delta: float) -> void:
-	if _invul_timer > 0.0:
-		_invul_timer = max(_invul_timer - delta, 0.0)
 	if _hit_timer > 0.0:
 		_hit_timer = max(_hit_timer - delta, 0.0)
 	_freeze_timer = max(_freeze_timer - delta, 0.0)
@@ -474,7 +472,7 @@ func _sync_camera() -> void:
 
 # ── Input ─────────────────────────────────────────────────────────────────────
 func _unhandled_key_input(event: InputEvent) -> void:
-	if not _active or not _is_player:
+	if not _active or not is_alive or not _is_player:
 		return
 	if _is_building_placing():
 		return
@@ -500,7 +498,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 					_on_secondary_attack()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _active or not _is_player:
+	if not _active or not is_alive or not _is_player:
 		return
 	if _is_building_placing():
 		return
@@ -526,19 +524,21 @@ func _physics_process(delta: float) -> void:
 	if not _active:
 		return
 	if not is_alive:
+		# Luôn giảm _death_timer khi đang chết (bất kể _state), để respawn không
+		# bị kẹt vĩnh viễn nếu state bị đè (vd nhiều đòn cùng lúc ghi HIT giữa
+		# chừng). Animation chết chỉ chạy khi đúng _state==DEAD.
+		_death_timer -= delta
 		if _state == State.DEAD:
-			_death_timer -= delta
 			velocity.x *= 0.85
 			velocity.z *= 0.85
 			_animate(delta)
-			if _death_timer <= 0.0:
-				_active = false
-				set_physics_process(false)
-				set_process_unhandled_input(false)
-				set_process_unhandled_key_input(false)
-				if _rig:
-					_rig.visible = false
-			return
+		if _death_timer <= 0.0:
+			_active = false
+			set_physics_process(false)
+			set_process_unhandled_input(false)
+			set_process_unhandled_key_input(false)
+			if _rig:
+				_rig.visible = false
 		return
 
 	_time          += delta

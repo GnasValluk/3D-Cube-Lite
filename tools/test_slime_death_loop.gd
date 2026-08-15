@@ -57,6 +57,10 @@ func _ready() -> void:
 	_check(respawn_found, "player respawn được (is_alive=true)")
 	print("DEBUG invul ngay sau respawn = ", respawn_invul)
 	_check(respawn_invul > 0.0, "có i-frame ngay sau respawn (invul=%.2f)" % respawn_invul)
+	# _invul_timer giờ chỉ bị trừ MỘT lần/frame (trong _physics_process) → 5.0 là
+	# đúng 5.0s. Trước khi sửa, nó bị trừ cả _process lẫn _physics_process nên
+	# ~2.5s → slime canh spawn hết i-frame sớm và giết lại ngay (tưởng không respawn).
+	_check(respawn_invul > 4.0, "i-frame đầy đủ 5s ngay sau respawn (invul=%.2f, không bị trừ 2 lần/frame)" % respawn_invul)
 
 	# Trong cửa sổ i-frame, player phải SỐNG dù slime đứng sát (cửa sổ này
 	# thực tế ~invul giây vì timer bị trừ ở cả _process lẫn _physics_process).

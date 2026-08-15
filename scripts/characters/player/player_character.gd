@@ -559,8 +559,9 @@ func _do_respawn() -> void:
 	stamina_changed.emit(stamina, max_stamina)
 	revive()
 	# Miễn nhiễm sau hồi sinh để slime đang canh ở điểm spawn không giết lại
-	# ngay lập tức (death loop vô hạn khi không có i-frame). Timer bị trừ cả
-	# trong _process lẫn _physics_process nên 5.0 ~ 2.5s thực tế.
+	# ngay lập tức (death loop vô hạn khi không có i-frame). `_invul_timer` chỉ
+	# bị trừ một lần trong _physics_process → 5.0 này là đúng 5.0s thực tế
+	# (trước đây bị trừ cả _process lẫn _physics_process nên chỉ ~2.5s).
 	_invul_timer = 5.0
 	_sync_camera()
 	_death_chest_spawned = false
@@ -867,7 +868,7 @@ func update_overload_effects() -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if _is_building_placing():
 		return
-	if not _active or not _is_player:
+	if not _active or not is_alive or not _is_player:
 		return
 	if event is InputEventKey:
 		var k := event as InputEventKey
@@ -896,7 +897,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	super._unhandled_key_input(event)
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _active:
+	if not _active or not is_alive:
 		return
 	if _is_building_placing():
 		return
