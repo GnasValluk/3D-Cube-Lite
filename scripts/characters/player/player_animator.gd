@@ -17,6 +17,10 @@ var player: PlayerCharacter
 var _slash_spawned: bool = false
 var _last_remaining: float = 0.0
 
+# Cache Node3D reference cho mỗi xương — tránh dict.get(name)+cast mỗi frame
+# (animate() chạm ~200 xương/lần gọi; việc tra cứu dict × Node3D cast là hot path).
+var _bones: Dictionary = {}
+
 # State tracking cho dash (thời điểm bắt đầu roll)
 var _last_state: CharacterBase.State = CharacterBase.State.IDLE
 var _dash_t0: float = 0.0
@@ -27,9 +31,14 @@ func setup(m: PlayerMesh, b: CharacterBase) -> void:
 	player = b as PlayerCharacter
 
 func _bone(name: String) -> Node3D:
+	var cached: Node3D = _bones.get(name) as Node3D
+	if cached != null:
+		return cached
 	if mesh == null:
 		return null
-	return mesh.bones.get(name) as Node3D
+	var n := mesh.bones.get(name) as Node3D
+	_bones[name] = n
+	return n
 
 func _lerp_rot(node: Node3D, axis: int, target: float, rate: float, delta: float) -> void:
 	if node == null:
