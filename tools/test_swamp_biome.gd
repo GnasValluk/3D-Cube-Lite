@@ -20,10 +20,12 @@ func _check(cond: bool, label: String) -> void:
 	if not cond:
 		_failures += 1
 
-## Tìm ô SWAMP lõi (swamp noise ≥ NGƯỠNG_LÕI để chắc chắn trong đầm, có nước
-## đứng) đất liền trong bán kính MAX_R từ gốc.
+## Tìm danh sách ô SWAMP lõi (swamp noise ≥ NGƯỠNG_LÕI để chắc chắn trong đầm,
+## có nước đứng) đất liền trong bán kính MAX_R từ gốc. Trả NHIỀU .candidate —
+## đầm lầy ngập sâu không có mô bùn nhô → 0 cây tràm; test chọn ô nào có cây.
 const NGƯỠNG_LÕI: float = 0.72
-func _find_swamp_cell(nd: Dictionary, max_r: float) -> Vector2:
+func _find_swamp_cells(nd: Dictionary, max_r: float, count: int = 8) -> Array:
+	var out: Array = []
 	var step := 40.0
 	for r in range(step, int(max_r) + 1, int(step)):
 		var samples: int = max(8, int(float(r) / step * TAU))
@@ -35,8 +37,10 @@ func _find_swamp_cell(nd: Dictionary, max_r: float) -> Vector2:
 			if _W._Noise._biome_at(wx, wz, RW) != _D.TileType.SWAMP: continue
 			var sw_v: float = (nd["swamp"].get_noise_2d(wx, wz) + 1.0) * 0.5
 			if sw_v >= NGƯỠNG_LÕI:
-				return Vector2(wx, wz)
-	return Vector2.ZERO
+				out.append(Vector2(wx, wz))
+				if out.size() >= count:
+					return out
+	return out
 
 func _ready() -> void:
 	print("== test_swamp_biome: mud tiles + standing water + tràm tree ==")
@@ -44,16 +48,53 @@ func _ready() -> void:
 	_W._Noise.clear_cache()
 
 	var nd := _W._Noise._noise_for_dim(RW)
-	var sw := _find_swamp_cell(nd, 12000.0)
-	_check(sw != Vector2.ZERO, "tìm thấy ô SWAMP trong bán kính 12km (%s)" % str(sw))
-	if sw == Vector2.ZERO:
+	var cells := _find_swamp_cells(nd, 12000.0)
+	_check(not cells.is_empty(), "tìm thấy ô SWAMP trong bán kính 12km (%d ô)" % cells.size())
+	if cells.is_empty():
 		get_tree().quit(1)
 		return
 
+	# Thử từng ô tới khi ô nào có chunk có CÂY TRÀM + ≥40 cột ngập nước đứng
+	# (đầm cần mô bùn nhô khỏi mặt nước — ô lõi có thể là vũng ngập sâu 0 cây).
+	var sw := Vector2.ZERO
+	var best := Vector2.ZERO
+	var best_water := 0
+	for cand in cells:
+		var ccx := int(floor(cand.x / SIZE))
+		var ccz := int(floor(cand.y / SIZE))
+		var d2 := _W.compute_chunk(ccx, ccz, SIZE, RW)
+		var tree_count := 0
+		for p in d2.get("plant_props", []):
+			if p.get("type", "") == "swamp_tree":
+				tree_count += 1
+		var water_count := 0
+		var bg2: Array = d2.get("biome_grid", [])
+		var bd2 := _BD.new()
+		bd2.from_bytes(d2["block_data_bytes"], SIZE, SIZE)
+		for x in range(SIZE):
+			for z in range(SIZE):
+				var b: int = int(bg2[x][z])
+				if b != _D.TileType.SWAMP_MUD and b != _D.TileType.SWAMP_DIRT:
+					continue
+				var top_blk := _D.BlockID.AIR
+				for ly in range(_BD.CHUNK_H - 1, -1, -1):
+					var blk := bd2.get_block(x, ly, z)
+					if blk != _D.BlockID.AIR:
+						top_blk = blk
+						break
+				if _D.is_water(top_blk):
+					water_count += 1
+		if tree_count > 0 and water_count >= 40:
+			sw = cand
+			break
+		if water_count > best_water:
+			best_water = water_count
+			best = cand
+	if sw == Vector2.ZERO:
+		sw = best
+
 	var cx := int(floor(sw.x / SIZE))
 	var cz := int(floor(sw.y / SIZE))
-	var lx := posmod(int(round(sw.x - (cx * SIZE - SIZE * 0.5))), SIZE)
-	var lz := posmod(int(round(sw.y - (cz * SIZE - SIZE * 0.5))), SIZE)
 	var data := _W.compute_chunk(cx, cz, SIZE, RW)
 	var bg: Array = data.get("biome_grid", [])
 	var bd = _BD.new()

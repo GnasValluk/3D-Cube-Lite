@@ -186,6 +186,30 @@ func _ready() -> void:
 	else:
 		print("ISLAND-STAT: 0 islands trong vùng quét")
 
+	# ── 6. BIỂN KHÔNG CẮT ĐỊA HÌNH NÚI: mọi ô lõi núi (mtn_t>0.50) là đất ─────
+	# Khớp `_ocean_mask_compute` + height_grid: mask núi không được phép phủ
+	# địa hình núi thành biển (MOUNTAIN_LAND_T=0.5). Quét lưới xa spawn.
+	print("-- 6. Núi luôn đất (mtn_t > 0.50 => không biển) --")
+	WorldSeed.seed_value = 20260805
+	_W._Noise.clear_cache()
+	_nd = _W._Noise._noise_for_dim(RW)
+	var cut := 0
+	var mtn_total := 0
+	for gx in range(-5, 6):
+		for gz in range(-5, 6):
+			var wx: float = float(gx) * 900.0 + 250.0
+			var wz: float = float(gz) * 900.0 + 250.0
+			var mtn: float = (_nd["mountain"].get_noise_2d(wx, wz) + 1.0) * 0.5
+			var mtn_t: float = clamp((mtn - 0.58) / 0.14, 0.0, 1.0)
+			mtn_t = mtn_t * mtn_t * (3.0 - 2.0 * mtn_t)
+			if mtn_t > 0.50:
+				mtn_total += 1
+				if _ocean(wx, wz):
+					cut += 1
+	print("  núi scanned=%d cut_by_sea=%d" % [mtn_total, cut])
+	_check(mtn_total > 0, "có lõi núi ngoài vùng spawn đủ để kiểm tra (%d)" % mtn_total)
+	_check(cut == 0, "không ô núi nào bị biển phủ (%d vi phạm)" % cut)
+
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())
 	get_tree().quit(0 if _failures == 0 else 1)

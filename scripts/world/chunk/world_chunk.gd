@@ -160,6 +160,12 @@ const SPAWN_BIAS_CUT: float = 2000000.0
 ## Đĩa an toàn quanh gốc: LUÔN là đất (spawn/tavern/village) — "đảo nhà" rộng
 ## ~650 để có lòng đồng cỏ sâu cho hồ/làng. Quần đảo nhỏ bắt đầu ngoài đĩa.
 const SPAWN_FORCE_R2: float = 110000.0
+## BIỂN KHÔNG ĐƯỢC PHÉP CẮT ĐỊA HÌNH NÚI: cells có "lõi núi thật" (mtn_t >
+## 0.50 — khớp đúng ngưỡng vùng núi của find_mountain/zone hệ thống) luôn là đất
+## liền, blob đảo bên dưới không thể phủ thành biển. Chọn 0.50 (không phải 0.0)
+## để chỉ núi thật làm đất: đồi thấp thoải vẫn được quần đảo phủ (land ~39%).
+## Hệ quả: dải núi thành lục địa tự nhiên, quần đảo sống ở vùng biển thấp.
+const MOUNTAIN_LAND_T: float = 0.5
 
 ## Giới hạn số đèn sen 1 chunk — trước đây tạo 20-40 OmniLight3D/chunk (49 chunk
 ## trong tầm = ~1500 node đèn, cày GC + enter/exit tree mỗi lần stream → spike
@@ -190,6 +196,16 @@ static func _ocean_mask_compute(nd: Dictionary, wx: float, wz: float) -> bool:
 	var d2: float = wx * wx + wz * wz
 	if d2 < SPAWN_FORCE_R2:
 		return false
+	# Vùng terrain thực sự MOUNTAIN → LUÔN đất, không để blob đảo phủ thành
+	# biển ("biển không được cắt địa hình núi"). Dùng đúng noise mountain +
+	# smoothstep như land-branch (height_grid 1c) để mask khớp địa hình thật.
+	var n_mt: FastNoiseLite = nd.get("mountain")
+	if n_mt:
+		var mtn: float = (n_mt.get_noise_2d(wx, wz) + 1.0) * 0.5
+		var mtn_t: float = clamp((mtn - 0.58) / 0.14, 0.0, 1.0)
+		mtn_t = mtn_t * mtn_t * (3.0 - 2.0 * mtn_t)
+		if mtn_t > MOUNTAIN_LAND_T:
+			return false
 	# Đảo = blob quanh hub của ô đảo chứa điểm. Rain lệch bán kính theo
 	# ocean_warp để bờ biển lồi lõm; spawn-safe: mọc rộng quanh gốc tọa độ.
 	var seed: int = SeedSnapshot.ensure()

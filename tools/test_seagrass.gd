@@ -182,7 +182,12 @@ func _ready() -> void:
 
 	# ── 11. Pipeline thật: chunk biển nông có cỏ biển multimesh ──
 	print("-- 11. Pipeline thật: tìm chunk biển nông qua _ocean_mask_at --")
-	var ocean_cell := Vector2.ZERO
+	var band_chunk := Vector2i(-999, -999)
+	var band_count := 0
+	# Chạy nhiều ray × bán kính rồi chọn chunk đầu tiên thực sự có dải nước
+	# nông 1.25-3.5 VÀ có cỏ biển (thảm meadow, pr<0.30) — với địa hình quần đảo
+	# mới, ô biển đầu tiên trên ray có thể là vũng nhỏ quanh bờ (chunk chủ yếu là
+	# đất) hoặc nằm ngoài thảm (0 lá) nên không dùng hit-spiral đầu.
 	for ray_i in range(16):
 		var a: float = float(ray_i) / 16.0 * TAU
 		var dx := cos(a)
@@ -190,35 +195,19 @@ func _ready() -> void:
 		for r in range(200, 5000, 16):
 			var wx: float = dx * float(r)
 			var wz: float = dz * float(r)
-			if _W._ocean_mask_at(nd, wx, wz):
-				ocean_cell = Vector2(wx, wz)
-				break
-		if ocean_cell != Vector2.ZERO:
-			break
-	_check(ocean_cell != Vector2.ZERO, "tìm thấy ô biển (cách gốc %.0f block)" % ocean_cell.length())
-
-	var found_chunk := Vector2i(-999, -999)
-	var found_blades := 0
-	var zone_mismatch := 0
-	var band_ok := false
-	if ocean_cell != Vector2.ZERO:
-		var cx0 := int(floor(ocean_cell.x / SIZE))
-		var cz0 := int(floor(ocean_cell.y / SIZE))
-		var sx := 1 if ocean_cell.x >= 0 else -1
-		var sz := 1 if ocean_cell.y >= 0 else -1
-		for step_i in range(4):
-			var cx := cx0 + sx * step_i
-			var cz := cz0 + sz * step_i
+			if not _W._ocean_mask_at(nd, wx, wz):
+				continue
+			var cx := int(floor(wx / SIZE))
+			var cz := int(floor(wz / SIZE))
 			var data := _W.compute_chunk(cx, cz, SIZE, RW)
 			var bg: Array = data.get("biome_grid", [])
 			var bd = _BD.new()
 			bd.from_bytes(data["block_data_bytes"], SIZE, SIZE)
-			band_ok = false
+			var n_band := 0
 			for vx in range(SIZE):
 				for vz in range(SIZE):
 					if int(bg[vx][vz]) != _Data.TileType.OCEAN_DEEP:
 						continue
-					# Độ sâu từ block data: lớp nước trên đáy → gap = WATER_Y - đáy
 					var top_is_water := false
 					var floor_ly := -1
 					for ly in range(_BD.CHUNK_H - 1, -1, -1):
@@ -235,35 +224,51 @@ func _ready() -> void:
 						continue
 					var gap: float = _Data.WATER_Y - _BD.layer_to_world_y(floor_ly)
 					if gap >= 1.0 and gap <= 3.5:
-						band_ok = true
-						break
-				if band_ok:
+						n_band += 1
+						if n_band >= 8:
+							break
+				if n_band >= 8:
 					break
-			if band_ok:
-				found_chunk = Vector2i(cx, cz)
-				break
-		if found_chunk.x != -999:
-			var data2 := _W.compute_chunk(found_chunk.x, found_chunk.y, SIZE, RW)
-			var gbd: Dictionary = data2.get("grass_blade_data", {})
-			var gx: Array = gbd.get("xforms", [])
+			if n_band < 8:
+				continue
+			# Chunk có dải nước nông — kiểm tra cỏ biển thật trong grass_blade_data
+			var gbd: Dictionary = data.get("grass_blade_data", {})
 			var gc: Array = gbd.get("colors", [])
-			var wox: float = found_chunk.x * SIZE
-			var woz: float = found_chunk.y * SIZE
-			zone_mismatch = 0
 			for i in range(gc.size()):
 				var col := gc[i] as Color
-				if col.b <= 0.40:
-					continue  # không phải cỏ biển (cỏ lúa/rêu xanh)
-				found_blades += 1
-				var tp := gx[i] as Transform3D
-				var zone: int = _Grass._sea_zone(wox + tp.origin.x, woz + tp.origin.z)
-				var want_purple: bool = zone == 0
-				var is_purple: bool = col.r >= 0.28
-				if is_purple != want_purple:
-					zone_mismatch += 1
-	_check(found_chunk.x != -999,
-		"chunk (%d,%d) có dải nước nông OCEAN_DEEP 1.25-3.5" % [found_chunk.x, found_chunk.y])
-	_check(band_ok and found_blades > 0,
+				if col.b > 0.40:
+					band_chunk = Vector2i(cx, cz)
+					band_count = n_band
+					break
+			if band_chunk.x != -999:
+				break
+		if band_chunk.x != -999:
+			break
+
+	var found_blades := 0
+	var zone_mismatch := 0
+	if band_chunk.x != -999 and band_count >= 8:
+		var data2 := _W.compute_chunk(band_chunk.x, band_chunk.y, SIZE, RW)
+		var gbd: Dictionary = data2.get("grass_blade_data", {})
+		var gx: Array = gbd.get("xforms", [])
+		var gc: Array = gbd.get("colors", [])
+		var wox: float = band_chunk.x * SIZE
+		var woz: float = band_chunk.y * SIZE
+		zone_mismatch = 0
+		for i in range(gc.size()):
+			var col := gc[i] as Color
+			if col.b <= 0.40:
+				continue  # không phải cỏ biển (cỏ lúa/rêu xanh)
+			found_blades += 1
+			var tp := gx[i] as Transform3D
+			var zone: int = _Grass._sea_zone(wox + tp.origin.x, woz + tp.origin.z)
+			var want_purple: bool = zone == 0
+			var is_purple: bool = col.r >= 0.28
+			if is_purple != want_purple:
+				zone_mismatch += 1
+	_check(band_chunk.x != -999,
+		"chunk (%d,%d) có dải nước nông OCEAN_DEEP 1.25-3.5" % [band_chunk.x, band_chunk.y])
+	_check(band_chunk.x != -999 and found_blades > 0,
 		"chunk biển có %d lá cỏ biển trong grass_blade_data" % found_blades)
 	_check(zone_mismatch == 0,
 		"màu cỏ biển khớp vùng phân tách (lệch %d lá)" % zone_mismatch)

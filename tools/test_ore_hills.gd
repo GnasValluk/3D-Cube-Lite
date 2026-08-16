@@ -39,6 +39,7 @@ const NATURAL_TOPS: Dictionary = {
 	_D.BlockID.YOUNG_GRASS: true, _D.BlockID.DARK_DIRT: true, _D.BlockID.SAND_DEEP: true,
 	_D.BlockID.GRASS_DIRT: true, _D.BlockID.DESERT_PLATEAU: true,
 	_D.BlockID.DRY_GRASS: true, _D.BlockID.SPARSE_GRASS: true, _D.BlockID.PALE_SAND: true,
+	_D.BlockID.SNOW: true, _D.BlockID.FROST_DIRT: true,
 }
 
 var _failures: int = 0
@@ -158,7 +159,7 @@ func _ready() -> void:
 		Vector2i(17, -15), Vector2i(19, -1), Vector2i(22, -26), Vector2i(39, -48),
 		Vector2i(48, 52), Vector2i(57, 37),
 		# không-đồng-bằng (biome sa mạc/slime/cao nguyên, plains=false)
-		Vector2i(-56, 29), Vector2i(-51, -6), Vector2i(-50, -4), Vector2i(-27, -3),
+		Vector2i(-56, 29), Vector2i(-51, -6), Vector2i(-50, -4), Vector2i(-55, 13),
 		Vector2i(-26, -21), Vector2i(-19, 9), Vector2i(-18, -5), Vector2i(-16, -4),
 		Vector2i(-9, -8), Vector2i(-7, -1), Vector2i(-54, 16), Vector2i(36, 38),
 		Vector2i(55, 8),

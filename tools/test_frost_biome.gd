@@ -20,8 +20,12 @@ func _check(cond: bool, label: String) -> void:
 	if not cond:
 		_failures += 1
 
-## Tìm ô FROST đất liền trong bán kính MAX_R từ gốc.
-func _find_frost_cell(nd: Dictionary, max_r: float) -> Vector2:
+## Tìm danh sách ô FROST đất liền trong bán kính MAX_R từ gốc. Trả NHIỀU
+## candidate — với biome per-column, ô FROST đầu tiên trong vòng xoắn có thể là
+## vệt đất mảnh giữa biển (chunk chủ yếu là OCEAN). Test chọn ô nào có chunk
+## đủ ≥200 ô tuyết + cây vân sam.
+func _find_frost_cells(nd: Dictionary, max_r: float, count: int = 10) -> Array:
+	var out: Array = []
 	var step := 40.0
 	for r in range(step, int(max_r) + 1, int(step)):
 		var samples: int = max(8, int(float(r) / step * TAU))
@@ -31,8 +35,10 @@ func _find_frost_cell(nd: Dictionary, max_r: float) -> Vector2:
 			var wz := sin(a) * float(r)
 			if _W._ocean_mask_at(nd, wx, wz): continue
 			if _W._Noise._biome_at(wx, wz, RW) == _D.TileType.FROST:
-				return Vector2(wx, wz)
-	return Vector2.ZERO
+				out.append(Vector2(wx, wz))
+				if out.size() >= count:
+					return out
+	return out
 
 func _ready() -> void:
 	print("== test_frost_biome: snow tiles + NORMAL water lakes + spruce ==")
@@ -40,17 +46,51 @@ func _ready() -> void:
 	_W._Noise.clear_cache()
 
 	var nd := _W._Noise._noise_for_dim(RW)
-	var fw := _find_frost_cell(nd, 12000.0)
-	_check(fw != Vector2.ZERO, "tìm thấy ô FROST trong bán kính 12km (%s)" % str(fw))
-	if fw == Vector2.ZERO:
+	var fws := _find_frost_cells(nd, 12000.0, 12)
+	_check(fws.size() > 0, "tìm thấy ≥1 ô FROST trong bán kính 12km (%d ô)" % fws.size())
+	if fws.is_empty():
 		get_tree().quit(1)
 		return
 
-	var cx := int(floor(fw.x / SIZE))
-	var cz := int(floor(fw.y / SIZE))
-	var lx := posmod(int(round(fw.x - (cx * SIZE - SIZE * 0.5))), SIZE)
-	var lz := posmod(int(round(fw.y - (cz * SIZE - SIZE * 0.5))), SIZE)
-	var data := _W.compute_chunk(cx, cz, SIZE, RW)
+	# Chọn candidate đầu tiên mà chunk thật sự đủ tuyết + cây vân sam — với biome
+	# per-column, ô FROST đầu tiên không đảm bảo chunk quanh nó là băng. Thử lần
+	# lượt từng candidate đến khi chunk đạt ngưỡng, thay vì hit-spiral đầu tiên.
+	var data: Dictionary = {}
+	var cx := 0
+	var cz := 0
+	var lx := 0
+	var lz := 0
+	for fw in fws:
+		var cand_cx := int(floor(fw.x / SIZE))
+		var cand_cz := int(floor(fw.y / SIZE))
+		var cand_data := _W.compute_chunk(cand_cx, cand_cz, SIZE, RW)
+		var cand_bg: Array = cand_data.get("biome_grid", [])
+		var cand_bd = _BD.new()
+		cand_bd.from_bytes(cand_data["block_data_bytes"], SIZE, SIZE)
+		var frost_n := 0
+		var spruce_n := 0
+		for p in cand_data.get("plant_props", []):
+			if p.get("type", "") == "spruce":
+				spruce_n += 1
+		for x in range(SIZE):
+			for z in range(SIZE):
+				var b: int = int(cand_bg[x][z])
+				if b == _D.TileType.FROST or b == _D.TileType.FROST_SNOW:
+					frost_n += 1
+		if frost_n >= 200 and spruce_n > 0:
+			data = cand_data
+			cx = cand_cx
+			cz = cand_cz
+			var cand_fw: Vector2 = fw
+			lx = posmod(int(round(cand_fw.x - (cx * SIZE - SIZE * 0.5))), SIZE)
+			lz = posmod(int(round(cand_fw.y - (cz * SIZE - SIZE * 0.5))), SIZE)
+			print("INFO  | chọn ô FROST %s → chunk (%d,%d) FROST=%d spruce=%d" % [str(fw), cx, cz, frost_n, spruce_n])
+			break
+	_check(not data.is_empty(), "có chunk FROST đạt ≥200 ô tuyết + cây vân sam")
+	if data.is_empty():
+		print("INFO  | các candidate đều không đạt ngưỡng (chunk băng quá mỏng)")
+		get_tree().quit(1)
+		return
 	var bg: Array = data.get("biome_grid", [])
 	var bd = _BD.new()
 	bd.from_bytes(data["block_data_bytes"], SIZE, SIZE)

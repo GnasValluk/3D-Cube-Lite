@@ -190,3 +190,7 @@ sprint={
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true
+# Quần đảo mới hiển thị nhiều chunk đất + nước cùng lúc → nhiều texture/material
+# trong descriptor heap RESOURCES hơn; tăng giới hạn tránh D3D12 ERR_OUT_OF_MEMORY
+# ("Cannot create uniform set ... not enough room in the RESOURCES descriptor heap").
+rendering_device/d3d12/max_resource_descriptors=32768
