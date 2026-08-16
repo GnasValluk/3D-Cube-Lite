@@ -3,7 +3,7 @@ extends Node3D
 ## Headless verification: thực vật đồng bằng mới (PlainsFloraProp) —
 ## Bụi dâu dại (wild_berry/FOOD), Cỏ ba lá (clover/MATERIAL), 3 hoa
 ## (sunflower/tulip/rose) + hạt giống. Kiểm tra item DB, mesh build, drop chính +
-## hạt, spawn trong chunk thật (chỉ GRASS_DIRT), icon ItemMesh, và cỏ khô vàng
+## hạt, spawn trong chunk thật (mọi khối cỏ đồng bằng), icon ItemMesh, và cỏ khô vàng
 ## (grass zone 1) so với cỏ xanh tươi (zone 0). Chạy qua tools/test_plains_flora.tscn.
 
 const _Grass = preload("res://scripts/world/chunk/chunk_grass.gd")
@@ -142,8 +142,9 @@ func _ready() -> void:
 	_check(dry_ok and float(dry_greenish) / float(dry_colors.size()) < 0.45,
 		"zone khô: phần lớn lá úa vàng (green %d/%d)" % [dry_greenish, dry_colors.size()])
 
-	# ── 5. Pipeline thật: flora spawn trong chunk GRASS_DIRT ──────────────
-	print("-- 5. Spawn trong chunk thật (đồng bằng GRASS_DIRT) --")
+	# ── 5. Pipeline thật: flora spawn trên MỌI khối cỏ đồng bằng ────────────
+	# Trước đây chỉ GRASS_DIRT (dải "nền giữa" mỏng) → gần như không thấy cây.
+	print("-- 5. Spawn trong chunk thật (grassy-tile plains) --")
 	WorldSeed.seed_value = 20260811
 	_W._Noise.clear_cache()
 	var nd := _W._Noise._noise_for_dim(RW)
@@ -152,6 +153,7 @@ func _ready() -> void:
 	var scan_until := 120
 	var scans := 0
 	var spawns := 0
+	var non_gdir_spawns := 0
 	var cand := {}
 	for cx in range(-40, 41, 2):
 		for cz in range(-40, 41, 2):
@@ -161,7 +163,7 @@ func _ready() -> void:
 			var wz := float(cz * SIZE) + SIZE * 0.5
 			if _W._ocean_mask_at(nd, wx, wz):
 				continue
-			if _W._Noise._biome_at(wx, wz, RW) != _D.TileType.GRASS_DIRT:
+			if not _D.is_grass_tile(_W._Noise._biome_at(wx, wz, RW)):
 				continue
 			cand[Vector2i(cx, cz)] = true
 	var keys: Array = cand.keys()
@@ -172,14 +174,21 @@ func _ready() -> void:
 		var ck: Vector2i = k
 		scans += 1
 		var data := _W.compute_chunk(ck.x, ck.y, SIZE, RW)
+		var bg: Array = data.get("biome_grid", [])
 		for p in data.get("plant_props", []):
 			var t: String = p.get("type", "")
 			if t in ["clover", "wild_berry", "sunflower", "tulip", "rose"]:
 				total[t] = total.get(t, 0) + 1
 				found[t] = true
 				spawns += 1
-	_check(scans > 0, "quét %d chunk GRASS_DIRT" % scans)
+				if not bg.is_empty():
+					var col_bio: int = bg[clampi(int(p["pos"].x + float(SIZE) * 0.5), 0, SIZE - 1)][clampi(int(p["pos"].z + float(SIZE) * 0.5), 0, SIZE - 1)]
+					if col_bio != _D.TileType.GRASS_DIRT:
+						non_gdir_spawns += 1
+	_check(scans > 0, "quét %d chunk đồng bằng (grassy)" % scans)
 	_check(found.has("clover"), "cỏ ba lá spawn trong chunk thật")
+	_check(spawns >= 3, "flora đủ dày để nhìn thấy (tổng %d cây)" % spawns)
+	_check(non_gdir_spawns > 0, "flora mọc cả trên khối cỏ KHÔNG phải GRASS_DIRT (%d cây)" % non_gdir_spawns)
 	var flora_any := found.size() > 0
 	_check(flora_any, "thực vật đồng bằng spawn trong chunk thật (%d loài, tổng %d cây)" % [found.size(), spawns])
 
