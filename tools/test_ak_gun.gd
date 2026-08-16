@@ -140,9 +140,12 @@ func _ready() -> void:
 	_check(not _AK.has_ammo(player), "hết đạn → has_ammo false")
 	_AK.cancel_aim(player)
 	_AK.start_fire(player)
-	_check(not player._bow_aiming, "hết đạn → không ngắm vũ khí")
+	_check(player._bow_aiming, "hết đạn → ADS vẫn bật được (RMB toggle)")
 	var before2: int = get_tree().get_nodes_in_group("bullets").size()
 	_AK.update_fire(player, 1.0 / 60.0)
+	_check(player._bow_aiming, "không giữ LMB → update_fire giữ nguyên ADS")
+	_AK.fire_shot(player)
+	_check(not player._bow_aiming, "hết đạn → fire_shot hủy ngắm")
 	_check(get_tree().get_nodes_in_group("bullets").size() == before2, "hết đạn → không spawn bullet")
 	player.free()
 

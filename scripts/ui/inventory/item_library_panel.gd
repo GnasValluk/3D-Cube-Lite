@@ -289,19 +289,68 @@ static func on_lib_search_changed(text: String, owner) -> void:
 static func on_lib_slot_input(event: InputEvent, owner, slot_i: int) -> void:
 	if not owner.visible or owner._inventory == null or owner._player_ref == null:
 		return
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var panel: Panel = owner._lib_panels[slot_i]
-		var item_idx: int = panel.get_meta("item_idx", -1)
-		if item_idx < 0 or item_idx >= owner._lib_items.size():
-			return
-		var item: ItemDef = owner._lib_items[item_idx]
-		var remaining: int = owner._inventory.add_item(item, 1)
-		if remaining == 0:
-			panel.add_theme_stylebox_override("panel", owner._lib_slot_hover_style)
-			var tween: Tween = owner.create_tween()
-			tween.tween_interval(0.15)
-			tween.tween_callback(func(): panel.add_theme_stylebox_override("panel", owner._lib_slot_style))
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		var mb := event as InputEventMouseButton
 		owner.accept_event()
+		# Chỉ bắt đầu "giữ" khi bấm xuống và chưa đang giữ slot khác.
+		if mb.pressed and owner._lib_hold_item == null:
+			var panel: Panel = owner._lib_panels[slot_i]
+			var item_idx: int = panel.get_meta("item_idx", -1)
+			if item_idx < 0 or item_idx >= owner._lib_items.size():
+				return
+			owner._lib_hold_item = owner._lib_items[item_idx]
+			owner._lib_hold_panel = panel
+			owner._lib_hold_time = 0.0
+			owner._lib_hold_stack_taken = false
+
+static func take_lib_one(owner, item: ItemDef, panel: Panel) -> void:
+	if owner._inventory == null or item == null:
+		return
+	var remaining: int = owner._inventory.add_item(item, 1)
+	if remaining == 0:
+		_flash_lib_slot(owner, panel)
+
+static func take_lib_stack(owner, item: ItemDef, panel: Panel) -> void:
+	if owner._inventory == null or item == null:
+		return
+	var remaining: int = owner._inventory.add_item(item, item.max_stack)
+	if remaining < item.max_stack:
+		_flash_lib_slot(owner, panel)
+
+static func _flash_lib_slot(owner, panel: Panel) -> void:
+	if panel == null or not is_instance_valid(panel):
+		return
+	panel.add_theme_stylebox_override("panel", owner._lib_slot_hover_style)
+	var tween: Tween = owner.create_tween()
+	tween.tween_interval(0.15)
+	tween.tween_callback(func(): panel.add_theme_stylebox_override("panel", owner._lib_slot_style))
+
+## Xử lý trạng thái "giữ chuột trái" trên slot thư viện: nhả trước 1s thì
+## lấy 1 pcs, giữ đủ 1s thì lấy trọn 1 stack. Được gọi mỗi frame trong
+## InventoryUI._process. Phát hiện nhả bằng Input thay vì gui_input để bền
+## khi di chuột ra khỏi slot giữa chừng.
+static func process_lib_hold(owner, delta: float) -> void:
+	var held: ItemDef = owner._lib_hold_item
+	if held == null:
+		return
+	if not owner.visible:
+		owner._lib_hold_item = null
+		owner._lib_hold_panel = null
+		owner._lib_hold_time = 0.0
+		owner._lib_hold_stack_taken = false
+		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		owner._lib_hold_time += delta
+		if not owner._lib_hold_stack_taken and owner._lib_hold_time >= 1.0:
+			owner._lib_hold_stack_taken = true
+			take_lib_stack(owner, held, owner._lib_hold_panel)
+	else:
+		if not owner._lib_hold_stack_taken:
+			take_lib_one(owner, held, owner._lib_hold_panel)
+		owner._lib_hold_item = null
+		owner._lib_hold_panel = null
+		owner._lib_hold_time = 0.0
+		owner._lib_hold_stack_taken = false
 
 static func on_lib_slot_entered(owner, slot_i: int) -> void:
 	var panel: Panel = owner._lib_panels[slot_i]

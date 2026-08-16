@@ -19,6 +19,7 @@ extends Node3D
 @export var zoom_max: float = 22.0
 @export var zoom_step:    float  = 0.5
 @export var aim_zoom:     float  = 1.8  # Khoảng cách khi đang ngắm (góc 3)
+@export var aim_offset_right: float = 0.55  # Nhích camera sang phải khi ngắm (đơn vị thế giới)
 
 @onready var _camera: Camera3D = $Camera3D
 
@@ -152,6 +153,11 @@ func _update_camera_position() -> void:
 	if _col_dist > 0.0 and _col_dist < cam_dist:
 		cam_dist = _col_dist
 	var offset := _camera_dir() * cam_dist
+	# Khi đang ngắm: nhích camera sang phải màn hình để người chơi không
+	# chắn giữa tầm nhìn — reset về 0 khi nhả ngắm (blend về 0).
+	var fwd := -_camera_dir()
+	var screen_right := fwd.cross(Vector3.UP).normalized()
+	offset += screen_right * (aim_offset_right * _aim_blend)
 	_camera.position = offset + _shake_offset
 	_camera.look_at(global_position + _shake_offset * 0.08, Vector3.UP)
 

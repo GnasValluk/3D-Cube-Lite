@@ -115,6 +115,13 @@ var _lib_sort_buttons: Array[Button] = []
 enum SortMode { NAME_ASC, NAME_DESC, TYPE, ATK, DEF, HEAL }
 var _lib_sort_mode: int = SortMode.NAME_ASC
 
+# Trạng thái "giữ chuột trái trên slot thư viện": nhả nhanh = lấy 1,
+# giữ đủ 1s = lấy trọn 1 stack. Trạng thái được xử lý trong _process.
+var _lib_hold_item: ItemDef = null
+var _lib_hold_panel: Panel = null
+var _lib_hold_time: float = 0.0
+var _lib_hold_stack_taken: bool = false
+
 # ── Styles ─────────────────────────────────────────────────────────────────────
 var _glass_style: StyleBoxFlat
 var _slot_style: StyleBoxFlat
@@ -1003,6 +1010,7 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if _inventory == null: return
+	_Library.process_lib_hold(self, delta)
 	if int((_inventory.slots.size() + COLS - 1) / COLS) != _grid_rows:
 		_rebuild_grid()
 	for i in range(_inventory.slots.size()):
@@ -1055,6 +1063,12 @@ func _process(delta: float) -> void:
 		var mp: Vector2 = get_global_mouse_position()
 		_tooltip.position = mp + Vector2(16, 16)
 		_tooltip_bg.position = mp + Vector2(14, 14)
+
+## Xử lý giữ chuột trên slot thư viện: nhả trước 1s = lấy 1 pcs,
+## giữ đủ 1s = lấy trọn 1 stack. Logic đặt trong _Library.process_lib_hold
+## để test được; ở đây chỉ ủy quyền.
+func _process_lib_hold(delta: float) -> void:
+	_Library.process_lib_hold(self, delta)
 
 func _update_equipment_display(player: PlayerCharacter) -> void:
 	var equipped: Array = [player.equipped_head, player.equipped_body, player.equipped_legs, player.equipped_feet, player.equipped_back, player.equipped_sub]

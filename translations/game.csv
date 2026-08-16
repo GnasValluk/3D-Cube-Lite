@@ -38,7 +38,7 @@ BUILD_TITLE,BUILD,XÂY DỰNG
 EMPTY_BUILD,No buildable items,Không có vật phẩm xây dựng
 MAP_TITLE,MAP,BẢN ĐỒ
 ITEM_LIBRARY_TITLE,"📦 Item Library","📦 Thư Viện Vật Phẩm"
-LIB_CLICK_HINT,Click = +1 to inventory,Click = +1 vào kho
+LIB_CLICK_HINT,Click=+1 · Hold 1s=+stack,Click=+1 · Giữ 1s=lấy stack
 FILTER_ALL,All,Tất cả
 FILTER_BLOCK,Block,Khối
 FILTER_WEAPON,Weapon,Vũ khí
@@ -46,7 +46,7 @@ FILTER_ARMOR,Armor,Giáp
 FILTER_FOOD,Food,Thức ăn
 FILTER_MATERIAL,Mat,NL
 FILTER_TOOL,Tool,Dụng cụ
-TOOLTIP_CLICK_ADD,"→ Click to add 1 to inventory","→ Click để thêm 1 vào kho"
+TOOLTIP_CLICK_ADD,"→ Click: add 1 · Hold 1s: add a stack","→ Click: thêm 1 · Giữ 1s: thêm 1 stack"
 INVENTORY_TITLE,Inventory,TÚI ĐỒ
 STATS_TITLE,Stats,CHỈ SỐ
 EQUIPMENT_TITLE,Equipment,TRANG BỊ

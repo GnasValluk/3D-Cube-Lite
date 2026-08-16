@@ -30,14 +30,19 @@ static func consume_ammo(player) -> bool:
 static func start_fire(player) -> void:
 	if not player.equipped_weapon or player.equipped_weapon.id != "ak_12":
 		return
-	if not has_ammo(player):
-		player._scroll_inventory_message(player.tr("NO_AK_AMMO"))
-		return
 	player._bow_aiming = true
 	player._bow_charge = 0.0
 	player._ak_fire_cooldown = 0.0
 	player._ak_recoil = 0.0
 	_setup_indicator(player)
+
+## Bật/tắt ADS (ngắm) bằng chuột phải — không kiểm tra đạn ở đây,
+## lúc bắn (update_fire) mới kiểm tra và báo hết đạn.
+static func toggle_ads(player) -> void:
+	if player._bow_aiming:
+		cancel_aim(player)
+	else:
+		start_fire(player)
 
 static func _setup_indicator(player) -> void:
 	if player._bow_indicator_root == null:

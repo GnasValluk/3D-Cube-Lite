@@ -932,7 +932,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_stop_eating()
 		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _bow_aiming:
 			if equipped_weapon != null and equipped_weapon.id == "ak_12":
-				_AK.cancel_aim(self)
+				# Nhả LMB: dừng bắn, ADS vẫn giữ (bật/tắt bằng RMB).
 				return
 			if _is_egg_aiming():
 				_EggThrow.fire(self)
@@ -951,6 +951,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_Halberd.do_melee(self)
 			return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
+			# AK-12: chuột phải bật/tắt ADS (ngắm), chuột trái để bắn.
+			if equipped_weapon != null and equipped_weapon.id == "ak_12":
+				_AK.toggle_ads(self)
+				return
 			if _bow_aiming:
 				var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
 				if _is_egg_aiming():
