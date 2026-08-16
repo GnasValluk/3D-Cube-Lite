@@ -89,6 +89,14 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"sea_bush": _build_sea_bush_icon(parent)
 		"grass_carpet": _build_grass_carpet_icon(parent)
 		"seaweed": _build_seaweed_algae_icon(parent)
+		"duckweed": _build_duckweed_icon(parent)
+		"swamp_sedge": _build_swamp_sedge_icon(parent)
+		"swamp_seed": _build_swamp_seed_icon(parent)
+		"mangrove_seed": _build_mangrove_seed_icon(parent)
+		"mud_crab": _build_mud_crab_icon(parent)
+		"spruce_wood": _build_wood_icon(parent, "spruce_wood")
+		"swamp_wood": _build_wood_icon(parent, "swamp_wood")
+		"mangrove_wood": _build_wood_icon(parent, "mangrove_wood")
 		"coconut_seed": _build_seed_icon(parent, 0)
 		"taro_seed": _build_seed_icon(parent, 1)
 		"seaweed_seed": _build_seed_icon(parent, 2)
@@ -1247,3 +1255,150 @@ static func _mesh_boxes_aabb(pivot: Node3D) -> AABB:
 			else:
 				result = result.merge(box)
 	return result
+
+## ── Khúc gỗ tròn (spruce/swamp/mangrove): vỏ xù + mặt cắt ngọn + vòng tuổi ──
+static func _build_wood_icon(p: Node3D, item_id: String) -> void:
+	var top: Color
+	var bark: Color
+	match item_id:
+		"spruce_wood":
+			top = Color(0.38, 0.24, 0.12)
+			bark = Color(0.27, 0.16, 0.08)
+		"swamp_wood":
+			top = Color(0.42, 0.38, 0.30)
+			bark = Color(0.30, 0.26, 0.18)
+		"mangrove_wood":
+			top = Color(0.56, 0.26, 0.14)
+			bark = Color(0.42, 0.17, 0.09)
+		_:
+			top = Color(0.50, 0.36, 0.20)
+			bark = Color(0.36, 0.26, 0.12)
+	# Khối gỗ + vệt thớ dọc trên mặt bên
+	ItemMeshShared.add_cube(p, 0, 0, 0, 2.4, 2.4, 2.4, bark)
+	ItemMeshShared.add_cube(p, 0, 0, 1.24, 0.4, 2.2, 0.05, bark.lightened(0.07))
+	ItemMeshShared.add_cube(p, 0, 0, -1.24, 0.4, 2.2, 0.05, bark.lightened(0.07))
+	ItemMeshShared.add_cube(p, 1.24, 0, 0, 0.05, 2.2, 0.4, bark.lightened(0.07))
+	ItemMeshShared.add_cube(p, -1.24, 0, 0, 0.05, 2.2, 0.4, bark.lightened(0.07))
+	# Mặt cắt ngọn (cross-section) sáng + vòng tuổi
+	ItemMeshShared.add_cube(p, 0.05, 1.24, -0.05, 2.4, 0.05, 2.4, top)
+	ItemMeshShared.add_cube(p, 0.05, 1.25, -0.05, 1.8, 0.06, 1.8, top.lightened(0.14))
+	ItemMeshShared.add_cube(p, 0.05, 1.26, -0.05, 1.0, 0.05, 1.0, top.darkened(0.08))
+	# Lõi mắt gỗ
+	ItemMeshShared.add_cube(p, 0.05, 1.27, -0.05, 0.44, 0.06, 0.44, top.darkened(0.20))
+
+## ── Lác nước đầm lầy: cụm lá kiếm dựng đứng, đầu lá chỏm nâu khô ──────────
+static func _build_swamp_sedge_icon(p: Node3D) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var col_base := Color(0.20, 0.34, 0.07)
+	var col_tip := Color(0.30, 0.42, 0.10)
+	var col_seed := Color(0.34, 0.26, 0.10)
+	var VOXEL: float = 0.25
+	for bi in range(7):
+		var ba := float(bi) / 7.0 * TAU
+		var br := 0.16 + float(bi % 3) * 0.11
+		var origin := Vector3(cos(ba) * 0.16 * br, 0, sin(ba) * 0.16 * br)
+		var blade_h := 0.55 + float(bi % 2) * 0.20
+		var w := VOXEL * 0.34
+		var lean := Vector3(0.10, 0, 0.06)
+		var prev := origin
+		for seg in range(3):
+			var t := float(seg + 1) / 3.0
+			var nxt := origin + Vector3(0, blade_h * t, 0) + lean * blade_h * 0.14 * t * t
+			var mid := (prev + nxt) * 0.5
+			var dir := (nxt - prev).normalized()
+			var perp := Vector3(-dir.z, 0, dir.x).normalized()
+			var taper: float = 1.0 - t * 0.82
+			var col := col_base.lerp(col_tip, t * 0.8)
+			_add_quad(st, mid, perp * w * 0.5 * taper, dir * (nxt - prev).length() * 0.5, Vector3(0, 1, 0), col)
+			prev = nxt
+		var tip: Vector3 = prev
+		# Chỏm nâu khô đặc trưng của lác
+		_add_quad(st, tip, Vector3(w * 0.14, 0, 0), Vector3(0, 0.12, 0), Vector3(0, 1, 0), col_seed)
+	var mesh := st.commit()
+	if mesh:
+		var mi := MeshInstance3D.new()
+		mi.mesh = mesh
+		var mat := StandardMaterial3D.new()
+		mat.vertex_color_use_as_albedo = true
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mi.material_override = mat
+		p.add_child(mi)
+
+## ── Bèo tấm: vạt lá nổi dẹt xếp rosette + đốm sáng + rễ buông ──────────────
+static func _build_duckweed_icon(p: Node3D) -> void:
+	var deep := Color(0.10, 0.26, 0.11)
+	var leaf := Color(0.14, 0.42, 0.15)
+	var leaf_l := Color(0.20, 0.52, 0.18)
+	var root := Color(0.06, 0.16, 0.08)
+	# Vạt bèo — mảng dẹt nổi
+	ItemMeshShared.add_cube(p, 0, -0.08, 0, 1.4, 0.10, 1.4, deep)
+	ItemMeshShared.add_cube(p, 0, -0.02, 0, 1.2, 0.04, 1.2, deep.lightened(0.05))
+	# Lá nổi hình giọt xếp tua (rosette)
+	for i in 6:
+		var la := float(i) / 6.0 * TAU
+		var r := 0.42
+		var c: Color = leaf if i % 2 == 0 else leaf_l
+		ItemMeshShared.add_cube(p, cos(la) * r * 0.6, 0.05, sin(la) * r * 0.6, 0.34, 0.07, 0.34, c)
+	ItemMeshShared.add_cube(p, 0, 0.05, 0, 0.4, 0.07, 0.4, leaf_l.lightened(0.06))
+	# Đốm sáng lấp lánh trên lá
+	ItemMeshShared.add_cube(p, 0.12, 0.10, 0.10, 0.16, 0.03, 0.16, Color(0.65, 0.85, 0.50))
+	# Rễ nhỏ buông xuống
+	ItemMeshShared.add_cube(p, -0.30, -0.16, 0, 0.06, 0.16, 0.06, root)
+	ItemMeshShared.add_cube(p, 0.14, -0.15, 0.22, 0.06, 0.14, 0.06, root)
+	ItemMeshShared.add_cube(p, 0.30, -0.16, -0.18, 0.06, 0.16, 0.06, root)
+
+## ── Mầm Tràm: hạt tròn + chồi non hai lá ───────────────────────────────────
+static func _build_swamp_seed_icon(p: Node3D) -> void:
+	var seed_c := Color(0.20, 0.28, 0.16)
+	var stem_c := Color(0.24, 0.40, 0.12)
+	var leaf_c := Color(0.08, 0.28, 0.10)
+	var leaf2_c := Color(0.12, 0.36, 0.12)
+	ItemMeshShared.add_cube(p, 0, -0.45, 0, 0.9, 0.7, 0.9, seed_c)
+	ItemMeshShared.add_cube(p, 0, -0.6, 0, 0.7, 0.3, 0.7, seed_c.darkened(0.15))
+	ItemMeshShared.add_cube(p, 0, -0.05, 0, 0.2, 0.8, 0.2, stem_c)
+	ItemMeshShared.add_cube(p, 0.22, 0.30, 0, 0.5, 0.14, 0.26, leaf_c)
+	ItemMeshShared.add_cube(p, -0.22, 0.30, 0, 0.5, 0.14, 0.26, leaf2_c)
+	ItemMeshShared.add_cube(p, 0, 0.66, 0, 0.1, 0.16, 0.1, stem_c.lightened(0.08))
+
+## ── Mầm Đước: trụ mầm (propagule) thuôn nhọn về đáy + lá non trên đỉnh ─────
+static func _build_mangrove_seed_icon(p: Node3D) -> void:
+	var pod := Color(0.26, 0.34, 0.14)
+	var pod_l := Color(0.34, 0.44, 0.18)
+	var pod_d := Color(0.18, 0.24, 0.10)
+	ItemMeshShared.add_cube(p, 0, 0.30, 0, 0.20, 0.55, 0.20, pod)
+	ItemMeshShared.add_cube(p, 0, -0.05, 0, 0.26, 0.50, 0.26, pod_l)
+	ItemMeshShared.add_cube(p, 0, -0.38, 0, 0.20, 0.28, 0.20, pod)
+	ItemMeshShared.add_cube(p, 0, -0.58, 0, 0.13, 0.12, 0.13, pod_d)
+	# Cuống + lá non ở đỉnh
+	ItemMeshShared.add_cube(p, 0, 0.62, 0, 0.14, 0.10, 0.14, pod_d)
+	ItemMeshShared.add_cube(p, 0.20, 0.68, 0, 0.34, 0.06, 0.18, pod_l.lightened(0.05))
+	ItemMeshShared.add_cube(p, -0.20, 0.68, 0, 0.34, 0.06, 0.18, pod_l)
+	ItemMeshShared.add_cube(p, 0.04, 0.55, 0, 0.26, 0.10, 0.26, pod_l)
+
+## ── Cua bùn: mai nâu đỏ phẳng + càng to + mắt trên cuống ───────────────────
+static func _build_mud_crab_icon(p: Node3D) -> void:
+	var shell := Color(0.44, 0.22, 0.12)
+	var shell_d := Color(0.33, 0.17, 0.10)
+	var leg := Color(0.33, 0.17, 0.10)
+	var claw := Color(0.52, 0.26, 0.14)
+	var eye := Color(0.08, 0.06, 0.05)
+	# Mai + đuôi gập
+	ItemMeshShared.add_cube(p, 0, 0.2, 0, 1.5, 0.55, 1.3, shell)
+	ItemMeshShared.add_cube(p, 0, 0.36, 0, 1.2, 0.38, 1.0, shell.lightened(0.05))
+	ItemMeshShared.add_cube(p, 0, 0.14, 0.55, 1.1, 0.4, 0.4, shell_d)
+	# Càng hai bên
+	ItemMeshShared.add_cube(p, -0.95, 0.15, 0.3, 0.35, 0.35, 0.35, claw)
+	ItemMeshShared.add_cube(p, -1.25, 0.05, 0.35, 0.3, 0.25, 0.25, claw.darkened(0.08))
+	ItemMeshShared.add_cube(p, 0.95, 0.15, 0.3, 0.35, 0.35, 0.35, claw)
+	ItemMeshShared.add_cube(p, 1.25, 0.05, 0.35, 0.3, 0.25, 0.25, claw.darkened(0.08))
+	# Chân
+	for i in 3:
+		var cx: float = -0.7 + i * 0.5
+		ItemMeshShared.add_cube(p, cx, -0.05, 0.75, 0.1, 0.1, 0.25, leg)
+		ItemMeshShared.add_cube(p, cx, -0.05, -0.75, 0.1, 0.1, 0.25, leg)
+	# Mắt trên cuống
+	ItemMeshShared.add_cube(p, -0.28, 0.62, 0.42, 0.12, 0.2, 0.12, shell_d)
+	ItemMeshShared.add_cube(p, 0.28, 0.62, 0.42, 0.12, 0.2, 0.12, shell_d)
+	ItemMeshShared.add_cube(p, -0.28, 0.78, 0.42, 0.1, 0.1, 0.1, eye)
+	ItemMeshShared.add_cube(p, 0.28, 0.78, 0.42, 0.1, 0.1, 0.1, eye)
