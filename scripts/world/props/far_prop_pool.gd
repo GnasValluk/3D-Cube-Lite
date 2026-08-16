@@ -115,11 +115,6 @@ static func _leaf_color(type: String, rng: RandomNumberGenerator) -> Color:
 		"swamp_tree":     base = Color(0.20, 0.35, 0.16)
 		"mangrove":       base = Color(0.22, 0.38, 0.20)
 		"palm":           base = Color(0.30, 0.50, 0.18)
-		"sunflower":      base = Color(0.95, 0.78, 0.10)  # đầu hoa vàng rực
-		"tulip":          base = Color(0.92, 0.22, 0.34)  # búp đỏ/cam
-		"rose":           base = Color(0.86, 0.12, 0.18)  # cánh hồng thắm
-		"clover":         base = Color(0.14, 0.50, 0.12)  # lá ba chét xanh
-		"wild_berry":     base = Color(0.52, 0.18, 0.10)  # quả đỏ thẫm
 		_:
 			base = Color(0.45, 0.62, 0.12)
 	var j := (rng.randf() - 0.5) * 0.10

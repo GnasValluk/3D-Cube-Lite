@@ -120,8 +120,7 @@ func _ready() -> void:
 	_check(chunk.block_data != null, "chunk setup sync ok")
 	if chunk.block_data != null:
 		var known := ["palm", "oak", "eggplant", "watermelon", "pumpkin",
-			"weed", "taro", "seagrass", "orange_tree", "dense_tree",
-			"clover", "wild_berry", "sunflower", "tulip", "rose"]
+			"weed", "taro", "seagrass", "orange_tree", "dense_tree"]
 		var bad: Array[String] = []
 		for pd in chunk._prop_queue:
 			var ptype: String = (pd as Dictionary).get("type", "")

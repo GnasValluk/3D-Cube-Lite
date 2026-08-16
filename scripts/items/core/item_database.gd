@@ -131,16 +131,6 @@ static func create_item_db() -> Dictionary:
 	_add(db, "grass_carpet", "Thảm Cỏ Biển", ItemDef.Type.MATERIAL, Color(0.05, 0.48, 0.14), "🍃", "Thảm cỏ xanh biển — lá mảnh rủ sát đáy, phủ thảm xanh dày", true, 32)
 	_add(db, "seaweed", "Tảo Biển", ItemDef.Type.MATERIAL, Color(0.20, 0.40, 0.12), "🌿", "Tảo biển to bản — lá dày xếp tầng, nguyên liệu chế tạo", true, 32)
 
-	# ── Đồng bằng: hoa & thực vật mới ─────────────────────────────────────────
-	_add(db, "wild_berry", "Dâu Mâm Xôi Dại", ItemDef.Type.FOOD, Color(0.80, 0.16, 0.24), "🍇", "Chùm quả mọng đỏ rực — chặt từ bụi dâu dại trên đồng cỏ, ăn tươi hồi máu nhẹ", true, 16, 6)
-	_add(db, "clover", "Cỏ Ba Lá", ItemDef.Type.MATERIAL, Color(0.12, 0.52, 0.12), "🍀", "Cỏ ba lá dại — cụm lá đậu xanh mọc rải rác đồng cỏ, nguyên liệu chế tạo", true, 32)
-	_add(db, "sunflower", "Hoa Hướng Dương", ItemDef.Type.MATERIAL, Color(0.95, 0.78, 0.10), "🌻", "Hoa hướng dương — đầu hoa cánh vàng rực tâm nâu, trang trí hoặc nguyên liệu chế tạo", true, 32)
-	_add(db, "sunflower_seed", "Hạt Hướng Dương", ItemDef.Type.MATERIAL, Color(0.28, 0.20, 0.08), "🌱", "Túi hạt giống hướng dương — nhặt từ hoa hướng dương dại trên đồng cỏ", true, 16)
-	_add(db, "tulip", "Hoa Tu Líp", ItemDef.Type.MATERIAL, Color(0.90, 0.18, 0.30), "🌷", "Hoa tu líp — búp hoa đỏ/cam khum 3 cánh, trang trí hoặc nguyên liệu chế tạo", true, 32)
-	_add(db, "tulip_seed", "Củ Tu Líp", ItemDef.Type.MATERIAL, Color(0.75, 0.60, 0.30), "🌱", "Củ giống tu líp — nhặt từ hoa tu líp dại trên đồng cỏ", true, 16)
-	_add(db, "rose", "Hoa Hồng", ItemDef.Type.MATERIAL, Color(0.86, 0.12, 0.18), "🌹", "Hoa hồng — bông nở xoắn cánh đỏ thắm, mọc trên bụi gai đồng cỏ, trang trí hoặc nguyên liệu chế tạo", true, 32)
-	_add(db, "rose_seed", "Hạt Hoa Hồng", ItemDef.Type.MATERIAL, Color(0.24, 0.12, 0.08), "🌱", "Túi hạt giống hoa hồng — nhặt từ hoa hồng dại trên đồng cỏ", true, 16)
-
 	# ── Mầm cây trồng ─────────────────────────────────────────────────────────
 	_add(db, "coconut_seed", "Mầm Dừa", ItemDef.Type.MATERIAL, Color(0.45, 0.72, 0.25), "🌱", "Mầm dừa — trồng trên đất tơi xốp, lớn thành cây dừa", true, 16)
 	_add(db, "taro_seed", "Mầm Môn Ngọt", ItemDef.Type.MATERIAL, Color(0.30, 0.55, 0.18), "🌱", "Mầm môn ngọt — trồng trên đất tơi xốp, thu hoạch củ môn", true, 16)
@@ -327,8 +317,6 @@ const WEIGHTS: Dictionary = {
 	"block_mangrove_mud": 0.6, "mangrove_wood": 0.6, "mangrove_seed": 0.1,
 	"block_swamp_mud": 0.6, "block_swamp_dirt": 0.6, "swamp_wood": 0.6,
 	"swamp_seed": 0.1, "swamp_sedge": 0.2, "duckweed": 0.1,
-	"wild_berry": 0.2, "clover": 0.1, "sunflower": 0.2, "sunflower_seed": 0.05,
-	"tulip": 0.15, "tulip_seed": 0.05, "rose": 0.2, "rose_seed": 0.05,
 	"golden_ring": 0.05, "leather_backpack": 1.0,
 	"flashlight": 0.4,
 	"lava_bucket": 0.5,

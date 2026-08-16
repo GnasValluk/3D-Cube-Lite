@@ -1,7 +1,6 @@
 class_name ItemMesh
 
 const SeaPlantProp = preload("res://scripts/world/props/sea_plant_prop.gd")
-const PlainsFloraProp = preload("res://scripts/world/props/plains_flora_prop.gd")
 
 static func build(parent: Node3D, item_id: String) -> void:
 	match item_id:
@@ -92,14 +91,6 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"taro_seed": _build_seed_icon(parent, 1)
 		"seaweed_seed": _build_seed_icon(parent, 2)
 		"seagrass_seed": _build_seed_icon(parent, 3)
-		"sunflower": _build_flora_icon(parent, "sunflower")
-		"sunflower_seed": _build_seed_icon(parent, 4)
-		"tulip": _build_flora_icon(parent, "tulip")
-		"tulip_seed": _build_seed_icon(parent, 5)
-		"rose": _build_flora_icon(parent, "rose")
-		"rose_seed": _build_seed_icon(parent, 6)
-		"wild_berry": _build_flora_icon(parent, "wild_berry")
-		"clover": _build_flora_icon(parent, "clover")
 		"orange": _build_orange_icon(parent)
 		"orange_seed": _build_orange_seed_icon(parent)
 		"egg_carp": _build_egg_icon(parent, "egg_carp")
@@ -674,9 +665,6 @@ static func _build_grass_carpet_icon(p: Node3D) -> void:
 static func _build_seaweed_algae_icon(p: Node3D) -> void:
 	_build_sea_plant_icon(p, "seaweed")
 
-static func _build_flora_icon(p: Node3D, flora_type: String) -> void:
-	PlainsFloraProp.build(p, flora_type, 1234567, 7654321)
-
 static func _build_taro_icon(p: Node3D) -> void:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -1087,21 +1075,6 @@ static func _build_seed_icon(p: Node3D, variant: int) -> void:
 			stem_c = Color(0.08, 0.62, 0.40)
 			leaf_c = Color(0.05, 0.50, 0.30)
 			leaf2_c = Color(0.10, 0.70, 0.46)
-		4:  # Hạt hướng dương — nâu xám sọc
-			seed_c = Color(0.30, 0.22, 0.10)
-			stem_c = Color(0.95, 0.78, 0.10)
-			leaf_c = Color(0.30, 0.60, 0.12)
-			leaf2_c = Color(0.42, 0.70, 0.16)
-		5:  # Củ tu líp — củ nâu, mầm đỏ
-			seed_c = Color(0.52, 0.36, 0.20)
-			stem_c = Color(0.92, 0.22, 0.34)
-			leaf_c = Color(0.12, 0.42, 0.08)
-			leaf2_c = Color(0.18, 0.50, 0.10)
-		6:  # Hạt hồng — hạt nâu gai, mầm xanh
-			seed_c = Color(0.30, 0.14, 0.10)
-			stem_c = Color(0.86, 0.12, 0.18)
-			leaf_c = Color(0.10, 0.36, 0.08)
-			leaf2_c = Color(0.14, 0.44, 0.10)
 		_:
 			stem_c = Color(0.42, 0.68, 0.18)
 			leaf_c = Color(0.24, 0.58, 0.12)

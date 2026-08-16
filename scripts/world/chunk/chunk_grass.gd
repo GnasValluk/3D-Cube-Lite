@@ -60,17 +60,7 @@ static func add_voxel_grass(vx: int, vz: int, pos: Vector3, out_xforms: Array, o
 	var spread_val: float = 0.20 + (det2 * 0.5 + 0.5) * 0.20
 
 	var seed_val: int = wx * 1000 + wz * 371 + 5000
-	_add_clump(seed_val, pos, blade_count, spread_val, height_scale,
-		_grass_zone(float(wx), float(wz)), out_xforms, out_colors)
-
-## ── 2 style cỏ đồng bằng — chọn theo vùng thế giới, deterministic ──────────
-## Zone 0 = cỏ xanh tươi (xanh lục đậm); Zone 1 = cỏ khô vàng úa (đồng cỏ khô).
-## Vùng lớn hàng trăm block không trộn lẫn — dùng chung hàm _noise mảnh.
-
-static func _grass_zone(wx: float, wz: float) -> int:
-	var z: float = sin(wx * 0.0013 + 2.4) * 0.5 \
-		+ sin(wz * 0.0019 - 1.1) * 0.5 + 0.5
-	return 0 if z < 0.45 else 1  # 0 = xanh tươi, 1 = cỏ khô vàng
+	_add_clump(seed_val, pos, blade_count, spread_val, height_scale, out_xforms, out_colors)
 
 ## ── Cỏ biển — copy cấu trúc cỏ lúa (cell 12×12 + clump), 2 loại màu ────────
 ## Tím và xanh dương mọc riêng từng vùng lớn (hàng trăm block) theo tọa độ
@@ -207,7 +197,7 @@ static func _add_seagrass_clump(s: int, offset: Vector3, blade_count: int,
 			out_xforms.append(Transform3D(b, Vector3(pos_x, pos_y, pos_z)))
 			out_colors.append(col * 0.72)
 
-static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float, height_scale: float, zone: int, out_xforms: Array, out_colors: Array) -> void:
+static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float, height_scale: float, out_xforms: Array, out_colors: Array) -> void:
 	var ss := s
 	for i in range(blade_count):
 		ss = ss * 16807 + 1
@@ -220,13 +210,7 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 		var curve_angle: float = angle + (float(ss & 0x7FFF) / 32768.0 - 0.5) * 1.2
 		ss = ss * 16807 + 1
 		var cv := float(ss & 0xFF) / 256.0
-		var base_col: Color
-		if zone == 0:
-			# Cỏ xanh tươi — xanh lục đậm hơn, ít vàng hơn (đồng bằng xanh)
-			base_col = Color(0.04 + cv * 0.10, 0.22 + cv * 0.26, 0.02 + cv * 0.05)
-		else:
-			# Cỏ khô vàng — úa vàng nâu, gốc phai nhạt hơn
-			base_col = Color(0.52 + cv * 0.22, 0.42 + cv * 0.20, 0.06 + cv * 0.08)
+		var base_col := Color(0.06 + cv * 0.12, 0.20 + cv * 0.25, 0.02 + cv * 0.06)
 		var mature: bool = (ss & 0x1) == 0
 
 		var bx: float = offset.x + cos(angle) * radius
@@ -248,22 +232,13 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 			var pos_y := offset.y + vy
 
 			var col: Color
-			if zone == 0:
-				if mature and t > 0.65:
-					var seed_t := (t - 0.65) / 0.35
-					var gold := Color(0.85 + cv * 0.10, 0.72 + cv * 0.08, 0.10 + cv * 0.05)
-					var green := Color(0.10 + cv * 0.12, 0.46 + cv * 0.15, 0.03 + cv * 0.05)
-					col = green.lerp(gold, seed_t)
-				else:
-					col = base_col.lerp(Color(base_col.r + 0.16, base_col.g + 0.10, base_col.b * 0.7), t)
+			if mature and t > 0.65:
+				var seed_t := (t - 0.65) / 0.35
+				var gold := Color(0.85 + cv * 0.10, 0.72 + cv * 0.08, 0.10 + cv * 0.05)
+				var green := Color(0.14 + cv * 0.12, 0.45 + cv * 0.15, 0.04 + cv * 0.06)
+				col = green.lerp(gold, seed_t)
 			else:
-				# Cỏ khô — đầu ngọn bạc vàng nhạt hơn, gân trắng xám khi già
-				if mature and t > 0.65:
-					var seed_t := (t - 0.65) / 0.35
-					var pale := Color(0.88 + cv * 0.06, 0.78 + cv * 0.08, 0.28 + cv * 0.10)
-					col = base_col.lerp(pale, seed_t)
-				else:
-					col = base_col.lerp(Color(base_col.r * 1.12, base_col.g * 1.08, base_col.b * 0.8), t)
+				col = base_col.lerp(Color(base_col.r + 0.18, base_col.g + 0.10, base_col.b * 0.7), t)
 			var cv2 := float(ss & 0xFF) / 256.0
 			col.r = clampf(col.r + (cv2 - 0.5) * 0.04, 0.0, 1.0)
 			col.g = clampf(col.g + (cv2 - 0.5) * 0.04, 0.0, 1.0)
