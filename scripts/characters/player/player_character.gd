@@ -89,6 +89,9 @@ var _bow_max_charge: float = 2.0
 var _ak_fire_cooldown: float = 0.0
 ## Giật nòng AK-12: 0 → 1, dùng trong _AK.update_pose để ngả nòng nhẹ rồi hồi.
 var _ak_recoil: float = 0.0
+## Vị trí cầm gốc của weapon_pivot khi cầm AK — hồi recoil về đây (tránh trôi).
+var _ak_hold_base: Vector3 = Vector3.ZERO
+var _ak_hold_captured: bool = false
 var _mortar_vertical_speed: float = 8.0
 var _mortar_launch_angle_deg: float = 60.0
 var _bow_aim_dir: Vector3 = Vector3.FORWARD
@@ -792,8 +795,13 @@ func _update_weapon_mesh() -> void:
 	if item_id.is_empty():
 		if _bow_aiming:
 			_Bow.cancel_aim(self)
+		_ak_recoil = 0.0
+		_ak_hold_captured = false
 		return
 	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight", "ak_12", "bullet_762mm"]:
+		if item_id != "ak_12":
+			_ak_recoil = 0.0
+			_ak_hold_captured = false
 		ToolsMesh.build_held(pivot, item_id)
 		if item_id == "crossbow":
 			_bow_string_node = null

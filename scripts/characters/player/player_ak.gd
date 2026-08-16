@@ -129,15 +129,28 @@ static func update_pose(player, delta: float) -> void:
 	if player._mesh == null or player._mesh.weapon_pivot == null or player._mesh.arm_r == null:
 		return
 	if player.equipped_weapon == null or player.equipped_weapon.id != "ak_12":
+		if player._ak_recoil > 0.0:
+			player._ak_recoil = 0.0
 		return
 	var wp: Node3D = player._mesh.weapon_pivot
+	if not player._ak_hold_captured:
+		player._ak_hold_base = wp.position
+		player._ak_hold_captured = true
 	var is_ak_aiming: bool = player._bow_aiming
-	# Súng luôn xoay nòng ra trước (giống tư thế nỏ).
-	var target_rot: Vector3 = Vector3(90, 0, 0)
-	# Giật nhẹ khi bắn: nòng nhích lên, từ từ về lại.
+	# Giật nòng: từ từ hồi về 0.
 	player._ak_recoil = maxf(player._ak_recoil - delta * 3.0, 0.0)
+	# Súng luôn xoay nòng ra trước (giống tư thế nỏ) + ngả nhẹ khi giật.
+	var target_rot: Vector3 = Vector3(90, 0, 0)
 	target_rot.x += player._ak_recoil * 3.0
 	wp.rotation_degrees = wp.rotation_degrees.lerp(target_rot, 0.15)
+	# Giật lùi dọc theo hướng bắn ngược + hạ nhẹ nòng, rồi hồi về vị trí cầm gốc.
+	# Không dùng tween riêng cho position — chỉ lerp về base cố định để không trôi.
+	var aim: Vector3 = player._bow_aim_dir
+	if aim.length_squared() < 0.001:
+		aim = -player.global_transform.basis.z
+	var kick: Vector3 = -aim * (player._ak_recoil * 0.05)
+	kick.y -= player._ak_recoil * 0.02
+	wp.position = wp.position.lerp(player._ak_hold_base + kick, delta * 14.0)
 	if is_ak_aiming:
 		# Tay phải đẩy tay cầm, tay trái giữ thân — tư thế ngắm bắn
 		player._mesh.arm_r.rotation.x = lerp(player._mesh.arm_r.rotation.x, -0.55, 0.15)
@@ -224,20 +237,11 @@ static func _muzzle_flash(player, pos: Vector3, dir: Vector3) -> void:
 		stw.tween_property(spark_mat, "emission_energy_multiplier", 0.0, 0.10)
 		stw.tween_callback(spark.queue_free).set_delay(0.11)
 
-## Giật nòng (recoil): tween nhẹ trên rotation/pivot theo đúng tư thế cầm,
-## không đặt cứng lại vị trí gốc — trả về tư thế cầm hiện tại của pose.
-static func _kick(player, dir: Vector3) -> void:
-	if player._mesh == null or player._mesh.weapon_pivot == null:
-		return
-	var wp: Node3D = player._mesh.weapon_pivot
-	# Đè lên recoil để update_pose ngả nòng nhẹ (có hồi).
-	var recoil: float = minf(player._ak_recoil + 0.6, 1.0)
-	player._ak_recoil = recoil
-	var base_pos: Vector3 = wp.position
-	# Giật nhẹ lùi theo hướng bắn ngược + hạ nòng xuống rồi về.
-	var tw: Tween = wp.create_tween()
-	tw.tween_property(wp, "position", base_pos - dir * 0.020 - Vector3(0, 0.012, 0), 0.03)
-	tw.tween_property(wp, "position", base_pos, 0.07).set_delay(0.03)
+## Giật nòng (recoil): chỉ cộng dồn vào _ak_recoil — update_pose sẽ ngả nòng
+## + lùi nhẹ rồi hồi về base cố định. Không tạo tween riêng để tránh chồng
+## tween làm súng trôi dần khỏi vị trí cầm khi bắn tự động.
+static func _kick(player, _dir: Vector3) -> void:
+	player._ak_recoil = minf(player._ak_recoil + 0.6, 1.0)
 
 static func _align_y_to(b: Basis, dir: Vector3) -> Basis:
 	var up := Vector3.UP

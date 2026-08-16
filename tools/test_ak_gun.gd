@@ -116,6 +116,25 @@ func _ready() -> void:
 		_AK.update_pose(player, 1.0 / 60.0)
 	_check(player._ak_recoil <= 0.001, "giật nòng hồi về 0")
 
+	# ── 5d. bắn liên tục → súng không trôi khỏi vị trí cầm gốc ────────────
+	player._ak_hold_captured = false
+	player._ak_recoil = 0.0
+	_AK.update_pose(player, 1.0 / 60.0)
+	var base_hold: Vector3 = player._mesh.weapon_pivot.position
+	player._bow_aim_dir = -player.global_transform.basis.z.normalized()
+	for shot in 30:
+		player.inventory.add_item(_IDB.items_db["bullet_762mm"], 1)
+		player._equipped_durability = player.equipped_weapon.max_durability
+		_AK.fire_shot(player)
+		for i in 4:
+			_AK.update_pose(player, 1.0 / 60.0)
+	for b in get_tree().get_nodes_in_group("bullets"):
+		b.free()
+	for i in 240:
+		_AK.update_pose(player, 1.0 / 60.0)
+	var drift: float = player._mesh.weapon_pivot.position.distance_to(base_hold)
+	_check(drift < 0.01, "bắn 30 phát liên tục → pivot về đúng vị trí cầm (drift=%.4f)" % drift)
+
 	# ── 6. Hết đạn → chuyển ngắm, không spawn ─────────────────────────────
 	player.inventory.remove_item_by_id(_IDB.items_db["bullet_762mm"].id, 99)
 	_check(not _AK.has_ammo(player), "hết đạn → has_ammo false")
