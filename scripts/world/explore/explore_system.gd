@@ -159,27 +159,15 @@ func _sample_color_rw(wx: float, wz: float) -> Color:
 
 func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 	var nd: Dictionary = _Noise._noise_for_dim(_dimension_id)
-	var n_biome: FastNoiseLite = nd["biome"]
 
-	# Sa mạc
-	var n_desert: FastNoiseLite = nd.get("desert") as FastNoiseLite
-	if n_desert:
-		var dv: float = (n_desert.get_noise_2d(wx, wz) + 1.0) * 0.5
-		if dv > 0.55:
-			if _is_river(wx, wz):
-				return Color(0.08, 0.38, 0.72, 0.70)
-			var pd: float = (nd.get("patch2") as FastNoiseLite).get_noise_2d(wx, wz) \
-					if nd.get("patch2") else 0.0
-			if pd > 0.72:
-				return Color(0.94, 0.88, 0.62)   # PALE_SAND
-			return Color(0.92, 0.78, 0.32)
-
-	# Cao nguyên (đồng bằng cao) — khớp _biome_at: xa spawn, mask > 0.55
-	var n_highland: FastNoiseLite = nd.get("highland") as FastNoiseLite
-	if n_highland:
-		var hv: float = (n_highland.get_noise_2d(wx, wz) + 1.0) * 0.5
-		if hv > 0.55 and (wx * wx + wz * wz) > 1500000.0:
-			return Color(0.16, 0.54, 0.10)
+	# Biển — dùng ĐÚNG nguồn sự thật `_ocean_mask_at` (mask quần đảo) để minimap
+	# không lệch địa hình khi chunk chưa load.
+	if WorldChunk._ocean_mask_at(nd, wx, wz):
+		var dist_to_shore: float = _ocean_shore_dist(wx, wz, nd)
+		if dist_to_shore < 5.0:
+			return Color(0.72, 0.82, 0.55)
+		var ocean_depth_t: float = clamp((dist_to_shore - 5.0) / 45.0, 0.0, 1.0)
+		return Color(0.04, lerp(0.35, 0.15, ocean_depth_t), lerp(0.60, 0.35, ocean_depth_t))
 
 	# Sông
 	if _is_river(wx, wz):
@@ -188,20 +176,32 @@ func _sample_color_rw_fallback(wx: float, wz: float) -> Color:
 	if _is_road(wx, wz):
 		return Color(0.68, 0.52, 0.26)
 
-	# Biển
-	var n_ocean: FastNoiseLite = nd["ocean"]
-	var ow: FastNoiseLite = nd["ocean_warp"]
-	var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
-	var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
-	var is_ocean: bool = (n_ocean.get_noise_2d(wx + warp_x, wz + warp_z) + 1.0) * 0.5 > _Data.OCEAN_THRESHOLD
-	if is_ocean:
-		var dist_to_shore: float = _ocean_shore_dist(wx, wz, nd)
-		if dist_to_shore < 5.0:
-			return Color(0.72, 0.82, 0.55)
-		var ocean_depth_t: float = clamp((dist_to_shore - 5.0) / 45.0, 0.0, 1.0)
-		return Color(0.04, lerp(0.35, 0.15, ocean_depth_t), lerp(0.60, 0.35, ocean_depth_t))
+	# Đất liền: biome theo ô đảo (cùng nguồn `biome_at`)
+	match WorldChunk.biome_at(wx, wz, _dimension_id):
+		_Data.TileType.DESERT:
+			var pd: float = (nd.get("patch2") as FastNoiseLite).get_noise_2d(wx, wz) \
+					if nd.get("patch2") else 0.0
+			if pd > 0.72:
+				return Color(0.94, 0.88, 0.62)   # PALE_SAND
+			return Color(0.92, 0.78, 0.32)
+		_Data.TileType.FROST:
+			return Color(0.88, 0.92, 0.96)
+		_Data.TileType.SWAMP:
+			return Color(0.14, 0.33, 0.18)
+		_:
+			pass
 
-# Đồng bằng cỏ (nhiều loại cỏ) — bãi đất/bãi cỏ non như compute_chunk
+	# Cao nguyên (đồng bằng cao) — khớp _biome_at: xa spawn, mask > 0.55
+	var n_highland: FastNoiseLite = nd.get("highland") as FastNoiseLite
+	if n_highland:
+		var hv: float = (n_highland.get_noise_2d(wx, wz) + 1.0) * 0.5
+		if hv > 0.55 and (wx * wx + wz * wz) > 1500000.0:
+			return Color(0.16, 0.54, 0.10)
+
+	return _sample_color_rw_plain(wx, wz, nd)
+
+func _sample_color_rw_plain(wx: float, wz: float, nd: Dictionary) -> Color:
+	var n_biome: FastNoiseLite = nd["biome"]
 	var dn: float = (n_biome.get_noise_2d(wx * 0.7 + 500.0, wz * 0.7 + 500.0) + 1.0) * 0.5
 	if dn > 0.74:
 		return Color(0.42, 0.22, 0.08)                # DIRT
@@ -235,17 +235,11 @@ func _sample_color_tw(wx: float, wz: float) -> Color:
 	return Color(0.06, 0.22, 0.16)
 
 func _ocean_shore_dist(wx: float, wz: float, nd: Dictionary) -> float:
-	var n_ocean: FastNoiseLite = nd["ocean"]
-	var ow: FastNoiseLite = nd["ocean_warp"]
 	var rings: Array[int] = [2, 4, 6, 8, 10, 15, 20, 30, 40, 50]
 	for ri in range(rings.size()):
 		var r: int = rings[ri]
 		for off in [Vector2(r, 0), Vector2(-r, 0), Vector2(0, r), Vector2(0, -r)]:
-			var ox: float = wx + off.x
-			var oz: float = wz + off.y
-			var wx2: float = ow.get_noise_2d(ox * 0.5, oz * 0.5) * 200.0
-			var wz2: float = ow.get_noise_2d(ox * 0.5 + 100.0, oz * 0.5 + 100.0) * 200.0
-			if (n_ocean.get_noise_2d(ox + wx2, oz + wz2) + 1.0) * 0.5 <= _Data.OCEAN_THRESHOLD:
+			if not WorldChunk._ocean_mask_at(nd, wx + off.x, wz + off.y):
 				return float(r)
 	return 999.0
 

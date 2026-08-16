@@ -147,14 +147,21 @@ func _ready() -> void:
 	_check(near_ore == 0, "gần spawn: 0 quặng trong bán kính %d (got %d)" % [100, near_ore])
 
 	# ── 2. Chunk xa spawn ──────────────────────────────────────────────────
-	# Danh sách ghim theo seed 20260805: đồng bằng (GRASS_DIRT) + không-đồng-bằng
+	# Ghim theo seed 20260805 cho ĐỊA HÌNH QUẦN ĐẢO MỚI (ver: mỗi chunk máy kiểm
+	# tra xác nhận ore_hill.cx != -1 + đồi 4~12 block — chọn qua diag; đồng bằng
+	# GRASS_DIRT + không-đồng-bằng đều có đủ).
 	var far_coords := [
-		Vector2i(-3, 4), Vector2i(-3, 7), Vector2i(-5, 6), Vector2i(-6, 5),
-		Vector2i(-7, 6), Vector2i(0, 5), Vector2i(-5, -2), Vector2i(-2, 7),
-		Vector2i(4, 8), Vector2i(22, -9), Vector2i(31, 20), Vector2i(8, -4),
-		Vector2i(12, -8), Vector2i(10, 3), Vector2i(-9, 5), Vector2i(9, 9),
-		Vector2i(6, -14), Vector2i(13, 13), Vector2i(-15, 9), Vector2i(16, -5),
-		Vector2i(17, 7), Vector2i(5, -16), Vector2i(18, 12), Vector2i(19, 1),
+		# đồng bằng (GRASS_DIRT, plains=true)
+		Vector2i(-16, -2), Vector2i(-13, -3), Vector2i(-9, -3), Vector2i(-8, 3),
+		Vector2i(-7, 4), Vector2i(-7, 6), Vector2i(1, 8), Vector2i(2, 9),
+		Vector2i(6, 4), Vector2i(7, 0), Vector2i(7, -4), Vector2i(9, 4),
+		Vector2i(17, -15), Vector2i(19, -1), Vector2i(22, -26), Vector2i(39, -48),
+		Vector2i(48, 52), Vector2i(57, 37),
+		# không-đồng-bằng (biome sa mạc/slime/cao nguyên, plains=false)
+		Vector2i(-56, 29), Vector2i(-51, -6), Vector2i(-50, -4), Vector2i(-27, -3),
+		Vector2i(-26, -21), Vector2i(-19, 9), Vector2i(-18, -5), Vector2i(-16, -4),
+		Vector2i(-9, -8), Vector2i(-7, -1), Vector2i(-54, 16), Vector2i(36, 38),
+		Vector2i(55, 8),
 	]
 	var hills_found := 0
 	var plains_hills := 0

@@ -14,8 +14,8 @@ const BIOME_CACHE_MAX: int = 262144
 static var _biome_cache: Dictionary = {}
 static var _biome_cache_lock := Mutex.new()
 
-static func _biome_key(dim_id: int, wx: float, wz: float) -> Vector3i:
-	return Vector3i(dim_id, floori(wx), floori(wz))
+static func _biome_key(dim_id: int, wx: float, wz: float) -> Vector4i:
+	return Vector4i(dim_id, floori(wx), floori(wz), SeedSnapshot.ensure())
 
 ## Gọi để buộc tạo lại noise (vd: khi WorldSeed thay đổi)
 static func clear_cache() -> void:
@@ -328,20 +328,29 @@ static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 static func _biome_at_uncached(wx: float, wz: float, dim_id: int) -> int:
 	var nd: Dictionary = _noise_for_dim(dim_id)
 
-	# REAL_WORLD: chỉ desert/frost/swamp noise quyết định — còn lại luôn GRASS_DIRT.
+	# REAL_WORLD: BIOME THEO Ô ĐẢO — mỗi đảo (ô chứa) là 1 biome riêng, lấy
+	# theo noise desert/frost/swamp tại TÂM đảo (hub) nên cả đảo nhất quán và
+	# khớp test (chỉ tuyết/đầm tránh gần spawn như cũ). Đảo càng lớn càng rõ.
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5
-		if d > 0.55:
+		var seed: int = SeedSnapshot.ensure()
+		var cx: int = int(floor(wx / _Data.ISLAND_CELL))
+		var cz: int = int(floor(wz / _Data.ISLAND_CELL))
+		var hub := _Data.island_hub(cx, cz, seed)
+		var hx: float = hub.x
+		var hz: float = hub.y
+		var d: float = (nd["desert"].get_noise_2d(hx, hz) + 1.0) * 0.5
+		if d > 0.60:
 			return _Data.TileType.DESERT
 		# Bio băng giá — không lấn vào khu vực spawn (giữ đồng cỏ khô ráo cho
-		# người chơi mới), vùng còn lại theo mask lạnh cấp lục địa.
-		var fx: float = (nd["frost"].get_noise_2d(wx, wz) + 1.0) * 0.5
-		if wx * wx + wz * wz > 800000.0 and fx > 0.55:
+		# người chơi mới), vùng xa theo mask lạnh cấp lục địa.
+		var fx: float = (nd["frost"].get_noise_2d(hx, hz) + 1.0) * 0.5
+		var dhub2: float = hx * hx + hz * hz
+		if dhub2 > 800000.0 and fx > 0.60:
 			return _Data.TileType.FROST
-		# Rừng đầm lầy — cũng tránh vùng spawn (gần gốc tọa độ giữ đồng cỏ khô
-		# cho người chơi mới), mask ẩm cấp lục địa, không đè lên desert/frost.
-		var sw: float = (nd["swamp"].get_noise_2d(wx, wz) + 1.0) * 0.5
-		if wx * wx + wz * wz > 600000.0 and sw > 0.57:
+		# Rừng đầm lầy — cũng tránh vùng spawn, mask ẩm cấp lục địa, ngưỡng cao
+		# để các ô đầm nằm trong lõi mạnh (test tìm được nước đứng).
+		var sw: float = (nd["swamp"].get_noise_2d(hx, hz) + 1.0) * 0.5
+		if dhub2 > 600000.0 and sw > 0.62:
 			return _Data.TileType.SWAMP
 		return _Data.TileType.GRASS_DIRT
 

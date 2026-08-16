@@ -128,6 +128,64 @@ func _ready() -> void:
 		_check(cbg.size() == SIZE and int(cbg[fl.x][fl.y]) == _D.TileType.OCEAN_DEEP,
 			"ô biển mask = OCEAN_DEEP qua pipeline (được %d)" % (int(cbg[fl.x][fl.y]) if cbg.size() == SIZE else -1))
 
+	# ── 5. DIAGNOSTIC quần đảo: mỗi đảo 1 biome + phân bố kích thước đảo ─────
+	print("-- 5. Hình dạng quần đảo (mỗi đảo nên 1 biome) --")
+	WorldSeed.seed_value = 20260805
+	_W._Noise.clear_cache()
+	_nd = _W._Noise._noise_for_dim(RW)
+	var island_count := 0
+	var max_iso := 0
+	var min_iso := 1 << 30
+	var total_iso := 0
+	var mixed := 0
+	var seen := {}
+	const SAMP: int = 8
+	const CELLS: int = 12
+	const REG: int = int(_D.ISLAND_CELL * CELLS)
+	var px := -REG
+	while px <= REG:
+		var pz := -REG
+		while pz <= REG:
+			if not _ocean(px, pz) and not seen.has(Vector2i(px, pz)):
+				# BFS quần đảo
+				var q: Array = [Vector2i(px, pz)]
+				seen[Vector2i(px, pz)] = true
+				var size := 0
+				var expected: int = -1
+				var px2_: int = px
+				while not q.is_empty():
+					var c: Vector2i = q.pop_back()
+					size += 1
+					var bio: int = _W._Noise._biome_at(float(c.x), float(c.y), RW)
+					if expected == -1:
+						expected = bio
+					elif bio != expected:
+						mixed += 1
+					for off in [Vector2i(SAMP, 0), Vector2i(-SAMP, 0), Vector2i(0, SAMP), Vector2i(0, -SAMP)]:
+						var n: Vector2i = Vector2i(c.x + off.x, c.y + off.y)
+						if not seen.has(n) and not _ocean(float(n.x), float(n.y)) \
+								and absf(float(n.x)) <= REG and absf(float(n.y)) <= REG:
+							seen[n] = true
+							q.append(n)
+				# mật độ: mỗi sample = SAMP*SAMP block
+				var blk := size * SAMP * SAMP
+				island_count += 1
+				max_iso = maxi(max_iso, blk)
+				min_iso = mini(min_iso, blk)
+				total_iso += blk
+				if island_count <= 12:
+					print("  island %d: ~%.0f blocks biome=%d" % [island_count, float(blk), expected])
+			pz += SAMP
+		px += SAMP
+	if island_count > 0:
+		var region_blk := (2.0 * REG) * (2.0 * REG)
+		print("ISLAND-STAT: count=%d avg=%.0fblk min=%.0f max=%.0f mixed_points=%d land_pct=%.0f%%" % [
+			island_count, float(total_iso) / float(island_count),
+			float(min_iso), float(max_iso), mixed,
+			float(total_iso) / region_blk * 100.0])
+	else:
+		print("ISLAND-STAT: 0 islands trong vùng quét")
+
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())
 	get_tree().quit(0 if _failures == 0 else 1)

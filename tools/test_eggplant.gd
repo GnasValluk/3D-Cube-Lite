@@ -144,45 +144,53 @@ func _ready() -> void:
 		icon.queue_free()
 
 	# ── 7. Cây dại trên đồng cỏ ────────────────────────────────────────────
-	# Cà tím dại cần đường cách ≤2 ô (rdist<=2). Chỉ quét chunk gần road.
+	# Cà tím dại cần đường cách ≤2 ô (rdist<=2). Quần đảo mới: lòng đồng cỏ
+	# sát đường thưa hơn → quét ĐỘNG theo tâm chunk (đất + gần đường + GRASS_DIRT),
+	# tính tối đa 120 chunk cho tới khi thấy cây.
 	print("-- 7. Cây cà tím dại: spawn trong chunk thật --")
 	WorldSeed.seed_value = 20260807
 	_W._Noise.clear_cache()
 	var nd: Dictionary = _W._Noise._noise_for_dim(RW)
+	var _cand := {}
+	for cx in range(-40, 41, 2):
+		for cz in range(-40, 41, 2):
+			if _cand.size() >= 300:
+				break
+			var wx := float(cx * SIZE) + SIZE * 0.5
+			var wz := float(cz * SIZE) + SIZE * 0.5
+			if _W._ocean_mask_at(nd, wx, wz):
+				continue
+			if _W._Noise._biome_at(wx, wz, RW) != _D.TileType.GRASS_DIRT:
+				continue
+			var near_road := false
+			for off in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1),
+					Vector2(-2, 0), Vector2(2, 0), Vector2(0, -2), Vector2(0, 2)]:
+				if _Road.is_on_road(wx + off.x * 2.0, wz + off.y * 2.0):
+					near_road = true
+					break
+			if not near_road:
+				continue
+			_cand[Vector2i(cx, cz)] = true
+	var keys: Array = _cand.keys()
+	keys.sort()
 	var found := 0
 	var total_eg := 0
 	var scans := 0
-	for x in range(-1600, 1601, SIZE * 8):
-		for z in range(-1600, 1601, SIZE * 8):
-			if found > 0 or scans >= 12:
-				break
-			var wx := float(x) + 0.5
-			var wz := float(z) + 0.5
-			if _W._ocean_mask_at(nd, wx, wz):
-				continue
-			if not _Road.is_on_road(wx, wz):
-				var near_road := false
-				for off in [Vector2(-1, 0), Vector2(1, 0), Vector2(0, -1), Vector2(0, 1),
-						Vector2(-2, 0), Vector2(2, 0), Vector2(0, -2), Vector2(0, 2)]:
-					if _Road.is_on_road(wx + off.x * 2.0, wz + off.y * 2.0):
-						near_road = true
-						break
-				if not near_road:
-					continue
-			var bb: int = _W._Noise._biome_at(wx, wz, RW)
-			if bb != _D.TileType.GRASS_DIRT:
-				continue
-			scans += 1
-			print("   (compute chunk %d,%d...)" % [int(floor(wx / SIZE)), int(floor(wz / SIZE))])
-			var data := _W.compute_chunk(int(floor(wx / SIZE)), int(floor(wz / SIZE)), SIZE, RW)
-			var eg_count := 0
-			for p in data.get("plant_props", []):
-				if p.get("type", "") == "eggplant":
-					eg_count += 1
-			total_eg += eg_count
-			if eg_count >= 1:
-				found += 1
-				print("   (chunk %d,%d: cà tím dại=%d)" % [int(floor(wx / SIZE)), int(floor(wz / SIZE)), eg_count])
+	for k in keys:
+		if found > 0 or scans >= 120:
+			break
+		var ck: Vector2i = k
+		scans += 1
+		print("   (compute chunk %d,%d...)" % [ck.x, ck.y])
+		var data := _W.compute_chunk(ck.x, ck.y, SIZE, RW)
+		var eg_count := 0
+		for p in data.get("plant_props", []):
+			if p.get("type", "") == "eggplant":
+				eg_count += 1
+		total_eg += eg_count
+		if eg_count >= 1:
+			found += 1
+			print("   (chunk %d,%d: cà tím dại=%d)" % [ck.x, ck.y, eg_count])
 	_check(found >= 1, "tìm thấy cà tím dại trong chunk thật (%d chunk, tổng %d cây)" % [scans, total_eg])
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])

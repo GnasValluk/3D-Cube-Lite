@@ -46,6 +46,35 @@ func _find_sample(pmin: float) -> Vector2:
 		r += SCAN_STEP
 	return Vector2.ZERO
 
+## Tìm điểm "đại dương sâu": điểm ocean mà tại đó toàn bộ vòng khảo sát bán
+## kính 60 block đều là nước → chắc chắn ≥60 block xa bờ. Quần đảo mới rải islet
+## khắp đại dương (lưới 150, bán kính 15–30) nên không còn "điểm giữa đại dương"
+## cố định như (0, 200000); phải quét động để tìm khoảng nước thật xa đất.
+func _find_deep_ocean(nd: Dictionary) -> Vector2:
+	var r := 2500.0
+	while r <= 20000.0:
+		var samples: int = max(16, int(r / 250.0 * TAU))
+		for k in range(samples):
+			var a: float = float(k) / float(samples) * TAU
+			var p := Vector2(cos(a), sin(a)) * r
+			if not _ocean_mask_at(nd, p.x, p.y):
+				continue
+			var clear := true
+			for d in range(8):
+				var ang: float = float(d) / 8.0 * TAU
+				if not _ocean_mask_at(nd, p.x + cos(ang) * 60.0, p.y + sin(ang) * 60.0):
+					clear = false
+					break
+			if clear:
+				return p
+		r += 250.0
+	return Vector2.ZERO
+
+## Land/sea chuẩn cho việc tìm deep-ocean (đọc thẳng mask thành phần, không dùng
+## strength để tránh phụ thuộc clamp đang được kiểm thử).
+static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
+	return _W._ocean_mask_at(nd, wx, wz)
+
 func _ready() -> void:
 	print("== test_mangrove_gen: Rừng ngập mặn (gen + block + item) ==")
 
@@ -64,9 +93,13 @@ func _ready() -> void:
 			if bool(fm.get("ok", false)):
 				var st: float = _W._mangrove_strength_at(_nd, float(fm["x"]), float(fm["z"]))
 				_check(st >= 0.60, "seed %d: lõi teleport có strength ≥ 0.60 (có %f)" % [s, st])
-		# Ở giữa đại dương xa bờ → cường độ phải = 0 (bị clamp)
-		var far_st: float = _W._mangrove_strength_at(_nd, 0.0, 200000.0)
-		_check(far_st == 0.0, "seed %d: xa bờ (đại dương) strength = 0 (có %f)" % [s, far_st])
+		# Ở giữa đại dương xa bờ → cường độ phải = 0 (bị clamp). Quần đảo mới
+		# rải islet khắp đại dương nên tìm động điểm thật xa đất (≥60 block).
+		var dp := _find_deep_ocean(_nd)
+		_check(dp != Vector2.ZERO, "seed %d: có điểm đại dương sâu (≥60 block xa bờ)" % s)
+		if dp != Vector2.ZERO:
+			var far_st: float = _W._mangrove_strength_at(_nd, dp.x, dp.y)
+			_check(far_st == 0.0, "seed %d: xa bờ (đại dương) strength = 0 (có %f)" % [s, far_st])
 
 	# ── 2. Block mới: mapping id↔tên + hardness + soil/till/shovel/axe ─────────
 	print("-- 2. Block MANGROVE_MUD / MANGROVE_WOOD --")

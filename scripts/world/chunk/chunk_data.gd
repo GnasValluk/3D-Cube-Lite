@@ -213,6 +213,53 @@ const RIVER_OFFSET: float = 50.0
 const RIVER_HALF_W: float = 3.0
 const RIVER_GRID_R: int = 40
 
+## ── Lưới ĐẢO — 1 ô = 1 đảo. Mỗi đảo là 1 blob quanh hub (tâm ô + nhiễu), bán
+## kính luôn < 0.5*CELL nên các đảo KHÔNG BAO GIỜ chạm nhau → quần đảo nhỏ dày.
+## Ocean mask (world_chunk) và biome (chunk_noise) dùng CHUNG lưới này để "1 đảo
+## = 1 biome" nhất quán qua mọi pipeline (chunk/tile/LOD/hud/explore/teleport).
+const ISLAND_CELL: float = 340.0
+
+## Hash tất định (0..1) theo ô đảo + seed — jitter hàng/fixture không cần noise.
+static func _h01(seed: int, x: int, y: int) -> float:
+	var h: int = x * 374761393 + y * 668265263 + seed * 1442695040
+	h = (h ^ (h >> 13)) * 1274126177
+	h = h ^ (h >> 16)
+	return float(h & 0x7fffffff) / 2147483647.0
+
+## Tâm đảo (nhiễu FULL ô — hub có thể nằm sát mép ô, đủ để các đường lưới
+## chính (x=k*CELL, z=k*CELL) của ray test luôn cắt được blob): các hàm dùng
+## chung phải cho CÙNG kết quả.
+static func island_hub(cx: int, cz: int, seed: int) -> Vector2:
+	var hx: float = (cx + 0.5) * ISLAND_CELL
+	var hz: float = (cz + 0.5) * ISLAND_CELL
+	var jx: float = (_h01(seed, cx * 2 + 1, cz * 2 + 1) - 0.5) * ISLAND_CELL
+	var jz: float = (_h01(seed, cx * 2 + 2, cz * 2 + 2) - 0.5) * ISLAND_CELL
+	return Vector2(hx + jx, hz + jz)
+
+## Bán kính đảo theo 2 trục (elip) — max gần < 0.5*CELL nên đảo các ô hiếm khi
+## dính nhau; bán kính trung bình ~0.29*CELL → đất ~25-30% (biển chiếm đa số).
+static func island_axes(cx: int, cz: int, seed: int) -> Vector2:
+	var rn: float = _h01(seed, cx * 3 + 1, cz * 3 + 1)
+	var radius: float = ISLAND_CELL * (0.22 + rn * 0.14)
+	var shape: float = (_h01(seed, cx * 3 + 2, cz * 3 + 2) - 0.5)
+	var rx: float = radius * (1.0 + shape * 0.6)
+	var rz: float = radius * (1.0 - shape * 0.6)
+	return Vector2(rx, rz)
+
+## ── Đảo nhỏ (islet) — rải rác đầy biển để bất kỳ hướng đi nào cũng gặp đất
+## trong tầm ngắn (dân cư nouvelle ở giữa các đảo lớn). Không phải biome riêng.
+const ISLET_CELL: float = 150.0
+static func islet_hub(cx: int, cz: int, seed: int) -> Vector2:
+	var hx: float = (cx + 0.5) * ISLET_CELL
+	var hz: float = (cz + 0.5) * ISLET_CELL
+	var jx: float = (_h01(seed, cx * 5 + 1, cz * 5 + 1) - 0.5) * ISLET_CELL
+	var jz: float = (_h01(seed, cx * 5 + 2, cz * 5 + 2) - 0.5) * ISLET_CELL
+	return Vector2(hx + jx, hz + jz)
+static func islet_present(cx: int, cz: int, seed: int) -> bool:
+	return _h01(seed, cx * 5 + 3, cz * 5 + 3) < 0.35
+static func islet_radius(cx: int, cz: int, seed: int) -> float:
+	return ISLET_CELL * (0.10 + _h01(seed, cx * 5 + 4, cz * 5 + 4) * 0.10)
+
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 
 ## ── Màu sắc theo block ID ────────────────────────────────────────────────────

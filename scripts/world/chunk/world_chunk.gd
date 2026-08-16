@@ -157,6 +157,9 @@ static func _fluid_kind(bid: int) -> int:
 const SPAWN_BIAS_AMP: float = 2.2
 const SPAWN_BIAS_SIG2: float = 500000.0
 const SPAWN_BIAS_CUT: float = 2000000.0
+## Đĩa an toàn quanh gốc: LUÔN là đất (spawn/tavern/village) — "đảo nhà" rộng
+## ~650 để có lòng đồng cỏ sâu cho hồ/làng. Quần đảo nhỏ bắt đầu ngoài đĩa.
+const SPAWN_FORCE_R2: float = 110000.0
 
 ## Giới hạn số đèn sen 1 chunk — trước đây tạo 20-40 OmniLight3D/chunk (49 chunk
 ## trong tầm = ~1500 node đèn, cày GC + enter/exit tree mỗi lần stream → spike
@@ -167,7 +170,8 @@ const MAX_LOTUS_PER_CHUNK: int = 12
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	# Thread-safe cache theo ô thế giới: lưới ocean stride-2 (42×42) của 2 chunk
 	# kề nhau overlap ~62% số sample — dùng chung bỏ qua FastNoiseLite FBM lặp.
-	var key := Vector2i(floori(wx), floori(wz))
+	# Key gồm seed để switch seed giữa chừng không trả mask của seed cũ.
+	var key := Vector3i(floori(wx), floori(wz), SeedSnapshot.ensure())
 	_ocean_cache_lock.lock()
 	if _ocean_cache.has(key):
 		var hit: bool = _ocean_cache[key]
@@ -183,14 +187,42 @@ static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	return val
 
 static func _ocean_mask_compute(nd: Dictionary, wx: float, wz: float) -> bool:
-	var ow: FastNoiseLite = nd["ocean_warp"]
-	var warp_x: float = ow.get_noise_2d(wx * 0.5, wz * 0.5) * 200.0
-	var warp_z: float = ow.get_noise_2d(wx * 0.5 + 100.0, wz * 0.5 + 100.0) * 200.0
-	var raw: float = (nd["ocean"] as FastNoiseLite).get_noise_2d(wx + warp_x, wz + warp_z)
 	var d2: float = wx * wx + wz * wz
-	if d2 < SPAWN_BIAS_CUT:
-		raw -= SPAWN_BIAS_AMP * exp(-d2 / SPAWN_BIAS_SIG2)
-	return (raw + 1.0) * 0.5 > _Data.OCEAN_THRESHOLD
+	if d2 < SPAWN_FORCE_R2:
+		return false
+	# Đảo = blob quanh hub của ô đảo chứa điểm. Rain lệch bán kính theo
+	# ocean_warp để bờ biển lồi lõm; spawn-safe: mọc rộng quanh gốc tọa độ.
+	var seed: int = SeedSnapshot.ensure()
+	var cx: int = int(floor(wx / _Data.ISLAND_CELL))
+	var cz: int = int(floor(wz / _Data.ISLAND_CELL))
+	var hub := _Data.island_hub(cx, cz, seed)
+	var axes := _Data.island_axes(cx, cz, seed)
+	var dx: float = wx - hub.x
+	var dz: float = wz - hub.y
+	var edge: float = (nd["ocean_warp"] as FastNoiseLite).get_noise_2d(wx * 0.5, wz * 0.5)
+	var e: float = 1.0 + edge * 0.12
+	var grow: float = SPAWN_BIAS_AMP * exp(-d2 / SPAWN_BIAS_SIG2)
+	# Gần gốc: đảo MỌC LỚN hơn (hồ nội địa, làng, quán rượu cần lòng đồng cỏ
+	# sâu >40 ô). Suy giảm theo e^{−r²/σ²} → xa ~1.2km là quần đảo nhỏ chuẩn.
+	var g: float = grow * 40.0
+	var gaxes := Vector2(axes.x + g, axes.y + g)
+	var sq: float = (dx / (gaxes.x * e)) * (dx / (gaxes.x * e)) \
+		+ (dz / (gaxes.y * e)) * (dz / (gaxes.y * e))
+	var seen: bool = sq < 1.0
+	# Đảo nhỏ rải biển — thêm đất mảnh, tránh hành trình biển dài không đảo.
+	if not seen:
+		var icx: int = int(floor(wx / _Data.ISLET_CELL))
+		var icz: int = int(floor(wz / _Data.ISLET_CELL))
+		var ihub := _Data.islet_hub(icx, icz, seed)
+		var ir: float = _Data.islet_radius(icx, icz, seed)
+		var idx: float = wx - ihub.x
+		var idz: float = wz - ihub.y
+		seen = _Data.islet_present(icx, icz, seed) \
+			and (idx * idx + idz * idz) < ir * ir
+	if not seen and grow > 0.0:
+		var reach: float = maxf(axes.x, axes.y) + grow * 1.8
+		seen = dx * dx + dz * dz < reach * reach
+	return not seen
 
 ## ── _gen_water_top_layer: layer cao nhất nước generation có thể tồn tại ─────
 static func _gen_water_top_layer() -> int:
@@ -659,8 +691,8 @@ static func roll_bio_bonus_at(wx: float, wz: float) -> Dictionary:
 		bonus += randi_range(0, 30)
 		zones.append("sea")
 	else:
-		var d: float = (nd["desert"].get_noise_2d(wx, wz) + 1.0) * 0.5
-		if d > 0.55:
+		var bio: int = biome_at(wx, wz, DIM)
+		if bio == _Data.TileType.DESERT:
 			bonus += randi_range(10, 15)
 			zones.append("desert")
 		else:

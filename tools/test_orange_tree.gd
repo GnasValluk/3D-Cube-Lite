@@ -43,15 +43,12 @@ func _ready() -> void:
 	_check(_D.is_axable(_D.BlockID.HARD_WOOD), "gỗ cứng chặt được bằng rìu")
 
 	# ── 2. Recipe orange_seed ──────────────────────────────────────────────
+	# Toàn bộ công thức chế tạo ĐÃ BỊ XÓA theo thiết kế hiện tại (same as
+	# test_mangrove_gen/test_eggplant): không còn recipe hạt cam.
 	_RD.ensure()
-	var found_recipe := false
-	for r in _RD.recipes:
-		var rd := r as Dictionary
-		if rd.get("id", "") == "orange_seed":
-			found_recipe = true
-			_check(rd["ingredients"].get("orange", 0) == 1, "recipe orange_seed: cần 1 quả cam")
-			_check(rd["count"] == 2, "recipe orange_seed: ra 2 hạt giống")
-	_check(found_recipe, "recipe orange_seed tồn tại")
+	_check(_RD.recipes.is_empty(), "toàn bộ công thức đã bị xoá (còn %d)" % _RD.recipes.size())
+	var orange_r: Dictionary = _RD.match_counts({"orange": 1})
+	_check(orange_r.is_empty(), "không còn recipe orange_seed (đã xoá cùng mọi recipe)")
 
 	# ── 3. Seed gieo trồng ─────────────────────────────────────────────────
 	_check(_Placement._is_seed_item("orange_seed"), "orange_seed là seed trồng được")
@@ -78,9 +75,9 @@ func _ready() -> void:
 	orange_tree.set_birth_age_days(80.0)
 	var mature_voxels: int = orange_tree._ordered.size()
 	_check(mature_voxels >= young_voxels * 0.8, "cây cam 80 ngày vẫn đầy đủ thân/tán/quả (có %d)" % mature_voxels)
-	var fruit_mmi := orange_tree.find_child("FruitVisual", false, false) as MultiMeshInstance3D
+	var fruit_mmi := orange_tree.find_child("OrangeVisual", false, false) as MultiMeshInstance3D
 	_check(fruit_mmi != null and fruit_mmi.multimesh != null and fruit_mmi.multimesh.instance_count >= 30,
-		"cây cam trưởng thành có quả cam trên tán (có %d voxel quả)"
+		"cây cam trưởng thành có tán + quả cam gộp trong OrangeVisual (có %d voxel)"
 			% (fruit_mmi.multimesh.instance_count if fruit_mmi != null else 0))
 	var cam_count := _count_orange_voxels(orange_tree._grid)
 	_check(cam_count >= 50, "có ≥50 voxel quả màu cam rực trong cây (có %d)" % cam_count)
@@ -125,37 +122,106 @@ func _ready() -> void:
 		var known := ["palm", "oak", "eggplant", "watermelon", "pumpkin",
 			"weed", "taro", "seagrass", "orange_tree", "dense_tree"]
 		var bad: Array[String] = []
-		var has_orange := false
-		var has_dense := false
 		for pd in chunk._prop_queue:
 			var ptype: String = (pd as Dictionary).get("type", "")
 			if ptype not in known:
 				bad.append(ptype)
-			if ptype == "orange_tree":
-				has_orange = true
-			if ptype == "dense_tree":
-				has_dense = true
 		_check(bad.is_empty(), "prop queue không có ptype lạ (có %d)" % bad.size())
-		# Gen thêm vài chunk để chắc chắn có cây cam/cây rừng mọc ra
+		# Quần đảo mới: lòng đảo nhỏ → cây cam/rừng thưa ở từng chunk riêng;
+		# quét xoắn ốc quanh gốc (đảo nhà đồng cỏ rộng) tới khi gặp cả 2 loại.
+		# Re-seed trước khi quét để stream RNG chunk-gen ổn định, không phụ
+		# thuộc số randf() của các prop dựng ở phần 4-5.
+		WorldSeed.seed_value = 20260803
+		_W._Noise.clear_cache()
+		seed(20260803)
 		var total_orange := 0
 		var total_dense := 0
-		for i in range(8):
-			var coords: Array[int] = [0, 0, 7, 3, 2, 8, -3, 4, 5, -2, -6, 6, 9, 1, -1, 9]
-			var c2 := _W.new()
-			c2.name = "FruitTreeChunk2_%d" % i
-			add_child(c2)
-			c2.setup(coords[i * 2], coords[i * 2 + 1], SIZE, RW, true)
-			for pd in c2._prop_queue:
-				var ptype: String = (pd as Dictionary).get("type", "")
-				if ptype == "orange_tree":
-					total_orange += 1
-				elif ptype == "dense_tree":
-					total_dense += 1
-			c2.queue_free()
-		total_orange += 1 if has_orange else 0
-		total_dense += 1 if has_dense else 0
-		_check(total_orange >= 1, "cây cam mọc trong chunk thật (có %d)" % total_orange)
-		_check(total_dense >= 1, "cây rừng rậm mọc trong chunk thật (có %d)" % total_dense)
+		var attempts := 0
+		var r := 0
+		while (total_orange == 0 or total_dense == 0) and attempts < 120:
+			if r == 0:
+				var c0 := _W.new()
+				c0.name = "Fs_%d" % attempts
+				add_child(c0)
+				c0.setup(0, 0, SIZE, RW, true)
+				for pd in c0._prop_queue:
+					var ptype: String = (pd as Dictionary).get("type", "")
+					if ptype == "orange_tree":
+						total_orange += 1
+					elif ptype == "dense_tree":
+						total_dense += 1
+				c0.queue_free()
+				attempts += 1
+			else:
+				for vx in range(-r, r):
+					var c1 := _W.new()
+					c1.name = "Fs_%d" % attempts
+					add_child(c1)
+					c1.setup(vx, -r, SIZE, RW, true)
+					for pd in c1._prop_queue:
+						var ptype: String = (pd as Dictionary).get("type", "")
+						if ptype == "orange_tree":
+							total_orange += 1
+						elif ptype == "dense_tree":
+							total_dense += 1
+					c1.queue_free()
+					attempts += 1
+					if (total_orange > 0 and total_dense > 0) or attempts >= 120:
+						break
+				if (total_orange > 0 and total_dense > 0) or attempts >= 120:
+					break
+				for vz in range(-r, r):
+					var c2 := _W.new()
+					c2.name = "Fs_%d" % attempts
+					add_child(c2)
+					c2.setup(r, vz, SIZE, RW, true)
+					for pd in c2._prop_queue:
+						var ptype: String = (pd as Dictionary).get("type", "")
+						if ptype == "orange_tree":
+							total_orange += 1
+						elif ptype == "dense_tree":
+							total_dense += 1
+					c2.queue_free()
+					attempts += 1
+					if (total_orange > 0 and total_dense > 0) or attempts >= 120:
+						break
+				if (total_orange > 0 and total_dense > 0) or attempts >= 120:
+					break
+				for vx in range(-r, r):
+					var c3 := _W.new()
+					c3.name = "Fs_%d" % attempts
+					add_child(c3)
+					c3.setup(-vx, r, SIZE, RW, true)
+					for pd in c3._prop_queue:
+						var ptype: String = (pd as Dictionary).get("type", "")
+						if ptype == "orange_tree":
+							total_orange += 1
+						elif ptype == "dense_tree":
+							total_dense += 1
+					c3.queue_free()
+					attempts += 1
+					if (total_orange > 0 and total_dense > 0) or attempts >= 120:
+						break
+				if (total_orange > 0 and total_dense > 0) or attempts >= 120:
+					break
+				for vz in range(-r, r):
+					var c4 := _W.new()
+					c4.name = "Fs_%d" % attempts
+					add_child(c4)
+					c4.setup(-r, -vz, SIZE, RW, true)
+					for pd in c4._prop_queue:
+						var ptype: String = (pd as Dictionary).get("type", "")
+						if ptype == "orange_tree":
+							total_orange += 1
+						elif ptype == "dense_tree":
+							total_dense += 1
+					c4.queue_free()
+					attempts += 1
+					if (total_orange > 0 and total_dense > 0) or attempts >= 120:
+						break
+			r += 1
+		_check(total_orange >= 1, "cây cam mọc trong chunk thật (quét %d chunk, có %d)" % [attempts, total_orange])
+		_check(total_dense >= 1, "cây rừng rậm mọc trong chunk thật (quét %d chunk, có %d)" % [attempts, total_dense])
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	await WorldChunk.wait_for_tasks_async(get_tree())

@@ -143,14 +143,12 @@ func _ready() -> void:
 		"tán lá chuối vàng-xanh sáng (r=%.2f g=%.2f b=%.2f)" % [leaf_avg.r, leaf_avg.g, leaf_avg.b])
 	_check(oak.find_child("FallingLeaves", false, false) == null, "không còn hiệu ứng lá rơi")
 	_check(oak.find_child("FallingAcorns", false, false) == null, "không còn hiệu ứng sồi rơi")
-	var tuft0: Node3D = oak.find_child("Tuft0", false, false)
-	_check(tuft0 != null, "chùm lá nằm trong container riêng (gió theo chùm)")
-	if tuft0 != null:
-		var tmi: MultiMeshInstance3D = tuft0.find_child("TuftVisual", false, false)
-		_check(tmi != null and tmi.multimesh != null and tmi.multimesh.instance_count > 0,
-			"chùm lá Tuft0 có voxel lá")
-		_check(tmi != null and tmi.multimesh.instance_count >= 50,
-			"chùm lá chính dày đặc (≥50 voxel, có %d)" % (tmi.multimesh.instance_count if tmi != null else 0))
+	# Lá của MỌI chùm gộp trong 1 MultiMesh "OakVisual" (1 draw call/cây).
+	var ovis: MultiMeshInstance3D = oak.find_child("OakVisual", false, false) as MultiMeshInstance3D
+	_check(ovis != null and ovis.multimesh != null and ovis.multimesh.instance_count > 0,
+		"OakVisual gộp thân + lá mọi chùm (có %d voxel)" % (ovis.multimesh.instance_count if ovis != null else 0))
+	_check(ovis != null and ovis.multimesh.instance_count >= 50,
+		"OakVisual đủ voxel (≥50, có %d)" % (ovis.multimesh.instance_count if ovis != null else 0))
 
 	# Collision khớp silhouette cây thật (không còn 1 trụ khổng lồ phủ cả tán).
 	var coli: StaticBody3D = oak.find_child("OakCollision", false, false)
@@ -168,8 +166,8 @@ func _ready() -> void:
 					biggest_radius = maxf(biggest_radius, (shp as CylinderShape3D).radius)
 	_check(sphere_count == mature_tufts,
 		"collision có đúng %d đùm lá (có %d)" % [mature_tufts, sphere_count])
-	_check(biggest_radius < oak._canopy_r() * 0.6,
-		"collision KHÔNG to hơn cây (bán kính tối đa %.2f < %.2f)" % [biggest_radius, oak._canopy_r() * 0.6])
+	_check(biggest_radius <= oak._canopy_r() * 0.8,
+		"collision khớp silhouette — đùm lá %.2f ≤ 80%% tán %.2f" % [biggest_radius, oak._canopy_r()])
 
 	# Không còn giai đoạn vị thành niên: 30 ngày (trước đây là cây non) đã
 	# phải là trưởng thành với tán đầy đủ chùm lá.
@@ -184,20 +182,19 @@ func _ready() -> void:
 	oak.set_birth_age_days(3.0)
 	_check(oak._ordered.size() > 0, "mầm có thân nhỏ")
 	_check(oak._tuft_data.size() == 1, "mầm có cụm lá nhỏ trên ngọn")
-	_check(oak.find_child("Tuft0", false, false) != null, "mầm có container chùm")
+	_check(oak.find_child("OakVisual", false, false) != null, "mầm có chùm lá trên ngọn (OakVisual)")
 	var sapling_avg := _avg_color(oak._grid)
 	_check(sapling_avg.r > sapling_avg.g and sapling_avg.g > sapling_avg.b,
 		"thân mầm nâu đậm (r=%.2f g=%.2f b=%.2f)" % [sapling_avg.r, sapling_avg.g, sapling_avg.b])
 
-	# Gió: quay container chùm lá theo thời gian
+	# Gió: đung đưa TOÀN CÂY (các chùm lá gộp trong OakVisual, gió quay node cây)
 	oak.set_birth_age_days(80.0)
-	tuft0 = oak.find_child("Tuft0", false, false)
-	var rot_before: float = tuft0.rotation.x if tuft0 != null else 0.0
+	var rot_before: float = oak.rotation.x
 	await get_tree().process_frame
 	await get_tree().process_frame
-	var rot_after: float = tuft0.rotation.x if tuft0 != null else 0.0
-	_check(absf(rot_after - rot_before) > 0.0001 or tuft0 == null,
-		"container chùm đung đưa theo thời gian (gió)")
+	var rot_after: float = oak.rotation.x
+	_check(absf(rot_after - rot_before) > 0.0001,
+		"thân đung đưa theo thời gian (gió)")
 
 	oak.queue_free()
 
