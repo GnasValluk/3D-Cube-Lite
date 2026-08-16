@@ -21,6 +21,8 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"watermelon_nuke_ammo": _build_dan_hat_nhan_dua_hau(pivot)
 		"pumpkin_mortar": _build_phao_coi(pivot)
 		"flashlight": _build_den_pin(pivot)
+		"ak_12": _build_ak12(pivot)
+		"bullet_762mm": _build_bullet_762(pivot)
 
 static func _mat(col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -786,3 +788,94 @@ static func bucket_drop(p: Node3D, is_lava: bool = false) -> void:
 	else:
 		var water := Color(0.15, 0.42, 0.72)
 		ItemMeshShared.add_cube_shaded(p, 0, -0.3, 0, 0.9, 0.8, 0.9, water, 0.0, 0.2, Color(0.0, 0.3, 0.8))
+
+# ── AK-12 — held model (local: +Y = hướng nòng, -Y = báng, -Z = trên, +Z = dưới) ──
+static func _build_ak12(p: Node3D) -> void:
+	var receiver   := _mat(Color(0.20, 0.24, 0.20))
+	var receiver_d := _mat(Color(0.14, 0.17, 0.15))
+	var metal      := _mat(Color(0.30, 0.32, 0.34))
+	var metal_d    := _mat(Color(0.20, 0.21, 0.24))
+	var handguard  := _mat(Color(0.32, 0.23, 0.14))
+	var mag        := _mat(Color(0.30, 0.22, 0.13))
+	var mag_l      := _mat(Color(0.36, 0.27, 0.16))
+	var bullet_c   := _mat(Color(0.85, 0.72, 0.15))
+	var bright     := _mat(Color(0.60, 0.62, 0.68))
+
+	# Báng súng
+	_box(p, Vector3(0, -0.44, 0), Vector3(0.050, 0.14, 0.052), receiver_d)
+	_box(p, Vector3(0, -0.38, -0.028), Vector3(0.044, 0.06, 0.020), receiver)
+	_cyl(p, Vector3(0, -0.33, 0), 0.018, 0.10, receiver_d)
+
+	# Thân hộp tiếp đạn
+	_box(p, Vector3(0, -0.14, 0), Vector3(0.055, 0.26, 0.055), receiver)
+	_box(p, Vector3(0, -0.06, -0.048), Vector3(0.012, 0.27, 0.010), metal)
+	_box(p, Vector3(0.030, -0.20, -0.034), Vector3(0.010, 0.05, 0.012), metal_d)
+	_box(p, Vector3(0, -0.30, -0.054), Vector3(0.014, 0.04, 0.006), metal)
+	_box(p, Vector3(0, 0.30, -0.050), Vector3(0.012, 0.05, 0.010), metal)
+	_box(p, Vector3(0, 0.335, -0.050), Vector3(0.006, 0.02, 0.006), bright)
+
+	# Tay cầm (chếch về sau)
+	var grip := Node3D.new()
+	grip.rotation_degrees = Vector3(-25, 0, 0)
+	grip.position = Vector3(0, -0.20, 0.055)
+	p.add_child(grip)
+	_box(grip, Vector3(0, -0.02, 0), Vector3(0.040, 0.09, 0.048), receiver_d)
+
+	# Bộ phận cò + bảo vệ cò
+	_box(p, Vector3(0, -0.22, 0.075), Vector3(0.030, 0.035, 0.030), metal_d)
+	_box(p, Vector3(0, -0.245, 0.065), Vector3(0.012, 0.02, 0.014), bright)
+
+	# Băng đạn cong
+	var mag_p := Node3D.new()
+	mag_p.rotation_degrees = Vector3(12, 0, 0)
+	mag_p.position = Vector3(0, -0.22, 0.075)
+	p.add_child(mag_p)
+	_box(mag_p, Vector3(0, -0.07, 0), Vector3(0.034, 0.16, 0.048), mag)
+	_box(mag_p, Vector3(0, 0.02, -0.026), Vector3(0.034, 0.08, 0.012), mag_l)
+	_box(mag_p, Vector3(-0.011, 0.08, -0.006), Vector3(0.010, 0.03, 0.012), bullet_c)
+	_box(mag_p, Vector3(0, 0.08, -0.006), Vector3(0.010, 0.03, 0.012), bullet_c)
+	_box(mag_p, Vector3(0.011, 0.08, -0.006), Vector3(0.010, 0.03, 0.012), bullet_c)
+
+	# Nòng + bộ phận trên nòng
+	_cyl(p, Vector3(0, 0.22, -0.010), 0.015, 0.20, metal)
+	_cyl(p, Vector3(0, 0.33, -0.010), 0.022, 0.05, metal_d)
+	_cyl(p, Vector3(0, 0.18, -0.038), 0.008, 0.18, metal)
+
+	# Tay cầm trên nòng (bằng gỗ polymer)
+	_box(p, Vector3(0, 0.10, 0.028), Vector3(0.048, 0.12, 0.048), handguard)
+	_box(p, Vector3(0, 0.16, 0.028), Vector3(0.050, 0.05, 0.022), handguard)
+
+# ── Đạn 7,62mm — held model (dọc +Y) ──
+static func _build_bullet_762(p: Node3D) -> void:
+	var brass   := _mat(Color(0.78, 0.65, 0.20))
+	var brass_d := _mat(Color(0.60, 0.48, 0.14))
+	var bullet  := _mat(Color(0.55, 0.58, 0.62))
+	var tip     := _mat(Color(0.85, 0.85, 0.90))
+	_cyl(p, Vector3(0, 0, 0), 0.048, 0.09, brass)
+	_cyl(p, Vector3(0, -0.045, 0), 0.056, 0.015, brass_d)
+	_cyl(p, Vector3(0, 0.062, 0), 0.032, 0.05, bullet)
+	_cyl(p, Vector3(0, 0.10, 0), 0.028, 0.02, tip)
+
+# ── AK-12 — model drop / icon (voxel nhỏ) ──
+static func ak12_drop(p: Node3D) -> void:
+	var receiver   := Color(0.20, 0.24, 0.20)
+	var receiver_d := Color(0.14, 0.17, 0.15)
+	var metal      := Color(0.30, 0.32, 0.34)
+	var metal_d    := Color(0.20, 0.21, 0.24)
+	var handguard  := Color(0.32, 0.23, 0.14)
+	var mag        := Color(0.30, 0.22, 0.13)
+	ItemMeshShared.add_cube(p, 0, -2, 0, 3, 3, 2, receiver_d)
+	ItemMeshShared.add_cube(p, 0, 0, 0, 2, 3, 2, receiver)
+	ItemMeshShared.add_cube(p, 0, 3, 0, 1, 3, 1, metal)
+	ItemMeshShared.add_cube(p, 0, 6, 0, 1.5, 1, 1, metal_d)
+	ItemMeshShared.add_cube(p, 0, 1, -1, 1.5, 4, 0.6, metal)
+	ItemMeshShared.add_cube(p, 0, -1, 1, 1, 2, 1, receiver_d)
+	ItemMeshShared.add_cube(p, 1, -1, 1, 1, 3, 1.5, mag)
+	ItemMeshShared.add_cube(p, 0, 2, 1, 2, 2, 1.5, handguard)
+
+# ── Đạn 7,62mm — model drop / icon (voxel nhỏ) ──
+static func bullet_762_drop(p: Node3D) -> void:
+	var brass  := Color(0.78, 0.65, 0.20)
+	var bullet := Color(0.55, 0.58, 0.62)
+	ItemMeshShared.add_cube(p, 0, -1, 0, 0.8, 1.6, 0.8, brass)
+	ItemMeshShared.add_cube(p, 0, 1, 0, 0.5, 1.2, 0.5, bullet)

@@ -65,7 +65,8 @@ func _snap_item(item_id: String) -> void:
 
 	var held_items := ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod",
 		"iron_greatsword", "iron_halberd", "leather_gloves", "crossbow",
-		"watermelon_cannon", "arrow", "watermelon_nuke_ammo", "pumpkin_mortar"]
+		"watermelon_cannon", "arrow", "watermelon_nuke_ammo", "pumpkin_mortar",
+		"ak_12", "bullet_762mm"]
 
 	if item_id in held_items:
 		ToolsMesh.build_held(root, item_id)

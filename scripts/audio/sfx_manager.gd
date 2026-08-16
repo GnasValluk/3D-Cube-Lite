@@ -126,6 +126,42 @@ func play_plant_crop() -> void:    play_arr_var(S_PLANT_CROP)
 func play_slime_attack() -> void:  play_arr_var(S_SLIME_ATTACK)
 func play_slime_big() -> void:     play_arr_var(S_SLIME_BIG, -2.0)
 func play_slime_small() -> void:   play_arr_var(S_SLIME_SMALL, -4.0)
+func play_gun_shot() -> void:
+	if _muted:
+		return
+	if _gunshot == null:
+		_gunshot = _generate_gunshot()
+	if _gunshot == null:
+		return
+	var p := _next_player()
+	p.stream = _gunshot
+	p.volume_db = -4.0
+	p.pitch_scale = 1.0 + randf_range(-0.06, 0.06)
+	p.play()
+
+var _gunshot: AudioStreamWAV = null
+
+func _generate_gunshot() -> AudioStreamWAV:
+	var mix_rate := 22050
+	var n := int(mix_rate * 0.18)
+	var data := PackedByteArray()
+	data.resize(n * 2)
+	for i in n:
+		var t := float(i) / float(mix_rate)
+		var decay := exp(-t * 32.0)
+		var noise := randf_range(-1.0, 1.0) * decay
+		var thump := sin(TAU * 110.0 * t) * exp(-t * 18.0) * 0.8
+		var crack := 0.0
+		if t < 0.012:
+			crack = randf_range(-1.0, 1.0) * (1.0 - t / 0.012) * 0.7
+		var s := clampf(noise * 0.85 + thump + crack, -1.0, 1.0)
+		data.encode_s16(i * 2, int(s * 32767.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = mix_rate
+	wav.stereo = false
+	wav.data = data
+	return wav
 
 func set_muted(val: bool) -> void:
 	_muted = val

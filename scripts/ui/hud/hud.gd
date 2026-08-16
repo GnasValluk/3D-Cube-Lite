@@ -509,7 +509,7 @@ func _process(delta: float) -> void:
 	if _crosshair and _cross_player and _cross_player._use_tp and _cross_player._bow_aiming:
 		if _cross_player.equipped_weapon != null:
 			var _wid: String = _cross_player.equipped_weapon.id
-			if _wid == "crossbow" or _wid == "watermelon_cannon" or _wid == "pumpkin_mortar":
+			if _wid == "crossbow" or _wid == "watermelon_cannon" or _wid == "pumpkin_mortar" or _wid == "ak_12":
 				_cross_show = true
 	if _crosshair:
 		_crosshair.visible = _cross_show

@@ -51,6 +51,8 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"crossbow": ToolsMesh.no_drop(parent)
 		"watermelon_cannon": ToolsMesh.phao_dua_hau_drop(parent)
 		"arrow": ToolsMesh.arrow_drop(parent)
+		"ak_12": ToolsMesh.ak12_drop(parent)
+		"bullet_762mm": ToolsMesh.bullet_762_drop(parent)
 		"twilight_gate": StructuresMesh.gate(parent)
 		"fishing_boat": StructuresMesh.fishing_boat(parent)
 		"tractor": StructuresMesh.tractor(parent)

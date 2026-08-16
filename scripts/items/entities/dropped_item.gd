@@ -47,7 +47,7 @@ func _setup_mesh():
 	root.position.y = 0.15
 
 	var item_id := item_def.id
-	if item_id in ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight"]:
+	if item_id in ["pickaxe", "shovel", "axe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight", "ak_12", "bullet_762mm"]:
 		var scale_node := Node3D.new()
 		scale_node.scale = Vector3(1.8, 1.8, 1.8)
 		root.add_child(scale_node)

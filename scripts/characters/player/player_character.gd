@@ -5,6 +5,7 @@ const _BlockHighlight := preload("res://scripts/items/entities/block_highlight.g
 const _BlockData := preload("res://scripts/world/chunk/chunk_block_data.gd")
 const _Data := preload("res://scripts/world/chunk/chunk_data.gd")
 const _Bow := preload("player_bow.gd")
+const _AK := preload("player_ak.gd")
 const _Mortar := preload("player_mortar.gd")
 const _EggThrow := preload("player_egg_throw.gd")
 const _Halberd := preload("player_halberd.gd")
@@ -85,6 +86,7 @@ var _bow_aiming: bool = false
 var _bow_charge: float = 0.0
 var _bow_charge_rate: float = 0.35
 var _bow_max_charge: float = 2.0
+var _ak_fire_cooldown: float = 0.0
 var _mortar_vertical_speed: float = 8.0
 var _mortar_launch_angle_deg: float = 60.0
 var _bow_aim_dir: Vector3 = Vector3.FORWARD
@@ -789,7 +791,7 @@ func _update_weapon_mesh() -> void:
 		if _bow_aiming:
 			_Bow.cancel_aim(self)
 		return
-	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight"]:
+	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight", "ak_12", "bullet_762mm"]:
 		ToolsMesh.build_held(pivot, item_id)
 		if item_id == "crossbow":
 			_bow_string_node = null
@@ -919,6 +921,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_stop_mining()
 			_stop_eating()
 		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _bow_aiming:
+			if equipped_weapon != null and equipped_weapon.id == "ak_12":
+				_AK.cancel_aim(self)
+				return
 			if _is_egg_aiming():
 				_EggThrow.fire(self)
 			elif equipped_weapon and equipped_weapon.id == "crossbow":
@@ -1005,6 +1010,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			if equipped_weapon != null:
 				match equipped_weapon.id:
+					"ak_12": _AK.start_fire(self); return
 					"crossbow": _Bow.start_aim(self); return
 					"pumpkin_mortar": _Mortar.start_aim(self); return
 					"watermelon_cannon": _Bow.start_cannon_aim(self); return
@@ -1311,7 +1317,9 @@ func _process(delta: float) -> void:
 	if _bow_aiming:
 		if _state == State.HIT:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-			if _is_egg_aiming():
+			if equipped_weapon != null and equipped_weapon.id == "ak_12":
+				_AK.cancel_aim(self)
+			elif _is_egg_aiming():
 				_EggThrow.cancel_aim(self)
 			elif is_mortar:
 				_Mortar.cancel_aim(self)
@@ -1319,7 +1327,10 @@ func _process(delta: float) -> void:
 				_Bow.cancel_aim(self)
 		else:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-			if _is_egg_aiming():
+			if equipped_weapon != null and equipped_weapon.id == "ak_12":
+				_Bow.update_aim(self, delta)
+				_AK.update_fire(self, delta)
+			elif _is_egg_aiming():
 				_EggThrow.update_aim(self, delta)
 			elif is_mortar:
 				_Mortar.update_aim(self, delta)
