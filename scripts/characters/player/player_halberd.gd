@@ -11,17 +11,6 @@ static func start_throw_aim(player) -> void:
 	else:
 		for ch in player._bow_indicator_root.get_children():
 			ch.queue_free()
-	var line_mat := StandardMaterial3D.new()
-	line_mat.albedo_color = Color(0.3, 0.8, 0.6, 0.35)
-	line_mat.emission_enabled = true
-	line_mat.emission_color = Color(0.3, 0.8, 0.6)
-	line_mat.emission_energy_multiplier = 0.5
-	line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	line_mat.no_depth_test = true
-	player._bow_indicator_line = MeshInstance3D.new()
-	player._bow_indicator_line.mesh = BoxMesh.new()
-	player._bow_indicator_line.material_override = line_mat
-	player._bow_indicator_root.add_child(player._bow_indicator_line)
 	var ring_mat := StandardMaterial3D.new()
 	ring_mat.albedo_color = Color(0.3, 0.8, 0.6, 0.50)
 	ring_mat.emission_enabled = true
@@ -62,15 +51,9 @@ static func update_aim(player, delta: float) -> void:
 	var range_len: float = lerp(player.HALBERD_MIN_RANGE, player.HALBERD_MAX_RANGE, charge_pct)
 	var end_pos: Vector3 = player._halberd_aim_dir * range_len
 	end_pos.y = plane_y
-	if player._bow_indicator_root == null or player._bow_indicator_line == null or player._bow_indicator_target == null: return
+	if player._bow_indicator_root == null or player._bow_indicator_target == null: return
 	player._bow_indicator_root.global_position = player.global_position + Vector3(0, 0.3, 0)
-	player._bow_indicator_line.position = end_pos * 0.5
-	player._bow_indicator_line.mesh.size = Vector3(0.04, 0.04, range_len)
-	player._bow_indicator_line.look_at(player._bow_indicator_root.global_position + end_pos, Vector3.UP)
 	player._bow_indicator_target.global_position = player._bow_indicator_root.global_position + end_pos
-	var line_color := Color(0.3, 0.8, 0.6).lerp(Color(1.0, 0.4, 0.3), charge_pct)
-	line_color.a = 0.35
-	player._bow_indicator_line.material_override.albedo_color = line_color
 	var ring_color := Color(0.3, 0.8, 0.6).lerp(Color(1.0, 0.4, 0.3), charge_pct)
 	ring_color.a = 0.50
 	player._bow_indicator_target.material_override.albedo_color = ring_color

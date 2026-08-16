@@ -55,17 +55,6 @@ static func start_aim(player) -> void:
 	else:
 		for ch in player._bow_indicator_root.get_children():
 			ch.queue_free()
-	var line_mat := StandardMaterial3D.new()
-	line_mat.albedo_color = Color(1.0, 1.0, 1.0, 0.35)
-	line_mat.emission_enabled = true
-	line_mat.emission_color = Color(1.0, 1.0, 1.0)
-	line_mat.emission_energy_multiplier = 0.4
-	line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	line_mat.no_depth_test = true
-	player._bow_indicator_line = MeshInstance3D.new()
-	player._bow_indicator_line.mesh = BoxMesh.new()
-	player._bow_indicator_line.material_override = line_mat
-	player._bow_indicator_root.add_child(player._bow_indicator_line)
 	var ring_mat := StandardMaterial3D.new()
 	ring_mat.albedo_color = Color(1.0, 0.85, 0.4, 0.40)
 	ring_mat.emission_enabled = true
@@ -121,17 +110,6 @@ static func start_cannon_aim(player) -> void:
 	else:
 		for ch in player._bow_indicator_root.get_children():
 			ch.queue_free()
-	var line_mat := StandardMaterial3D.new()
-	line_mat.albedo_color = Color(0.9, 0.35, 0.35, 0.40)
-	line_mat.emission_enabled = true
-	line_mat.emission_color = Color(1.0, 0.4, 0.4)
-	line_mat.emission_energy_multiplier = 0.5
-	line_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	line_mat.no_depth_test = true
-	player._bow_indicator_line = MeshInstance3D.new()
-	player._bow_indicator_line.mesh = BoxMesh.new()
-	player._bow_indicator_line.material_override = line_mat
-	player._bow_indicator_root.add_child(player._bow_indicator_line)
 	var ring_mat := StandardMaterial3D.new()
 	ring_mat.albedo_color = Color(1.0, 0.85, 0.4, 0.45)
 	ring_mat.emission_enabled = true
@@ -212,28 +190,21 @@ static func update_aim(player, delta: float) -> void:
 			player._bow_aim_dir = to_target.normalized()
 	player.rotation.y = atan2(player._bow_aim_dir.x, player._bow_aim_dir.z)
 
-	if player._bow_indicator_root == null or player._bow_indicator_line == null or player._bow_indicator_target == null:
+	if player._bow_indicator_root == null or player._bow_indicator_target == null:
 		return
 	var range_len: float = 25.0 if is_cannon else lerp(16.0, 100.0, player._bow_charge / player._bow_max_charge)
 	var end_pos: Vector3 = player._bow_aim_dir * range_len
 	end_pos.y = plane_y
 
 	player._bow_indicator_root.global_position = player.global_position + Vector3(0, 0.3, 0)
-	player._bow_indicator_line.position = end_pos * 0.5
-	player._bow_indicator_line.mesh.size = Vector3(0.04, 0.04, range_len)
-	player._bow_indicator_line.look_at(player._bow_indicator_root.global_position + end_pos, Vector3.UP)
 	player._bow_indicator_target.global_position = player._bow_indicator_root.global_position + end_pos
 	if player._bow_indicator_aoe:
 		player._bow_indicator_aoe.global_position = player._bow_indicator_target.global_position
 
 	if is_cannon:
-		player._bow_indicator_line.material_override.albedo_color = Color(0.8, 0.3, 0.3, 0.35)
 		player._bow_indicator_target.material_override.albedo_color = Color(1.0, 0.8, 0.3, 0.40)
 	else:
 		var cp: float = player._bow_charge / player._bow_max_charge
-		var line_color := Color.WHITE.lerp(Color(1.0, 0.3, 0.1), cp)
-		line_color.a = 0.30
-		player._bow_indicator_line.material_override.albedo_color = line_color
 		var ring_color := Color(1.0, 0.8, 0.3).lerp(Color(1.0, 0.2, 0.1), cp)
 		ring_color.a = 0.35
 		player._bow_indicator_target.material_override.albedo_color = ring_color
@@ -263,29 +234,20 @@ static func _update_aim_tps(player, delta: float, is_cannon: bool) -> void:
 	var use_dist: float = min(aim_dist, range_len)
 	var end_pos: Vector3 = muzzle + to_target.normalized() * use_dist
 
-	if player._bow_indicator_root == null or player._bow_indicator_line == null or player._bow_indicator_target == null:
+	if player._bow_indicator_root == null or player._bow_indicator_target == null:
 		return
 	var plane_y: float = player.global_position.y
 
 	var shown_from: Vector3 = player.global_position + Vector3(0, 0.6, 0)
-	var shown_to: Vector3 = end_pos
-	shown_to.y = max(shown_to.y, plane_y + 0.1)
 	player._bow_indicator_root.global_position = shown_from
-	player._bow_indicator_line.position = (shown_to - shown_from) * 0.5
-	player._bow_indicator_line.mesh.size = Vector3(0.04, 0.04, shown_from.distance_to(shown_to))
-	player._bow_indicator_line.look_at(shown_to, Vector3.UP)
 	player._bow_indicator_target.global_position = Vector3(end_pos.x, max(end_pos.y, plane_y + 0.1), end_pos.z)
 	if player._bow_indicator_aoe:
 		player._bow_indicator_aoe.global_position = player._bow_indicator_target.global_position
 
 	if is_cannon:
-		player._bow_indicator_line.material_override.albedo_color = Color(0.8, 0.3, 0.3, 0.35)
 		player._bow_indicator_target.material_override.albedo_color = Color(1.0, 0.8, 0.3, 0.40)
 	else:
 		var cp: float = player._bow_charge / player._bow_max_charge
-		var line_color := Color.WHITE.lerp(Color(1.0, 0.3, 0.1), cp)
-		line_color.a = 0.30
-		player._bow_indicator_line.material_override.albedo_color = line_color
 		var ring_color := Color(1.0, 0.8, 0.3).lerp(Color(1.0, 0.2, 0.1), cp)
 		ring_color.a = 0.35
 		player._bow_indicator_target.material_override.albedo_color = ring_color

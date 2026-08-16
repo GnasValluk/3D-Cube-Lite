@@ -92,7 +92,6 @@ var _aim_world_point: Vector3 = Vector3.ZERO
 var _aim_tp_mode: bool = false
 var _mortar_launch_h: float = 0.0
 var _mortar_launch_v: float = 0.0
-var _bow_indicator_line: MeshInstance3D = null
 var _bow_indicator_target: MeshInstance3D = null
 var _bow_indicator_aoe: MeshInstance3D = null
 var _bow_indicator_root: Node3D = null
