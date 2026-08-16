@@ -119,7 +119,8 @@ func _ready() -> void:
 	# ── 5d. bắn liên tục → súng không trôi khỏi vị trí cầm gốc ────────────
 	player._ak_hold_captured = false
 	player._ak_recoil = 0.0
-	_AK.update_pose(player, 1.0 / 60.0)
+	for i in 60:
+		_AK.update_pose(player, 1.0 / 60.0)
 	var base_hold: Vector3 = player._mesh.weapon_pivot.position
 	player._bow_aim_dir = -player.global_transform.basis.z.normalized()
 	for shot in 30:

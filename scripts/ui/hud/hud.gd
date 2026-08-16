@@ -80,6 +80,7 @@ var _zoom_slider_label: Label
 var _last_tp_zoom: float = -1.0
 var _hud_throttle: float = 0.0
 var _crosshair: Control = null
+var _scope_overlay: ColorRect = null
 
 const _Dim = preload("res://scripts/world/dimension_defs.gd")
 const _Village = preload("res://scripts/world/chunk/village.gd")
@@ -248,6 +249,7 @@ func _setup_ui() -> void:
 	_setup_debug_menu()
 	_setup_mobile_controls()
 	_setup_crosshair()
+	_setup_scope_overlay()
 
 ## FPS-style crosshair (chỉ hiện khi đang ngắm vũ khí ở góc 3).
 func _setup_crosshair() -> void:
@@ -279,6 +281,21 @@ func _setup_crosshair() -> void:
 	dot.size = Vector2(3, 3)
 	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_crosshair.add_child(dot)
+
+## Ống ngắm M200: ColorRect toàn màn hình dùng shader lens — ẩn ngoại cảnh,
+## giữ vòng kính + reticle, để lộ 3D thế giới qua kính (camera 3 chuột đã zoom).
+func _setup_scope_overlay() -> void:
+	_scope_overlay = ColorRect.new()
+	_scope_overlay.name = "ScopeOverlay"
+	_scope_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_scope_overlay.color = Color(0, 0, 0, 1)
+	_scope_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_scope_overlay.visible = false
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://scripts/ui/hud/scope_lens.gdshader") as Shader
+	mat.set_shader_parameter("lens_radius", 0.42)
+	_scope_overlay.material = mat
+	add_child(_scope_overlay)
 
 ## Ẩn con trỏ chuột khi đang chơi (không mở menu nào); hiện lại khi mở UI.
 ## Cam 3 (TPS): khóa chuột vào giữa màn hình (MOUSE_MODE_CAPTURED) để xoay
@@ -504,17 +521,23 @@ func _process(delta: float) -> void:
 		_build_hint.text = ""
 
 	# Crosshair FPS: chỉ hiện khi ngắm vũ khí tầm xa ở góc 3 (nỏ/cối/pháo dưa hấu).
+	# M200: hiện ống ngắm scope (lens + reticle) thay cho crosshair.
 	var _cross_player := _find_player_character()
 	var _cross_show := false
-	if _crosshair and _cross_player and _cross_player._use_tp and _cross_player._bow_aiming:
+	var _scope_show := false
+	if _scope_overlay and _cross_player and _cross_player._use_tp and _cross_player._bow_aiming:
 		if _cross_player.equipped_weapon != null:
 			var _wid: String = _cross_player.equipped_weapon.id
-			if _wid == "crossbow" or _wid == "watermelon_cannon" or _wid == "pumpkin_mortar" or _wid == "ak_12":
+			if _wid == "m200":
+				_scope_show = true
+			elif _wid == "crossbow" or _wid == "watermelon_cannon" or _wid == "pumpkin_mortar" or _wid == "ak_12":
 				_cross_show = true
 	if _crosshair:
 		_crosshair.visible = _cross_show
 		if _cross_show:
 			_crosshair.position = get_viewport().get_visible_rect().size * 0.5
+	if _scope_overlay:
+		_scope_overlay.visible = _scope_show
 
 	_sync_mouse_visibility()
 

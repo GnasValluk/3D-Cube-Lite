@@ -206,6 +206,7 @@ CREATURE_3D_VIEW,3D Preview,Xem 3D
 CREATURE_BUTTON,Library,Thư viện
 BOW_NO_ARROWS,No arrows!,Hết tên! Chế tạo thêm.
 NO_AK_AMMO,No ammo! Craft 7.62mm bullets.,Hết đạn! Chế tạo đạn 7,62mm.
+NO_M200_AMMO,No ammo! Craft .338 Lapua bullets.,Hết đạn .338 Lapua! Chế tạo thêm.
 LIB_SEARCH_HINT,Search items... (name or id),Tìm đồ... (tên hoặc id)
 PARTY_CLOSE_HINT,"ESC / P — Close","ESC / P — Đóng"
 PARTY_CONFIRM,Confirm,XÁC NHẬN

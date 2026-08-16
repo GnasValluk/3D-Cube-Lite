@@ -6,6 +6,7 @@ const _BlockData := preload("res://scripts/world/chunk/chunk_block_data.gd")
 const _Data := preload("res://scripts/world/chunk/chunk_data.gd")
 const _Bow := preload("player_bow.gd")
 const _AK := preload("player_ak.gd")
+const _M200 := preload("player_m200.gd")
 const _Mortar := preload("player_mortar.gd")
 const _EggThrow := preload("player_egg_throw.gd")
 const _Halberd := preload("player_halberd.gd")
@@ -103,6 +104,12 @@ var _bow_indicator_target: MeshInstance3D = null
 var _bow_indicator_aoe: MeshInstance3D = null
 var _bow_indicator_root: Node3D = null
 var _bow_string_node: Node3D = null
+## Súng bắn tỉa M200: cờ đang ngắm kính + thời gian hồi thoi nòng.
+var _m200_aiming: bool = false
+var _m200_bolt_cd: float = 0.0
+var _m200_hold_base: Vector3 = Vector3.ZERO
+var _m200_hold_captured: bool = false
+var _m200_recoil: float = 0.0
 
 const HALBERD_CHARGE_TIME: float = 0.7
 const HALBERD_MIN_RANGE: float = 6.0
@@ -797,11 +804,20 @@ func _update_weapon_mesh() -> void:
 			_Bow.cancel_aim(self)
 		_ak_recoil = 0.0
 		_ak_hold_captured = false
+		_m200_aiming = false
+		_m200_bolt_cd = 0.0
+		_m200_recoil = 0.0
+		_m200_hold_captured = false
 		return
-	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight", "ak_12", "bullet_762mm"]:
+	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight", "ak_12", "bullet_762mm", "m200", "bullet_338mm"]:
 		if item_id != "ak_12":
 			_ak_recoil = 0.0
 			_ak_hold_captured = false
+		if item_id != "m200":
+			_m200_aiming = false
+			_m200_bolt_cd = 0.0
+			_m200_recoil = 0.0
+			_m200_hold_captured = false
 		ToolsMesh.build_held(pivot, item_id)
 		if item_id == "crossbow":
 			_bow_string_node = null
@@ -931,6 +947,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			_stop_mining()
 			_stop_eating()
 		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _bow_aiming:
+			if equipped_weapon != null and equipped_weapon.id == "m200":
+				# M200: nhả LMB = bắn 1 phát (kèm hồi thoi nòng).
+				_M200.fire(self)
+				return
 			if equipped_weapon != null and equipped_weapon.id == "ak_12":
 				# Nhả LMB: dừng bắn, ADS vẫn giữ (bật/tắt bằng RMB).
 				return
@@ -1025,6 +1045,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if equipped_weapon != null:
 				match equipped_weapon.id:
 					"ak_12": _AK.start_fire(self); return
+					"m200": _M200.start_aim(self); return
 					"crossbow": _Bow.start_aim(self); return
 					"pumpkin_mortar": _Mortar.start_aim(self); return
 					"watermelon_cannon": _Bow.start_cannon_aim(self); return
@@ -1320,6 +1341,9 @@ func _process(delta: float) -> void:
 	_process_mining(delta)
 	_Bow.update_pose(self)
 	_AK.update_pose(self, delta)
+	_M200.update_pose(self, delta)
+	if _m200_bolt_cd > 0.0:
+		_m200_bolt_cd = maxf(_m200_bolt_cd - delta, 0.0)
 	if equipped_weapon != null and equipped_weapon.id == "iron_halberd":
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			if _halberd_charge_time < 0.0:
@@ -1332,7 +1356,9 @@ func _process(delta: float) -> void:
 	if _bow_aiming:
 		if _state == State.HIT:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-			if equipped_weapon != null and equipped_weapon.id == "ak_12":
+			if equipped_weapon != null and equipped_weapon.id == "m200":
+				_M200.cancel_aim(self)
+			elif equipped_weapon != null and equipped_weapon.id == "ak_12":
 				_AK.cancel_aim(self)
 			elif _is_egg_aiming():
 				_EggThrow.cancel_aim(self)
@@ -1342,7 +1368,9 @@ func _process(delta: float) -> void:
 				_Bow.cancel_aim(self)
 		else:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
-			if equipped_weapon != null and equipped_weapon.id == "ak_12":
+			if equipped_weapon != null and equipped_weapon.id == "m200":
+				_Bow.update_aim(self, delta)
+			elif equipped_weapon != null and equipped_weapon.id == "ak_12":
 				_Bow.update_aim(self, delta)
 				_AK.update_fire(self, delta)
 			elif _is_egg_aiming():

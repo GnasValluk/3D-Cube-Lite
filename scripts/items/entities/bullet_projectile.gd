@@ -1,8 +1,15 @@
 class_name BulletProjectile
 extends Area3D
 
-## Đạn 7,62mm của AK-12 — bay thẳng cực nhanh, xuyên theo đường sweep,
+## Đạn của súng trường/sniper — bay thẳng cực nhanh, xuyên theo đường sweep,
 ## tắt khi hết tầm. Không rớt lại item (khác mũi tên nỏ).
+##
+## Dễ dính địch nhờ: bán kính sweep rộng + "aim-assist" kéo đầu đạn về phía
+## địch nằm sát đường bay (trong phạm vi cho phép) thay vì trượt qua.
+
+const HIT_RADIUS: float = 0.16
+## Bán kính tìm mục tiêu quanh đầu đạn để bám — chỉ bám trong khoảng cách bước đạn.
+const ASSIST_RADIUS: float = 0.6
 
 var _damage: int = 8
 var _shooter: Node = null
@@ -27,7 +34,7 @@ func _ready() -> void:
 	add_to_group("bullets")
 	var col := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = 0.08
+	shape.radius = HIT_RADIUS
 	col.shape = shape
 	add_child(col)
 	_sweep_shape = shape
@@ -96,12 +103,62 @@ func _physics_process(delta: float) -> void:
 					queue_free()
 					return
 			else:
+				# Đường bay tự do — thử bám tới địch sát đường bay trước khi bay tiếp.
+				if _try_assist(space, step):
+					return
 				global_position += step
+		else:
+			if _try_assist(space, step):
+				return
+			global_position += step
 	_dist_traveled += step.length()
 	_spawn_dist += step.length()
 	_spawn_trail()
 	if _dist_traveled >= _max_range:
 		queue_free()
+
+## Aim-assist: nếu đường bay tự do (không trúng tường) nhưng có địch sống nằm
+## trong ASSIST_RADIUS quanh đầu đạn, kéo đạn bám về phía địch ngay trong bước
+## di chuyển này — giúp trúng dễ hơn trong gameplay. Trả true nếu đã kết thúc đạn.
+func _try_assist(space: PhysicsDirectSpaceState3D, step: Vector3) -> bool:
+	var end_pos: Vector3 = global_position + step
+	var q := PhysicsShapeQueryParameters3D.new()
+	var sph := SphereShape3D.new()
+	sph.radius = ASSIST_RADIUS
+	q.shape = sph
+	q.transform = Transform3D(Basis.IDENTITY, end_pos)
+	q.collide_with_areas = false
+	q.collide_with_bodies = true
+	if _shooter is CollisionObject3D:
+		q.exclude = [_shooter.get_rid()]
+	var hits := space.intersect_shape(q, 8)
+	var nearest: Node3D = null
+	var nearest_dist: float = ASSIST_RADIUS + 1.0
+	for h in hits:
+		var body: Node = h.get("collider")
+		if body == null or body == _shooter:
+			continue
+		if body is CharacterBase and body.is_alive:
+			var nb: Node3D = body as Node3D
+			var d: float = global_position.distance_to(nb.global_position)
+			if d < nearest_dist:
+				nearest_dist = d
+				nearest = nb
+	if nearest == null:
+		return false
+	var to_target := (nearest.global_position + Vector3(0, 0.4, 0)) - global_position
+	var assist_len: float = min(to_target.length(), step.length() * 1.6)
+	var assist_step: Vector3 = to_target.normalized() * maxf(assist_len, 0.0)
+	# Chỉ bám khi mục tiêu nằm phía trước theo hướng bay trội hơn.
+	if to_target.normalized().dot(_direction) < 0.1:
+		return false
+	global_position += assist_step
+	_dist_traveled += assist_step.length()
+	_spawn_dist += assist_step.length()
+	_hit_something = true
+	_resolve_hit(space)
+	queue_free()
+	return true
 
 func _resolve_hit(space: PhysicsDirectSpaceState3D) -> void:
 	var q := PhysicsShapeQueryParameters3D.new()
