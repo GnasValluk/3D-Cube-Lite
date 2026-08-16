@@ -80,6 +80,61 @@ func _ready() -> void:
 			anim.animate(0.016)
 		_check(not _has_nan(mesh), "no NaN sau %s" % name)
 
+	# ── Gait engine: chân trụ KHÔNG trượt + spring hội tụ ─────────────────────
+	player._state = CharacterBase.State.WALK
+	player.velocity = Vector3(5, 0, 0)
+	var prev_l := Vector3.ZERO
+	var prev_r := Vector3.ZERO
+	var have_l := false
+	var have_r := false
+	var max_slide := 0.0
+	var max_gap_l := 0.0
+	var max_gap_r := 0.0
+	var stance_frac := 0.6
+	var settle := 60
+	for f in range(260):
+		player.global_position += Vector3(5 * 0.016, 0, 0)
+		player._time += 0.016
+		anim.animate(0.016)
+		if f < settle:
+			continue
+		var lp: float = fmod(anim._step_phase, 1.0)
+		var rp: float = fmod(anim._step_phase + 0.5, 1.0)
+		var fl: Node3D = mesh.bones.get("foot_l") as Node3D
+		var fr: Node3D = mesh.bones.get("foot_r") as Node3D
+		if fl != null:
+			var w := fl.global_position
+			if lp < stance_frac:
+				max_gap_l = maxf(max_gap_l, w.distance_to(anim._plant_l))
+				if have_l:
+					max_slide = maxf(max_slide, w.distance_to(prev_l))
+				prev_l = w
+				have_l = true
+			else:
+				have_l = false
+		if fr != null:
+			if rp < stance_frac:
+				var w := fr.global_position
+				max_gap_r = maxf(max_gap_r, w.distance_to(anim._plant_r))
+				if have_r:
+					max_slide = maxf(max_slide, w.distance_to(prev_r))
+				prev_r = w
+				have_r = true
+			else:
+				have_r = false
+	# Slide <= 6cm/frame-stance trong nghệ thuật blocky là chân trụ; ngưỡng 0.06m.
+	_check(max_slide < 0.06, "chân trụ KHÔNG trượt khi walk (max %.4fm)" % max_slide)
+	_check(not _has_nan(mesh), "no NaN sau gait long-run")
+	var sp: float = anim._sp_val.get("step_speed", 0.0)
+	_check(anim._gait == 1 and absf(sp - 5.0) < 0.6, "step_speed hội tụ về vận tốc (%.2f)" % sp)
+	var all_finite := true
+	for k in anim._sp_val:
+		var v: float = anim._sp_val[k]
+		var u: float = anim._sp_vel.get(k, 0.0)
+		if not (is_finite(v) and is_finite(u)):
+			all_finite = false
+	_check(all_finite, "spring state hữu hạn (no NaN/inf)")
+
 	player._state = CharacterBase.State.HIT
 	player._hit_timer = 0.18
 	for f in range(20):

@@ -218,12 +218,12 @@ func _build_arm_chain(parent: Node3D, side: String) -> void:
 		gauntlet_r_pivot = g_pivot
 
 func _build_leg_chain(parent: Node3D, side: String) -> void:
-	var ca := _bone(parent, "calf_%s" % side, Vector3(0, -0.33, 0))
+	var ca := _bone(parent, "calf_%s" % side, Vector3(0, -0.48, 0))
 	if side == "l":
 		knee_l = ca
 	else:
 		knee_r = ca
-	var fo := _bone(ca, "foot_%s" % side, Vector3(0, -0.30, 0))
+	var fo := _bone(ca, "foot_%s" % side, Vector3(0, -0.48, 0))
 	_bone(fo, "toe_%s" % side, Vector3(0, -0.035, 0.14))
 	var l_pivot := MeshBuilder.pivot(parent, Vector3(0, -0.05, -0.02))
 	l_pivot.name = "LegArmor%sPivot" % ("L" if side == "l" else "R")
