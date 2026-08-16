@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://vst6qm2y7rn"
-path="res://.godot/imported/wraith_tear.png-f3ef42eb335e8503a88836b01ee3e657.ctex"
+uid="uid://bcshvpsng40t7"
+path="res://.godot/imported/sunflower.png-e8e90a70d0ccdbd0f360a256c2f193c9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icon_items/wraith_tear.png"
-dest_files=["res://.godot/imported/wraith_tear.png-f3ef42eb335e8503a88836b01ee3e657.ctex"]
+source_file="res://assets/icon_items/sunflower.png"
+dest_files=["res://.godot/imported/sunflower.png-e8e90a70d0ccdbd0f360a256c2f193c9.ctex"]
 
 [params]
 

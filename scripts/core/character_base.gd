@@ -862,27 +862,6 @@ func _do_melee_hit() -> void:
 					sn.take_damage(dmg, self)
 					landed = true
 
-	# Also hit plains monsters (Bóng Đêm) trong đêm
-	for grp in ["wraith"]:
-		var pm_nodes := get_tree().get_nodes_in_group(grp)
-		for mn in pm_nodes:
-			if not is_instance_valid(mn) or not mn.get("is_alive"):
-				continue
-			var offset: Vector3 = mn.global_position - global_position
-			offset.y = 0.0
-			var dist: float = offset.length()
-			if dist <= max_dist + mn.hit_radius:
-				var dot: float = fwd.dot(offset / dist)
-				if dot >= angle_threshold:
-					SFXManager.play_damage_hit()
-					var dmg: int = attack_power
-					if _is_player:
-						var pc := self as PlayerCharacter
-						if pc and pc.equipped_weapon:
-							dmg += pc.equipped_weapon.atk_bonus
-					mn.take_damage(dmg, self)
-					landed = true
-
 	# Also hit destroyable props (đèn, cây, v.v.)
 	var weapon_id: String = ""
 	if _is_player:

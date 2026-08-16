@@ -15,7 +15,6 @@
 [ext_resource type="Script" path="res://scripts/world/weather/rain_manager.gd" id="18"]
 [ext_resource type="Script" uid="uid://b5ovd1swrpgop" path="res://scripts/characters/pig/pig_spawner.gd" id="19"]
 [ext_resource type="Script" path="res://scripts/characters/slime/slime_spawner.gd" id="20"]
-[ext_resource type="Script" path="res://scripts/characters/plains_monster_spawner.gd" id="21"]
 
 [node name="OpenWorldThucTe" type="Node3D" unique_id=708082117]
 
@@ -83,15 +82,6 @@ pack_spawn_radius = 45.0
 despawn_distance = 90.0
 check_interval = 6.0
 scan_attempts = 10
-
-[node name="PlainsMonsterSpawner" type="Node3D" parent="."]
-script = ExtResource("21")
-max_packs = 5
-pack_spacing = 40.0
-pack_spawn_radius = 50.0
-despawn_distance = 95.0
-check_interval = 6.0
-scan_attempts = 14
 
 [node name="LotusLightManager" type="Node" parent="." unique_id=1239342789]
 script = ExtResource("16")

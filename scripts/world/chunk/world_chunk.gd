@@ -31,6 +31,7 @@ const _SeaPlantProp = preload("res://scripts/world/props/sea_plant_prop.gd")
 const _SwampTreeProp = preload("res://scripts/world/props/swamp_tree_prop.gd")
 const _SwampSedgeProp = preload("res://scripts/world/props/swamp_sedge_prop.gd")
 const _DuckweedProp = preload("res://scripts/world/props/duckweed_prop.gd")
+const _PlainsFloraProp = preload("res://scripts/world/props/plains_flora_prop.gd")
 const _FarPropPool = preload("res://scripts/world/props/far_prop_pool.gd")
 
 ## Bán kính Chebyshev (chunk) giới hạn vòng prop tương tác: chunk TRONG vòng này
@@ -1781,6 +1782,40 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
 					plant_props.append({"type": "pumpkin", "pos": Vector3(px, y, pz), "variant": "wild"})
 
+	# ── 8g2. Hoa & thực vật mới — CHỈ đồng bằng (GRASS_DIRT) ──────────────────
+	# Bụi dâu dại, cỏ ba lá, hướng dương, tu líp, hồng. Cỏ ba lá phổ biến nhất,
+	# hoa thưa hơn; tránh đường đi và vùng ngập. Chặt đứt (tay/kiếm) rơi item.
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var fl_bio: int = biome_grid[vx][vz]
+				if fl_bio != _Data.TileType.GRASS_DIRT:
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if road_grid[vx * cols + vz] != 0:
+					continue
+				if wdist[vx * cols + vz] <= 1:
+					continue
+				var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+				var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+				if _is_on_road(world_ox + px, world_oz + pz):
+					continue
+				var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+				var pos := Vector3(px, y, pz)
+				var r: float = randf()
+				if r < 0.0035:
+					plant_props.append({"type": "clover", "pos": pos, "variant": "plains"})
+				elif r < 0.0050:
+					plant_props.append({"type": "wild_berry", "pos": pos, "variant": "plains"})
+				elif r < 0.0060:
+					plant_props.append({"type": "sunflower", "pos": pos, "variant": "plains"})
+				elif r < 0.0068:
+					plant_props.append({"type": "tulip", "pos": pos, "variant": "plains"})
+				elif r < 0.0074:
+					plant_props.append({"type": "rose", "pos": pos, "variant": "plains"})
+
 	# ── 8h. Cây cam — bờ nước (xa nước 2-3 ô) & trung tâm đồng cỏ tối ────────
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		for vx in range(cols):
@@ -3200,6 +3235,12 @@ func _process(delta: float) -> void:
 			var prop := _DuckweedProp.new(10, DestroyableProp.WeaponReq.NONE, "duckweed")
 			prop.position = pd["pos"]
 			prop.setup()
+			_spawn_prop_child(prop)
+		elif ptype == "clover" or ptype == "wild_berry" or ptype == "sunflower" \
+				or ptype == "tulip" or ptype == "rose":
+			var prop := _PlainsFloraProp.new(30, DestroyableProp.WeaponReq.NONE, ptype)
+			prop.position = pd["pos"]
+			prop.setup(pd.get("variant", "plains"))
 			_spawn_prop_child(prop)
 		elif ptype == "kelp_tall":
 			var prop := _SeaPlantProp.new(45, DestroyableProp.WeaponReq.SWORD, ptype)
