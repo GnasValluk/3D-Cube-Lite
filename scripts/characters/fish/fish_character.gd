@@ -196,6 +196,7 @@ func _physics_process(delta: float) -> void:
 	_wall_cooldown -= delta
 	_wall_memory_timer = max(0.0, _wall_memory_timer - delta)
 	_alert_check_cooldown -= delta
+	_invul_timer = max(_invul_timer - delta, 0.0)
 	if _flee_timer > 0.0:
 		_flee_timer -= delta
 	if _alert_timer > 0.0:

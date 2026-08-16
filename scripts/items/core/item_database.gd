@@ -301,49 +301,53 @@ static func _add(db: Dictionary, id: String, name: String, type: int, color: Col
 	db[id].weight = WEIGHTS.get(id, _default_weight(type))
 
 ## Trọng lượng riêng theo từng item (override mặc định theo loại).
+## Đã tái cân bằng toàn bộ so với giới hạn tải 100 của người chơi: trước đây
+## 1 stack 64 khối nặng 128 → vượt trần 100 ngay, gần như vật phẩm nào cũng
+## "quá nặng". Nay các vật nặng nhất (máy móc) ≈ 8-12, khối xây ≈ 0.4-0.6/khối
+## (stack 64 ≈ 25-38), còn máy móc lớn vẫn nặng nhất để quá tải có ý nghĩa.
 const WEIGHTS: Dictionary = {
-	"chest": 8.0, "crafting_table": 6.0, "furnace": 10.0, "twilight_gate": 20.0,
-	"cooking_stove": 9.0,
-	"tool_table": 7.0, "mech_table": 9.0, "farm_table": 7.0, "chem_table": 8.0,
-	"magic_table": 8.0, "kitchen_table": 7.0, "architecture_table": 9.0,
-	"pickaxe": 4.0, "shovel": 4.0, "axe": 5.0, "hoe": 3.0,
-	"iron_sword": 4.0, "iron_greatsword": 8.0, "iron_halberd": 9.0,
-	"crossbow": 6.0, "fishing_rod": 2.0, "watermelon_cannon": 14.0,
-	"pumpkin_mortar": 12.0, "leather_gloves": 1.5,
-	"watermelon": 6.0, "pumpkin": 5.0, "jack_o_lantern": 5.0,
-	"coconut": 2.0, "orange": 0.3, "eggplant_fruit": 0.8,
-	"eggplant_slice": 0.3, "watermelon_slice": 0.4, "pumpkin_slice": 0.3,
-	"eggplant_seed": 0.1, "watermelon_seed": 0.1, "pumpkin_seed": 0.1, "orange_seed": 0.1,
-	"coconut_seed": 0.2, "taro_seed": 0.2, "seaweed_seed": 0.1, "seagrass_seed": 0.1,
-	"carp": 1.0, "climbing_perch": 0.8, "red_tilapia": 1.2, "snakehead": 1.5,
-	"flowerhorn": 1.4, "shrimp": 0.4, "raw_pork": 3.0, "taro": 0.6,
-	"tractor": 40.0, "fishing_boat": 50.0, "rescue_helicopter": 55.0,
-	"iron_helmet": 1.5, "iron_chestplate": 4.5, "iron_boots": 1.0,
-	"iron_leggings": 1.8, "mud_crab": 0.6, "cattail": 0.4,
-	"block_mangrove_mud": 2.0, "mangrove_wood": 2.0, "mangrove_seed": 0.2,
-	"block_swamp_mud": 2.0, "block_swamp_dirt": 2.0, "swamp_wood": 2.0,
-	"swamp_seed": 0.2, "swamp_sedge": 0.4, "duckweed": 0.2,
-	"wild_berry": 0.4, "clover": 0.2, "sunflower": 0.4, "sunflower_seed": 0.1,
-	"tulip": 0.35, "tulip_seed": 0.1, "rose": 0.4, "rose_seed": 0.1,
-	"golden_ring": 0.1, "leather_backpack": 2.0,
-	"flashlight": 0.8,
-	"lava_bucket": 0.9,
-	"cooked_pork": 2.8, "baked_taro": 0.6, "cooked_shrimp": 0.35,
-	"grilled_carp": 0.9, "grilled_perch": 0.7, "grilled_tilapia": 1.1,
-	"grilled_snakehead": 1.3, "grilled_flowerhorn": 1.3, "cooked_crab": 0.5,
-	"grilled_eggplant": 0.3, "baked_pumpkin": 0.3,
-	"experience_orb": 0.05,
+	"chest": 2.0, "crafting_table": 1.5, "furnace": 2.5, "twilight_gate": 4.0,
+	"cooking_stove": 2.5,
+	"tool_table": 2.0, "mech_table": 2.5, "farm_table": 2.0, "chem_table": 2.0,
+	"magic_table": 2.0, "kitchen_table": 1.5, "architecture_table": 2.5,
+	"pickaxe": 1.2, "shovel": 1.2, "axe": 1.5, "hoe": 0.8,
+	"iron_sword": 1.2, "iron_greatsword": 3.0, "iron_halberd": 3.5,
+	"crossbow": 1.8, "fishing_rod": 0.6, "watermelon_cannon": 5.0,
+	"pumpkin_mortar": 4.0, "leather_gloves": 0.5,
+	"watermelon": 2.0, "pumpkin": 1.5, "jack_o_lantern": 1.5,
+	"coconut": 0.6, "orange": 0.15, "eggplant_fruit": 0.3,
+	"eggplant_slice": 0.1, "watermelon_slice": 0.15, "pumpkin_slice": 0.1,
+	"eggplant_seed": 0.05, "watermelon_seed": 0.05, "pumpkin_seed": 0.05, "orange_seed": 0.05,
+	"coconut_seed": 0.1, "taro_seed": 0.1, "seaweed_seed": 0.05, "seagrass_seed": 0.05,
+	"carp": 0.5, "climbing_perch": 0.4, "red_tilapia": 0.6, "snakehead": 0.8,
+	"flowerhorn": 0.7, "shrimp": 0.15, "raw_pork": 1.5, "taro": 0.25,
+	"tractor": 8.0, "fishing_boat": 10.0, "rescue_helicopter": 12.0,
+	"iron_helmet": 0.8, "iron_chestplate": 2.0, "iron_boots": 0.5,
+	"iron_leggings": 0.9, "mud_crab": 0.3, "cattail": 0.2,
+	"block_mangrove_mud": 0.6, "mangrove_wood": 0.6, "mangrove_seed": 0.1,
+	"block_swamp_mud": 0.6, "block_swamp_dirt": 0.6, "swamp_wood": 0.6,
+	"swamp_seed": 0.1, "swamp_sedge": 0.2, "duckweed": 0.1,
+	"wild_berry": 0.2, "clover": 0.1, "sunflower": 0.2, "sunflower_seed": 0.05,
+	"tulip": 0.15, "tulip_seed": 0.05, "rose": 0.2, "rose_seed": 0.05,
+	"golden_ring": 0.05, "leather_backpack": 1.0,
+	"flashlight": 0.4,
+	"lava_bucket": 0.5,
+	"cooked_pork": 1.4, "baked_taro": 0.2, "cooked_shrimp": 0.15,
+	"grilled_carp": 0.4, "grilled_perch": 0.35, "grilled_tilapia": 0.5,
+	"grilled_snakehead": 0.7, "grilled_flowerhorn": 0.7, "cooked_crab": 0.25,
+	"grilled_eggplant": 0.15, "baked_pumpkin": 0.15,
+	"experience_orb": 0.02,
 }
 
 static func _default_weight(type: int) -> float:
 	match type:
-		ItemDef.Type.BLOCK:    return 2.0
-		ItemDef.Type.TOOL:     return 3.0
-		ItemDef.Type.WEAPON:   return 4.0
-		ItemDef.Type.ARMOR:    return 3.0
-		ItemDef.Type.FOOD:     return 0.5
-		ItemDef.Type.MATERIAL: return 1.0
-	return 1.0
+		ItemDef.Type.BLOCK:    return 0.4
+		ItemDef.Type.TOOL:     return 1.5
+		ItemDef.Type.WEAPON:   return 2.0
+		ItemDef.Type.ARMOR:    return 1.5
+		ItemDef.Type.FOOD:     return 0.2
+		ItemDef.Type.MATERIAL: return 0.3
+	return 0.3
 
 static func load_icon_2d(item_id: String) -> Texture2D:
 	var path := "res://assets/icon_items/%s.png" % item_id

@@ -52,16 +52,16 @@ func _ready() -> void:
 	# ── 3. Trọng lượng item ──────────────────────────────────────────────
 	print("-- 3. ItemDef có trọng lượng --")
 	var db := ItemDatabase.items_db
-	_check((db["chest"] as ItemDef).weight == 8.0, "rương 8.0")
-	_check((db["furnace"] as ItemDef).weight == 10.0, "lò nung 10.0")
-	_check((db["pickaxe"] as ItemDef).weight == 4.0, "cúp sắt 4.0")
-	_check((db["iron_greatsword"] as ItemDef).weight == 8.0, "đại kiếm 8.0")
-	_check((db["watermelon"] as ItemDef).weight == 6.0, "dưa hấu 6.0")
-	_check((db["eggplant_fruit"] as ItemDef).weight == 0.8, "cà tím 0.8")
-	_check((db["eggplant_seed"] as ItemDef).weight == 0.1, "hạt cà tím 0.1")
-	_check(absf((db["carp"] as ItemDef).weight - 1.0) < 0.0001, "cá chép 1.0 (override)")
-	_check(absf((db["block_dirt"] as ItemDef).weight - 2.0) < 0.0001,
-		"block mặc định 2.0 mỗi khối")
+	_check((db["chest"] as ItemDef).weight == 2.0, "rương 2.0")
+	_check((db["furnace"] as ItemDef).weight == 2.5, "lò nung 2.5")
+	_check((db["pickaxe"] as ItemDef).weight == 1.2, "cúp sắt 1.2")
+	_check((db["iron_greatsword"] as ItemDef).weight == 3.0, "đại kiếm 3.0")
+	_check((db["watermelon"] as ItemDef).weight == 2.0, "dưa hấu 2.0")
+	_check((db["eggplant_fruit"] as ItemDef).weight == 0.3, "cà tím 0.3")
+	_check((db["eggplant_seed"] as ItemDef).weight == 0.05, "hạt cà tím 0.05")
+	_check(absf((db["carp"] as ItemDef).weight - 0.5) < 0.0001, "cá chép 0.5 (override)")
+	_check(absf((db["block_dirt"] as ItemDef).weight - 0.4) < 0.0001,
+		"block mặc định 0.4 mỗi khối")
 
 	# ── 4. Tổng trọng lượng kho đồ ───────────────────────────────────────
 	print("-- 4. Inventory.get_total_weight --")
@@ -70,11 +70,11 @@ func _ready() -> void:
 	var heavy := ItemDef.new("test_heavy", "Test", ItemDef.Type.BLOCK, Color.WHITE, "H")
 	heavy.weight = 30.0
 	inv.add_item(egg_seed, 10)
-	_check(absf(inv.get_total_weight() - 1.0) < 0.0001, "10 hạt × 0.1 = 1.0")
+	_check(absf(inv.get_total_weight() - 0.5) < 0.0001, "10 hạt × 0.05 = 0.5")
 	inv.add_item(heavy, 4)
-	_check(absf(inv.get_total_weight() - 121.0) < 0.0001, "10 hạt + 4 khối nặng = 121.0")
+	_check(absf(inv.get_total_weight() - 120.5) < 0.0001, "10 hạt + 4 khối nặng = 120.5")
 	inv.remove_item_by_id("test_heavy", 4)
-	_check(absf(inv.get_total_weight() - 1.0) < 0.0001, "bỏ 4 khối → 1.0")
+	_check(absf(inv.get_total_weight() - 0.5) < 0.0001, "bỏ 4 khối → 0.5")
 
 	# ── 5. Quá tải trên nhân vật ─────────────────────────────────────────
 	print("-- 5. Quá tải: vượt ngưỡng → slow 2, vượt 25% → slow 5 --")

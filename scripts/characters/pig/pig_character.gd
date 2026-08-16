@@ -210,6 +210,8 @@ func _physics_process(delta: float) -> void:
 				queue_free()
 		return
 
+	_invul_timer = max(_invul_timer - delta, 0.0)
+
 	# Water detection every frame (same as player)
 	var was_underwater := _underwater
 	if _water_mgr == null or not _water_mgr.is_inside_tree():
