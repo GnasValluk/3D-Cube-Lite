@@ -87,8 +87,34 @@ func _ready() -> void:
 	_check(spawned_after == spawned_before + 1, "fire_shot spawn 1 BulletProjectile")
 	_check(_count(player.inventory, _IDB.items_db["bullet_762mm"].id) == 9, "bắn 1 phát → còn 9 đạn")
 	_check(player._equipped_durability == dura_before - 1, "bắn → giảm 1 độ bền")
+	_check(player._ak_recoil > 0.0, "bắn → khởi tạo giật nòng")
 	for b in get_tree().get_nodes_in_group("bullets"):
 		b.free()
+
+	# ── 5b. update_pose: giơ súng ngang + tay giữ khi ngắm, hạ khi nghỉ ──
+	var wp: Node3D = player._mesh.weapon_pivot
+	var arm_r: Node3D = player._mesh.arm_r
+	var arm_l: Node3D = player._mesh.arm_l
+	player._bow_aiming = true
+	player._ak_recoil = 0.0
+	for i in 40:
+		_AK.update_pose(player, 1.0 / 60.0)
+	await get_tree().process_frame
+	_check(absf(wp.rotation_degrees.x - 90.0) < 2.0, "ngắm AK → pivot xoay nòng ra trước ~90° (%.1f)" % wp.rotation_degrees.x)
+	_check(arm_r.rotation.x <= -0.40, "ngắm AK → tay phải giơ giữ tay cầm (%.2f)" % arm_r.rotation.x)
+	_check(arm_l.rotation.x <= -0.30, "ngắm AK → tay trái giữ thân súng (%.2f)" % arm_l.rotation.x)
+	player._bow_aiming = false
+	for i in 40:
+		_AK.update_pose(player, 1.0 / 60.0)
+	await get_tree().process_frame
+	_check(arm_r.rotation.x > -0.35, "nghỉ → tay phải hạ xuống (%.2f)" % arm_r.rotation.x)
+
+	# ── 5c. recoil nòng hồi về 0 sau khi bắn ──────────────────────────────
+	player._ak_recoil = 0.8
+	player._bow_aiming = true
+	for i in 120:
+		_AK.update_pose(player, 1.0 / 60.0)
+	_check(player._ak_recoil <= 0.001, "giật nòng hồi về 0")
 
 	# ── 6. Hết đạn → chuyển ngắm, không spawn ─────────────────────────────
 	player.inventory.remove_item_by_id(_IDB.items_db["bullet_762mm"].id, 99)

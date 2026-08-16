@@ -36,6 +36,7 @@ static func start_fire(player) -> void:
 	player._bow_aiming = true
 	player._bow_charge = 0.0
 	player._ak_fire_cooldown = 0.0
+	player._ak_recoil = 0.0
 	_setup_indicator(player)
 
 static func _setup_indicator(player) -> void:
@@ -120,44 +121,143 @@ static func fire_shot(player) -> void:
 	bullet.setup(dir, base_dmg, AK_BULLET_SPEED, AK_RANGE, player)
 
 	SFXManager.play_gun_shot()
-	_muzzle_flash(player, spawn_from)
-	_kick(player)
+	_muzzle_flash(player, spawn_from, dir)
+	_kick(player, dir)
 
-static func _muzzle_flash(player, pos: Vector3) -> void:
+## Pose cầm/ngắm AK-12: giơ súng ngang, hai tay giữ súng khi bắn, hạ thấp khi nghỉ.
+static func update_pose(player, delta: float) -> void:
+	if player._mesh == null or player._mesh.weapon_pivot == null or player._mesh.arm_r == null:
+		return
+	if player.equipped_weapon == null or player.equipped_weapon.id != "ak_12":
+		return
+	var wp: Node3D = player._mesh.weapon_pivot
+	var is_ak_aiming: bool = player._bow_aiming
+	# Súng luôn xoay nòng ra trước (giống tư thế nỏ).
+	var target_rot: Vector3 = Vector3(90, 0, 0)
+	# Giật nhẹ khi bắn: nòng nhích lên, từ từ về lại.
+	player._ak_recoil = maxf(player._ak_recoil - delta * 3.0, 0.0)
+	target_rot.x += player._ak_recoil * 3.0
+	wp.rotation_degrees = wp.rotation_degrees.lerp(target_rot, 0.15)
+	if is_ak_aiming:
+		# Tay phải đẩy tay cầm, tay trái giữ thân — tư thế ngắm bắn
+		player._mesh.arm_r.rotation.x = lerp(player._mesh.arm_r.rotation.x, -0.55, 0.15)
+		player._mesh.arm_r.rotation.z = lerp(player._mesh.arm_r.rotation.z, -0.06, 0.12)
+		player._mesh.arm_l.rotation.x = lerp(player._mesh.arm_l.rotation.x, -0.42, 0.15)
+		player._mesh.arm_l.rotation.z = lerp(player._mesh.arm_l.rotation.z, 0.18, 0.12)
+	else:
+		# Cầm súng hạ thấp, nghỉ ngơi
+		player._mesh.arm_r.rotation.x = lerp(player._mesh.arm_r.rotation.x, -0.22, 0.12)
+		player._mesh.arm_l.rotation.x = lerp(player._mesh.arm_l.rotation.x, -0.14, 0.12)
+		player._mesh.arm_l.rotation.z = lerp(player._mesh.arm_l.rotation.z, 0.10, 0.12)
+
+## Ánh lửa nòng: chùm sáng hình nón + lõi sáng + tia lửa bắn về hướng đạn.
+static func _muzzle_flash(player, pos: Vector3, dir: Vector3) -> void:
 	var world: Node = player.get_tree().current_scene
 	if world == null:
 		return
-	var mat := MeshBuilder.emit_mat(
-		Color(1.0, 0.85, 0.4, 0.9),
-		Color(1.0, 0.8, 0.4), 5.0)
-	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	var mi := MeshInstance3D.new()
+
+	# Lõi sáng rực phía đầu nòng
+	var core_mat := MeshBuilder.emit_mat(
+		Color(1.0, 0.9, 0.55, 1.0),
+		Color(1.0, 0.8, 0.4), 8.0)
+	core_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var core := MeshInstance3D.new()
 	var sph := SphereMesh.new()
 	sph.radius = 0.05
 	sph.height = 0.10
-	mi.mesh = sph
-	mi.material_override = mat
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	world.add_child(mi)
-	mi.global_position = pos
-	var tw: Tween = mi.create_tween().set_parallel()
-	tw.tween_property(mi, "scale", Vector3(0.25, 0.25, 0.25), 0.06)
-	tw.tween_property(mat, "albedo_color:a", 0.0, 0.12)
-	tw.tween_property(mat, "emission_energy_multiplier", 0.0, 0.12)
-	tw.tween_callback(mi.queue_free).set_delay(0.15)
+	core.mesh = sph
+	core.material_override = core_mat
+	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(core)
+	core.global_position = pos
+	var tw: Tween = core.create_tween()
+	tw.tween_property(core, "scale", Vector3(0.28, 0.28, 0.28), 0.05)
+	tw.tween_property(core, "scale", Vector3(0.10, 0.10, 0.10), 0.10).set_delay(0.05)
+	tw.tween_property(core_mat, "albedo_color:a", 0.0, 0.10).set_delay(0.05)
+	tw.tween_property(core_mat, "emission_energy_multiplier", 0.0, 0.10).set_delay(0.05)
+	tw.tween_callback(core.queue_free).set_delay(0.16)
 
-static func _kick(player) -> void:
+	# Chùm lửa hình nón phóng về phía nòng (theo hướng bắn)
+	var flame_mat := MeshBuilder.emit_mat(
+		Color(1.0, 0.7, 0.3, 0.9),
+		Color(1.0, 0.6, 0.2), 7.0)
+	flame_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flame_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var flame := MeshInstance3D.new()
+	var fmesh := CylinderMesh.new()
+	fmesh.top_radius = 0.015
+	fmesh.bottom_radius = 0.05
+	fmesh.height = 0.30
+	fmesh.radial_segments = 8
+	flame.mesh = fmesh
+	flame.material_override = flame_mat
+	flame.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	world.add_child(flame)
+	flame.global_position = pos + dir * 0.15
+	flame.global_basis = _align_y_to(flame.global_basis, dir)
+	var ftw: Tween = flame.create_tween().set_parallel()
+	ftw.tween_property(flame, "scale", Vector3(1.4, 1.6, 1.4), 0.05)
+	ftw.tween_property(flame_mat, "albedo_color:a", 0.0, 0.11)
+	ftw.tween_property(flame_mat, "emission_energy_multiplier", 0.0, 0.11)
+	ftw.tween_callback(flame.queue_free).set_delay(0.12)
+
+	# Tia lửa văng về phía trước
+	for i in 4:
+		var spark_mat := MeshBuilder.emit_mat(
+			Color(1.0, 0.75, 0.3, 1.0),
+			Color(1.0, 0.65, 0.25), 6.0)
+		spark_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		spark_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var spark := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = 0.012
+		sm.height = 0.024
+		spark.mesh = sm
+		spark.material_override = spark_mat
+		spark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		world.add_child(spark)
+		spark.global_position = pos + dir * 0.08
+		var sdir := (dir + _rand_side(dir) * randf_range(-0.6, 0.6)).normalized()
+		var stw: Tween = spark.create_tween().set_parallel()
+		stw.tween_property(spark, "global_position", spark.global_position + sdir * randf_range(0.35, 0.7), 0.10)
+		stw.tween_property(spark_mat, "albedo_color:a", 0.0, 0.10)
+		stw.tween_property(spark_mat, "emission_energy_multiplier", 0.0, 0.10)
+		stw.tween_callback(spark.queue_free).set_delay(0.11)
+
+## Giật nòng (recoil): tween nhẹ trên rotation/pivot theo đúng tư thế cầm,
+## không đặt cứng lại vị trí gốc — trả về tư thế cầm hiện tại của pose.
+static func _kick(player, dir: Vector3) -> void:
 	if player._mesh == null or player._mesh.weapon_pivot == null:
 		return
 	var wp: Node3D = player._mesh.weapon_pivot
+	# Đè lên recoil để update_pose ngả nòng nhẹ (có hồi).
+	var recoil: float = minf(player._ak_recoil + 0.6, 1.0)
+	player._ak_recoil = recoil
 	var base_pos: Vector3 = wp.position
-	var tw: Tween = player.create_tween()
-	tw.tween_property(wp, "position:y", base_pos.y - 0.03, 0.035)
-	tw.tween_property(wp, "position:y", base_pos.y, 0.07).set_delay(0.035)
+	# Giật nhẹ lùi theo hướng bắn ngược + hạ nòng xuống rồi về.
+	var tw: Tween = wp.create_tween()
+	tw.tween_property(wp, "position", base_pos - dir * 0.020 - Vector3(0, 0.012, 0), 0.03)
+	tw.tween_property(wp, "position", base_pos, 0.07).set_delay(0.03)
+
+static func _align_y_to(b: Basis, dir: Vector3) -> Basis:
+	var up := Vector3.UP
+	if absf(dir.dot(up)) > 0.98:
+		up = Vector3.RIGHT
+	var x_axis := up.cross(dir).normalized()
+	var z_axis := x_axis.cross(dir).normalized()
+	return Basis(x_axis, dir, z_axis)
+
+static func _rand_side(dir: Vector3) -> Vector3:
+	var up := Vector3.UP
+	if absf(dir.dot(up)) > 0.98:
+		up = Vector3.RIGHT
+	var h := dir.cross(up).normalized()
+	return h
 
 static func cancel_aim(player) -> void:
 	player._bow_aiming = false
 	player._bow_charge = 0.0
 	player._aim_tp_mode = false
+	player._ak_recoil = 0.0
 	if player._bow_indicator_root:
 		player._bow_indicator_root.visible = false

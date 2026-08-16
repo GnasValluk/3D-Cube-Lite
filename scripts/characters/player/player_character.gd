@@ -87,6 +87,8 @@ var _bow_charge: float = 0.0
 var _bow_charge_rate: float = 0.35
 var _bow_max_charge: float = 2.0
 var _ak_fire_cooldown: float = 0.0
+## Giật nòng AK-12: 0 → 1, dùng trong _AK.update_pose để ngả nòng nhẹ rồi hồi.
+var _ak_recoil: float = 0.0
 var _mortar_vertical_speed: float = 8.0
 var _mortar_launch_angle_deg: float = 60.0
 var _bow_aim_dir: Vector3 = Vector3.FORWARD
@@ -1305,6 +1307,7 @@ func _process(delta: float) -> void:
 	_update_block_target()
 	_process_mining(delta)
 	_Bow.update_pose(self)
+	_AK.update_pose(self, delta)
 	if equipped_weapon != null and equipped_weapon.id == "iron_halberd":
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			if _halberd_charge_time < 0.0:
