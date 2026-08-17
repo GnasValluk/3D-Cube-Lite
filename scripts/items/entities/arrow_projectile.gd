@@ -27,7 +27,7 @@ func setup(dir: Vector3, dmg: int, spd: float, max_rng: float, shooter: Node) ->
 func _ready() -> void:
 	var col := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = 0.20
+	shape.radius = 0.30
 	col.shape = shape
 	add_child(col)
 	_sweep_shape = shape

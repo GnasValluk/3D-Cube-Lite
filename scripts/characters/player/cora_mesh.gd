@@ -221,7 +221,7 @@ func _build_arms() -> void:
 	weapon_pivot = MeshBuilder.pivot(arm_r, Vector3(0.0, -0.28, 0.0))
 	weapon_pivot.name = "WeaponPivot"
 	weapon_pivot.rotation_degrees = Vector3(90, 0, 0)
-	weapon_pivot.scale = Vector3(1.8, 1.8, 1.8)
+	weapon_pivot.scale = Vector3(1.5, 1.5, 1.5)
 	gauntlet_l_pivot = MeshBuilder.pivot(arm_l, Vector3(0, -0.16, 0))
 	gauntlet_l_pivot.name = "GauntletLPivot"
 	gauntlet_l_pivot.scale = Vector3(0.5, 0.5, 0.5)

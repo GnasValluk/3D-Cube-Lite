@@ -9,7 +9,6 @@ const M200_BULLET_SPEED: float = 150.0
 const M200_RANGE: float = 120.0
 const M200_SPREAD_DEG: float = 0.12
 const M200_BOLT_TIME: float = 1.0
-const M200_HOLD_FORWARD: float = 0.08
 
 static func has_ammo(player) -> bool:
 	if player.inventory == null:
@@ -103,7 +102,7 @@ static func update_pose(player, delta: float) -> void:
 		return
 	var wp: Node3D = player._mesh.weapon_pivot
 	if not player._m200_hold_captured:
-		player._m200_hold_base = wp.position + Vector3(0, 0, M200_HOLD_FORWARD)
+		player._m200_hold_base = wp.position
 		player._m200_hold_captured = true
 	var is_aiming: bool = player._m200_aiming or player._bow_aiming
 	player._m200_recoil = maxf(player._m200_recoil - delta * 3.0, 0.0)

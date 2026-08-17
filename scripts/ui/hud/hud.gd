@@ -538,6 +538,11 @@ func _process(delta: float) -> void:
 			_crosshair.position = get_viewport().get_visible_rect().size * 0.5
 	if _scope_overlay:
 		_scope_overlay.visible = _scope_show
+		if _scope_show:
+			var _lock: float = 1.0 if _scope_target_locked(_cross_player) else 0.0
+			var _sm := _scope_overlay.material
+			if _sm is ShaderMaterial:
+				(_sm as ShaderMaterial).set_shader_parameter("target_locked", _lock)
 
 	_sync_mouse_visibility()
 
@@ -982,6 +987,30 @@ func _find_player_character() -> PlayerCharacter:
 		if ch is PlayerCharacter:
 			return ch as PlayerCharacter
 	return null
+
+## M200 lock: raycast từ đầu nòng theo hướng ngắm — trúng địch sống (không phải
+## bản thân) thì báo khóa để reticle trong kính nhấp nháy đỏ.
+func _scope_target_locked(player: PlayerCharacter) -> bool:
+	if player == null or player._mesh == null or player._mesh.weapon_pivot == null:
+		return false
+	var dir: Vector3 = player._bow_aim_dir
+	if dir.length_squared() < 0.001:
+		return false
+	var from: Vector3 = player._mesh.weapon_pivot.global_transform * Vector3(0, 0.44, 0)
+	var space: PhysicsDirectSpaceState3D = player.get_world_3d().direct_space_state
+	if space == null:
+		return false
+	var q := PhysicsRayQueryParameters3D.create(from, from + dir * 200.0)
+	q.collide_with_areas = false
+	q.collide_with_bodies = true
+	q.exclude = [player.get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit.is_empty():
+		return false
+	var body: Node = hit.get("collider")
+	if body == null or body == player:
+		return false
+	return body is CharacterBase and body.is_alive
 
 func _track_character(ch: CharacterBase) -> void:
 	_tracked = ch

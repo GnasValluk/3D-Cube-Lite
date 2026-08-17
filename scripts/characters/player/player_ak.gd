@@ -8,8 +8,6 @@ const AK_FIRE_INTERVAL: float = 0.11
 const AK_BULLET_SPEED: float = 120.0
 const AK_RANGE: float = 40.0
 const AK_SPREAD_DEG: float = 0.8
-## Nhích vị trí cầm súng về phía trước (dọc theo nòng, trục +Z của tay phải).
-const AK_HOLD_FORWARD: float = 0.06
 
 static func has_ammo(player) -> bool:
 	if player.inventory == null:
@@ -141,7 +139,7 @@ static func update_pose(player, delta: float) -> void:
 		return
 	var wp: Node3D = player._mesh.weapon_pivot
 	if not player._ak_hold_captured:
-		player._ak_hold_base = wp.position + Vector3(0, 0, AK_HOLD_FORWARD)
+		player._ak_hold_base = wp.position
 		player._ak_hold_captured = true
 	var is_ak_aiming: bool = player._bow_aiming
 	# Giật nòng: từ từ hồi về 0.

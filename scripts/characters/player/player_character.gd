@@ -112,6 +112,8 @@ var _m200_hold_captured: bool = false
 var _m200_recoil: float = 0.0
 
 const HALBERD_CHARGE_TIME: float = 0.7
+## Tỷ lệ phóng to nhân vật người chơi (~20%): mesh + capsule + hit_radius.
+const PLAYER_SCALE: float = 1.2
 const HALBERD_MIN_RANGE: float = 6.0
 const HALBERD_MAX_RANGE: float = 16.67
 var _halberd_charge_time: float = -1.0
@@ -156,17 +158,18 @@ func _build_character() -> void:
 
 	var col := CollisionShape3D.new()
 	var cs := CapsuleShape3D.new()
-	cs.radius = 0.32
-	cs.height = 1.10
+	cs.radius = 0.32 * PLAYER_SCALE
+	cs.height = 1.10 * PLAYER_SCALE
 	col.shape = cs
-	col.position = Vector3(0, 0.55, 0)
+	col.position = Vector3(0, 0.55 * PLAYER_SCALE, 0)
 	add_child(col)
-	hit_radius = 0.32
+	hit_radius = 0.32 * PLAYER_SCALE
 
 	skin_id = _current_skin_id()
 	_mesh = _Skin.make_mesh(skin_id)
 	_mesh.set_palette(_Skin.palette_for(skin_id))
 	_mesh.build(self)
+	_mesh.ground_anchor.scale = Vector3.ONE * PLAYER_SCALE
 	_rig = _mesh.rig
 
 	_anim = PlayerAnimator.new()
@@ -226,6 +229,7 @@ func _rebuild_mesh() -> void:
 	_mesh = _Skin.make_mesh(skin_id)
 	_mesh.set_palette(_Skin.palette_for(skin_id))
 	_mesh.build(self)
+	_mesh.ground_anchor.scale = Vector3.ONE * PLAYER_SCALE
 	_rig = _mesh.rig
 
 	# Khởi lại animator với mesh mới

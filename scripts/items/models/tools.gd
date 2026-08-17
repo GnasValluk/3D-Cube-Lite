@@ -21,10 +21,27 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"watermelon_nuke_ammo": _build_dan_hat_nhan_dua_hau(pivot)
 		"pumpkin_mortar": _build_phao_coi(pivot)
 		"flashlight": _build_den_pin(pivot)
-		"ak_12": _build_ak12(pivot)
+		"ak_12":
+			_build_ak12(pivot)
+			_wrap_forward(pivot, 0.05)
 		"bullet_762mm": _build_bullet_762(pivot)
-		"m200": _build_m200(pivot)
+		"m200":
+			_build_m200(pivot)
+			_wrap_forward(pivot, 0.05)
 		"bullet_338mm": _build_bullet_338(pivot)
+
+## Dời model súng (không phải pivot/hold base) nhích ra trước dọc theo nòng.
+## Pivot local +Y = hướng nòng (rotate 90°X → world +Z), nên dịch +Y.
+static func _wrap_forward(pivot: Node3D, fwd: float) -> void:
+	var holder := Node3D.new()
+	holder.name = "HoldForward"
+	holder.position = Vector3(0, fwd, 0)
+	pivot.add_child(holder)
+	for ch in pivot.get_children():
+		if ch == holder:
+			continue
+		pivot.remove_child(ch)
+		holder.add_child(ch)
 
 static func _mat(col: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()

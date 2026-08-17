@@ -48,6 +48,9 @@ func _ready() -> void:
 	add_child(pivot)
 	_TL.build_held(pivot, "m200")
 	_check(pivot.get_child_count() > 0, "build_held(m200) tạo mesh")
+	var hf := pivot.get_node_or_null("HoldForward")
+	_check(hf != null, "m200: súng được bọc trong HoldForward (không đổi hold base)")
+	_check(hf != null and hf.position.is_equal_approx(Vector3(0, 0.05, 0)), "m200: HoldForward nhích ra trước nòng 0.05")
 	_TL.build_held(pivot, "bullet_338mm")
 	_check(pivot.get_child_count() > 0, "build_held(bullet_338mm) tạo mesh")
 	var drop_pivot := Node3D.new()
@@ -141,8 +144,9 @@ func _ready() -> void:
 	_check(not player._bow_aiming, "hết đạn → fire thoát ngắm")
 
 	# ── 8. Hitbox: bán kính sweep mở rộng + aim-assist ────────────────────
-	_check(absf(_Bullet.HIT_RADIUS - 0.16) < 0.001, "HIT_RADIUS = 0.16 (rộng hơn 0.08 cũ)")
-	_check(_Bullet.ASSIST_RADIUS >= 0.5, "ASSIST_RADIUS >= 0.5")
+	_check(absf(_Bullet.HIT_RADIUS - 0.24) < 0.001, "HIT_RADIUS = 0.24 (to hơn — dễ dính)")
+	_check(_Bullet.ASSIST_RADIUS >= 0.8, "ASSIST_RADIUS >= 0.8 (bám địch dễ hơn)")
+	_check(_Bullet.WORLD_RADIUS < 0.05, "WORLD_RADIUS nhỏ — đạn không dính địa hình sát mặt đất")
 	player._m200_bolt_cd = 0.0
 	player.inventory.add_item(_IDB.items_db["bullet_338mm"], 1)
 	player._bow_aiming = true
@@ -160,6 +164,39 @@ func _ready() -> void:
 	_check(b.is_queued_for_deletion() or b._dist_traveled > 0.0, "bullet chạy bước physics không lỗi")
 	if is_instance_valid(b):
 		b.free()
+
+	# ── 9. Player phóng to 1.2 + scope shader ───────────────────────────────
+	var cap_ok := false
+	for c in player.get_children():
+		if c is CollisionShape3D and c.shape is CapsuleShape3D:
+			cap_ok = absf((c.shape as CapsuleShape3D).radius - 0.32 * 1.2) < 0.001
+			break
+	_check(cap_ok, "player capsule phóng to 1.2 (radius 0.384)")
+	_check(absf(player.hit_radius - 0.32 * 1.2) < 0.001, "hit_radius phóng to 1.2 (0.384)")
+	_check(player._mesh != null and player._mesh.ground_anchor != null and player._mesh.ground_anchor.scale.is_equal_approx(Vector3.ONE * 1.2), "mesh player scale 1.2")
+	var shader_src := FileAccess.get_file_as_string("res://scripts/ui/hud/scope_lens.gdshader")
+	_check(shader_src.contains("target_locked"), "scope shader: uniform target_locked (nháy đỏ khi khóa)")
+	_check(shader_src.contains("SCREEN_TEXTURE"), "scope shader: blur nền bên ngoài kính")
+
+	# ── 10. Nổ khi trúng địch: sát thương vùng nhỏ + kết thúc đạn ──────────
+	_check(_Bullet.BLAST_RADIUS >= 1.5, "BLAST_RADIUS >= 1.5 — đạn nổ khi trúng địch")
+	var target := _PC.new()
+	add_child(target)
+	target.global_position = Vector3(0, -1.0, -10)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	var target_hp: int = target.hp
+	var b2 := BulletProjectile.new()
+	player.get_tree().current_scene.add_child(b2)
+	b2.global_position = target.global_position + Vector3(0, 0.6, 10)
+	b2.setup(Vector3(0, 0, -1), 8, 200.0, 40.0, player)
+	for i in 30:
+		if b2.is_queued_for_deletion():
+			break
+		b2._physics_process(1.0 / 60.0)
+	_check(target.hp < target_hp, "đạn trúng địch → nổ gây sát thương vùng (%d → %d)" % [target_hp, target.hp])
+	_check(b2.is_queued_for_deletion(), "đạn trúng địch → kết thúc sau khi nổ")
+	target.free()
 
 	player.free()
 
