@@ -875,62 +875,92 @@ static func _build_bullet_762(p: Node3D) -> void:
 	_cyl(p, Vector3(0, 0.062, 0), 0.032, 0.05, bullet)
 	_cyl(p, Vector3(0, 0.10, 0), 0.028, 0.02, tip)
 
-# ── M200 — held model (dọc +Y, nòng dài + ống ngắm) ──
+static func _neon(col: Color) -> StandardMaterial3D:
+	var m := _mat(col)
+	m.emission_enabled = true
+	m.emission = Color(col.r * 0.85, col.g * 0.85, col.b * 0.85, 1.0)
+	m.emission_energy_multiplier = 2.0
+	return m
+
+# ── M200 DarkVoid — held model (dọc +Y, nòng dài + ống ngắm, cyberpunk neon) ──
 static func _build_m200(p: Node3D) -> void:
-	var body     := _mat(Color(0.16, 0.18, 0.16))
-	var body_d   := _mat(Color(0.11, 0.12, 0.11))
-	var metal    := _mat(Color(0.30, 0.32, 0.34))
-	var metal_d  := _mat(Color(0.20, 0.21, 0.24))
-	var scope    := _mat(Color(0.06, 0.07, 0.09))
-	var scope_r  := _mat(Color(0.24, 0.25, 0.28))
-	var grip     := _mat(Color(0.34, 0.24, 0.14))
-	var bullet_c := _mat(Color(0.85, 0.75, 0.20))
+	var void_m    := _mat(Color(0.020, 0.016, 0.034))   # thân void đen pha tím
+	var void_d    := _mat(Color(0.011, 0.009, 0.022))   # panel tối hơn
+	var metal     := _mat(Color(0.10, 0.105, 0.15))     # gunmetal
+	var metal_d   := _mat(Color(0.055, 0.06, 0.095))
+	var neon_p    := _neon(Color(0.66, 0.24, 1.0))      # tím neon (pulse)
+	var neon_p_d  := _neon(Color(0.42, 0.14, 0.70))     # tím neon tối (tĩnh)
+	var neon_c    := _neon(Color(0.16, 0.95, 1.0))      # cyan neon (pulse)
+	var neon_r    := _neon(Color(1.0, 0.20, 0.45))      # đỏ-pink LED
 
-	# Báng súng
-	_box(p, Vector3(0, -0.50, 0), Vector3(0.050, 0.16, 0.055), body_d)
-	_box(p, Vector3(0, -0.44, -0.030), Vector3(0.044, 0.05, 0.022), body)
-	_cyl(p, Vector3(0, -0.38, 0), 0.018, 0.12, body_d)
+	# ── Báng súng: khối void + 2 dải neon tím nhấp nháy ──
+	_box(p, Vector3(0, -0.55, 0), Vector3(0.050, 0.13, 0.062), void_m)
+	_box(p, Vector3(0, -0.585, 0.004), Vector3(0.046, 0.016, 0.056), void_d)
+	_box(p, Vector3(0, -0.47, 0.036), Vector3(0.042, 0.035, 0.026), void_d)
+	_box(p, Vector3(-0.027, -0.55, 0), Vector3(0.004, 0.13, 0.060), neon_p)
+	_box(p, Vector3(0.027, -0.55, 0), Vector3(0.004, 0.13, 0.060), neon_p)
+	_box(p, Vector3(0, -0.60, 0), Vector3(0.048, 0.010, 0.060), neon_p_d)
 
-	# Thân hộp tiếp đạn (dài hơn AK)
-	_box(p, Vector3(0, -0.16, 0), Vector3(0.058, 0.28, 0.058), body)
-	_box(p, Vector3(0, -0.10, -0.050), Vector3(0.012, 0.30, 0.010), metal)
-	_box(p, Vector3(0, -0.32, -0.056), Vector3(0.014, 0.04, 0.006), metal)
-	_box(p, Vector3(0.034, -0.22, -0.036), Vector3(0.010, 0.05, 0.012), metal_d)
+	# ── Thân hộp tiếp đạn: void + 2 má gunmetal vát + cửa sổ năng lượng ──
+	_box(p, Vector3(0, -0.10, 0), Vector3(0.062, 0.30, 0.062), void_m)
+	var side_l := Node3D.new()
+	side_l.rotation_degrees = Vector3(0, 0, -10)
+	side_l.position = Vector3(0, -0.10, 0)
+	p.add_child(side_l)
+	_box(side_l, Vector3(-0.036, 0, 0), Vector3(0.008, 0.22, 0.058), metal)
+	var side_r := Node3D.new()
+	side_r.rotation_degrees = Vector3(0, 0, 10)
+	side_r.position = Vector3(0, -0.10, 0)
+	p.add_child(side_r)
+	_box(side_r, Vector3(0.036, 0, 0), Vector3(0.008, 0.22, 0.058), metal)
+	_box(p, Vector3(0, 0.02, 0.049), Vector3(0.028, 0.28, 0.005), neon_c)       # rail cyan
+	_box(p, Vector3(0, -0.13, 0.032), Vector3(0.034, 0.09, 0.004), neon_p)      # cửa sổ năng lượng
+	_box(p, Vector3(-0.033, -0.21, 0), Vector3(0.003, 0.012, 0.028), neon_r)    # LED đỏ
+	_box(p, Vector3(0.033, -0.21, 0), Vector3(0.003, 0.012, 0.028), neon_r)
+	_box(p, Vector3(0, 0.03, -0.034), Vector3(0.056, 0.14, 0.005), metal_d)     # rail dưới
 
-	# Nòng dài
-	_cyl(p, Vector3(0, 0.28, -0.010), 0.016, 0.50, metal)
-	_cyl(p, Vector3(0, 0.50, -0.010), 0.024, 0.06, metal_d)
-	_cyl(p, Vector3(0, 0.24, -0.040), 0.008, 0.46, metal)
+	# ── Ống ngắm: nòng kính tối + kính trước cyan phát sáng ──
+	_box(p, Vector3(0, 0.14, 0.016), Vector3(0.040, 0.05, 0.022), metal_d)
+	_cyl(p, Vector3(0, 0.10, 0.052), 0.025, 0.26, void_m)
+	_cyl(p, Vector3(0, 0.225, 0.052), 0.030, 0.015, metal)
+	_cyl(p, Vector3(0, -0.025, 0.052), 0.030, 0.015, metal)
+	_cyl(p, Vector3(0, 0.215, 0.052), 0.019, 0.008, neon_c)                     # lens cyan
+	_box(p, Vector3(0, 0.02, 0.066), Vector3(0.016, 0.010, 0.012), neon_r)      # holo dot
 
-	# Ống ngắm (scope) trên thân
-	var scol := Node3D.new()
-	scol.position = Vector3(0, 0.18, 0.052)
-	p.add_child(scol)
-	_cyl(scol, Vector3(0, 0, 0), 0.028, 0.22, scope)
-	_cyl(scol, Vector3(0, 0, -0.11), 0.034, 0.02, scope_r)
-	_cyl(scol, Vector3(0, 0, 0.11), 0.034, 0.02, scope_r)
-	_cyl(scol, Vector3(0, 0, -0.06), 0.012, 0.02, scope_r)
-	_cyl(scol, Vector3(0, 0.02, -0.14), 0.010, 0.03, scope_r)
+	# ── Nòng dài: nòng + vòng neon tím + đầu nòng phát sáng ──
+	_cyl(p, Vector3(0, 0.30, -0.012), 0.013, 0.54, metal)
+	_cyl(p, Vector3(0, 0.30, -0.012), 0.008, 0.56, metal_d)
+	for yr in [0.18, 0.32, 0.46]:
+		_cyl(p, Vector3(0, yr, -0.012), 0.018, 0.011, neon_p)
+	_cyl(p, Vector3(0, 0.565, -0.012), 0.024, 0.055, void_m)                    # bù giật
+	_box(p, Vector3(-0.026, 0.565, -0.012), Vector3(0.006, 0.045, 0.03), neon_c)
+	_box(p, Vector3(0.026, 0.565, -0.012), Vector3(0.006, 0.045, 0.03), neon_c)
+	_cyl(p, Vector3(0, 0.592, -0.012), 0.029, 0.016, neon_c)                    # đầu nòng glow
 
-	# Tay cầm (chếch sau) + cò
+	# ── Dưới nòng: ống năng lượng tím + chân chống (bipod) ──
+	_cyl(p, Vector3(0, 0.10, -0.046), 0.015, 0.34, neon_p_d)
+	_box(p, Vector3(-0.016, 0.20, -0.040), Vector3(0.010, 0.15, 0.010), metal_d)
+	_box(p, Vector3(0.016, 0.20, -0.040), Vector3(0.010, 0.15, 0.010), metal_d)
+	_box(p, Vector3(-0.016, 0.10, -0.040), Vector3(0.010, 0.010, 0.016), neon_p_d)
+	_box(p, Vector3(0.016, 0.10, -0.040), Vector3(0.010, 0.010, 0.016), neon_p_d)
+
+	# ── Tay cầm + cò + băng đạn ──
 	var grip_n := Node3D.new()
 	grip_n.rotation_degrees = Vector3(-22, 0, 0)
-	grip_n.position = Vector3(0, -0.24, 0.06)
+	grip_n.position = Vector3(0, -0.26, 0.06)
 	p.add_child(grip_n)
-	_box(grip_n, Vector3(0, -0.02, 0), Vector3(0.042, 0.10, 0.050), body_d)
-	_box(p, Vector3(0, -0.26, 0.078), Vector3(0.030, 0.035, 0.030), metal_d)
-	_box(p, Vector3(0, -0.285, 0.070), Vector3(0.012, 0.02, 0.014), scope_r)
+	_box(grip_n, Vector3(0, -0.02, 0), Vector3(0.042, 0.10, 0.050), void_m)
+	_box(grip_n, Vector3(-0.021, 0, 0), Vector3(0.004, 0.10, 0.046), neon_p)
+	_box(p, Vector3(0, -0.28, 0.072), Vector3(0.036, 0.03, 0.028), metal_d)
+	_box(p, Vector3(0, -0.30, 0.066), Vector3(0.010, 0.020, 0.010), neon_r)
+	_box(p, Vector3(0, -0.30, 0.030), Vector3(0.036, 0.10, 0.040), void_d)
+	_box(p, Vector3(0, -0.30, 0.052), Vector3(0.030, 0.09, 0.004), neon_p)
 
-	# Băng đạn ngắn dưới thân
-	var mag_p := Node3D.new()
-	mag_p.position = Vector3(0, -0.24, 0.060)
-	p.add_child(mag_p)
-	_box(mag_p, Vector3(0, -0.05, 0), Vector3(0.034, 0.10, 0.050), grip)
-	_box(mag_p, Vector3(0, 0.04, 0), Vector3(0.034, 0.02, 0.012), bullet_c)
-
-	# Chân chống trước (bipod)
-	_box(p, Vector3(0, 0.24, 0.030), Vector3(0.012, 0.26, 0.012), metal_d)
-	_box(p, Vector3(0, 0.37, 0.055), Vector3(0.030, 0.010, 0.024), metal)
+	# ── VFX idle: lõi năng lượng + hạt neon bay quanh nòng ──
+	var vfx := preload("res://scripts/items/models/weapon_m200_vfx.gd").new()
+	vfx.name = "M200VFX"
+	p.add_child(vfx)
+	vfx.setup([neon_p, neon_c])
 
 # ── Đạn .338 Lapua — held model (dọc +Y) ──
 static func _build_bullet_338(p: Node3D) -> void:
@@ -967,23 +997,31 @@ static func bullet_762_drop(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, 0, -1, 0, 0.8, 1.6, 0.8, brass)
 	ItemMeshShared.add_cube(p, 0, 1, 0, 0.5, 1.2, 0.5, bullet)
 
-# ── M200 — model drop / icon (voxel nhỏ) ──
+# ── M200 DarkVoid — model drop / icon (voxel nhỏ, cyberpunk neon) ──
 static func m200_drop(p: Node3D) -> void:
-	var body       := Color(0.16, 0.18, 0.16)
-	var body_d     := Color(0.12, 0.13, 0.12)
-	var metal      := Color(0.30, 0.32, 0.34)
-	var metal_d    := Color(0.20, 0.21, 0.24)
-	var scope      := Color(0.06, 0.07, 0.09)
-	var grip       := Color(0.34, 0.24, 0.14)
-	ItemMeshShared.add_cube(p, 0, -3, 0, 2, 2, 2, body_d)       # báng
-	ItemMeshShared.add_cube(p, 0, -1, 0, 2.5, 3, 2.5, body)     # thân
-	ItemMeshShared.add_cube(p, 0, 2, 0, 1.5, 4, 1.5, body)      # nối nòng
-	ItemMeshShared.add_cube(p, 0, 6, 0, 1.2, 3, 1.2, metal)     # nòng
-	ItemMeshShared.add_cube(p, 0, 8, 0, 1.5, 1, 1.5, metal_d)   # đầu nòng
-	ItemMeshShared.add_cube(p, 0, 1, 2, 1.5, 2, 2, scope)       # ống ngắm
-	ItemMeshShared.add_cube(p, 0, 0, 2, 1.8, 1, 1.2, metal_d)   # chân kính
-	ItemMeshShared.add_cube(p, 1.5, -1, 1.5, 1, 2, 1.5, grip)   # tay cầm
-	ItemMeshShared.add_cube(p, 0, -2, 1.5, 1.2, 2, 1.5, body_d) # hộp đạn
+	var void_m   := Color(0.05, 0.04, 0.09)
+	var void_d   := Color(0.02, 0.02, 0.04)
+	var metal    := Color(0.16, 0.17, 0.22)
+	var neon_p   := Color(0.78, 0.40, 1.0)
+	var neon_c   := Color(0.30, 0.95, 1.0)
+	var neon_r   := Color(1.0, 0.30, 0.50)
+	ItemMeshShared.add_cube(p, 0, -3, 0, 2, 2, 2, void_d)        # báng
+	ItemMeshShared.add_cube(p, 0, -3, -1, 0.5, 2, 2, neon_p)     # viền neon báng
+	ItemMeshShared.add_cube(p, 0, -1, 0, 2.5, 3, 2.5, void_m)    # thân
+	ItemMeshShared.add_cube(p, 0, 0, 1, 2.6, 1, 0.6, neon_c)     # dải rail cyan
+	ItemMeshShared.add_cube(p, 0, -1, 1.5, 1.0, 2, 0.4, neon_p)  # cửa sổ năng lượng
+	ItemMeshShared.add_cube(p, 0, 2, 0, 1.5, 4, 1.5, metal)      # nối nòng
+	ItemMeshShared.add_cube(p, 0, 6, 0, 1.2, 3, 1.2, metal)      # nòng
+	ItemMeshShared.add_cube(p, 0, 5.5, 0, 1.5, 0.5, 1.5, neon_p) # ring neon
+	ItemMeshShared.add_cube(p, 0, 8, 0, 1.5, 1, 1.5, void_m)     # đầu nòng
+	ItemMeshShared.add_cube(p, 0, 8.5, 0, 1.0, 0.6, 1.0, neon_c) # đầu nòng glow
+	ItemMeshShared.add_cube(p, 0, 1, 2, 1.5, 2, 2, void_m)       # ống ngắm
+	ItemMeshShared.add_cube(p, 0, 2, 2, 1.2, 0.5, 2.2, neon_c)   # lens cyan
+	ItemMeshShared.add_cube(p, 0, 0, 2, 1.8, 1, 1.2, metal)      # chân kính
+	ItemMeshShared.add_cube(p, 1.5, -1, 1.5, 1, 2, 1.5, void_m)  # tay cầm
+	ItemMeshShared.add_cube(p, 1.5, -1, 2.2, 0.6, 2, 0.5, neon_p)# viền tay cầm
+	ItemMeshShared.add_cube(p, 0, -2, 1.5, 1.2, 2, 1.5, void_d)  # hộp đạn
+	ItemMeshShared.add_cube(p, 0, -2, 2.2, 1.2, 2, 0.4, neon_r)  # LED đỏ
 
 # ── Đạn .338 — model drop / icon (voxel nhỏ) ──
 static func bullet_338_drop(p: Node3D) -> void:

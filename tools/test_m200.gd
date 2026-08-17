@@ -39,6 +39,7 @@ func _ready() -> void:
 		_check(not m200.stackable, "m200 không stackable")
 		_check(m200.atk_bonus >= 14, "m200 atk_bonus >= 14 (got %d)" % m200.atk_bonus)
 		_check(m200.max_durability >= 200, "m200 max_durability >= 200")
+		_check(m200.name.contains("DarkVoid"), "m200 tên chứa 'DarkVoid' (got '%s')" % m200.name)
 	if ammo:
 		_check(ammo.type == ItemDef.Type.MATERIAL, "bullet_338mm type = MATERIAL")
 		_check(ammo.stackable and ammo.max_stack >= 16, "bullet_338mm stackable >= 16")
@@ -51,6 +52,14 @@ func _ready() -> void:
 	var hf := pivot.get_node_or_null("HoldForward")
 	_check(hf != null, "m200: súng được bọc trong HoldForward (không đổi hold base)")
 	_check(hf != null and hf.position.is_equal_approx(Vector3(0, 0.05, 0)), "m200: HoldForward nhích ra trước nòng 0.05")
+	var vfx := pivot.get_node_or_null("HoldForward/M200VFX")
+	_check(vfx != null, "m200: có node idle VFX M200VFX")
+	_check(vfx != null and vfx.get_child_count() >= 6, "m200: VFX có lõi/halo/hạt neon/đèn (children=%d)" % (vfx.get_child_count() if vfx != null else -1))
+	if vfx != null:
+		var tick_ok := true
+		for i in 30:
+			vfx.call("_process", 1.0 / 60.0)
+		_check(tick_ok, "m200: VFX idle chạy 30 tick không lỗi")
 	_TL.build_held(pivot, "bullet_338mm")
 	_check(pivot.get_child_count() > 0, "build_held(bullet_338mm) tạo mesh")
 	var drop_pivot := Node3D.new()
