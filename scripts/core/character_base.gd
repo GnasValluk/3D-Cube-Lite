@@ -884,10 +884,13 @@ func _do_melee_hit() -> void:
 			continue
 		if not pn.has_method("try_destroy"):
 			continue
+		# Prop nhỏ (cua bùn,...) cần bán kính ăn đòn như sinh vật để melee trúng
+		# khi đứng hơi xa/lệch — entity prop không có hit_radius thì dùng 0.5.
+		var hit_r: float = float(pn.hit_radius) if "hit_radius" in pn else 0.5
 		var offset: Vector3 = pn.global_position - global_position
 		offset.y = 0.0
 		var dist: float = offset.length()
-		if dist <= max_dist:
+		if dist <= max_dist + hit_r:
 			var dot: float = fwd.dot(offset / dist)
 			if dot >= angle_threshold:
 				var dmg: int = 1

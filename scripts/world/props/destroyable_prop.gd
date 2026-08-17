@@ -8,6 +8,10 @@ var hp: int
 var weapon_requirement: int = WeaponReq.NONE
 var drop_item_id: String = ""
 var _destroyed: bool = false
+## Bán kính "ăn đòn" theo phương ngang như sinh vật — sát thương cận chiến tính
+## `melee_range + hit_radius` (giống cá/heo/slime) để prop nhỏ (cua bùn,...)
+## trúng được dù đứng hơi xa/lệch. Entity prop lớp riêng tự set khi cần.
+var hit_radius: float = 0.5
 
 func _init(p_max_hp: int = 3, p_weapon_req: int = WeaponReq.NONE, p_drop_id: String = "") -> void:
 	max_hp = p_max_hp

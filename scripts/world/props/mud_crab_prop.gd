@@ -31,6 +31,7 @@ func setup() -> void:
 func _init(p_max_hp: int = MAX_HP, p_weapon_req: int = WeaponReq.NONE, p_drop_id: String = "mud_crab") -> void:
 	# Luôn dùng HP thấp (MAX_HP) để damage rõ rệt; bỏ qua p_max_hp truyền vào
 	super(MAX_HP, p_weapon_req, p_drop_id)
+	hit_radius = 0.6
 
 func _ready() -> void:
 	super._ready()
