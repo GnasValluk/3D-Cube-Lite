@@ -809,7 +809,7 @@ static func bucket_drop(p: Node3D, is_lava: bool = false) -> void:
 		ItemMeshShared.add_cube_shaded(p, 0, -0.3, 0, 0.9, 0.8, 0.9, water, 0.0, 0.2, Color(0.0, 0.3, 0.8))
 
 # ── AK-12 — held model (local: +Y = hướng nòng, -Y = báng, -Z = trên, +Z = dưới) ──
-## Bản điện tử cyberpunk "Neon Lôi": thân void đen + dải neon vàng/hổ phách.
+## Bản điện tử cyberpunk "Neon Thunderbolt": thân void đen + dải neon vàng/hổ phách.
 static func _build_ak12(p: Node3D) -> void:
 	var void_m    := _mat(Color(0.020, 0.014, 0.010))   # void hơi ấm
 	var void_d    := _mat(Color(0.011, 0.008, 0.006))

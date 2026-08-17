@@ -37,7 +37,7 @@ func _ready() -> void:
 		_check(not ak.stackable, "ak_12 không stackable")
 		_check(ak.atk_bonus >= 7, "ak_12 atk_bonus >= 7 (got %d)" % ak.atk_bonus)
 		_check(ak.max_durability >= 200, "ak_12 max_durability >= 200")
-		_check(ak.name.contains("Lôi"), "ak_12 tên chứa 'Lôi' (got '%s')" % ak.name)
+		_check(ak.name.contains("Thunderbolt"), "ak_12 tên chứa 'Thunderbolt' (got '%s')" % ak.name)
 	if ammo:
 		_check(ammo.type == ItemDef.Type.MATERIAL, "bullet_762mm type = MATERIAL")
 		_check(ammo.stackable and ammo.max_stack >= 16, "bullet_762mm stackable >= 16")
