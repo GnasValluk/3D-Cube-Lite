@@ -53,6 +53,16 @@ func _ready() -> void:
 	var ak_vfx := pivot.get_node_or_null("HoldForward/AK12VFX")
 	_check(ak_vfx != null, "ak_12: có node idle VFX AK12VFX")
 	_check(ak_vfx != null and ak_vfx.get_child_count() >= 6, "ak_12: VFX có lõi/halo/hạt neon/đèn (children=%d)" % (ak_vfx.get_child_count() if ak_vfx != null else -1))
+	if ak_vfx != null:
+		var arc_root := ak_vfx.get_node_or_null("ArcRoot")
+		_check(arc_root != null, "ak_12: VFX có tia sét giật (ArcRoot)")
+		_check(arc_root != null and arc_root.get_child_count() >= 10, "ak_12: ArcRoot có đủ đoạn tia (segments=%d)" % (arc_root.get_child_count() if arc_root != null else -1))
+		var saw_zap := false
+		for i in 90:
+			ak_vfx.call("_process", 1.0 / 60.0)
+			if arc_root != null and arc_root.visible:
+				saw_zap = true
+		_check(saw_zap, "ak_12: tia sét giật xuất hiện trong 90 tick")
 	_TL.build_held(pivot, "bullet_762mm")
 	_check(pivot.get_child_count() > 0, "build_held(bullet_762mm) tạo mesh")
 	var drop_pivot := Node3D.new()

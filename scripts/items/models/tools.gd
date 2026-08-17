@@ -872,7 +872,7 @@ static func _build_ak12(p: Node3D) -> void:
 		_box(p, Vector3(0, vy, 0.028), Vector3(0.049, 0.006, 0.047), neon_a)
 	_box(p, Vector3(0, 0.16, 0.028), Vector3(0.050, 0.05, 0.022), void_d)
 
-	# ── VFX idle neon vàng: lõi năng lượng + hạt vàng bay quanh nòng ──
+	# ── VFX idle neon vàng + tia sét giật: lõi năng lượng + hạt vàng + crackle ──
 	var vfx := preload("res://scripts/items/models/weapon_neon_vfx.gd").new()
 	vfx.name = "AK12VFX"
 	p.add_child(vfx)
@@ -880,7 +880,8 @@ static func _build_ak12(p: Node3D) -> void:
 		Color(1.0, 0.78, 0.18), Color(0.95, 0.55, 0.10),
 		Color(1.0, 0.95, 0.40), Color(1.0, 0.65, 0.15),
 		Color(1.0, 0.75, 0.30),
-		Vector3(0, 0.37, -0.010), 0.08, 0.085, Vector3(0, 0.22, -0.010))
+		Vector3(0, 0.37, -0.010), 0.08, 0.085, Vector3(0, 0.22, -0.010),
+		{"a": Vector3(0, 0.37, -0.010), "b": Vector3(0, 0.12, 0.030), "c": Vector3(0, 0.30, -0.045)})
 
 # ── Đạn 7,62mm — held model (dọc +Y) ──
 static func _build_bullet_762(p: Node3D) -> void:
