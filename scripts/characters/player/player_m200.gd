@@ -78,6 +78,7 @@ static func fire(player) -> void:
 	var dir := (aim_dir + right * randf_range(-spread, spread) + up2 * randf_range(-spread, spread)).normalized()
 
 	var bullet := BulletProjectile.new()
+	bullet.calibre = ".338"
 	var world: Node = player.get_tree().current_scene
 	if world:
 		world.add_child(bullet)

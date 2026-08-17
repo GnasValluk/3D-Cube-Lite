@@ -105,6 +105,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"seagrass_seed": _build_seed_icon(parent, 3)
 		"orange": _build_orange_icon(parent)
 		"orange_seed": _build_orange_seed_icon(parent)
+		"cherry": _build_cherry_icon(parent)
 		"egg_carp": _build_egg_icon(parent, "egg_carp")
 		"egg_perch": _build_egg_icon(parent, "egg_perch")
 		"egg_tilapia": _build_egg_icon(parent, "egg_tilapia")
@@ -1126,6 +1127,29 @@ static func _build_orange_icon(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, 0.00, 0.58, 0.00, 0.16, 0.12, 0.16, stem)
 	ItemMeshShared.add_cube(p, -0.02, 0.68, 0.02, 0.10, 0.08, 0.10, stem.darkened(0.08))
 	ItemMeshShared.add_cube(p, 0.10, -0.54, 0.10, 0.30, 0.06, 0.30, orange_d.darkened(0.10))
+
+## ── Chùm cherry tím: 2 trái bóng tím mọng + cuống dài ───────────────────────
+static func _build_cherry_icon(p: Node3D) -> void:
+	var cherry := Color(0.62, 0.08, 0.46)
+	var cherry_l := Color(0.72, 0.16, 0.55)
+	var cherry_d := Color(0.40, 0.03, 0.30)
+	var hl := Color(1.00, 0.75, 0.90)
+	var stem := Color(0.34, 0.46, 0.16)
+	# Trái trái
+	ItemMeshShared.add_cube(p, -0.30, 0.00, 0.00, 0.62, 0.58, 0.58, cherry)
+	ItemMeshShared.add_cube(p, -0.30, 0.18, 0.00, 0.54, 0.20, 0.50, cherry_l)
+	ItemMeshShared.add_cube(p, -0.30, -0.18, 0.00, 0.54, 0.14, 0.52, cherry_d)
+	# Trái phải
+	ItemMeshShared.add_cube(p, 0.30, -0.04, 0.00, 0.56, 0.52, 0.52, cherry)
+	ItemMeshShared.add_cube(p, 0.30, 0.12, 0.00, 0.48, 0.18, 0.44, cherry_l)
+	ItemMeshShared.add_cube(p, 0.30, -0.20, 0.00, 0.48, 0.12, 0.46, cherry_d)
+	# Vệt sáng bóng nhỏ
+	ItemMeshShared.add_cube(p, -0.38, 0.10, 0.16, 0.08, 0.08, 0.06, hl)
+	ItemMeshShared.add_cube(p, 0.24, -0.02, 0.14, 0.06, 0.06, 0.05, hl.darkened(0.05))
+	# Cuống dài chụm vào nhau
+	ItemMeshShared.add_cube(p, -0.30, 0.34, 0.00, 0.10, 0.18, 0.10, stem)
+	ItemMeshShared.add_cube(p, 0.30, 0.30, 0.00, 0.10, 0.10, 0.10, stem)
+	ItemMeshShared.add_cube(p, -0.04, 0.46, 0.00, 0.12, 0.16, 0.12, stem.darkened(0.06))
 
 ## ── Túi hạt giống cam: kraft + logo quả cam in mặt trước + hạt cam vãi ──────
 static func _build_orange_seed_icon(p: Node3D) -> void:

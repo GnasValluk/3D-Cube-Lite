@@ -13,8 +13,13 @@ const ASSIST_RADIUS: float = 1.0
 ## Bán kính hình cầu "cản cứng" (tường/đất) — nhỏ, bám sát viên đạn để không dính
 ## va chạm địa hình khi bay sát mặt đất; địch vẫn được bắt nhờ sweep rộng + assist.
 const WORLD_RADIUS: float = 0.03
-## Bán kính vụ nổ khi trúng địch — địch trong vùng chịu sát thương bằng đạn.
+## Bán kính vụ nổ khi trúng địch (cỡ thường) — địch trong vùng chịu sát thương bằng đạn.
 const BLAST_RADIUS: float = 2.0
+
+## Loại đạn — quyết định màu VFX bay/vụ nổ + cỡ viên đạn:
+## "7.62"  (AK-12): vệt bay vàng, nổ cam thường.
+## ".338"  (M200): vệt bay tím, viên to hơn, nổ lớn hơn, nổ màu tím.
+var calibre: String = "7.62"
 
 var _damage: int = 8
 var _shooter: Node = null
@@ -27,6 +32,26 @@ var _spawn_dist: float = 0.0
 
 var _sweep_shape: SphereShape3D = null
 var _world_shape: SphereShape3D = null
+
+func _is_heavy() -> bool:
+	return calibre == ".338"
+
+func _blast_radius() -> float:
+	return 3.5 if _is_heavy() else BLAST_RADIUS
+
+func _body_color() -> Color:
+	return Color(0.62, 0.20, 0.85) if _is_heavy() else Color(0.95, 0.75, 0.30)
+
+func _body_emission() -> Color:
+	return Color(0.90, 0.40, 1.0) if _is_heavy() else Color(1.0, 0.85, 0.40)
+
+func _trail_style() -> Dictionary:
+	if _is_heavy():
+		return { "color": Color(0.70, 0.25, 1.0, 0.60), "e": Color(0.95, 0.55, 1.0), "r": 0.055, "max": 4.8 }
+	return { "color": Color(1.0, 0.85, 0.30, 0.45), "e": Color(1.0, 0.90, 0.50), "r": 0.03, "max": 3.4 }
+
+func _blast_tint() -> Color:
+	return Color(0.70, 0.25, 1.0) if _is_heavy() else Color(1.0, 0.6, 0.1)
 
 func setup(dir: Vector3, dmg: int, spd: float, max_rng: float, shooter: Node) -> void:
 	_direction = dir
@@ -49,18 +74,20 @@ func _ready() -> void:
 	_world_shape = wcol
 	monitoring = false
 
+	var heavy: bool = _is_heavy()
+
 	var mi := MeshInstance3D.new()
 	mi.mesh = CylinderMesh.new()
-	mi.mesh.top_radius = 0.02
-	mi.mesh.bottom_radius = 0.02
-	mi.mesh.height = 0.30
+	mi.mesh.top_radius = 0.035 if heavy else 0.02
+	mi.mesh.bottom_radius = 0.035 if heavy else 0.02
+	mi.mesh.height = 0.42 if heavy else 0.30
 	mi.mesh.radial_segments = 6
-	mi.position = Vector3(0, 0, -0.11)
+	mi.position = Vector3(0, 0, -0.15 if heavy else -0.11)
 	mi.rotation_degrees.x = 90
 	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Color(0.95, 0.75, 0.30)
+	mat.albedo_color = _body_color()
 	mat.emission_enabled = true
-	mat.emission = Color(1.0, 0.85, 0.40)
+	mat.emission = _body_emission()
 	mat.emission_energy_multiplier = 2.0
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mi.material_override = mat
@@ -69,16 +96,16 @@ func _ready() -> void:
 	## Đốm tia cuối đầu đạn — sáng hơn để đọc được hướng bay.
 	var tip := MeshInstance3D.new()
 	tip.mesh = SphereMesh.new()
-	tip.mesh.radius = 0.035
-	tip.mesh.height = 0.07
+	tip.mesh.radius = 0.06 if heavy else 0.035
+	tip.mesh.height = 0.12 if heavy else 0.07
 	var tip_mat := StandardMaterial3D.new()
-	tip_mat.albedo_color = Color(1.0, 0.92, 0.55)
+	tip_mat.albedo_color = _body_emission()
 	tip_mat.emission_enabled = true
-	tip_mat.emission = Color(1.0, 0.9, 0.5)
+	tip_mat.emission = _body_emission()
 	tip_mat.emission_energy_multiplier = 3.0
 	tip_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	tip.material_override = tip_mat
-	tip.position = Vector3(0, 0, -0.26)
+	tip.position = Vector3(0, 0, -0.38 if heavy else -0.26)
 	add_child(tip)
 
 func _physics_process(delta: float) -> void:
@@ -182,11 +209,8 @@ func _resolve_hit(space: PhysicsDirectSpaceState3D) -> void:
 		var body: Node = h.get("collider")
 		if body == null or body == _shooter:
 			continue
-		if body is CharacterBase and body.is_alive:
-			# Trúng địch → NỔ: sát thương vùng quanh điểm dính + hiệu ứng nổ.
-			_explode_on_target()
-			return
-		_spawn_impact()
+		# Trúng địch HOẶC tường → đều NỔ (địch quanh điểm nổ chịu sát thương).
+		_explode_on_target()
 		return
 	_spawn_impact()
 
@@ -201,7 +225,7 @@ func _deal_blast_damage() -> void:
 			continue
 		var offset: Vector3 = global_position - ch.global_position
 		offset.y = 0.0
-		if offset.length() < BLAST_RADIUS:
+		if offset.length() < _blast_radius():
 			ch.take_damage(_damage, _shooter, 0)
 
 func _get_characters() -> Array:
@@ -222,25 +246,27 @@ func _spawn_explosion_vfx() -> void:
 	var parent := get_parent()
 	if parent == null:
 		return
-	# Flash sáng cam.
+	var heavy: bool = _is_heavy()
+	var tint: Color = _blast_tint()
+	# Flash sáng theo màu đạn (.338 tím, đạn thường cam).
 	var flash := OmniLight3D.new()
-	flash.light_color = Color(1.0, 0.6, 0.1)
-	flash.light_energy = 18.0
-	flash.omni_range = 7.0
+	flash.light_color = tint
+	flash.light_energy = 26.0 if heavy else 18.0
+	flash.omni_range = 10.0 if heavy else 7.0
 	flash.light_specular = 0.0
 	parent.add_child(flash)
 	flash.global_position = global_position
-	get_tree().create_timer(0.1).timeout.connect(
+	get_tree().create_timer(0.12).timeout.connect(
 		func(): if is_instance_valid(flash): flash.queue_free())
-	# Quả cầu lửa phình to rồi tắt.
+	# Quả cầu lửa phình to rồi tắt (.338 to hơn).
 	var ball_mat := StandardMaterial3D.new()
-	ball_mat.albedo_color = Color(1.0, 0.55, 0.12, 0.85)
+	ball_mat.albedo_color = Color(tint.r, tint.g, tint.b, 0.85)
 	ball_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	ball_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	var ball := MeshInstance3D.new()
 	var ball_mesh := SphereMesh.new()
-	ball_mesh.radius = 0.25
-	ball_mesh.height = 0.5
+	ball_mesh.radius = 0.35 if heavy else 0.25
+	ball_mesh.height = 0.7 if heavy else 0.5
 	ball.mesh = ball_mesh
 	ball.material_override = ball_mat
 	ball.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -248,19 +274,22 @@ func _spawn_explosion_vfx() -> void:
 	ball.global_position = global_position
 	var tw := ball.create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(ball, "scale", Vector3.ONE * 4.0, 0.3)
+	tw.tween_property(ball, "scale", Vector3.ONE * (6.0 if heavy else 4.0), 0.3)
 	tw.tween_property(ball_mat, "albedo_color:a", 0.0, 0.3)
 	tw.tween_callback(ball.queue_free).set_delay(0.35)
-	# Tia lửa bắn ra mọi hướng.
-	for i in range(10):
+	# Tia lửa bắn ra mọi hướng (.338 nhiều + to hơn).
+	var n_spark: int = 16 if heavy else 10
+	for i in range(n_spark):
 		var mat := StandardMaterial3D.new()
-		mat.albedo_color = Color(1.0, 0.5 + randf_range(0.0, 0.3), 0.0, 0.7)
+		var sc: Color = tint
+		sc.r = clampf(sc.r + randf_range(0.0, 0.15), 0.0, 1.0)
+		mat.albedo_color = Color(sc.r, sc.g, sc.b, 0.75)
 		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		var mi := MeshInstance3D.new()
 		var sph := SphereMesh.new()
-		sph.radius = 0.05
-		sph.height = 0.1
+		sph.radius = 0.07 if heavy else 0.05
+		sph.height = 0.14 if heavy else 0.1
 		mi.mesh = sph
 		mi.material_override = mat
 		mi.position = Vector3(randf_range(-0.15, 0.15), randf_range(-0.15, 0.15), randf_range(-0.15, 0.15))
@@ -269,7 +298,7 @@ func _spawn_explosion_vfx() -> void:
 		mi.global_position = global_position
 		var t2 := mi.create_tween()
 		t2.set_parallel(true)
-		t2.tween_property(mi, "position", mi.position * 4.0, 0.25)
+		t2.tween_property(mi, "position", mi.position * (5.0 if heavy else 4.0), 0.25)
 		t2.tween_property(mat, "albedo_color:a", 0.0, 0.25)
 		t2.tween_callback(mi.queue_free).set_delay(0.3)
 
@@ -303,17 +332,18 @@ func _spawn_trail(step_len: float) -> void:
 	if parent == null:
 		return
 	# Vệt mờ DÀI kéo về sau theo hướng bay — nối liền theo từng bước để đọc hướng rõ.
-	var trail_len: float = minf(step_len + 1.2, 3.4)
+	var style: Dictionary = _trail_style()
+	var trail_len: float = minf(step_len + 1.2, style["max"])
 	var mat := MeshBuilder.emit_mat(
-		Color(0.55, 0.85, 1.0, 0.45),
-		Color(0.6, 0.9, 1.0), 5.0)
+		style["color"],
+		style["e"], 5.0)
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.metallic_specular = 0.0
 	var mi := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
-	cyl.top_radius = 0.03
-	cyl.bottom_radius = 0.03
+	cyl.top_radius = style["r"]
+	cyl.bottom_radius = style["r"]
 	cyl.height = trail_len
 	cyl.radial_segments = 6
 	mi.mesh = cyl

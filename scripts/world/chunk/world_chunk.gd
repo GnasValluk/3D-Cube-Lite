@@ -17,6 +17,7 @@ const _DenseTreeProp = preload("res://scripts/world/props/dense_tree_prop.gd")
 const _EggplantProp = preload("res://scripts/world/props/eggplant_prop.gd")
 const _WatermelonVine = preload("res://scripts/world/props/watermelon_vine_prop.gd")
 const _PumpkinVine = preload("res://scripts/world/props/pumpkin_vine_prop.gd")
+const _PlainsBush = preload("res://scripts/world/props/plains_bush_prop.gd")
 const _Terrain = preload("chunk_terrain.gd")
 const _Village = preload("village.gd")
 const _ChimneySmoke = preload("chimney_smoke.gd")
@@ -314,6 +315,7 @@ const _PROP_SPAWN_COST := {
 	"pumpkin": 1,
 	"watermelon": 1,
 	"eggplant": 1,
+	"cherry_bush": 1,
 	"mud_crab": 2,
 }
 
@@ -1721,6 +1723,27 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				var variant := "plains"
 				plant_props.append({"type": "oak", "pos": Vector3(px, y, pz), "variant": variant})
 
+	# ── 8d. Bụi cherry tím dại — đồng cỏ, xa nước ≥2 ──────────────────────────
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var bush_bio: int = biome_grid[vx][vz]
+				if not _Data.is_grass_tile(bush_bio):
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if wdist[vx * cols + vz] <= 2:
+					continue
+				var chance: float = 0.0045 if bush_bio == _Data.TileType.GRASS_DIRT else 0.0016
+				if randf() < chance:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					if _is_on_road(world_ox + px, world_oz + pz):
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "cherry_bush", "pos": Vector3(px, y, pz), "variant": "plains"})
+
 	# ── 8e. Cây cà tím dại — SÁT ĐƯỜNG ĐI (cách đường ≤2 ô), KHÔNG mọc trên đường ──
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		for vx in range(cols):
@@ -2497,25 +2520,29 @@ static func _build_water_mesh(bd: _BlockData, cols: int, dim_id: int,
 			# Top face (+y) — luôn có vì tl là đỉnh cao nhất
 			_add_quad(st, Vector3(px, top_y + hv, pz), Vector3(hh, 0, 0), Vector3(0, 0, hh), Vector3(0, 1, 0), col)
 
-			# Side faces: band [nb_top+1 .. tl] nếu neighbor thấp hơn (hoặc 0 nước).
+			# Side faces: band [bề mặt hàng xóm .. bề mặt cột hiện tại] nếu neighbor
+			# thấp hơn (hoặc 0 nước). Vách KHỚP đúng 2 bề mặt nước (không lệch 0.5 slab)
+			# → khối nước 4 mặt kín, không còn khe hở ở mép mực nước / bờ.
 			# NOTE: tops là z-major (ti = z*cols+x) → x-neighbor lệch ±1, z lệch ±cols.
 			var nxm: int = tops[ti - 1] if x > 0 else _nb_water_top(bd, nb_data, cols, x, max_ly, z, -1, 0, fluid_kind)
 			var nxp: int = tops[ti + 1] if x + 1 < cols else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 1, 0, fluid_kind)
 			var nzm: int = tops[ti - cols] if z > 0 else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 0, -1, fluid_kind)
 			var nzp: int = tops[ti + cols] if z + 1 < cols else _nb_water_top(bd, nb_data, cols, x, max_ly, z, 0, 1, fluid_kind)
 
+			# Đỉnh vách = đúng mặt nước (cùng mặt phẳng với top face) — không lệch xuống.
+			var ytop := (float(tl + Y_MIN) + 1.0) * SLAB
 			if nxp < tl:
-				var ya := (float(maxi(nxp, -1) + 1 + Y_MIN) + 0.5) * SLAB
-				_add_quad(st, Vector3(px + hh + EPS, (ya + top_y) * 0.5, pz), Vector3(0, (top_y - ya) * 0.5, 0), Vector3(0, 0, hh), Vector3(1, 0, 0), col)
+				var ya := (float(maxi(nxp, -1) + 1 + Y_MIN)) * SLAB
+				_add_quad(st, Vector3(px + hh + EPS, (ya + ytop) * 0.5, pz), Vector3(0, (ytop - ya) * 0.5, 0), Vector3(0, 0, hh), Vector3(1, 0, 0), col)
 			if nxm < tl:
-				var ya := (float(maxi(nxm, -1) + 1 + Y_MIN) + 0.5) * SLAB
-				_add_quad(st, Vector3(px - hh - EPS, (ya + top_y) * 0.5, pz), Vector3(0, (top_y - ya) * 0.5, 0), Vector3(0, 0, hh), Vector3(-1, 0, 0), col)
+				var ya := (float(maxi(nxm, -1) + 1 + Y_MIN)) * SLAB
+				_add_quad(st, Vector3(px - hh - EPS, (ya + ytop) * 0.5, pz), Vector3(0, (ytop - ya) * 0.5, 0), Vector3(0, 0, hh), Vector3(-1, 0, 0), col)
 			if nzp < tl:
-				var ya := (float(maxi(nzp, -1) + 1 + Y_MIN) + 0.5) * SLAB
-				_add_quad(st, Vector3(px, (ya + top_y) * 0.5, pz + hh + EPS), Vector3(hh, 0, 0), Vector3(0, (top_y - ya) * 0.5, 0), Vector3(0, 0, 1), col)
+				var ya := (float(maxi(nzp, -1) + 1 + Y_MIN)) * SLAB
+				_add_quad(st, Vector3(px, (ya + ytop) * 0.5, pz + hh + EPS), Vector3(hh, 0, 0), Vector3(0, (ytop - ya) * 0.5, 0), Vector3(0, 0, 1), col)
 			if nzm < tl:
-				var ya := (float(maxi(nzm, -1) + 1 + Y_MIN) + 0.5) * SLAB
-				_add_quad(st, Vector3(px, (ya + top_y) * 0.5, pz - hh - EPS), Vector3(hh, 0, 0), Vector3(0, (top_y - ya) * 0.5, 0), Vector3(0, 0, -1), col)
+				var ya := (float(maxi(nzm, -1) + 1 + Y_MIN)) * SLAB
+				_add_quad(st, Vector3(px, (ya + ytop) * 0.5, pz - hh - EPS), Vector3(hh, 0, 0), Vector3(0, (ytop - ya) * 0.5, 0), Vector3(0, 0, -1), col)
 	return st.commit()
 
 ## ── _nb_water_top: top layer fluid của ô (x+dx, z+dz), băng qua biên chunk ──────
@@ -3138,6 +3165,11 @@ func _process(delta: float) -> void:
 			_spawn_prop_child(prop)
 		elif ptype == "oak":
 			var prop := _OakProp.new(250, DestroyableProp.WeaponReq.AXE, "block_oak_wood")
+			prop.position = pd["pos"]
+			prop.setup(pd.get("variant", "plains"))
+			_spawn_prop_child(prop)
+		elif ptype == "cherry_bush":
+			var prop := _PlainsBush.new(40, DestroyableProp.WeaponReq.SWORD, "cherry")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "plains"))
 			_spawn_prop_child(prop)

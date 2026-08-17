@@ -21,6 +21,7 @@ const EAT_TIMES: Dictionary = {
 	"watermelon_slice": 1.2,
 	"pumpkin_slice": 1.2,
 	"orange": 2.2,
+	"cherry": 1.0,
 	"cooked_pork": 3.2,
 	"baked_taro": 2.2,
 	"cooked_shrimp": 1.0,
@@ -93,6 +94,7 @@ static func create_item_db() -> Dictionary:
 	_add(db, "egg_pig",        "Trứng Heo",          ItemDef.Type.MATERIAL, Color(0.87, 0.72, 0.63), "🥚", "Trứng heo — giữ chuột trái để ngắm, thả để ném; chạm đất nở heo con", true, 16)
 
 	_add(db, "pumpkin", "Trái Bí Đỏ", ItemDef.Type.FOOD, Color(0.91,0.41,0.21), "🎃", "Trái bí đỏ — cầu dẹp 8-10 múi khía sâu, cam cháy ấm, cuống gỗ 5 góc; chế biến món ăn, trang trí hoặc đục thành đèn lồng", true, 16, 14)
+	_add(db, "cherry", "Quả Cherry Tím", ItemDef.Type.FOOD, Color(0.55, 0.10, 0.45), "🍒", "Chùm cherry tím mọng — hái từ bụi cây dại ở đồng bằng; ăn nhanh, hồi ít máu", true, 16, 4)
 
 	# ── Món ăn đã nấu chín (từ Bếp Nấu) ────────────────────────────────────────
 	_add(db, "cooked_pork",     "Thịt Heo Nướng",   ItemDef.Type.FOOD, Color(0.55, 0.30, 0.22), "🥓", "Thịt heo nướng chín vàng — thơm ngon, hồi máu cao hơn thịt sống", true, 16, 26)
@@ -309,7 +311,7 @@ const WEIGHTS: Dictionary = {
 	"crossbow": 1.8, "fishing_rod": 0.6, "watermelon_cannon": 5.0,
 	"pumpkin_mortar": 4.0, "leather_gloves": 0.5, "ak_12": 4.0, "bullet_762mm": 0.3, "m200": 6.0, "bullet_338mm": 0.4,
 	"watermelon": 2.0, "pumpkin": 1.5, "jack_o_lantern": 1.5,
-	"coconut": 0.6, "orange": 0.15, "eggplant_fruit": 0.3,
+	"coconut": 0.6, "orange": 0.15, "eggplant_fruit": 0.3, "cherry": 0.08,
 	"eggplant_slice": 0.1, "watermelon_slice": 0.15, "pumpkin_slice": 0.1,
 	"eggplant_seed": 0.05, "watermelon_seed": 0.05, "pumpkin_seed": 0.05, "orange_seed": 0.05,
 	"coconut_seed": 0.1, "taro_seed": 0.1, "seaweed_seed": 0.05, "seagrass_seed": 0.05,
