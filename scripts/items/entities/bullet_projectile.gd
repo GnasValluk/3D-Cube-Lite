@@ -21,6 +21,14 @@ const BLAST_RADIUS: float = 2.0
 ## ".338"  (M200): vệt bay tím, viên to hơn, nổ lớn hơn, nổ màu tím.
 var calibre: String = "7.62"
 
+## Nguyên tố sát thương chính (mặc định Vật Lý).
+var damage_type: int = CharacterBase.DamageType.PHYSICAL
+## Nguyên tố phụ (-1 = không có) + tỷ lệ % sát thương chuyển sang nguyên tố phụ.
+## VD M200 DarkVoid: damage_type=SPACE, damage_type_alt=PHYSICAL, alt_frac=0.2
+## → 80% Dmg Không Gian + 20% Dmg Vật Lý.
+var damage_type_alt: int = -1
+var alt_frac: float = 0.0
+
 var _damage: int = 8
 var _shooter: Node = null
 var _speed: float = 120.0
@@ -38,6 +46,11 @@ func _is_heavy() -> bool:
 
 func _blast_radius() -> float:
 	return 3.5 if _is_heavy() else BLAST_RADIUS
+
+## Chia _damage thành phần nguyên tố chính/thuần (tổng không đổi).
+func _split_damage() -> Dictionary:
+	var dmg_alt: int = roundi(float(_damage) * alt_frac) if damage_type_alt >= 0 else 0
+	return { "primary": _damage - dmg_alt, "alt": dmg_alt }
 
 func _body_color() -> Color:
 	return Color(0.62, 0.20, 0.85) if _is_heavy() else Color(0.95, 0.75, 0.30)
@@ -220,13 +233,18 @@ func _explode_on_target() -> void:
 	_spawn_explosion_vfx()
 
 func _deal_blast_damage() -> void:
+	var split := _split_damage()
 	for ch in _get_characters():
 		if ch == _shooter:
 			continue
 		var offset: Vector3 = global_position - ch.global_position
 		offset.y = 0.0
 		if offset.length() < _blast_radius():
-			ch.take_damage(_damage, _shooter, 0)
+			# 1 nhát gộp tổng dmg (giáp chỉ trừ 1 lần, i-frame 1 lần) với nguyên tố
+			# chính; số dmg nguyên tố phụ chỉ hiển thị thêm dưới dạng số nổi.
+			ch.take_damage(_damage, _shooter, damage_type)
+			if split.alt > 0:
+				ch._spawn_damage_number(split.alt, _shooter, damage_type_alt)
 
 func _get_characters() -> Array:
 	var chars: Array = []

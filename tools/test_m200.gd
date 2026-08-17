@@ -99,6 +99,15 @@ func _ready() -> void:
 	_M200.fire(player)
 	var spawned_after: int = get_tree().get_nodes_in_group("bullets").size()
 	_check(spawned_after == spawned_before + 1, "fire spawn 1 BulletProjectile")
+	var shot: Node = null
+	for b in get_tree().get_nodes_in_group("bullets"):
+		shot = b
+	_check(shot != null and shot.get("damage_type") == _PC.DamageType.SPACE, "m200: đạn nguyên tố chính = Không Gian")
+	_check(shot != null and shot.get("damage_type_alt") == _PC.DamageType.PHYSICAL, "m200: đạn nguyên tố phụ = Vật Lý")
+	_check(shot != null and absf(shot.get("alt_frac") - 0.2) < 0.001, "m200: alt_frac = 0.2 (20% vật lý)")
+	if shot != null:
+		var split: Dictionary = shot.call("_split_damage")
+		_check(split.alt > 0 and split.primary + split.alt == int(shot.get("_damage")), "chia dmg đúng tổng (%d K.Gian + %d V.Lý = %d)" % [split.primary, split.alt, int(shot.get("_damage"))])
 	_check(_count(player.inventory, _IDB.items_db["bullet_338mm"].id) == 4, "bắn 1 phát → còn 4 đạn")
 	_check(player._equipped_durability == dura_before - 1, "bắn → giảm 1 độ bền")
 	_check(player._m200_recoil > 0.0, "bắn → khởi tạo giật nòng")

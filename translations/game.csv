@@ -225,11 +225,12 @@ PARTY_STAMINA_REGEN,Stamina Regen: %.1f/s,Hồi Stamina: %.1f/s
 PARTY_STAMINA_REFUND,Stamina Refund: %d,Hoàn Stamina: %d
 PARTY_STAMINA_COST,%d Stamina,%d Stamina
 PARTY_NEED_CHAR,Need at least 1 character,Cần ít nhất một nhân vật
-ELEM_ELECTRIC,Electric,Điện
-ELEM_FIRE,Fire,Hỏa
+ELEM_PHYSICAL,Physical,Vật Lý
 ELEM_ICE,Ice,Băng
-ELEM_DARK,Dark,Hắc Ám
-ELEM_DECAY,Decay,Phân hủy
+ELEM_LIGHTNING,Lightning,Lôi
+ELEM_FIRE,Fire,Hỏa
+ELEM_POISON,Poison,Độc
+ELEM_SPACE,Space,Không Gian
 ELEM_LIGHT,Light,Ánh Sáng
 LIB_TAB_CREATURES,Creatures,Sinh vật
 LIB_SECTION_PARTY,— PARTY —,— ĐỘI —

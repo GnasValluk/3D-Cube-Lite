@@ -19,23 +19,30 @@ signal level_up(new_level: int)
 signal submerged(underwater: bool)
 
 # ── Damage type system ─────────────────────────────────────────────────────────
-enum DamageType { PHYSICAL, POISON, FIRE, WATER, LIGHTNING, ICE }
+## Hệ thống nguyên tố sát thương (7 nguyên tố):
+## Vật Lý, Băng, Lôi, Hoả, Độc + Không Gian, Ánh Sáng.
+enum DamageType { PHYSICAL, ICE, LIGHTNING, FIRE, POISON, SPACE, LIGHT }
 const DAMAGE_TYPE_COLORS: Dictionary = {
-	DamageType.PHYSICAL:   Color(1.0, 1.0, 1.0),
-	DamageType.POISON:     Color(0.20, 0.85, 0.20),
-	DamageType.FIRE:       Color(1.0, 0.35, 0.05),
-	DamageType.WATER:      Color(0.20, 0.55, 1.0),
-	DamageType.LIGHTNING:  Color(1.0, 0.85, 0.0),
-	DamageType.ICE:        Color(0.40, 0.85, 1.0),
+	DamageType.PHYSICAL:  Color(1.0, 1.0, 1.0),
+	DamageType.ICE:       Color(0.40, 0.85, 1.0),
+	DamageType.LIGHTNING: Color(1.0, 0.85, 0.0),
+	DamageType.FIRE:      Color(1.0, 0.35, 0.05),
+	DamageType.POISON:    Color(0.20, 0.85, 0.20),
+	DamageType.SPACE:     Color(0.68, 0.25, 1.0),
+	DamageType.LIGHT:     Color(1.0, 0.92, 0.60),
 }
 const DAMAGE_TYPE_NAMES: Dictionary = {
-	DamageType.PHYSICAL:   "Dmg Vật Lý",
-	DamageType.POISON:     "Dmg Độc",
-	DamageType.FIRE:       "Dmg Lửa",
-	DamageType.WATER:      "Dmg Nước",
-	DamageType.LIGHTNING:  "Dmg Điện",
-	DamageType.ICE:        "Dmg Băng",
+	DamageType.PHYSICAL:  "Dmg Vật Lý",
+	DamageType.ICE:       "Dmg Băng",
+	DamageType.LIGHTNING: "Dmg Lôi",
+	DamageType.FIRE:      "Dmg Hoả",
+	DamageType.POISON:    "Dmg Độc",
+	DamageType.SPACE:     "Dmg Không Gian",
+	DamageType.LIGHT:     "Dmg Ánh Sáng",
 }
+## Nguyên tố bản thân sinh vật (khớp thứ tự DamageType) — dùng để hiển thị
+## thư viện sinh vật / mở rộng hệ khắc chế sau này.
+enum Element { PHYSICAL, ICE, LIGHTNING, FIRE, POISON, SPACE, LIGHT }
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
 @export var max_hp:             int   = 100

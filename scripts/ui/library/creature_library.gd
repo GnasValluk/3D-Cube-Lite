@@ -62,10 +62,12 @@ var _tab_buttons: Array[Button] = []
 
 func _get_element_name(elem: int) -> String:
 	match elem:
-		1: return tr("ELEM_ELECTRIC")
-		2: return tr("ELEM_ICE")
-		3: return tr("ELEM_DECAY")
-		5: return tr("ELEM_DARK")
+		0: return tr("ELEM_PHYSICAL")
+		1: return tr("ELEM_ICE")
+		2: return tr("ELEM_LIGHTNING")
+		3: return tr("ELEM_FIRE")
+		4: return tr("ELEM_POISON")
+		5: return tr("ELEM_SPACE")
 		6: return tr("ELEM_LIGHT")
 	return ""
 

@@ -79,6 +79,10 @@ static func fire(player) -> void:
 
 	var bullet := BulletProjectile.new()
 	bullet.calibre = ".338"
+	# DarkVoid: 80% Dmg Không Gian + 20% Dmg Vật Lý.
+	bullet.damage_type = CharacterBase.DamageType.SPACE
+	bullet.damage_type_alt = CharacterBase.DamageType.PHYSICAL
+	bullet.alt_frac = 0.2
 	var world: Node = player.get_tree().current_scene
 	if world:
 		world.add_child(bullet)
