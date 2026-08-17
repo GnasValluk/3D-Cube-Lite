@@ -1,11 +1,12 @@
-class_name M200IdleVFX
+class_name WeaponNeonVFX
 extends Node3D
 
-## VFX idle của M200 DarkVoid — chạy mọi lúc khi súng được cầm / rơi ngoài đất:
-## - Các dải neon tím/cyan trên thân nhấp nháy (pulse albedo + emission).
-## - Lõi năng lượng tím ở đầu nòng thở phồng + hào quang mờ xoay.
-## - 4 hạt neon bay lượn quanh nòng theo quỹ đạo sin.
-## - Đèn tím mềm chiếu nhẹ ra môi trường tối.
+## VFX idle neon chung cho vũ khí cyberpunk:
+## M200 DarkVoid (tím/cyan) — AK-12 Neon (vàng/lôi).
+## - Các dải neon trên thân pulse (albedo brightness + emission).
+## - Lõi năng lượng đầu nòng thở phồng + hào quang xoay.
+## - Hạt neon bay lượn quanh nòng theo quỹ đạo sin.
+## - Đèn màu nhẹ chiếu ra môi trường tối.
 
 var _t: float = 0.0
 var _active: bool = false
@@ -23,29 +24,39 @@ var _mote_base: Array[Vector3] = []
 var _mote_phase: Array[float] = []
 var _mote_tint: Array[Color] = []
 
-func setup(mats: Array) -> void:
+## mats: dải neon trên súng sẽ nhấp nháy (StandardMaterial3D, tự dò màu gốc).
+## core_col/halo_col: màu lõi năng lượng + hào quang đầu nòng.
+## tint_a/tint_b: 2 màu hạt neon bay quanh nòng.
+## light_col: màu đèn môi trường nhẹ.
+## muzzle: vị trí lõi năng lượng (đầu nòng). mote_start/step: dàn hạt dọc nòng.
+## light_pos: vị trí đèn.
+func setup(mats: Array, core_col: Color, halo_col: Color,
+		tint_a: Color, tint_b: Color, light_col: Color,
+		muzzle: Vector3, mote_start: float, mote_step: float, light_pos: Vector3) -> void:
 	_pulse_mats = mats
 	_base_cols.clear()
 	for m in mats:
 		_base_cols.append(m.albedo_color if m is StandardMaterial3D else Color.WHITE)
-	_build_visuals()
+	_build_visuals(core_col, halo_col, tint_a, tint_b, light_col, muzzle, mote_start, mote_step, light_pos)
 	_active = true
 
-func _build_visuals() -> void:
-	_core_mat = _glow_mat(Color(0.72, 0.35, 1.0))
+func _build_visuals(core_col: Color, halo_col: Color, tint_a: Color, tint_b: Color,
+		light_col: Color, muzzle: Vector3, mote_start: float, mote_step: float, light_pos: Vector3) -> void:
+	_core_mat = _glow_mat(core_col)
 	_core = _glow_sphere(0.018, _core_mat)
-	_core.position = Vector3(0, 0.60, -0.012)
+	_core.position = muzzle
 	add_child(_core)
 
-	_halo_mat = _glow_mat(Color(0.55, 0.20, 1.0))
+	_halo_mat = _glow_mat(halo_col)
 	_halo = _glow_sphere(0.036, _halo_mat)
-	_halo.position = Vector3(0, 0.60, -0.012)
+	_halo.position = muzzle
 	add_child(_halo)
 
-	var tints := [Color(0.20, 0.90, 1.0), Color(0.78, 0.40, 1.0)]
+	var tints := [tint_a, tint_b]
+	var bz: float = muzzle.z
 	for i in 4:
 		var m := _glow_sphere(0.008, _glow_mat(tints[i % 2]))
-		m.position = Vector3(0, 0.12 + float(i) * 0.13, -0.012)
+		m.position = Vector3(0, mote_start + float(i) * mote_step, bz)
 		add_child(m)
 		_motes.append(m)
 		_mote_base.append(m.position)
@@ -53,11 +64,11 @@ func _build_visuals() -> void:
 		_mote_tint.append(tints[i % 2])
 
 	_light = OmniLight3D.new()
-	_light.light_color = Color(0.55, 0.30, 1.0)
+	_light.light_color = light_col
 	_light.light_energy = 0.9
 	_light.omni_range = 2.2
 	_light.shadow_enabled = false
-	_light.position = Vector3(0, 0.30, -0.012)
+	_light.position = light_pos
 	add_child(_light)
 
 func _process(delta: float) -> void:

@@ -198,7 +198,7 @@ static func create_item_db() -> Dictionary:
 
 	_add(db, "arrow", "Mũi Tên", ItemDef.Type.MATERIAL, Color(0.60, 0.50, 0.35), "🪶", "Đạn cho nỏ — tiêu hao khi bắn", true, 64)
 	_add(db, "watermelon_nuke_ammo", "Đạn Hạt Nhân Dưa Hấu", ItemDef.Type.MATERIAL, Color(0.18, 0.50, 0.12), "☢", "Đạn cho pháo dưa hấu hạt nhân — tiêu hao khi bắn", true, 32)
-	_add(db, "ak_12", "Súng Trường AK-12", ItemDef.Type.WEAPON, Color(0.20, 0.24, 0.18), "🔫", "Súng trường tấn công AK-12 — bắn tự động đạn 7,62mm, tiêu hao đạn và độ bền khi khai hỏa", false, 1, 0, 8, 0, -1, 400)
+	_add(db, "ak_12", "Súng Trường AK-12 Lôi", ItemDef.Type.WEAPON, Color(0.20, 0.24, 0.18), "🔫", "Súng trường điện tử AK-12 Lôi — thân void đen dải neon vàng, bắn tự động đạn 7,62mm pha năng lượng. Đạn gây 80% Dmg Vật Lý + 20% Dmg Lôi khi trúng đích", false, 1, 0, 8, 0, -1, 400)
 	_add(db, "bullet_762mm", "Đạn 7,62mm", ItemDef.Type.MATERIAL, Color(0.72, 0.62, 0.25), "▮", "Đạn súng trường 7,62×39mm — tiêu hao khi bắn AK-12", true, 64)
 	_add(db, "m200", "Súng Bắn Tỉa M200 DarkVoid", ItemDef.Type.WEAPON, Color(0.20, 0.12, 0.30), "🎯", "Súng bắn tỉa hạng nặng DarkVoid bản cyberpunk — thân void đen tuyền, neon tím/cyan, lõi năng lượng nhấp nháy khi cầm. Đạn 80% Dmg Không Gian + 20% Dmg Vật Lý — bắn phát một, giữ chuột trái ngắm kính, nhả ra để bắn. Sát thương cao, tiêu hao đạn .338 và độ bền", false, 1, 0, 16, 0, -1, 400)
 	_add(db, "bullet_338mm", "Đạn .338 Lapua", ItemDef.Type.MATERIAL, Color(0.85, 0.75, 0.20), "▮", "Đạn bắn tỉa .338 Lapua — tiêu hao khi bắn M200", true, 64)

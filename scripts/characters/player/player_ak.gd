@@ -118,6 +118,9 @@ static func fire_shot(player) -> void:
 
 	var bullet := BulletProjectile.new()
 	bullet.calibre = "7.62"
+	bullet.damage_type = CharacterBase.DamageType.LIGHTNING
+	bullet.damage_type_alt = CharacterBase.DamageType.PHYSICAL
+	bullet.alt_frac = 0.2
 	var world: Node = player.get_tree().current_scene
 	if world:
 		world.add_child(bullet)

@@ -37,6 +37,7 @@ func _ready() -> void:
 		_check(not ak.stackable, "ak_12 không stackable")
 		_check(ak.atk_bonus >= 7, "ak_12 atk_bonus >= 7 (got %d)" % ak.atk_bonus)
 		_check(ak.max_durability >= 200, "ak_12 max_durability >= 200")
+		_check(ak.name.contains("Lôi"), "ak_12 tên chứa 'Lôi' (got '%s')" % ak.name)
 	if ammo:
 		_check(ammo.type == ItemDef.Type.MATERIAL, "bullet_762mm type = MATERIAL")
 		_check(ammo.stackable and ammo.max_stack >= 16, "bullet_762mm stackable >= 16")
@@ -49,6 +50,9 @@ func _ready() -> void:
 	var hf := pivot.get_node_or_null("HoldForward")
 	_check(hf != null, "ak_12: súng được bọc trong HoldForward (không đổi hold base)")
 	_check(hf != null and hf.position.is_equal_approx(Vector3(0, 0.05, 0)), "ak_12: HoldForward nhích ra trước nòng 0.05")
+	var ak_vfx := pivot.get_node_or_null("HoldForward/AK12VFX")
+	_check(ak_vfx != null, "ak_12: có node idle VFX AK12VFX")
+	_check(ak_vfx != null and ak_vfx.get_child_count() >= 6, "ak_12: VFX có lõi/halo/hạt neon/đèn (children=%d)" % (ak_vfx.get_child_count() if ak_vfx != null else -1))
 	_TL.build_held(pivot, "bullet_762mm")
 	_check(pivot.get_child_count() > 0, "build_held(bullet_762mm) tạo mesh")
 	var drop_pivot := Node3D.new()
@@ -91,6 +95,18 @@ func _ready() -> void:
 	_check(_count(player.inventory, _IDB.items_db["bullet_762mm"].id) == 9, "bắn 1 phát → còn 9 đạn")
 	_check(player._equipped_durability == dura_before - 1, "bắn → giảm 1 độ bền")
 	_check(player._ak_recoil > 0.0, "bắn → khởi tạo giật nòng")
+	var shot_bullet: Node = null
+	for b in get_tree().get_nodes_in_group("bullets"):
+		if b.is_inside_tree():
+			shot_bullet = b
+			break
+	_check(shot_bullet != null and shot_bullet.get("calibre") == "7.62", "đạn calibre 7.62")
+	_check(shot_bullet != null and shot_bullet.get("damage_type") == _PC.DamageType.LIGHTNING, "ak: đạn nguyên tố chính = Lôi")
+	_check(shot_bullet != null and shot_bullet.get("damage_type_alt") == _PC.DamageType.PHYSICAL, "ak: đạn nguyên tố phụ = Vật Lý")
+	_check(shot_bullet != null and absf(shot_bullet.get("alt_frac") - 0.2) < 0.001, "ak: alt_frac = 0.2 (20% lôi)")
+	if shot_bullet != null:
+		var split: Dictionary = shot_bullet.call("_split_damage")
+		_check(split.alt > 0 and split.primary + split.alt == int(shot_bullet.get("_damage")), "chia dmg đúng tổng (%d Lôi + %d V.Lý = %d)" % [split.primary, split.alt, int(shot_bullet.get("_damage"))])
 	for b in get_tree().get_nodes_in_group("bullets"):
 		b.free()
 
