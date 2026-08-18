@@ -2821,7 +2821,8 @@ static func _get_grass_resources() -> Array:
 	if _grass_mat == null:
 		_grass_mat = StandardMaterial3D.new()
 		_grass_mat.vertex_color_use_as_albedo = true
-		_grass_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		# Cỏ/rêu shaded để bắt sáng DirectionalLight3D (không còn flat unshaded).
+		_grass_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
 	return [_grass_box, _grass_mat]
 
 ## Khởi tạo grass resources trên MAIN thread trước khi chunk worker chạm tới —

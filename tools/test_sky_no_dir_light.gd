@@ -1,9 +1,9 @@
 extends Node
 
-## Smoke test: sky tự vẽ bằng shader — KHÔNG có DirectionalLight3D.
-## Kiểm tra real_world_environment + twilight_environment build sky
-## ShaderMaterial, update_sky đẩy đúng uniforms, và scene không chứa
-## DirectionalLight3D.
+## Smoke test: sky tự vẽ mặt trời bằng shader (SkyLight.update_sky) và thế giới
+## có đúng 1 DirectionalLight3D "SunLight" (bóng đổ), KHÔNG còn ambient light.
+## Kiểm tra real_world_environment + twilight_environment build sky ShaderMaterial
+## với uniforms hợp lệ, và scene có SunLight + ambient_light_energy = 0.
 
 var _failures: int = 0
 
@@ -38,28 +38,36 @@ func _ready() -> void:
 	_check(top_night.r < 0.1, "đêm sky_top_color tối")
 	_check(mat.get_shader_parameter("sun_energy") < 0.1, "đêm sun_energy ~ 0")
 
-	# 3. Scene real không chứa DirectionalLight3D.
+	# 3. Scene real có đúng 1 DirectionalLight3D "SunLight" + không ambient.
 	var scene := load("res://scenes/open_world_real.tscn")
 	var inst: Node = scene.instantiate()
 	add_child(inst)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var dirs := inst.find_children("*", "DirectionalLight3D", true, false)
-	_check(dirs.size() == 0, "open_world_real KHÔNG có DirectionalLight3D")
+	_check(dirs.size() == 1, "open_world_real có đúng 1 DirectionalLight3D (có %d)" % dirs.size())
+	if dirs.size() == 1:
+		var sun := dirs[0] as DirectionalLight3D
+		_check(sun.name == "SunLight", "DirectionalLight3D tên 'SunLight' (có '%s')" % sun.name)
+		_check(sun.shadow_enabled, "SunLight bật shadow")
 	var env := inst.get_node_or_null("WorldEnvironment") as WorldEnvironment
 	_check(env != null, "WorldEnvironment tồn tại")
 	if env:
 		var rw := env as RealWorldEnvironment
 		_check(rw._sky_mat != null and rw._sky_mat is ShaderMaterial, "real_world_environment._sky_mat là ShaderMaterial")
+		_check(absf(env.environment.ambient_light_energy) < 0.001, "ambient_light_energy = 0 (có %g)" % env.environment.ambient_light_energy)
 	inst.queue_free()
 	await get_tree().process_frame
 
-	# 4. Twilight (hub/main) cũng không cần DirectionalLight3D.
+	# 4. Twilight (hub/main) cũng có SunLight + không ambient.
 	var tw_script: GDScript = load("res://scripts/world/environment/twilight_environment.gd") as GDScript
 	var tw: Node = tw_script.new()
 	add_child(tw)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	var tw_sun := tw.get_node_or_null("SunLight") as DirectionalLight3D
+	_check(tw_sun != null and tw_sun.shadow_enabled, "twilight có SunLight + shadow")
+	_check(absf(tw.environment.ambient_light_energy) < 0.001, "twilight ambient_light_energy = 0")
 	_check(tw._sky_mat is ShaderMaterial, "twilight_environment._sky_mat là ShaderMaterial")
 	tw.queue_free()
 	await get_tree().process_frame

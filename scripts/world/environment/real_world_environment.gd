@@ -2,6 +2,7 @@ extends WorldEnvironment
 class_name RealWorldEnvironment
 
 var _sky_mat: ShaderMaterial
+var _sun: DirectionalLight3D = null
 
 const CYCLE_DURATION: float = 600.0
 
@@ -51,7 +52,8 @@ func _ready() -> void:
 
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color  = k["amb"]
-	env.ambient_light_energy = k["ae"]
+	# Không ambient — ánh sáng đến từ DirectionalLight3D (SunLight) duy nhất.
+	env.ambient_light_energy = 0.0
 
 	env.fog_enabled = true
 	env.fog_density = 0.0
@@ -71,6 +73,7 @@ func _ready() -> void:
 		DeviceManager.device_changed.connect(func(_m: bool): _reapply_preset())
 
 	_setup_lights()
+	_ensure_sun()
 
 func _apply_graphics_preset(env: Environment) -> void:
 	if not SettingsManager:
@@ -156,6 +159,33 @@ func _setup_lights() -> void:
 		if l:
 			l.light_energy = 0.0
 
+func _ensure_sun() -> void:
+	if _sun != null:
+		return
+	_sun = DirectionalLight3D.new()
+	_sun.name = "SunLight"
+	_sun.light_color = Color(1.0, 0.95, 0.85)
+	_sun.shadow_enabled = true
+	_sun.shadow_blur = 2.0
+	add_child(_sun)
+
+func _update_sun(h: float, rain_factor: float) -> void:
+	if _sun == null:
+		return
+	# Hướng nắng ăn khớp mặt trời trên sky shader (SkyLight): 6h chân trời đông,
+	# 12h đỉnh đầu, 18h tây.
+	var elev_deg: float = 90.0 * sin((h - 6.0) / 12.0 * PI)
+	var day_t: float = clamp((elev_deg + 5.0) / 95.0, 0.0, 1.0)
+	var yaw_deg: float = 90.0 - h * 15.0
+	var pitch_rad := deg_to_rad(elev_deg)
+	var yaw_rad := deg_to_rad(yaw_deg)
+	var sun_dir := Vector3(cos(pitch_rad) * cos(yaw_rad), sin(pitch_rad), cos(pitch_rad) * sin(yaw_rad))
+	var up := Vector3.FORWARD if absf(sun_dir.y) > 0.99 else Vector3.UP
+	_sun.look_at(_sun.global_position - sun_dir, up)
+	var warm: float = clamp(1.0 - absf(h - 17.0) / 3.0, 0.0, 1.0)
+	_sun.light_color = Color(1.0, 0.95, 0.85).lerp(Color(1.0, 0.62, 0.30), warm * 0.8)
+	_sun.light_energy = lerp(0.0, 4.0, day_t) * rain_factor
+
 func _reapply_preset() -> void:
 	if environment:
 		_apply_graphics_preset(environment)
@@ -171,7 +201,8 @@ func _process(delta: float) -> void:
 
 	SkyLight.update_sky(_sky_mat, h, weather_intensity, float(TimeSystem.get_total_days()) if TimeSystem else -1.0)
 	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
-	environment.ambient_light_energy = k["ae"] * rain_factor
+	environment.ambient_light_energy = 0.0
+	_update_sun(h, rain_factor)
 
 	environment.fog_density = weather_intensity * 0.012
 	environment.fog_height_density = weather_intensity * 0.08
