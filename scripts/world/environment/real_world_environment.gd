@@ -182,9 +182,14 @@ func _update_sun(h: float, rain_factor: float) -> void:
 	var sun_dir := Vector3(cos(pitch_rad) * cos(yaw_rad), sin(pitch_rad), cos(pitch_rad) * sin(yaw_rad))
 	var up := Vector3.FORWARD if absf(sun_dir.y) > 0.99 else Vector3.UP
 	_sun.look_at(_sun.global_position - sun_dir, up)
-	var warm: float = clamp(1.0 - absf(h - 17.0) / 3.0, 0.0, 1.0)
-	_sun.light_color = Color(1.0, 0.95, 0.85).lerp(Color(1.0, 0.62, 0.30), warm * 0.8)
-	_sun.light_energy = lerp(0.0, 4.0, day_t) * rain_factor
+	# Bình minh (~7h) và hoàng hôn (~17h) ngả vàng cam ấm; buổi trưa giữ
+	# trắng-vàng mềm (không chói) cho dễ nhìn.
+	var sunrise_t: float = clamp(1.0 - absf(h - 7.0) / 2.0, 0.0, 1.0)
+	var sunset_t: float = clamp(1.0 - absf(h - 17.0) / 3.0, 0.0, 1.0)
+	var warm: float = maxf(sunrise_t, sunset_t)
+	_sun.light_color = Color(1.0, 0.97, 0.90).lerp(Color(1.0, 0.62, 0.30), warm * 0.8)
+	# Energy trưa vừa phải (~1.6) để không bị chá/chói, sáng lên mềm theo độ cao.
+	_sun.light_energy = lerp(0.0, 1.6, pow(day_t, 0.6)) * rain_factor
 
 func _reapply_preset() -> void:
 	if environment:
