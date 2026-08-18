@@ -2020,7 +2020,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	if not grass_xforms.is_empty():
 		var gres := _get_grass_resources()
 		var gcube := gres[0] as BoxMesh
-		var gmat := gres[1] as StandardMaterial3D
+		var gmat := gres[1] as Material
 		gcube.material = gmat
 		var gmm := MultiMesh.new()
 		gmm.transform_format = MultiMesh.TRANSFORM_3D
@@ -2082,11 +2082,11 @@ static func _multimesh_buffer(mm: MultiMesh, xforms: Array, colors: Array) -> vo
 static func _build_xform_multimesh(xforms: Array, colors: Array,
 		shadow_on: bool = false, unshaded: bool = true) -> MultiMeshInstance3D:
 	var cube: BoxMesh
-	var mat: StandardMaterial3D
+	var mat: Material
 	if unshaded:
 		var res := _get_grass_resources()
 		cube = res[0] as BoxMesh
-		mat = res[1] as StandardMaterial3D
+		mat = res[1] as Material
 	else:
 		var res := _get_village_resources()
 		cube = res[0] as BoxMesh
@@ -2807,22 +2807,20 @@ void fragment() {
 
 static var _mat_cache: Dictionary = {}
 
-## ── Cache dùng chung cho grass/rêu: 1 BoxMesh + 1 StandardMaterial3D ────────
+## ── Cache dùng chung cho grass/rêu: 1 BoxMesh + 1 ShaderMaterial (sway) ──────
 ## Mỗi chunk trước đây tự tạo BoxMesh + material mới → D3D12 phải compile
 ## shader pipeline mỗi lần chunk mới stream vào (stutter ~100-300ms). Dùng chung
 ## 1 resource cho mọi chunk → GPU pipeline cache hit, giảm hẳn spike khi lướt.
 static var _grass_box: BoxMesh = null
-static var _grass_mat: StandardMaterial3D = null
+static var _grass_mat: ShaderMaterial = null
 
 static func _get_grass_resources() -> Array:
 	if _grass_box == null:
 		_grass_box = BoxMesh.new()
 		_grass_box.size = Vector3.ONE
 	if _grass_mat == null:
-		_grass_mat = StandardMaterial3D.new()
-		_grass_mat.vertex_color_use_as_albedo = true
-		# Cỏ/rêu shaded để bắt sáng DirectionalLight3D (không còn flat unshaded).
-		_grass_mat.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+		_grass_mat = ShaderMaterial.new()
+		_grass_mat.shader = load("res://scripts/world/chunk/grass.gdshader")
 	return [_grass_box, _grass_mat]
 
 ## Khởi tạo grass resources trên MAIN thread trước khi chunk worker chạm tới —

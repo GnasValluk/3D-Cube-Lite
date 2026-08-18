@@ -40,8 +40,8 @@ func _ready() -> void:
 	_check(absf(env.environment.ambient_light_energy) < 0.001,
 		"Real world ambient_light_energy = 0 (có %g)" % env.environment.ambient_light_energy)
 	if WorldChunk._grass_mat != null:
-		_check(int(WorldChunk._grass_mat.shading_mode) == BaseMaterial3D.SHADING_MODE_PER_PIXEL,
-			"grass shading = PER_PIXEL (nhận sáng)")
+		_check(WorldChunk._grass_mat is ShaderMaterial,
+			"grass dùng ShaderMaterial sway (nhận sáng + đu đưa)")
 
 	# ── 2. Twilight (hub/main) ──────────────────────────────────────────────
 	var tw := _Twilight.new()

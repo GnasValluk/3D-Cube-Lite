@@ -195,7 +195,9 @@ static func _add_seagrass_clump(s: int, offset: Vector3, blade_count: int,
 			var voxel_scale: float = GV * taper * height_scale
 			var b := Basis().scaled(Vector3.ONE * voxel_scale)
 			out_xforms.append(Transform3D(b, Vector3(pos_x, pos_y, pos_z)))
-			out_colors.append(col * 0.72)
+			var c := col * 0.72
+			c.a = t  # chiều cao trong lá (0= gốc, 1= ngọn) → shader sway
+			out_colors.append(c)
 
 static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float, height_scale: float, out_xforms: Array, out_colors: Array) -> void:
 	var ss := s
@@ -210,7 +212,7 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 		var curve_angle: float = angle + (float(ss & 0x7FFF) / 32768.0 - 0.5) * 1.2
 		ss = ss * 16807 + 1
 		var cv := float(ss & 0xFF) / 256.0
-		var base_col := Color(0.04 + cv * 0.12, 0.30 + cv * 0.32, 0.02 + cv * 0.06)
+		var base_col := Color(0.03 + cv * 0.12, 0.34 + cv * 0.34, 0.02 + cv * 0.06)
 		var mature: bool = (ss & 0x1) == 0
 
 		var bx: float = offset.x + cos(angle) * radius
@@ -235,7 +237,7 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 			if mature and t > 0.65:
 				var seed_t := (t - 0.65) / 0.35
 				var gold := Color(0.85 + cv * 0.10, 0.72 + cv * 0.08, 0.10 + cv * 0.05)
-				var green := Color(0.10 + cv * 0.12, 0.52 + cv * 0.18, 0.04 + cv * 0.06)
+				var green := Color(0.08 + cv * 0.12, 0.56 + cv * 0.20, 0.03 + cv * 0.06)
 				col = green.lerp(gold, seed_t)
 			else:
 				col = base_col.lerp(Color(base_col.r + 0.18, base_col.g + 0.10, base_col.b * 0.7), t)
@@ -247,6 +249,8 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 			var voxel_scale: float = GV * taper * height_scale
 			var b := Basis().scaled(Vector3.ONE * voxel_scale)
 			out_xforms.append(Transform3D(b, Vector3(pos_x, pos_y, pos_z)))
-			out_colors.append(col * 0.88)
+			var c := col * 0.88
+			c.a = t  # chiều cao trong lá (0= gốc, 1= ngọn) → shader sway
+			out_colors.append(c)
 
 		# (Bông lúa sẽ thêm sau)
