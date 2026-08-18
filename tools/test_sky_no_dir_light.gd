@@ -81,6 +81,20 @@ func _ready() -> void:
 		_check(absf(env.environment.ambient_light_energy) <= 0.35, "ambient = fill nhẹ dịu bóng (có %.2f)" % env.environment.ambient_light_energy)
 		_check(rw._sun.light_color.g > rw._sun.light_color.b, "trưa SunLight ngả vàng ấm (color %s)" % rw._sun.light_color.to_html())
 		_check_moon_cycle(rw)
+	# Mây thể tích thật (VolumetricClouds) + nút bật/tắt ở setting đồ hoạ.
+	var clouds_node := inst.get_node_or_null("VolumetricClouds")
+	_check(clouds_node != null, "real world có VolumetricClouds (mây thể tích)")
+	if clouds_node:
+		_check(clouds_node.visible, "mây thể tích hiển thị khi bật")
+		var was_on: bool = SettingsManager.clouds_enabled if SettingsManager else true
+		if SettingsManager:
+			SettingsManager.clouds_enabled = false
+		await get_tree().process_frame
+		_check(not clouds_node.visible, "tắt mây → ẩn VolumetricClouds")
+		if SettingsManager:
+			SettingsManager.clouds_enabled = was_on
+		await get_tree().process_frame
+		_check(clouds_node.visible, "bật lại mây → VolumetricClouds hiện")
 	inst.queue_free()
 	await get_tree().process_frame
 

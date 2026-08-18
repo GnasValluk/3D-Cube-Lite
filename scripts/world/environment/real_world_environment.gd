@@ -1,9 +1,15 @@
 extends WorldEnvironment
 class_name RealWorldEnvironment
 
+const _VolumetricClouds := preload("res://scripts/world/environment/volumetric_clouds.gd")
+
 var _sky_mat: ShaderMaterial
 var _sun: DirectionalLight3D = null
 var _moon: DirectionalLight3D = null
+var _clouds: MeshInstance3D = null
+var _player: Node3D = null
+var _sun_dir := Vector3(0.0, 1.0, 0.0)
+var _moon_dir := Vector3(0.0, -1.0, 0.0)
 
 const CYCLE_DURATION: float = 600.0
 
@@ -75,6 +81,7 @@ func _ready() -> void:
 
 	_setup_lights()
 	_ensure_sun()
+	_setup_clouds()
 
 func _apply_graphics_preset(env: Environment) -> void:
 	if not SettingsManager:
@@ -190,6 +197,7 @@ func _update_sun(h: float, rain_factor: float) -> void:
 	var pitch_rad := deg_to_rad(elev_deg)
 	var yaw_rad := deg_to_rad(yaw_deg)
 	var sun_dir := Vector3(cos(pitch_rad) * cos(yaw_rad), sin(pitch_rad), cos(pitch_rad) * sin(yaw_rad))
+	_sun_dir = sun_dir
 	var up := Vector3.FORWARD if absf(sun_dir.y) > 0.99 else Vector3.UP
 	_sun.look_at(_sun.global_position - sun_dir, up)
 	# Bình minh (~7h) và hoàng hôn (~17h) ngả vàng cam ấm; buổi trưa ngả
@@ -215,6 +223,7 @@ func _update_sun(h: float, rain_factor: float) -> void:
 	var mp_rad := deg_to_rad(moon_elev_deg)
 	var my_rad := deg_to_rad(moon_yaw_deg)
 	var moon_dir := Vector3(cos(mp_rad) * cos(my_rad), sin(mp_rad), cos(mp_rad) * sin(my_rad))
+	_moon_dir = moon_dir
 	var moon_up: float = clamp(moon_elev_deg / 40.0, 0.0, 1.0)
 	_moon.look_at(_moon.global_position - moon_dir, Vector3.FORWARD if absf(moon_dir.y) > 0.99 else Vector3.UP)
 	# Sáng đầy đủ khi trăng tròn, nhạt khi trăng mảnh.
@@ -225,6 +234,48 @@ func _update_sun(h: float, rain_factor: float) -> void:
 		phase_light = lerp(0.55, 1.0, 0.5 * (1.0 - cos(phase * TAU)))
 	_moon.visible = moon_up > 0.01 and night_factor > 0.05
 	_moon.light_energy = 0.55 * moon_up * night_factor * phase_light * rain_factor
+
+func _setup_clouds() -> void:
+	_clouds = _VolumetricClouds.new()
+	_clouds.name = "VolumetricClouds"
+	get_parent().call_deferred("add_child", _clouds)
+
+func _find_cloud_player() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	var world := tree.current_scene
+	if world == null:
+		return
+	var mgr := world.get_node_or_null("CharacterManager") as CharacterManager
+	if mgr:
+		_player = mgr.get_current_character()
+	else:
+		_player = world.get_node_or_null("Player")
+
+# Đẩy màu/hướng sáng + vị trí cho đám mây thể tích mỗi frame.
+func _update_clouds(h: float, weather: float, day_t: float) -> void:
+	if _clouds == null:
+		return
+	var night: float = 1.0 - day_t
+	var light_dir: Vector3 = _sun_dir.lerp(_moon_dir, night * 0.85)
+	if light_dir.length_squared() < 0.001:
+		light_dir = Vector3(0.0, 1.0, 0.0)
+	light_dir = light_dir.normalized()
+	var sun_low: float = clamp(1.0 - absf(_sun_dir.y) * 2.2, 0.0, 1.0)
+	var col := Color(1.04, 1.03, 0.99)
+	col = col.lerp(Color(1.28, 1.06, 0.80), sun_low * 0.55)
+	col = col.lerp(Color(0.30, 0.34, 0.48), night * 0.9)
+	col = col.lerp(Color(0.56, 0.57, 0.60), weather * 0.9)
+	var bright: float = (1.0 - night * 0.62) * (1.0 - weather * 0.2) * (0.85 + 0.3 * day_t)
+	var threshold: float = 0.42 + night * 0.05 + weather * 0.03
+	_clouds.update_clouds(light_dir, col, bright, threshold)
+	_clouds.visible = SettingsManager.clouds_enabled if SettingsManager else true
+	if _player == null or not is_instance_valid(_player):
+		_find_cloud_player()
+		if _player == null:
+			return
+	_clouds.follow(_player.global_position)
 
 func _reapply_preset() -> void:
 	if environment:
@@ -245,6 +296,9 @@ func _process(delta: float) -> void:
 	# Fill mềm theo ngày/đêm + mưa để bóng dịu, không đen tuyệt.
 	environment.ambient_light_energy = 0.25 * rain_factor * lerp(0.5, 1.0, day_t_real)
 	_update_sun(h, rain_factor)
+	# Mây thể tích thật thay mây vẽ trên sky shader (tránh trùng hai lớp).
+	_sky_mat.set_shader_parameter("cloud_cover", 0.0)
+	_update_clouds(h, weather_intensity, day_t_real)
 
 	environment.fog_density = weather_intensity * 0.012
 	environment.fog_height_density = weather_intensity * 0.08
