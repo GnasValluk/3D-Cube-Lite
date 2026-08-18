@@ -3,14 +3,15 @@ class_name RealWorldEnvironment
 
 var _sky_mat: ShaderMaterial
 var _sun: DirectionalLight3D = null
+var _moon: DirectionalLight3D = null
 
 const CYCLE_DURATION: float = 600.0
 
 var _keys: Array[Dictionary] = [
 	{ "h": 0.0, "bg": Color(0.08, 0.10, 0.20), "amb": Color(0.10, 0.12, 0.22), "ae": 0.30,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
 	{ "h": 6.0, "bg": Color(0.70, 0.55, 0.45), "amb": Color(0.65, 0.50, 0.40), "ae": 0.8,  "dc": Color(1.0, 0.85, 0.60), "de": 2.5 },
-	{ "h": 8.0, "bg": Color(0.55, 0.78, 0.88), "amb": Color(0.58, 0.60, 0.62), "ae": 1.0, "dc": Color(1.0, 0.95, 0.82), "de": 5.0 },
-	{ "h": 14.0,"bg": Color(0.55, 0.78, 0.88), "amb": Color(0.58, 0.60, 0.62), "ae": 1.2, "dc": Color(1.0, 0.95, 0.82), "de": 5.5 },
+	{ "h": 8.0, "bg": Color(0.55, 0.78, 0.88), "amb": Color(0.66, 0.62, 0.54), "ae": 1.0, "dc": Color(1.0, 0.95, 0.82), "de": 5.0 },
+	{ "h": 14.0,"bg": Color(0.55, 0.78, 0.88), "amb": Color(0.66, 0.62, 0.54), "ae": 1.2, "dc": Color(1.0, 0.95, 0.82), "de": 5.5 },
 	{ "h": 15.0,"bg": Color(0.70, 0.60, 0.45), "amb": Color(0.65, 0.55, 0.40), "ae": 1.5, "dc": Color(1.0, 0.80, 0.50), "de": 3.5 },
 	{ "h": 18.0,"bg": Color(0.30, 0.22, 0.28), "amb": Color(0.25, 0.20, 0.25), "ae": 0.35,"dc": Color(0.85, 0.60, 0.40), "de": 1.2 },
 	{ "h": 24.0,"bg": Color(0.08, 0.10, 0.20), "amb": Color(0.10, 0.12, 0.22), "ae": 0.30,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
@@ -169,6 +170,15 @@ func _ensure_sun() -> void:
 	_sun.shadow_blur = 4.0
 	add_child(_sun)
 
+	_moon = DirectionalLight3D.new()
+	_moon.name = "MoonLight"
+	_moon.light_color = Color(0.74, 0.84, 1.0)
+	_moon.light_energy = 0.0
+	_moon.shadow_enabled = true
+	_moon.shadow_blur = 6.0
+	_moon.visible = false
+	add_child(_moon)
+
 func _update_sun(h: float, rain_factor: float) -> void:
 	if _sun == null:
 		return
@@ -182,15 +192,39 @@ func _update_sun(h: float, rain_factor: float) -> void:
 	var sun_dir := Vector3(cos(pitch_rad) * cos(yaw_rad), sin(pitch_rad), cos(pitch_rad) * sin(yaw_rad))
 	var up := Vector3.FORWARD if absf(sun_dir.y) > 0.99 else Vector3.UP
 	_sun.look_at(_sun.global_position - sun_dir, up)
-	# Bình minh (~7h) và hoàng hôn (~17h) ngả vàng cam ấm; buổi trưa giữ
-	# trắng-vàng mềm (không chói) cho dễ nhìn.
+	# Bình minh (~7h) và hoàng hôn (~17h) ngả vàng cam ấm; buổi trưa ngả
+	# VÀNG ẤM dịu (không trắng gắt) cho dễ nhìn — trưa là khoảng thường xuyên
+	# nên cần cảm giác êm ái nhất có thể.
 	var sunrise_t: float = clamp(1.0 - absf(h - 7.0) / 2.0, 0.0, 1.0)
 	var sunset_t: float = clamp(1.0 - absf(h - 17.0) / 3.0, 0.0, 1.0)
 	var warm: float = maxf(sunrise_t, sunset_t)
-	_sun.light_color = Color(1.0, 0.97, 0.90).lerp(Color(1.0, 0.62, 0.30), warm * 0.8)
-	# Energy trưa giữ bằng mức lúc ~9h (không tăng tiếp) để không bị gắt/chói.
+	_sun.light_color = Color(1.0, 0.94, 0.78).lerp(Color(1.0, 0.62, 0.30), warm * 0.8)
+	# Energy trưa giữ bằng mức lúc ~9h (không tăng tiếp) + hạ nhẹ so với
+	# trước (1.6→1.45) để trưa dịu, không chói gắt.
 	var energy_t: float = minf(day_t, 0.725)
-	_sun.light_energy = lerp(0.0, 1.6, pow(energy_t, 0.6)) * rain_factor
+	_sun.light_energy = lerp(0.0, 1.45, pow(energy_t, 0.6)) * rain_factor
+
+	# ── Ánh trăng: đèn Directional ngược phía mặt trời — ban đêm có trăng sáng thật ──
+	if _moon == null:
+		return
+	# Quỹ đạo trăng khớp sky shader (SkyLight): mọc ~18h, đỉnh nửa đêm, lặn ~6h.
+	var night_factor: float = 1.0 - day_t
+	var moon_scan := fposmod(h + 12.0, 24.0)
+	var moon_elev_deg: float = 90.0 * sin(deg_to_rad((moon_scan - 6.0) * 15.0))
+	var moon_yaw_deg: float = 90.0 - moon_scan * 15.0 + 22.0
+	var mp_rad := deg_to_rad(moon_elev_deg)
+	var my_rad := deg_to_rad(moon_yaw_deg)
+	var moon_dir := Vector3(cos(mp_rad) * cos(my_rad), sin(mp_rad), cos(mp_rad) * sin(my_rad))
+	var moon_up: float = clamp(moon_elev_deg / 40.0, 0.0, 1.0)
+	_moon.look_at(_moon.global_position - moon_dir, Vector3.FORWARD if absf(moon_dir.y) > 0.99 else Vector3.UP)
+	# Sáng đầy đủ khi trăng tròn, nhạt khi trăng mảnh.
+	var days: float = float(TimeSystem.get_total_days()) if TimeSystem else -1.0
+	var phase_light: float = 1.0
+	if days >= 0.0:
+		var phase: float = fposmod(days / SkyLight.SYNODIC_MONTH, 1.0)
+		phase_light = lerp(0.55, 1.0, 0.5 * (1.0 - cos(phase * TAU)))
+	_moon.visible = moon_up > 0.01 and night_factor > 0.05
+	_moon.light_energy = 0.55 * moon_up * night_factor * phase_light * rain_factor
 
 func _reapply_preset() -> void:
 	if environment:

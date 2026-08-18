@@ -1,9 +1,10 @@
 extends Node
 
-## Smoke test: sky tự vẽ mặt trời bằng shader (SkyLight.update_sky) và thế giới
-## có đúng 1 DirectionalLight3D "SunLight" (bóng đổ), KHÔNG còn ambient light.
+## Smoke test: sky tự vẽ mặt trời/mặt trăng bằng shader (SkyLight.update_sky)
+## và thế giới có đúng 2 DirectionalLight3D: "SunLight" (trưa vàng ấm dịu) +
+## "MoonLight" (ban đêm trăng sáng thật), KHÔNG còn ambient light nặng.
 ## Kiểm tra real_world_environment + twilight_environment build sky ShaderMaterial
-## với uniforms hợp lệ, và scene có SunLight + ambient_light_energy = 0.
+## với uniforms hợp lệ, và scene có SunLight + MoonLight + ambient fill nhẹ.
 
 var _failures: int = 0
 
@@ -11,6 +12,19 @@ func _check(ok: bool, label: String) -> void:
 	print("%s | %s" % ["PASS" if ok else "FAIL", label])
 	if not ok:
 		_failures += 1
+
+func _check_moon_cycle(rw: Node) -> void:
+	# 0h: trăng lên đỉnh, đêm tối → trăng rọi sáng thế giới.
+	rw._update_sun(0.0, 1.0)
+	_check(rw._moon != null, "real_world_environment có _moon")
+	if rw._moon:
+		_check(rw._moon.visible, "0h MoonLight hiển thị (trăng trên cao)")
+		_check(rw._moon.light_energy > 0.0, "0h MoonLight rọi sáng (energy %.3f)" % rw._moon.light_energy)
+		_check(rw._sun.light_energy <= 0.001, "0h SunLight tắt (%.3f)" % rw._sun.light_energy)
+	# 12h: trưa → trăng lặn, tắt hẳn.
+	rw._update_sun(12.0, 1.0)
+	_check(not rw._moon.visible or rw._moon.light_energy <= 0.0, "trưa MoonLight tắt")
+	_check(rw._sun.light_energy > 0.0, "trưa SunLight sáng (%.3f)" % rw._sun.light_energy)
 
 func _ready() -> void:
 	print("== test_sky_no_dir_light ==")
@@ -38,37 +52,52 @@ func _ready() -> void:
 	_check(top_night.r < 0.1, "đêm sky_top_color tối")
 	_check(mat.get_shader_parameter("sun_energy") < 0.1, "đêm sun_energy ~ 0")
 
-	# 3. Scene real có đúng 1 DirectionalLight3D "SunLight" + không ambient.
+	# 3. Scene real có đúng 2 DirectionalLight3D: SunLight + MoonLight + ambient nhẹ.
 	var scene := load("res://scenes/open_world_real.tscn")
 	var inst: Node = scene.instantiate()
 	add_child(inst)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var dirs := inst.find_children("*", "DirectionalLight3D", true, false)
-	_check(dirs.size() == 1, "open_world_real có đúng 1 DirectionalLight3D (có %d)" % dirs.size())
-	if dirs.size() == 1:
-		var sun := dirs[0] as DirectionalLight3D
-		_check(sun.name == "SunLight", "DirectionalLight3D tên 'SunLight' (có '%s')" % sun.name)
-		_check(sun.shadow_enabled, "SunLight bật shadow")
+	_check(dirs.size() == 2, "open_world_real có SunLight + MoonLight (có %d)" % dirs.size())
+	var sun_found := false
+	var moon_found := false
+	for d in dirs:
+		var dl := d as DirectionalLight3D
+		if dl.name == "SunLight":
+			sun_found = true
+			_check(dl.shadow_enabled, "SunLight bật shadow")
+		elif dl.name == "MoonLight":
+			moon_found = true
+			_check(dl.shadow_enabled, "MoonLight bật shadow")
+			_check(dl.light_color.b > dl.light_color.r, "MoonLight ánh sáng mát (trắng xanh)")
+	_check(sun_found, "có DirectionalLight3D tên 'SunLight'")
+	_check(moon_found, "có DirectionalLight3D tên 'MoonLight'")
 	var env := inst.get_node_or_null("WorldEnvironment") as WorldEnvironment
 	_check(env != null, "WorldEnvironment tồn tại")
 	if env:
 		var rw := env as RealWorldEnvironment
 		_check(rw._sky_mat != null and rw._sky_mat is ShaderMaterial, "real_world_environment._sky_mat là ShaderMaterial")
 		_check(absf(env.environment.ambient_light_energy) <= 0.35, "ambient = fill nhẹ dịu bóng (có %.2f)" % env.environment.ambient_light_energy)
+		_check(rw._sun.light_color.g > rw._sun.light_color.b, "trưa SunLight ngả vàng ấm (color %s)" % rw._sun.light_color.to_html())
+		_check_moon_cycle(rw)
 	inst.queue_free()
 	await get_tree().process_frame
 
-	# 4. Twilight (hub/main) cũng có SunLight + không ambient.
+	# 4. Twilight (hub/main) cũng có SunLight + MoonLight + không ambient.
 	var tw_script: GDScript = load("res://scripts/world/environment/twilight_environment.gd") as GDScript
 	var tw: Node = tw_script.new()
 	add_child(tw)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var tw_sun := tw.get_node_or_null("SunLight") as DirectionalLight3D
+	var tw_moon := tw.get_node_or_null("MoonLight") as DirectionalLight3D
 	_check(tw_sun != null and tw_sun.shadow_enabled, "twilight có SunLight + shadow")
+	_check(tw_moon != null and tw_moon.shadow_enabled, "twilight có MoonLight + shadow")
 	_check(absf(tw.environment.ambient_light_energy) <= 0.35, "twilight ambient = fill nhẹ dịu bóng (có %.2f)" % tw.environment.ambient_light_energy)
 	_check(tw._sky_mat is ShaderMaterial, "twilight_environment._sky_mat là ShaderMaterial")
+	if tw is Node and tw._moon != null:
+		_check_moon_cycle(tw)
 	tw.queue_free()
 	await get_tree().process_frame
 

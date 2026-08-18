@@ -109,7 +109,7 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	var sun_t: float = clamp(elev_deg / 70.0, 0.0, 1.0)
 	var sun_low := Color(1.00, 0.60, 0.22)   # chạm chân trời: cam
 	var sun_mid := Color(1.00, 0.86, 0.58)   # độ cao vừa: vàng ấm
-	var sun_high := Color(1.00, 0.96, 0.84)  # cao: trắng-vàng
+	var sun_high := Color(1.00, 0.94, 0.76)  # cao: vàng ấm dịu (không trắng gắt)
 	var sun_kind: Color = sun_low.lerp(sun_mid, clamp((sun_t - 0.05) / 0.35, 0.0, 1.0))
 	sun_kind = sun_kind.lerp(sun_high, clamp((sun_t - 0.50) / 0.40, 0.0, 1.0))
 	# Buổi sáng: ấm vàng hơn; buổi chiều gần hoàng hôn: cam đỏ rực.
@@ -129,7 +129,7 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	var sun_dir := Vector3(cos(pitch_rad) * cos(yaw_rad), sin(pitch_rad), cos(pitch_rad) * sin(yaw_rad))
 	mat.set_shader_parameter("sun_dir", sun_dir)
 	mat.set_shader_parameter("sun_color", sun_color)
-	mat.set_shader_parameter("sun_energy", lerp(0.0, 2.4, day_t) * (1.0 - weather * 0.55))
+	mat.set_shader_parameter("sun_energy", lerp(0.0, 2.1, day_t) * (1.0 - weather * 0.55))
 	# Mặt trời nhỏ + xa: chỉ ~1.1° (bán kính), quầng mềm trong shader.
 	mat.set_shader_parameter("sun_angle_max", 1.1)
 	mat.set_shader_parameter("sun_curve", 0.1)
