@@ -99,12 +99,12 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"spruce_wood": _build_wood_icon(parent, "spruce_wood")
 		"swamp_wood": _build_wood_icon(parent, "swamp_wood")
 		"mangrove_wood": _build_wood_icon(parent, "mangrove_wood")
-		"log_oak": _build_wood_icon(parent, "log_oak")
-		"log_hard_wood": _build_wood_icon(parent, "log_hard_wood")
-		"log_spruce": _build_wood_icon(parent, "log_spruce")
-		"log_swamp": _build_wood_icon(parent, "log_swamp")
-		"log_mangrove": _build_wood_icon(parent, "log_mangrove")
-		"log_palm": _build_wood_icon(parent, "log_palm")
+		"log_oak": _build_log_icon(parent, "log_oak")
+		"log_hard_wood": _build_log_icon(parent, "log_hard_wood")
+		"log_spruce": _build_log_icon(parent, "log_spruce")
+		"log_swamp": _build_log_icon(parent, "log_swamp")
+		"log_mangrove": _build_log_icon(parent, "log_mangrove")
+		"log_palm": _build_log_icon(parent, "log_palm")
 		"coconut_seed": _build_seed_icon(parent, 0)
 		"taro_seed": _build_seed_icon(parent, 1)
 		"seaweed_seed": _build_seed_icon(parent, 2)
@@ -1288,7 +1288,18 @@ static func _mesh_boxes_aabb(pivot: Node3D) -> AABB:
 				result = result.merge(box)
 	return result
 
-## ── Khúc gỗ tròn (spruce/swamp/mangrove + khúc cây): vỏ xù + mặt cắt ngọn + vòng tuổi ──
+## ── Khúc cây (log): model = bộ xương thân cây VOXEL THẬT bỏ lá, dựng lại từ
+## chính code dựng cây của từng loài (OakProp.build_log, ...) — không phải
+## khối gỗ tròn như wood block. ──────────────────────────────────────────────
+static func _build_log_icon(p: Node3D, item_id: String) -> void:
+	match item_id:
+		"log_oak": OakProp.build_log(p)
+		"log_hard_wood": DenseTreeProp.build_log(p)
+		"log_spruce": FrostTreeProp.build_log(p)
+		"log_swamp": SwampTreeProp.build_log(p)
+		"log_mangrove": MangroveProp.build_log(p)
+		"log_palm": PalmProp.build_log(p)
+
 static func _build_wood_icon(p: Node3D, item_id: String) -> void:
 	var top: Color
 	var bark: Color

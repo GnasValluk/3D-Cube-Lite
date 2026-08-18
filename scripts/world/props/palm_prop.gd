@@ -508,3 +508,27 @@ func _hit_flash() -> void:
 
 func _get_mesh_instances() -> Array[MeshInstance3D]:
 	return []
+
+## Model khúc gỗ dừa = thân cong vằn sẹo THẬT (bỏ tàu lá), built từ chính
+## code dựng cây rồi canh giữa + thu nhỏ cỡ món đồ item drop.
+static func build_log(parent: Node3D) -> void:
+	var t := PalmProp.new()
+	t._variant = "river"
+	t._size = PalmSize.MEDIUM
+	t._base_h = 3.8
+	t._stage = GrowingProp.Stage.MATURE
+	var base_r: float = t._get_base_r()
+	var top_r: float = t._get_top_r()
+	t._trunk_voxels(t._base_h, base_r, top_r)
+	var positions: Array = []
+	var colors: Array = []
+	for i in range(t._ordered.size()):
+		var p: Vector3 = t._ordered[i]
+		positions.append(p)
+		colors.append(t._grid[t._key(p)])
+	t.free()
+	var mmi := _VoxelShared.build_centered(positions, _VoxelShared.TRUNK_SCALE, colors, _VoxelShared.LOG_ITEM_TARGET)
+	if mmi == null:
+		return
+	mmi.name = "LogVisual"
+	parent.add_child(mmi)

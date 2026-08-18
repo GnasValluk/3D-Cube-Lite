@@ -15,6 +15,10 @@ const BRANCH_SCALE: float = 0.075  # cành mảnh
 const LEAF_SCALE: float = 0.20     # lưới lá 3×VOXEL (0.1875) + overlap
 const FINE_SCALE: float = 0.07     # trái / cây mảnh / mầm (lưới 1×VOXEL)
 
+# Cỡ tối đa (unit icon) của model khúc gỗ khi drop — nhỏ hơn khối gỗ để
+# người chơi phân biệt được khúc cây (thân thật) với block gỗ đặt được.
+const LOG_ITEM_TARGET: float = 2.0
+
 static var _box: BoxMesh = null
 static var _mat: StandardMaterial3D = null
 
@@ -66,6 +70,34 @@ static func build(positions: Array, scales: Array, colors: Array) -> MultiMeshIn
 ## Transform cho 1 instance với scale — dùng khi tự điền MultiMesh.
 static func xform(pos: Vector3, s: float) -> Transform3D:
 	return Transform3D(Basis.from_scale(Vector3.ONE * s), pos)
+
+## Canh giữa + thu/phóng đều về quanh gốc tọa độ sao cho kích thước lớn nhất =
+## target (unit), rồi build MultiMesh. Dùng cho model khúc cây (bộ xương thân
+## cây thật) khi gắn vào item drop. Không đọc lại transform qua
+## get_instance_transform (sau set_buffer không đáng tin cậy), mà biến đổi
+## thẳng mảng vị trí trước khi build.
+static func build_centered(positions: Array, voxel_size: float, colors: Array, target: float) -> MultiMeshInstance3D:
+	var n := positions.size()
+	if n == 0:
+		return null
+	var minv := Vector3.INF
+	var maxv := -Vector3.INF
+	for i in range(n):
+		var o: Vector3 = positions[i]
+		minv = Vector3(minf(minv.x, o.x), minf(minv.y, o.y), minf(minv.z, o.z))
+		maxv = Vector3(maxf(maxv.x, o.x), maxf(maxv.y, o.y), maxf(maxv.z, o.z))
+	var ext := maxv - minv
+	var m := maxf(maxf(ext.x, ext.y), ext.z)
+	var s := 1.0
+	if m > 0.0001:
+		s = target / m
+	var center := (minv + maxv) * 0.5
+	var pos2: Array = []
+	var sc2: Array = []
+	for i in range(n):
+		pos2.append((positions[i] as Vector3 - center) * s)
+		sc2.append(voxel_size * s)
+	return build(pos2, sc2, colors)
 
 ## ── Sway budget: chỉ tính sway cho prop GẦN camera ───────────────────────────
 ## Hàng trăm cây/cỏ biển mỗi cây chạy `_process` + vài sin/cos mỗi frame dù ở

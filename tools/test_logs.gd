@@ -45,11 +45,14 @@ func _ready() -> void:
 	for id in LOG_IDS:
 		var host := Node3D.new()
 		_ItemMesh.build(host, id)
-		var mesh_count := 0
+		var found_mmi := false
+		var total_instances := 0
 		for ch in host.get_children():
-			if ch is MeshInstance3D:
-				mesh_count += 1
-		_check(mesh_count > 0, "%s build ra mesh (%d MeshInstance)" % [id, mesh_count])
+			if ch is MultiMeshInstance3D:
+				found_mmi = true
+				var mm: MultiMesh = (ch as MultiMeshInstance3D).multimesh
+				total_instances += mm.instance_count
+		_check(found_mmi and total_instances >= 40, "%s build bộ xương thân cây voxel thật (%d voxel)" % [id, total_instances])
 		host.queue_free()
 
 	# ── 3. Drop của từng cây: log đúng loại, không còn block gỗ ───────────

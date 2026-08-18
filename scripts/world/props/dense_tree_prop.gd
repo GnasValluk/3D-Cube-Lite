@@ -143,6 +143,31 @@ func _jitter(col: Color) -> Color:
 	col.b = clampf(col.b + j, 0.0, 1.0)
 	return col
 
+## Model khúc gỗ cây rừng rậm = bộ xương thân + nhánh THẬT bỏ lá (tái dùng
+## chính code dựng cây), canh giữa + thu nhỏ cỡ món đồ item drop.
+static func build_log(parent: Node3D) -> void:
+	var t := DenseTreeProp.new()
+	t._variant = "plains"
+	t._size = DenseSize.MEDIUM
+	t._base_h = 4.2
+	t._stage = GrowingProp.Stage.MATURE
+	var base_r: float = t._get_base_r()
+	var top_r: float = t._get_top_r()
+	t._trunk_voxels(t._base_h, base_r, top_r)
+	t._branch_voxels(t._base_h)
+	var positions: Array = []
+	var colors: Array = []
+	for i in range(t._ordered.size()):
+		var p: Vector3 = t._ordered[i]
+		positions.append(p)
+		colors.append(t._grid[t._key(p)])
+	t.free()
+	var mmi := _VoxelShared.build_centered(positions, _VoxelShared.TRUNK_SCALE, colors, _VoxelShared.LOG_ITEM_TARGET)
+	if mmi == null:
+		return
+	mmi.name = "LogVisual"
+	parent.add_child(mmi)
+
 ## Palette gradient xanh lÃ¡ Ä‘áº­m 6 sáº¯c: rá»«ng tháº«m â†’ xanh tÆ°Æ¡i â†’ ngá»n sÃ¡ng.
 const _LEAF_TONES: Array[Color] = [
 	Color(0.10, 0.26, 0.05),

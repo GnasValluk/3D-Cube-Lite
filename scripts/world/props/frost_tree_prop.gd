@@ -287,5 +287,28 @@ func _hit_flash() -> void:
 			mmi.material_override = orig
 	)
 
+## Model khúc gỗ vân sam = thân thật bỏ tán (bộ xương cây), built từ chính
+## code dựng cây rồi canh giữa + thu nhỏ cỡ món đồ item drop.
+static func build_log(parent: Node3D) -> void:
+	var t := FrostTreeProp.new()
+	t._variant = "snow"
+	t._size = SpruceSize.MEDIUM
+	t._base_h = 3.6
+	t._stage = GrowingProp.Stage.MATURE
+	var base_r: float = t._get_base_r()
+	t._trunk_voxels(t._base_h, base_r)
+	var positions: Array = []
+	var colors: Array = []
+	for i in range(t._ordered.size()):
+		var p: Vector3 = t._ordered[i]
+		positions.append(p)
+		colors.append(t._grid[t._key(p)])
+	t.free()
+	var mmi := _VoxelShared.build_centered(positions, _VoxelShared.TRUNK_SCALE, colors, _VoxelShared.LOG_ITEM_TARGET)
+	if mmi == null:
+		return
+	mmi.name = "LogVisual"
+	parent.add_child(mmi)
+
 func _get_mesh_instances() -> Array[MeshInstance3D]:
 	return []
