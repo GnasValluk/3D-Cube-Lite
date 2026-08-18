@@ -371,16 +371,6 @@ func _build_graphics_tab() -> void:
 	_content_vbox.add_child(distant_desc)
 	_add_toggle(tr("DISTANT_VIEW_TOGGLE"), _is_distant_view(), func(v): _set_distant_view(v))
 
-	_section_label(tr("CLOUDS"))
-	var clouds_desc := Label.new()
-	clouds_desc.text = tr("CLOUDS_DESC")
-	clouds_desc.add_theme_font_size_override("font_size", 18)
-	clouds_desc.add_theme_color_override("font_color", Color(TEXT_DIM.r, TEXT_DIM.g, TEXT_DIM.b, 0.70))
-	clouds_desc.autowrap_mode = TextServer.AUTOWRAP_WORD
-	clouds_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_content_vbox.add_child(clouds_desc)
-	_add_toggle(tr("CLOUDS_TOGGLE"), _is_clouds_enabled(), func(v): _set_clouds_enabled(v))
-
 func _build_audio_tab() -> void:
 	_section_label(tr("MASTER_VOLUME"))
 	_add_slider(_get_master_volume(), func(v): _set_master_volume(v))
@@ -506,8 +496,6 @@ func _is_vsync() -> bool: return _Settings.is_vsync()
 func _set_vsync(v: bool) -> void: _Settings.set_vsync(v)
 func _is_distant_view() -> bool: return _Settings.is_distant_view()
 func _set_distant_view(v: bool) -> void: _Settings.set_distant_view(v)
-func _is_clouds_enabled() -> bool: return _Settings.is_clouds_enabled()
-func _set_clouds_enabled(v: bool) -> void: _Settings.set_clouds_enabled(v)
 func _set_framerate(mode: int) -> void: _Settings.set_framerate(mode)
 func _get_master_volume() -> float: return _Settings.get_master_volume()
 func _set_master_volume(v: float) -> void: _Settings.set_master_volume(v)

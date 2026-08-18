@@ -39,8 +39,7 @@ static func build_sky() -> Array:
 ## - hour ∈ [0,24), weather_intensity ∈ [0,1]
 ## - dayf: số ngày đã trôi qua (đếm pha trăng). dayf < 0 → coi là full moon
 ##   (tương thích test/benchmark cũ vốn không truyền ngày).
-## - clouds: bật/tắt mây chân thật (nút setting đồ hoạ). Mặc định true.
-static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: float = -1.0, clouds: bool = true) -> void:
+static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: float = -1.0) -> void:
 	if mat == null:
 		return
 
@@ -171,10 +170,4 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 
 	mat.set_shader_parameter("night_factor", night_factor)
 	mat.set_shader_parameter("weather", weather)
-	# Độ phủ mây: trời quang ~35%, mưa nhẹ ~60%, mưa to ~95%.
-	# Mưa/tuyết → KHÔNG có mây (bầu trời quang đãng để thấy hạt rơi rõ hơn).
-	# Trời quang: mây puffy ~35%; khi mưa/tuyết: 0%.
-	mat.set_shader_parameter("cloud_cover", lerp(0.35, 0.0, weather))
-	# Nút bật/tắt mây ở setting đồ hoạ — tắt hoàn toàn (bầu trời sạch, + FPS).
-	mat.set_shader_parameter("clouds_on", 1.0 if clouds else 0.0)
 	mat.set_shader_parameter("star_time", Time.get_ticks_msec() / 1000.0)

@@ -53,7 +53,7 @@ func _ready() -> void:
 	_check(mat.get_shader_parameter("sun_energy") < 0.1, "đêm sun_energy ~ 0")
 
 	# 3. Cả 2 thế giới (open_world mặc định + open_world_real) dùng real_world_environment:
-	# SunLight + MoonLight + mây thể tích thật, ambient nhẹ.
+	# SunLight + MoonLight + ambient nhẹ.
 	for scene_path in ["res://scenes/open_world.tscn", "res://scenes/open_world_real.tscn"]:
 		var inst: Node = load(scene_path).instantiate()
 		add_child(inst)
@@ -83,25 +83,6 @@ func _ready() -> void:
 			_check(absf(env.environment.ambient_light_energy) <= 0.35, "%s: ambient = fill nhẹ dịu bóng (có %.2f)" % [label, env.environment.ambient_light_energy])
 			_check(rw._sun.light_color.g > rw._sun.light_color.b, "%s: trưa SunLight ngả vàng ấm (color %s)" % [label, rw._sun.light_color.to_html()])
 			_check_moon_cycle(rw)
-		# Mây thể tích thật (VolumetricClouds) + nút bật/tắt ở setting đồ hoạ.
-		var clouds_node := inst.get_node_or_null("VolumetricClouds")
-		_check(clouds_node != null, "%s: có VolumetricClouds (mây thể tích)" % label)
-		if clouds_node:
-			var was_on: bool = SettingsManager.clouds_enabled if SettingsManager else true
-			if SettingsManager:
-				SettingsManager.clouds_enabled = true
-			await get_tree().process_frame
-			_check(clouds_node.visible, "%s: bật mây → VolumetricClouds hiện" % label)
-			if SettingsManager:
-				SettingsManager.clouds_enabled = false
-			await get_tree().process_frame
-			_check(not clouds_node.visible, "%s: tắt mây → ẩn VolumetricClouds" % label)
-			if SettingsManager:
-				SettingsManager.clouds_enabled = true
-			await get_tree().process_frame
-			_check(clouds_node.visible, "%s: bật lại mây → VolumetricClouds hiện lại" % label)
-			if SettingsManager:
-				SettingsManager.clouds_enabled = was_on
 		inst.queue_free()
 		await get_tree().process_frame
 

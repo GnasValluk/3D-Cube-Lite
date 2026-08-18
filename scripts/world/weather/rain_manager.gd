@@ -6,7 +6,7 @@ extends Node3D
 ## - Trong BIO BĂNG GIÁ (FROST): mưa biến thành TUYẾT — hạt tròn trắng, rơi
 ##   chậm hơn, không có splash.
 ## - Không còn đám mây tối trên đầu khi mưa (theo yêu cầu: mưa/tuyết → không
-##   có mây; bầu trời quang đãng nhờ cloud_cover của sky shader bị tắt khi mưa).
+##   có mây; bầu trời phai xám nhờ shader khi trời mưa).
 
 class Zone:
 	var center: Vector2
