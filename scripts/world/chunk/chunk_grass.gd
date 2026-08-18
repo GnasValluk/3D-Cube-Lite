@@ -1,6 +1,6 @@
 extends RefCounted
 
-const GV: float = 0.028
+const GV: float = 0.036
 const _GRASS_CONST_INF: int = 999
 
 static func _noise(x: float, y: float) -> float:
@@ -56,7 +56,7 @@ static func add_voxel_grass(vx: int, vz: int, pos: Vector3, out_xforms: Array, o
 	if blade_count < 2:
 		return
 
-	var height_scale: float = 1.4 + (det * 0.5 + 0.5) * 1.4
+	var height_scale: float = 2.0 + (det * 0.5 + 0.5) * 1.8
 	var spread_val: float = 0.20 + (det2 * 0.5 + 0.5) * 0.20
 
 	var seed_val: int = wx * 1000 + wz * 371 + 5000
@@ -210,7 +210,7 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 		var curve_angle: float = angle + (float(ss & 0x7FFF) / 32768.0 - 0.5) * 1.2
 		ss = ss * 16807 + 1
 		var cv := float(ss & 0xFF) / 256.0
-		var base_col := Color(0.06 + cv * 0.12, 0.20 + cv * 0.25, 0.02 + cv * 0.06)
+		var base_col := Color(0.04 + cv * 0.12, 0.30 + cv * 0.32, 0.02 + cv * 0.06)
 		var mature: bool = (ss & 0x1) == 0
 
 		var bx: float = offset.x + cos(angle) * radius
@@ -235,7 +235,7 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 			if mature and t > 0.65:
 				var seed_t := (t - 0.65) / 0.35
 				var gold := Color(0.85 + cv * 0.10, 0.72 + cv * 0.08, 0.10 + cv * 0.05)
-				var green := Color(0.14 + cv * 0.12, 0.45 + cv * 0.15, 0.04 + cv * 0.06)
+				var green := Color(0.10 + cv * 0.12, 0.52 + cv * 0.18, 0.04 + cv * 0.06)
 				col = green.lerp(gold, seed_t)
 			else:
 				col = base_col.lerp(Color(base_col.r + 0.18, base_col.g + 0.10, base_col.b * 0.7), t)
@@ -247,6 +247,6 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 			var voxel_scale: float = GV * taper * height_scale
 			var b := Basis().scaled(Vector3.ONE * voxel_scale)
 			out_xforms.append(Transform3D(b, Vector3(pos_x, pos_y, pos_z)))
-			out_colors.append(col * 0.72)
+			out_colors.append(col * 0.88)
 
 		# (Bông lúa sẽ thêm sau)
