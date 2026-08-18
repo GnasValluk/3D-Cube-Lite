@@ -17,8 +17,6 @@ var _ground_y: float = 0.0
 var _throw_damage: int = 0
 var _throw_attacker: Node3D = null
 var _player: Node3D = null
-var _hl: MeshInstance3D = null
-var _hl_mat: StandardMaterial3D = null
 
 const MAGNET_RANGE: float = 3.0
 const FLY_SPEED: float = 7.0
@@ -83,74 +81,6 @@ func _setup_mesh():
 	collision_layer = 1
 	collision_mask = 0
 	set_process(true)
-	_setup_highlight(root)
-
-## Khung highlight (aura vàng trong mờ, nhấp nháy) quanh vật phẩm — dễ thấy
-## khi drop/đánh rơi đồ. Kích cỡ ôm vừa AABB của visual thật (khúc gỗ dài
-## nằm ngang → khung bọc dài theo trục, không cố định khối vuông nhỏ).
-func _setup_highlight(root: Node3D) -> void:
-	var aabb := _gather_visual_aabb(root)
-	if aabb.size.length_squared() <= 0.0001:
-		aabb = AABB(Vector3(-0.35, -0.35, -0.35), Vector3(0.7, 0.7, 0.7))
-	var pad := Vector3(0.5, 0.5, 0.5)
-	if aabb.size.length() > 2.5:
-		pad = Vector3(0.9, 0.35, 0.35)
-	_hl = MeshInstance3D.new()
-	_hl.name = "ItemHighlight"
-	var box := BoxMesh.new()
-	box.size = aabb.size + pad
-	_hl.mesh = box
-	_hl.position = aabb.position + aabb.size * 0.5
-	_hl_mat = StandardMaterial3D.new()
-	_hl_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_hl_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_hl_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_hl_mat.albedo_color = Color(1.0, 0.93, 0.55, 0.30)
-	_hl.material_override = _hl_mat
-	# Gắn vào root (không phải self) để highlight di chuyển/xoay cùng model.
-	root.add_child(_hl)
-
-## Gộp AABB của mọi visual (MeshInstance3D/MultiMeshInstance3D) dưới `root` về
-## toạ độ local của root. Dùng chuỗi transform LOCAL (item chưa vào scene lúc
-## init nên không được dùng get_global_transform). Với model dựng qua
-## build_centered thì đọc AABB chuẩn ghi sẵn trong meta "item_aabb"
-## (MultiMesh.get_aabb() = 0 trong headless, get_instance_transform bất định
-## sau set_buffer).
-func _gather_visual_aabb(root: Node3D) -> AABB:
-	var out := AABB()
-	var has := false
-	for gi in root.find_children("*", "", true, false):
-		var n := gi as Node3D
-		if n == null:
-			continue
-		var bounds := AABB()
-		if gi is MultiMeshInstance3D:
-			var mm := (gi as MultiMeshInstance3D).multimesh
-			if mm == null or mm.mesh == null:
-				continue
-			if (gi as MultiMeshInstance3D).has_meta("item_aabb"):
-				bounds = (gi as MultiMeshInstance3D).get_meta("item_aabb")
-			else:
-				bounds = mm.get_aabb()
-		elif gi is MeshInstance3D:
-			bounds = (gi as MeshInstance3D).get_aabb()
-		else:
-			continue
-		if bounds.size.length_squared() <= 0.0001:
-			continue
-		var xf := n.transform
-		var par := n.get_parent()
-		while par != null and par != root:
-			if par is Node3D:
-				xf = (par as Node3D).transform * xf
-			par = par.get_parent()
-		var b := xf * bounds
-		if not has:
-			out = b
-			has = true
-		else:
-			out = out.merge(b)
-	return out
 
 func _build_fish_model(parent: Node3D, item_id: String) -> void:
 	var variant: int = 0
@@ -289,12 +219,6 @@ func _process(delta: float):
 		position.y += bob * delta * 2.0
 		var rot := delta * 30.0
 		rotation.y += deg_to_rad(rot)
-		if _hl_mat:
-			var a: float = 0.20 + 0.10 * (0.5 + 0.5 * sin(_time_alive * 3.0))
-			_hl_mat.albedo_color = Color(1.0, 0.93, 0.55, a)
-		if _hl:
-			var s: float = 1.0 + 0.04 * (0.5 + 0.5 * sin(_time_alive * 3.0))
-			_hl.scale = Vector3(s, s, s)
 
 ## Vật phẩm rơi từ trên cao (không có launch): có trọng lực, rớt chạm đất rồi đứng yên.
 ## Nếu lúc đo chưa raycast trúng đất thật (chunk chưa có collider), cứ rơi tiếp theo
