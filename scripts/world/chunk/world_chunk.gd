@@ -26,7 +26,7 @@ const _WaterFlow = preload("water_flow.gd")
 const _OreTex = preload("res://scripts/items/models/ore_texture.gd")
 const _MangroveProp = preload("res://scripts/world/props/mangrove_prop.gd")
 const _CattailProp = preload("res://scripts/world/props/cattail_prop.gd")
-const _MudCrabProp = preload("res://scripts/world/props/mud_crab_prop.gd")
+const _MudCrabCreature = preload("res://scripts/characters/crab/mud_crab_character.gd")
 const _FrostTreeProp = preload("res://scripts/world/props/frost_tree_prop.gd")
 const _SeaPlantProp = preload("res://scripts/world/props/sea_plant_prop.gd")
 const _SwampTreeProp = preload("res://scripts/world/props/swamp_tree_prop.gd")
@@ -3209,10 +3209,9 @@ func _process(delta: float) -> void:
 			prop.setup()
 			_spawn_prop_child(prop)
 		elif ptype == "mud_crab":
-			var prop := _MudCrabProp.new(_MudCrabProp.MAX_HP, DestroyableProp.WeaponReq.NONE, "mud_crab")
-			prop.position = pd["pos"]
-			prop.setup()
-			_spawn_prop_child(prop)
+			var creature := _MudCrabCreature.new()
+			creature.position = pd["pos"]
+			_spawn_prop_child(creature)
 		elif ptype == "spruce":
 			var prop := _FrostTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "spruce_wood")
 			prop.position = pd["pos"]

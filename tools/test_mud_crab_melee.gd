@@ -5,7 +5,7 @@ extends Node
 ## trong CharacterManager, gọi _do_melee_hit() → kiểm tra hp giảm.
 ## Chạy qua tools/test_mud_crab_melee.tscn.
 
-const _Crab = preload("res://scripts/world/props/mud_crab_prop.gd")
+const _Crab = preload("res://scripts/characters/crab/mud_crab_character.gd")
 
 var _failures: int = 0
 
@@ -34,12 +34,13 @@ func _ready() -> void:
 		player.equipped_weapon = ItemDatabase.items_db.get("iron_sword")
 
 	# Cua bùn ngay trước mặt player (cùng mực Y, hướng +Z)
-	var crab := _Crab.new(_Crab.MAX_HP, _Crab.WeaponReq.NONE, "mud_crab")
+	var crab := _Crab.new()
 	add_child(crab)
+	crab.set_physics_process(false)
 	crab.position = player.global_position + Vector3(0, 0, 1.0)
 	await get_tree().process_frame
-	_check(crab.hp > 0 and crab.hp <= _Crab.MAX_HP, "cua ban đầu hp = %d" % crab.hp)
-	_check(absf(crab.hit_radius - 0.6) < 0.001, "cua hit_radius = 0.6 (có %s)" % crab.hit_radius)
+	_check(crab.hp > 0 and crab.hp <= crab.max_hp, "cua ban đầu hp = %d" % crab.hp)
+	_check(absf(crab.hit_radius - 0.5) < 0.001, "cua hit_radius = 0.5 (có %s)" % crab.hit_radius)
 
 	var hp0: int = crab.hp
 	player.rotation.y = 0.0
@@ -48,8 +49,9 @@ func _ready() -> void:
 
 	# ── Bỏ vũ khí (tay không): melee_range 2.2 → với hit_radius ăn được ở ~2.6m ──
 	player.equipped_weapon = null
-	var crab_far := _Crab.new(_Crab.MAX_HP, _Crab.WeaponReq.NONE, "mud_crab")
+	var crab_far := _Crab.new()
 	add_child(crab_far)
+	crab_far.set_physics_process(false)
 	crab_far.position = player.global_position + Vector3(0, 0, 2.6)
 	await get_tree().process_frame
 	player.rotation.y = 0.0
@@ -58,13 +60,16 @@ func _ready() -> void:
 	_check(crab_far.hp < hp_far, "melee trúng cua cách 2.6m (hit_radius ăn theo) (%d → %d)" % [hp_far, crab_far.hp])
 
 	# ── Đòn chết: cua mới, tay không (dmg 1) → vài đòn là chết ──
-	var crab2 := _Crab.new(_Crab.MAX_HP, _Crab.WeaponReq.NONE, "mud_crab")
+	var crab2 := _Crab.new()
 	add_child(crab2)
+	crab2.set_physics_process(false)
 	crab2.position = player.global_position + Vector3(0, 0, 0.8)
 	await get_tree().process_frame
 	var guard := 0
 	var last_hp2: int = crab2.hp
 	while last_hp2 > 0 and guard < 10 and is_instance_valid(crab2):
+		if is_instance_valid(crab2):
+			crab2._invul_timer = 0.0
 		player._do_melee_hit()
 		guard += 1
 		last_hp2 = crab2.hp if is_instance_valid(crab2) else 0

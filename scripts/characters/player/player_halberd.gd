@@ -116,6 +116,13 @@ static func _apply_throw_damage(player, dir: Vector3, landing_pos: Vector3, dmg:
 				f.take_damage(dmg, player)
 				_knockback(f, dir)
 				hit_any = true
+	var crab_nodes: Array[Node] = player.get_tree().get_nodes_in_group("crab")
+	for cn in crab_nodes:
+		if is_instance_valid(cn) and cn.get("is_alive"):
+			if _segment_dist(start, end, cn.global_position) <= 0.9 + cn.hit_radius:
+				cn.take_damage(dmg, player)
+				_knockback(cn, dir)
+				hit_any = true
 	if hit_any:
 		SFXManager.play_damage_hit()
 

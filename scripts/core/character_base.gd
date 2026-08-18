@@ -869,6 +869,28 @@ func _do_melee_hit() -> void:
 					sn.take_damage(dmg, self)
 					landed = true
 
+	# Also hit cua bùn (crab) — sinh vật lang thang không dưới CharacterManager nên
+	# phải quét nhóm "crab" riêng (giống cá/heo/slime). Bullet/ranged đã đánh qua
+	# CharacterBase trong bullet_projectile, melee + halberd cần khai báo group này.
+	var crab_nodes := get_tree().get_nodes_in_group("crab")
+	for cn in crab_nodes:
+		if not is_instance_valid(cn) or not cn.get("is_alive"):
+			continue
+		var offset: Vector3 = cn.global_position - global_position
+		offset.y = 0.0
+		var dist: float = offset.length()
+		if dist <= max_dist + cn.hit_radius:
+			var dot: float = fwd.dot(offset / dist)
+			if dot >= angle_threshold:
+					SFXManager.play_damage_hit()
+					var dmg: int = attack_power
+					if _is_player:
+						var pc := self as PlayerCharacter
+						if pc and pc.equipped_weapon:
+							dmg += pc.equipped_weapon.atk_bonus
+					cn.take_damage(dmg, self)
+					landed = true
+
 	# Also hit destroyable props (đèn, cây, v.v.)
 	var weapon_id: String = ""
 	if _is_player:
