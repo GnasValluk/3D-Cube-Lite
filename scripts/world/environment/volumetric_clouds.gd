@@ -8,8 +8,8 @@ class_name VolumetricClouds
 
 const SHADER := preload("res://scripts/world/environment/clouds_volumetric.gdshader")
 
-const CLOUD_MIN_Y := 55.0
-const CLOUD_MAX_Y := 115.0
+const CLOUD_MIN_Y := 100.0
+const CLOUD_MAX_Y := 210.0
 const BOX_HALF := 1500.0
 
 var _mat: ShaderMaterial

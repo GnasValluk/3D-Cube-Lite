@@ -267,8 +267,8 @@ func _update_clouds(h: float, weather: float, day_t: float) -> void:
 	col = col.lerp(Color(1.28, 1.06, 0.80), sun_low * 0.55)
 	col = col.lerp(Color(0.30, 0.34, 0.48), night * 0.9)
 	col = col.lerp(Color(0.56, 0.57, 0.60), weather * 0.9)
-	var bright: float = (1.0 - night * 0.62) * (1.0 - weather * 0.2) * (0.9 + 0.32 * day_t)
-	var threshold: float = 0.46 + night * 0.05 + weather * 0.03
+	var bright: float = (1.0 - night * 0.62) * (1.0 - weather * 0.2) * (0.9 + 0.26 * day_t)
+	var threshold: float = 0.60 + night * 0.04 + weather * 0.02
 	_clouds.update_clouds(light_dir, col, bright, threshold)
 	_clouds.visible = SettingsManager.clouds_enabled if SettingsManager else true
 	if _player == null or not is_instance_valid(_player):
