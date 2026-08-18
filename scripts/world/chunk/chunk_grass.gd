@@ -192,8 +192,12 @@ static func _add_seagrass_clump(s: int, offset: Vector3, blade_count: int,
 			col.g = clampf(col.g + (cv2 - 0.5) * 0.05, 0.0, 1.0)
 			col.b = clampf(col.b + (cv2 - 0.5) * 0.04, 0.0, 1.0)
 
-			var voxel_scale: float = GV * taper * height_scale
-			var b := Basis().scaled(Vector3.ONE * voxel_scale)
+			var xz_scale: float = GV * taper * height_scale
+			var y_scale: float = GV * height_scale * 1.02
+			var b := Basis()
+			b.x = Vector3(xz_scale, 0.0, 0.0)
+			b.y = Vector3(0.0, y_scale, 0.0)
+			b.z = Vector3(0.0, 0.0, xz_scale)
 			out_xforms.append(Transform3D(b, Vector3(pos_x, pos_y, pos_z)))
 			var c := col * 0.72
 			c.a = t  # chiều cao trong lá (0= gốc, 1= ngọn) → shader sway
@@ -246,8 +250,12 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 			col.g = clampf(col.g + (cv2 - 0.5) * 0.04, 0.0, 1.0)
 			col.b = clampf(col.b + (cv2 - 0.5) * 0.03, 0.0, 1.0)
 
-			var voxel_scale: float = GV * taper * height_scale
-			var b := Basis().scaled(Vector3.ONE * voxel_scale)
+			var xz_scale: float = GV * taper * height_scale
+			var y_scale: float = GV * height_scale * 1.02
+			var b := Basis()
+			b.x = Vector3(xz_scale, 0.0, 0.0)
+			b.y = Vector3(0.0, y_scale, 0.0)
+			b.z = Vector3(0.0, 0.0, xz_scale)
 			out_xforms.append(Transform3D(b, Vector3(pos_x, pos_y, pos_z)))
 			var c := col * 0.88
 			c.a = t  # chiều cao trong lá (0= gốc, 1= ngọn) → shader sway
