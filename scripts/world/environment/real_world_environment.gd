@@ -240,7 +240,7 @@ func _process(delta: float) -> void:
 	var rain_factor: float = 1.0 - weather_intensity * 0.55
 
 	var day_t_real: float = clamp((90.0 * sin((h - 6.0) / 12.0 * PI) + 5.0) / 95.0, 0.0, 1.0)
-	SkyLight.update_sky(_sky_mat, h, weather_intensity, float(TimeSystem.get_total_days()) if TimeSystem else -1.0)
+	SkyLight.update_sky(_sky_mat, h, weather_intensity, float(TimeSystem.get_total_days()) if TimeSystem else -1.0, SettingsManager.clouds_enabled if SettingsManager else true)
 	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
 	# Fill mềm theo ngày/đêm + mưa để bóng dịu, không đen tuyệt.
 	environment.ambient_light_energy = 0.25 * rain_factor * lerp(0.5, 1.0, day_t_real)

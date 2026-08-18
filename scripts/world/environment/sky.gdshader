@@ -1,13 +1,14 @@
 shader_type sky;
 
-// Bầu trời procedural phong cách "Ghibli voxel":
+// Bầu trời procedural phong cách "Ghibli voxel" với mây chân thật:
 //  - Gradient pastel mềm (xanh ngọc → kem nhạt sát chân trời).
-//  - Mây puffy dạng voxel (các khối cube mềm, 2 lớp xa/gần, có bóng + viền vàng
-//    lúc bình minh/hoàng hôn).
+//  - Mây cumulus fbm domain-warp: đáy phẳng, đỉnh bồng xơi, có khối, đổ nắng
+//    vàng/rim hoàng hôn, bạc trăng ban đêm + lớp cirrus mảnh trên cao.
 //  - Mặt trời nhỏ, quầng ấm dịu.
 //  - Mặt trăng nhỏ, pha theo hình cầu + quầng lạnh.
 //  - Sao đêm nhấp nháy.
-// Mọi tham số được đẩy từ GDScript (SkyLight.update_sky) mỗi frame.
+// Mọi tham số được đẩy từ GDScript (SkyLight.update_sky) mỗi frame;
+// clouds_on (0/1) là nút bật/tắt mây từ setting đồ hoạ.
 
 uniform vec3 sun_dir = vec3(0.0, 0.5, 1.0);
 uniform vec3 sun_color : source_color = vec3(1.0, 0.96, 0.85);
@@ -36,6 +37,8 @@ uniform float ground_energy : hint_range(0.0, 4.0) = 0.6;
 uniform float night_factor : hint_range(0.0, 1.0) = 0.0;
 uniform float weather : hint_range(0.0, 1.0) = 0.0;
 uniform float cloud_cover : hint_range(0.0, 1.0) = 0.35;
+// 0 = tắt mây (bầu trời sạch), 1 = vẽ mây chân thật (đẩy từ setting đồ hoạ).
+uniform float clouds_on = 1.0;
 
 // Thời gian đẩy từ GDScript mỗi frame (trôi mây + nhấp nháy sao).
 uniform float star_time = 0.0;
@@ -95,55 +98,70 @@ vec3 _star_color(float h) {
 	return mix(warm, white, fract(h * 7.31));
 }
 
-// Value noise trên lưới thô (mỗi "cube" là 1 blob) — bilinear để cạnh cube mềm.
-float _cube_blob(vec2 q, float layer) {
-	vec2 c = floor(q);
-	vec2 f = smoothstep(0.0, 1.0, fract(q));
-	float n00 = _vnoise(vec3(c, layer));
-	float n10 = _vnoise(vec3(c + vec2(1.0, 0.0), layer));
-	float n01 = _vnoise(vec3(c + vec2(0.0, 1.0), layer));
-	float n11 = _vnoise(vec3(c + vec2(1.0, 1.0), layer));
-	return mix(mix(n00, n10, f.x), mix(n01, n11, f.x), f.y);
-}
-
-// Mây voxel: 1 lớp blob to + 1 lớp facet nhỏ, giới hạn trong dải độ cao.
-// Trả về [density, độ sáng] để tô màu puffy (đỉnh sáng, đáy tối).
-vec2 _cloud_layer(vec3 dir) {
-	float alt = dir.y;
-	float band = smoothstep(0.05, 0.13, alt) * (1.0 - smoothstep(0.32, 0.46, alt));
-	if (band <= 0.001) {
-		return vec2(0.0, 0.0);
+// fbm 2D trên lát 3D cố định — nền cho mây (đáy phẳng/bồng đều hơn _fbm 3D).
+float _fbm2(vec2 p, int oct) {
+	float v = 0.0;
+	float amp = 0.5;
+	float f = 1.0;
+	for (int i = 0; i < oct; i++) {
+		v += amp * _vnoise(vec3(p * f, 3.7));
+		f *= 1.93;
+		amp *= 0.5;
 	}
-	// Phối cảnh: mây gần chân trời to hơn, trên đỉnh nhỏ hơn (foreshortening).
-	float persp = mix(0.55, 1.35, smoothstep(0.05, 0.42, alt));
-	vec2 p = dir.xz * persp;
-	// Trôi mây chậm.
-	p += vec2(star_time * 0.004, star_time * 0.0015);
-
-	float base = _cube_blob(p * 0.55, 0.0);
-	float detail = _cube_blob(p * 1.9, 1.0);
-	float d = base * 0.66 + detail * 0.34;
-
-	float cov = smoothstep(0.46, 0.66, d);
-	cov *= band;
-	// Đỉnh blob sáng hơn đáy (giả 3D puffy).
-	float light = mix(0.35, 1.0, smoothstep(0.42, 0.78, d));
-	return vec2(cov, light);
+	return v;
 }
 
-// Màu mây: sáng trắng-kem ban ngày, vàng-cam lúc nắng thấp, xám khi mưa,
-// xanh-tối ban đêm. Bóng mây ngả xanh dương nhạt.
-vec3 _cloud_color(vec3 base, vec3 shadow, float lit, vec3 dir, vec3 sun_dir_n, float sun_low) {
-	vec3 c = mix(shadow, base, lit);
-	// Viền vàng phía mặt trời lúc nắng thấp (rim light kiểu Ghibli).
-	float rim = clamp(dot(normalize(dir - dir.y * vec3(0.0, 1.0, 0.0)), sun_dir_n), 0.0, 1.0);
-	float rim_amt = pow(rim, 3.0) * sun_low * 0.9;
-	c = mix(c, vec3(1.0, 0.72, 0.42), rim_amt * lit);
-	return c;
+// Domain warp: bẻ cong không gian nhiễu → hình thù mây hữu cơ, không còn là
+// các khối tròn đều đặn trên lưới giá trị.
+float _cloud_noise(vec2 p) {
+	vec2 warp = vec2(
+		_vnoise(vec3(p * 0.30 + vec2(0.0, 0.0), 1.7)),
+		_vnoise(vec3(p * 0.33 + vec2(5.2, 9.7), 3.1)));
+	vec2 q = p + (warp - 0.5) * 2.7;
+	float base = _fbm2(q * 1.35, 4);
+	// Nhiễu mịn: gợn trên mặt mây (đỉnh bồng, không phẳng lì).
+	float ruffle = _vnoise(vec3(q * 4.6, 8.0));
+	return clamp(base * 0.70 + ruffle * 0.30, 0.0, 1.0);
+}
+
+// Mây cumulus bồng bềnh — đáy phẳng, đỉnh xơi cuộn + lớp cirrus mảnh trên cao.
+// Trả về vec4(density, hr [0 đáy..1 đỉnh trong band], lit [0 tối..1 sáng], cirrus).
+// Tất cả tham số đẩy từ GDScript mỗi frame; mây trôi bằng star_time.
+vec4 _cloud_layer(vec3 dir) {
+	float alt = dir.y;
+	if (alt < 0.02 || alt > 0.48) {
+		return vec4(0.0, 0.0, 0.0, 0.0);
+	}
+	float hr = clamp((alt - 0.02) / 0.46, 0.0, 1.0); // 0 đáy → 1 đỉnh band
+	// Phối cảnh: mây phủ rộng gần chân trời, thu hẹp dần lên cao (−> nhìn sâu).
+	float persp = mix(0.85, 2.1, smoothstep(0.02, 0.44, alt));
+	vec2 p = dir.xz * persp / max(dir.y, 0.05);
+	// Trôi mây chậm (x, z tốc độ khác nhau cho cảm giác có chiều sâu).
+	p += vec2(star_time * 0.0032, star_time * 0.0011);
+
+	// Cumulus: đáy phẳng (chỉ cụm mây dày mới lộ đáy), đỉnh bồng xơi mềm.
+	float f = _cloud_noise(p);
+	float thr = 0.56 - hr * 0.16;
+	float density = smoothstep(thr, thr + 0.16, f);
+	density *= smoothstep(0.06, 0.30, hr);          // tách mây khỏi sương chân trời
+	density *= 1.0 - smoothstep(0.72, 1.0, hr);     // tan dần trên đỉnh band
+	// Cuộn mặt mây: chỉ giữ puffy core, càng dày càng đặc.
+	density *= 0.80 + 0.20 * _vnoise(vec3(p * 3.2, 5.6));
+
+	// "Chiều dày" gần đúng: đỉnh sáng, đáy tối → mây có khối, không phải sticker.
+	float lit = mix(0.32, 1.06, smoothstep(0.0, 1.0, hr));
+
+	// Cirrus mảnh sọc ở tầng cao, mờ nhạt, không có 'đáy' rõ.
+	float cir = _fbm2(p * 0.55 + vec2(3.3, 1.7), 3);
+	float cir_band = smoothstep(0.40, 0.50, alt) * (1.0 - smoothstep(0.54, 0.66, alt));
+	float cir_d = smoothstep(0.66, 0.88, cir) * cir_band;
+
+	return vec4(clamp(density + cir_d * 0.6, 0.0, 1.0), hr, lit, cir_d);
 }
 
 void sky() {
 	vec3 dir = normalize(EYEDIR);
+	vec3 sun_dir_n = normalize(sun_dir);
 	float y = dir.y;
 
 	// ── Gradient trời: đỉnh → chân trời (pastel mềm) ────────────────────────
@@ -168,25 +186,40 @@ void sky() {
 	// Ánh sáng khuếch tán nền.
 	col *= mix(sky_energy, sky_energy * 0.4, night_factor * 0.6);
 
-	// ── Mây voxel ────────────────────────────────────────────────────────────
-	vec2 cl = _cloud_layer(dir);
-	float cloud = cl.x * cloud_cover;
-	vec3 sun_dir_n = normalize(sun_dir);
-	float sun_low = clamp(1.0 - abs(sun_dir.y) * 2.2, 0.0, 1.0);
+	// ── Mây chân thật ───────────────────────────────────────────────────────
+	float clouds_gate = cloud_cover * step(0.5, clouds_on);
+	if (clouds_gate > 0.001) {
+		vec4 cl = _cloud_layer(dir);
+		if (cl.x > 0.001) {
+			float sun_low = clamp(1.0 - abs(sun_dir.y) * 2.2, 0.0, 1.0);
 
-	vec3 cloud_base = vec3(1.0, 1.0, 0.985);
-	vec3 cloud_shadow = vec3(0.72, 0.78, 0.88);
-	// Ban đêm: mây tối xanh dương.
-	cloud_base = mix(cloud_base, vec3(0.22, 0.26, 0.40), night_factor * 0.85);
-	cloud_shadow = mix(cloud_shadow, vec3(0.12, 0.14, 0.24), night_factor * 0.85);
-	// Mưa: xám.
-	float w = clamp(weather, 0.0, 1.0);
-	cloud_base = mix(cloud_base, vec3(0.62, 0.63, 0.66), w * 0.9);
-	cloud_shadow = mix(cloud_shadow, vec3(0.42, 0.43, 0.46), w * 0.9);
+			// Màu đỉnh (sáng trắng-kem) và đáy (xám xanh) mây.
+			vec3 cloud_base = vec3(1.03, 1.02, 0.99);
+			vec3 cloud_shadow = vec3(0.55, 0.60, 0.72);
+			// Nắng thấp (sáng/chiều): mây ngả vàng cam ấm.
+			cloud_base = mix(cloud_base, vec3(1.28, 1.06, 0.80), sun_low * 0.55);
+			cloud_shadow = mix(cloud_shadow, vec3(0.72, 0.52, 0.38), sun_low * 0.4);
+			// Ban đêm: mây trăng bạc xanh tối.
+			cloud_base = mix(cloud_base, vec3(0.27, 0.31, 0.44), night_factor * 0.9);
+			cloud_shadow = mix(cloud_shadow, vec3(0.10, 0.12, 0.20), night_factor * 0.9);
+			// Mưa: xám nặng đầy u ám.
+			float w = clamp(weather, 0.0, 1.0);
+			cloud_base = mix(cloud_base, vec3(0.56, 0.57, 0.60), w * 0.95);
+			cloud_shadow = mix(cloud_shadow, vec3(0.34, 0.35, 0.38), w * 0.95);
 
-	vec3 cloud_col = _cloud_color(cloud_base, cloud_shadow, cl.y, dir, sun_dir_n, sun_low);
-	cloud_col *= mix(0.95, 1.35, sun_dir.y * 0.3 + 0.3) * (1.0 - w * 0.3);
-	col = mix(col, cloud_col, cloud);
+			// Khối mây: mix đáy↔đỉnh theo hr + lit; đỉnh sáng nhấp nháy dưới nắng.
+			vec3 cloud_col = mix(cloud_shadow, cloud_base, cl.z);
+			cloud_col *= mix(0.85, 1.45, clamp(sun_dir_n.y, 0.0, 1.0));
+			// Rim vàng ở mép mây hướng nắng khi nắng thấp (giống Ghibli).
+			float rim = clamp(dot(normalize(dir - dir.y * vec3(0.0, 1.0, 0.0)), sun_dir_n), 0.0, 1.0);
+			float rim_amt = pow(rim, 2.5) * sun_low * 0.8;
+			cloud_col = mix(cloud_col, vec3(1.0, 0.78, 0.48), rim_amt * cl.z);
+			cloud_col *= mix(0.95, 1.25, sun_dir.y * 0.3 + 0.3) * (1.0 - w * 0.25);
+
+			float cloud = cl.x * clouds_gate;
+			col = mix(col, cloud_col, cloud);
+		}
+	}
 
 	// ── Mặt trời (nhỏ, quầng ấm dịu) ────────────────────────────────────────
 	float sun_cos = dot(dir, sun_dir);

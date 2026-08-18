@@ -236,7 +236,7 @@ func _process(delta: float) -> void:
 	var wi: float = RainManager.get_local_rain_intensity()
 	var rf: float = 1.0 - wi * 0.55
 
-	SkyLight.update_sky(_sky_mat, hour, wi, float(TimeSystem.get_total_days()) if TimeSystem else -1.0)
+	SkyLight.update_sky(_sky_mat, hour, wi, float(TimeSystem.get_total_days()) if TimeSystem else -1.0, SettingsManager.clouds_enabled if SettingsManager else true)
 	environment.ambient_light_color = DAY_AMBIENT.lerp(NIGHT_AMBIENT, 1.0 - t).lerp(Color(0.08, 0.10, 0.14), wi * 0.7)
 	# Fill mềm theo ngày/đêm + mưa để bóng dịu, không đen tuyệt.
 	environment.ambient_light_energy = 0.25 * rf * lerp(0.3, 1.0, t)

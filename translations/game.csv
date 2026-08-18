@@ -305,3 +305,6 @@ MP_CONNECTING,Connecting...,Đang kết nối...
 MP_MODE_TITLE,Multiplayer mode (you are the host),Chế độ đa người chơi (bạn là host)
 MP_MODE_HINT,Create this world as a multiplayer server,Tạo thế giới này dưới dạng máy chủ đa người chơi
 CHAT_INPUT_HINT,Type a message (Enter to send),Nhập tin nhắn (Enter để gửi)
+CLOUDS,Clouds,Mây
+CLOUDS_DESC,"Volumetric cumulus clouds rendered on the sky. Turn off for a perfectly clear sky and higher FPS.","Vẽ mây bồng bềnh trên bầu trời. Tắt để trời trong xanh hẳn và tăng FPS."
+CLOUDS_TOGGLE,Enable Clouds,Bật mây

@@ -162,3 +162,10 @@ static func is_distant_view() -> bool:
 static func set_distant_view(v: bool) -> void:
 	if SettingsManager:
 		SettingsManager.set_distant_view(v)
+
+static func is_clouds_enabled() -> bool:
+	return true if SettingsManager == null else SettingsManager.clouds_enabled
+
+static func set_clouds_enabled(v: bool) -> void:
+	if SettingsManager:
+		SettingsManager.set_clouds_enabled(v)
