@@ -99,6 +99,12 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"spruce_wood": _build_wood_icon(parent, "spruce_wood")
 		"swamp_wood": _build_wood_icon(parent, "swamp_wood")
 		"mangrove_wood": _build_wood_icon(parent, "mangrove_wood")
+		"log_oak": _build_wood_icon(parent, "log_oak")
+		"log_hard_wood": _build_wood_icon(parent, "log_hard_wood")
+		"log_spruce": _build_wood_icon(parent, "log_spruce")
+		"log_swamp": _build_wood_icon(parent, "log_swamp")
+		"log_mangrove": _build_wood_icon(parent, "log_mangrove")
+		"log_palm": _build_wood_icon(parent, "log_palm")
 		"coconut_seed": _build_seed_icon(parent, 0)
 		"taro_seed": _build_seed_icon(parent, 1)
 		"seaweed_seed": _build_seed_icon(parent, 2)
@@ -1282,7 +1288,7 @@ static func _mesh_boxes_aabb(pivot: Node3D) -> AABB:
 				result = result.merge(box)
 	return result
 
-## ── Khúc gỗ tròn (spruce/swamp/mangrove): vỏ xù + mặt cắt ngọn + vòng tuổi ──
+## ── Khúc gỗ tròn (spruce/swamp/mangrove + khúc cây): vỏ xù + mặt cắt ngọn + vòng tuổi ──
 static func _build_wood_icon(p: Node3D, item_id: String) -> void:
 	var top: Color
 	var bark: Color
@@ -1296,6 +1302,24 @@ static func _build_wood_icon(p: Node3D, item_id: String) -> void:
 		"mangrove_wood":
 			top = Color(0.56, 0.26, 0.14)
 			bark = Color(0.42, 0.17, 0.09)
+		"log_oak":
+			top = Color(0.62, 0.47, 0.28)
+			bark = Color(0.39, 0.26, 0.12)
+		"log_hard_wood":
+			top = Color(0.47, 0.36, 0.20)
+			bark = Color(0.36, 0.25, 0.12)
+		"log_spruce":
+			top = Color(0.38, 0.24, 0.12)
+			bark = Color(0.27, 0.16, 0.08)
+		"log_swamp":
+			top = Color(0.42, 0.38, 0.30)
+			bark = Color(0.30, 0.26, 0.18)
+		"log_mangrove":
+			top = Color(0.56, 0.26, 0.14)
+			bark = Color(0.42, 0.17, 0.09)
+		"log_palm":
+			top = Color(0.62, 0.48, 0.28)
+			bark = Color(0.45, 0.28, 0.14)
 		_:
 			top = Color(0.50, 0.36, 0.20)
 			bark = Color(0.36, 0.26, 0.12)

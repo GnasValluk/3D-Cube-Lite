@@ -121,7 +121,7 @@ func _ready() -> void:
 				"phá gỗ sồi → overlay bị xóa")
 
 	# ── 6. Cây sồi kiểu Minecraft ─────────────────────────────────────────
-	var oak := _OakProp.new(250, DestroyableProp.WeaponReq.AXE, "block_oak_wood")
+	var oak := _OakProp.new(250, DestroyableProp.WeaponReq.AXE, "log_oak")
 	oak.setup("plains")
 	oak.position = Vector3(2.5, 0.5, 2.5)
 	add_child(oak)

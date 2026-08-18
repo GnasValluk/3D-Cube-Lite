@@ -234,6 +234,14 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_oak_wood", "Gỗ Sồi", ItemDef.Type.BLOCK, Color(0.62, 0.47, 0.28), "🧱", "Khối gỗ sồi — vân nâu sáng ấm, chặt từ cây sồi bằng rìu, xây dựng và chế tạo", true, 64)
 	_add(db, "block_hard_wood", "Gỗ Cứng", ItemDef.Type.BLOCK, Color(0.47, 0.36, 0.20), "🧱", "Khối gỗ cứng — vân nâu sẫm chắc chắn, chặt từ cây rừng rậm bằng rìu", true, 64)
 
+	# ── Khúc cây (log) — thân cây chặt xuống, mỗi loại 1 khúc riêng ──────────
+	_add(db, "log_oak", "Khúc Gỗ Sồi", ItemDef.Type.MATERIAL, Color(0.62, 0.47, 0.28), "🪵", "Khúc cây sồi — chặt từ cây sồi, dùng làm nguyên liệu chế tạo", true, 64)
+	_add(db, "log_hard_wood", "Khúc Gỗ Cứng", ItemDef.Type.MATERIAL, Color(0.47, 0.36, 0.20), "🪵", "Khúc cây gỗ cứng — chặt từ cây rừng rậm, dùng làm nguyên liệu chế tạo", true, 64)
+	_add(db, "log_spruce", "Khúc Gỗ Vân Sam", ItemDef.Type.MATERIAL, Color(0.38, 0.24, 0.12), "🪵", "Khúc cây vân sam — chặt từ cây vân sam vùng băng giá, dùng làm nguyên liệu chế tạo", true, 64)
+	_add(db, "log_swamp", "Khúc Gỗ Tràm", ItemDef.Type.MATERIAL, Color(0.42, 0.38, 0.30), "🪵", "Khúc cây tràm — chặt từ cây tràm rừng đầm lầy, dùng làm nguyên liệu chế tạo", true, 64)
+	_add(db, "log_mangrove", "Khúc Gỗ Đước", ItemDef.Type.MATERIAL, Color(0.56, 0.26, 0.14), "🪵", "Khúc cây đước — chặt từ cây đước rừng ngập mặn, dùng làm nguyên liệu chế tạo", true, 64)
+	_add(db, "log_palm", "Khúc Gỗ Dừa", ItemDef.Type.MATERIAL, Color(0.78, 0.70, 0.48), "🪵", "Khúc cây dừa — chặt từ cây dừa, dùng làm nguyên liệu chế tạo", true, 64)
+
 	# ── Bio băng giá ─────────────────────────────────────────────────────────
 	_add(db, "block_snow", "Khối Tuyết", ItemDef.Type.BLOCK, Color(0.93, 0.96, 0.99), "🧱", "Khối tuyết trắng tinh — bề mặt vùng đất băng giá, xẻng đào được", true, 64)
 	_add(db, "block_frost_dirt", "Đất Đóng Băng", ItemDef.Type.BLOCK, Color(0.44, 0.38, 0.42), "🧱", "Khối đất đóng băng — lớp nền bên dưới tuyết, xẻng đào được", true, 64)

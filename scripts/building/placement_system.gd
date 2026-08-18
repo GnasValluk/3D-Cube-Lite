@@ -183,7 +183,7 @@ func _plant_seed(item_id: String, pos: Vector3) -> void:
 		return
 	var prop: Node3D
 	if item_id == "coconut_seed":
-		prop = PalmProp.new(150, DestroyableProp.WeaponReq.AXE, "palm_wood")
+		prop = PalmProp.new(150, DestroyableProp.WeaponReq.AXE, "log_palm")
 		prop.setup("river")
 	elif item_id == "taro_seed":
 		prop = PlantProp.new(50, DestroyableProp.WeaponReq.SWORD, "taro")

@@ -3158,12 +3158,12 @@ func _process(delta: float) -> void:
 		var ptype: String = pd.get("type", "weed")
 		_prop_budget_remaining -= _prop_cost(ptype)
 		if ptype == "palm":
-			var prop := _PalmProp.new(150, DestroyableProp.WeaponReq.AXE, "palm_wood")
+			var prop := _PalmProp.new(150, DestroyableProp.WeaponReq.AXE, "log_palm")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "river"))
 			_spawn_prop_child(prop)
 		elif ptype == "oak":
-			var prop := _OakProp.new(250, DestroyableProp.WeaponReq.AXE, "block_oak_wood")
+			var prop := _OakProp.new(250, DestroyableProp.WeaponReq.AXE, "log_oak")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "plains"))
 			_spawn_prop_child(prop)
@@ -3178,7 +3178,7 @@ func _process(delta: float) -> void:
 			prop.setup(pd.get("variant", "plains"))
 			_spawn_prop_child(prop)
 		elif ptype == "dense_tree":
-			var prop := _DenseTreeProp.new(200, DestroyableProp.WeaponReq.AXE, "block_hard_wood")
+			var prop := _DenseTreeProp.new(200, DestroyableProp.WeaponReq.AXE, "log_hard_wood")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "plains"))
 			_spawn_prop_child(prop)
@@ -3198,7 +3198,7 @@ func _process(delta: float) -> void:
 			prop.setup()
 			_spawn_prop_child(prop)
 		elif ptype == "mangrove":
-			var prop := _MangroveProp.new(220, DestroyableProp.WeaponReq.AXE, "mangrove_wood")
+			var prop := _MangroveProp.new(220, DestroyableProp.WeaponReq.AXE, "log_mangrove")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "coast"))
 			_spawn_prop_child(prop)
@@ -3212,12 +3212,12 @@ func _process(delta: float) -> void:
 			creature.position = pd["pos"]
 			_spawn_prop_child(creature)
 		elif ptype == "spruce":
-			var prop := _FrostTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "spruce_wood")
+			var prop := _FrostTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "log_spruce")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "snow"))
 			_spawn_prop_child(prop)
 		elif ptype == "swamp_tree":
-			var prop := _SwampTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "swamp_wood")
+			var prop := _SwampTreeProp.new(220, DestroyableProp.WeaponReq.AXE, "log_swamp")
 			prop.position = pd["pos"]
 			prop.setup(pd.get("variant", "marsh"))
 			_spawn_prop_child(prop)

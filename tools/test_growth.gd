@@ -30,7 +30,7 @@ func _ready() -> void:
 	add_child(taro)
 	taro.global_position = Vector3(20, 0, 10)
 
-	var palm: PalmProp = _Palm.new(150, DestroyableProp.WeaponReq.AXE, "palm_wood")
+	var palm: PalmProp = _Palm.new(150, DestroyableProp.WeaponReq.AXE, "log_palm")
 	palm.name = "Palm"
 	palm.setup("river")
 	add_child(palm)

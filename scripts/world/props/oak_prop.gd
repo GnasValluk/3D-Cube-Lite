@@ -73,7 +73,7 @@ func _on_destroy() -> void:
 	var world := _find_world_manager()
 	if world == null: return
 	_ItemDatabase.ensure_db()
-	var wood_def = _ItemDatabase.items_db.get("block_oak_wood")
+	var wood_def = _ItemDatabase.items_db.get("log_oak")
 	if wood_def:
 		_DroppedItem.spawn(world, wood_def, global_position, randi() % 3 + 2, _spawn_drop_velocity(), global_position.y)
 

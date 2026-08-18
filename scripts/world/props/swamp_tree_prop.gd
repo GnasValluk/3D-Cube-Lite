@@ -283,7 +283,7 @@ func _on_destroy() -> void:
 		if seed_def:
 			DroppedItem.spawn(world, seed_def, global_position, 1, _spawn_drop_velocity(), global_position.y)
 	if randf() < 0.55:
-		var def: ItemDef = ItemDatabase.items_db.get("swamp_wood")
+		var def: ItemDef = ItemDatabase.items_db.get("log_swamp")
 		if def:
 			DroppedItem.spawn(world, def, global_position, randi() % 2 + 1, _spawn_drop_velocity(), global_position.y)
 

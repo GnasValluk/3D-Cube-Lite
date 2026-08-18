@@ -88,7 +88,7 @@ func _ready() -> void:
 	orange_tree.queue_free()
 
 	# ── 5. Cây rừng rậm: 3 giai đoạn, tán um tùm ──────────────────────────
-	var dense_tree := _Dense.new(200, DestroyableProp.WeaponReq.AXE, "block_hard_wood")
+	var dense_tree := _Dense.new(200, DestroyableProp.WeaponReq.AXE, "log_hard_wood")
 	dense_tree.setup("plains")
 	dense_tree.position = Vector3(5.5, 0.5, 2.5)
 	add_child(dense_tree)
@@ -119,8 +119,9 @@ func _ready() -> void:
 	chunk.setup(3, 5, SIZE, RW, true)
 	_check(chunk.block_data != null, "chunk setup sync ok")
 	if chunk.block_data != null:
-		var known := ["palm", "oak", "eggplant", "watermelon", "pumpkin",
-			"weed", "taro", "seagrass", "orange_tree", "dense_tree"]
+		var known := ["palm", "oak", "cherry_bush", "eggplant", "watermelon", "pumpkin",
+			"weed", "taro", "seagrass", "orange_tree", "dense_tree",
+			"mangrove", "cattail", "mud_crab", "spruce", "swamp_tree", "swamp_sedge", "duckweed"]
 		var bad: Array[String] = []
 		for pd in chunk._prop_queue:
 			var ptype: String = (pd as Dictionary).get("type", "")
