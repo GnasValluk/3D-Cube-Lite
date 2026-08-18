@@ -147,7 +147,7 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	var moon_dir := Vector3(cos(mp_rad) * cos(my_rad), sin(mp_rad), cos(mp_rad) * sin(my_rad))
 	mat.set_shader_parameter("moon_dir", moon_dir)
 	mat.set_shader_parameter("moon_color", SUN_NIGHT.lerp(GRAY_HORIZON, weather * 0.4))
-	mat.set_shader_parameter("moon_energy", lerp(0.0, 0.55, night_factor) * (1.0 - weather * 0.4))
+	mat.set_shader_parameter("moon_energy", lerp(0.0, 0.14, night_factor) * (1.0 - weather * 0.4))
 	# Mặt trăng nhỏ + xa: ~0.8° bán kính (nhỏ hơn mặt trời một chút).
 	mat.set_shader_parameter("moon_angle_max", 0.8)
 

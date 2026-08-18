@@ -245,8 +245,8 @@ void sky() {
 	float maria2 = mix(0.85, 1.0, _vnoise(surf_n * 9.0 + vec3(2.0, 11.0, 4.0)));
 	vec3 moon_col = mix(moon_color, moon_eclipse_color, moon_eclipse) * (maria * maria2);
 	float ecl_bright = 1.0 - moon_eclipse * 0.75;
-	float m_halo = pow(max(moon_cos, 0.0), 180.0) * 0.25;
-	float m_soft = pow(max(moon_cos, 0.0), 45.0) * 0.07;
+	float m_halo = pow(max(moon_cos, 0.0), 180.0) * 0.12;
+	float m_soft = pow(max(moon_cos, 0.0), 45.0) * 0.04;
 	col += moon_col * moon_energy * (m_disc * phase_amt * ecl_bright + m_halo + m_soft);
 
 	// ── Sao đêm ──────────────────────────────────────────────────────────────

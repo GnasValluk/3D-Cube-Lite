@@ -214,7 +214,7 @@ func _update_sun(h: float, rain_factor: float) -> void:
 		var phase: float = fposmod(days / SkyLight.SYNODIC_MONTH, 1.0)
 		phase_light = lerp(0.55, 1.0, 0.5 * (1.0 - cos(phase * TAU)))
 	_moon.visible = moon_up > 0.01 and night_factor > 0.05
-	_moon.light_energy = 0.55 * moon_up * night_factor * phase_light * rain_factor
+	_moon.light_energy = 0.35 * moon_up * night_factor * phase_light * rain_factor
 
 func _reapply_preset() -> void:
 	if environment:

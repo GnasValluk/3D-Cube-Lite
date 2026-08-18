@@ -52,51 +52,53 @@ func _ready() -> void:
 	_check(top_night.r < 0.1, "đêm sky_top_color tối")
 	_check(mat.get_shader_parameter("sun_energy") < 0.1, "đêm sun_energy ~ 0")
 
-	# 3. Scene real có đúng 2 DirectionalLight3D: SunLight + MoonLight + ambient nhẹ.
-	var scene := load("res://scenes/open_world_real.tscn")
-	var inst: Node = scene.instantiate()
-	add_child(inst)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	var dirs := inst.find_children("*", "DirectionalLight3D", true, false)
-	_check(dirs.size() == 2, "open_world_real có SunLight + MoonLight (có %d)" % dirs.size())
-	var sun_found := false
-	var moon_found := false
-	for d in dirs:
-		var dl := d as DirectionalLight3D
-		if dl.name == "SunLight":
-			sun_found = true
-			_check(dl.shadow_enabled, "SunLight bật shadow")
-		elif dl.name == "MoonLight":
-			moon_found = true
-			_check(dl.shadow_enabled, "MoonLight bật shadow")
-			_check(dl.light_color.b > dl.light_color.r, "MoonLight ánh sáng mát (trắng xanh)")
-	_check(sun_found, "có DirectionalLight3D tên 'SunLight'")
-	_check(moon_found, "có DirectionalLight3D tên 'MoonLight'")
-	var env := inst.get_node_or_null("WorldEnvironment") as WorldEnvironment
-	_check(env != null, "WorldEnvironment tồn tại")
-	if env:
-		var rw := env as RealWorldEnvironment
-		_check(rw._sky_mat != null and rw._sky_mat is ShaderMaterial, "real_world_environment._sky_mat là ShaderMaterial")
-		_check(absf(env.environment.ambient_light_energy) <= 0.35, "ambient = fill nhẹ dịu bóng (có %.2f)" % env.environment.ambient_light_energy)
-		_check(rw._sun.light_color.g > rw._sun.light_color.b, "trưa SunLight ngả vàng ấm (color %s)" % rw._sun.light_color.to_html())
-		_check_moon_cycle(rw)
-	# Mây thể tích thật (VolumetricClouds) + nút bật/tắt ở setting đồ hoạ.
-	var clouds_node := inst.get_node_or_null("VolumetricClouds")
-	_check(clouds_node != null, "real world có VolumetricClouds (mây thể tích)")
-	if clouds_node:
-		_check(clouds_node.visible, "mây thể tích hiển thị khi bật")
-		var was_on: bool = SettingsManager.clouds_enabled if SettingsManager else true
-		if SettingsManager:
-			SettingsManager.clouds_enabled = false
+	# 3. Cả 2 thế giới (open_world mặc định + open_world_real) dùng real_world_environment:
+	# SunLight + MoonLight + mây thể tích thật, ambient nhẹ.
+	for scene_path in ["res://scenes/open_world.tscn", "res://scenes/open_world_real.tscn"]:
+		var inst: Node = load(scene_path).instantiate()
+		add_child(inst)
 		await get_tree().process_frame
-		_check(not clouds_node.visible, "tắt mây → ẩn VolumetricClouds")
-		if SettingsManager:
-			SettingsManager.clouds_enabled = was_on
 		await get_tree().process_frame
-		_check(clouds_node.visible, "bật lại mây → VolumetricClouds hiện")
-	inst.queue_free()
-	await get_tree().process_frame
+		var label := "default" if scene_path.ends_with("open_world.tscn") else "real"
+		var dirs := inst.find_children("*", "DirectionalLight3D", true, false)
+		_check(dirs.size() == 2, "%s: SunLight + MoonLight (có %d)" % [label, dirs.size()])
+		var sun_found := false
+		var moon_found := false
+		for d in dirs:
+			var dl := d as DirectionalLight3D
+			if dl.name == "SunLight":
+				sun_found = true
+				_check(dl.shadow_enabled, "%s: SunLight bật shadow" % label)
+			elif dl.name == "MoonLight":
+				moon_found = true
+				_check(dl.shadow_enabled, "%s: MoonLight bật shadow" % label)
+				_check(dl.light_color.b > dl.light_color.r, "%s: MoonLight ánh sáng mát (trắng xanh)" % label)
+		_check(sun_found, "%s: có DirectionalLight3D tên 'SunLight'" % label)
+		_check(moon_found, "%s: có DirectionalLight3D tên 'MoonLight'" % label)
+		var env := inst.get_node_or_null("WorldEnvironment") as WorldEnvironment
+		_check(env != null, "%s: WorldEnvironment tồn tại" % label)
+		if env:
+			var rw := env as RealWorldEnvironment
+			_check(rw._sky_mat != null and rw._sky_mat is ShaderMaterial, "%s: real_world_environment._sky_mat là ShaderMaterial" % label)
+			_check(absf(env.environment.ambient_light_energy) <= 0.35, "%s: ambient = fill nhẹ dịu bóng (có %.2f)" % [label, env.environment.ambient_light_energy])
+			_check(rw._sun.light_color.g > rw._sun.light_color.b, "%s: trưa SunLight ngả vàng ấm (color %s)" % [label, rw._sun.light_color.to_html()])
+			_check_moon_cycle(rw)
+		# Mây thể tích thật (VolumetricClouds) + nút bật/tắt ở setting đồ hoạ.
+		var clouds_node := inst.get_node_or_null("VolumetricClouds")
+		_check(clouds_node != null, "%s: có VolumetricClouds (mây thể tích)" % label)
+		if clouds_node:
+			_check(clouds_node.visible, "%s: mây thể tích hiển thị khi bật" % label)
+			var was_on: bool = SettingsManager.clouds_enabled if SettingsManager else true
+			if SettingsManager:
+				SettingsManager.clouds_enabled = false
+			await get_tree().process_frame
+			_check(not clouds_node.visible, "%s: tắt mây → ẩn VolumetricClouds" % label)
+			if SettingsManager:
+				SettingsManager.clouds_enabled = was_on
+			await get_tree().process_frame
+			_check(clouds_node.visible, "%s: bật lại mây → VolumetricClouds hiện" % label)
+		inst.queue_free()
+		await get_tree().process_frame
 
 	# 4. Twilight (hub/main) cũng có SunLight + MoonLight + không ambient.
 	var tw_script: GDScript = load("res://scripts/world/environment/twilight_environment.gd") as GDScript
