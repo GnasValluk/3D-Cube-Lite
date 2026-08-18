@@ -55,7 +55,7 @@ func _ready() -> void:
 	if env:
 		var rw := env as RealWorldEnvironment
 		_check(rw._sky_mat != null and rw._sky_mat is ShaderMaterial, "real_world_environment._sky_mat là ShaderMaterial")
-		_check(absf(env.environment.ambient_light_energy) < 0.001, "ambient_light_energy = 0 (có %g)" % env.environment.ambient_light_energy)
+		_check(absf(env.environment.ambient_light_energy) <= 0.35, "ambient = fill nhẹ dịu bóng (có %.2f)" % env.environment.ambient_light_energy)
 	inst.queue_free()
 	await get_tree().process_frame
 
@@ -67,7 +67,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var tw_sun := tw.get_node_or_null("SunLight") as DirectionalLight3D
 	_check(tw_sun != null and tw_sun.shadow_enabled, "twilight có SunLight + shadow")
-	_check(absf(tw.environment.ambient_light_energy) < 0.001, "twilight ambient_light_energy = 0")
+	_check(absf(tw.environment.ambient_light_energy) <= 0.35, "twilight ambient = fill nhẹ dịu bóng (có %.2f)" % tw.environment.ambient_light_energy)
 	_check(tw._sky_mat is ShaderMaterial, "twilight_environment._sky_mat là ShaderMaterial")
 	tw.queue_free()
 	await get_tree().process_frame

@@ -52,8 +52,8 @@ func _ready() -> void:
 
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color  = k["amb"]
-	# Không ambient — ánh sáng đến từ DirectionalLight3D (SunLight) duy nhất.
-	env.ambient_light_energy = 0.0
+	# Fill nhẹ (sky bounce) để bóng không đen tuyệt — directional vẫn là nguồn chính.
+	env.ambient_light_energy = 0.25
 
 	env.fog_enabled = true
 	env.fog_density = 0.0
@@ -166,7 +166,7 @@ func _ensure_sun() -> void:
 	_sun.name = "SunLight"
 	_sun.light_color = Color(1.0, 0.95, 0.85)
 	_sun.shadow_enabled = true
-	_sun.shadow_blur = 2.0
+	_sun.shadow_blur = 4.0
 	add_child(_sun)
 
 func _update_sun(h: float, rain_factor: float) -> void:
@@ -205,9 +205,11 @@ func _process(delta: float) -> void:
 
 	var rain_factor: float = 1.0 - weather_intensity * 0.55
 
+	var day_t_real: float = clamp((90.0 * sin((h - 6.0) / 12.0 * PI) + 5.0) / 95.0, 0.0, 1.0)
 	SkyLight.update_sky(_sky_mat, h, weather_intensity, float(TimeSystem.get_total_days()) if TimeSystem else -1.0)
 	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
-	environment.ambient_light_energy = 0.0
+	# Fill mềm theo ngày/đêm + mưa để bóng dịu, không đen tuyệt.
+	environment.ambient_light_energy = 0.25 * rain_factor * lerp(0.5, 1.0, day_t_real)
 	_update_sun(h, rain_factor)
 
 	environment.fog_density = weather_intensity * 0.012

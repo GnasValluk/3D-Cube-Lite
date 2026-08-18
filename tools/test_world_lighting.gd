@@ -37,8 +37,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check_sun(env, "Real world")
-	_check(absf(env.environment.ambient_light_energy) < 0.001,
-		"Real world ambient_light_energy = 0 (có %g)" % env.environment.ambient_light_energy)
+	_check(env.environment.ambient_light_energy >= 0.0 and env.environment.ambient_light_energy <= 0.35,
+		"Real world ambient = fill nhẹ dịu bóng (có %.2f)" % env.environment.ambient_light_energy)
 	if WorldChunk._grass_mat != null:
 		_check(WorldChunk._grass_mat is ShaderMaterial,
 			"grass dùng ShaderMaterial sway (nhận sáng + đu đưa)")
@@ -49,8 +49,8 @@ func _ready() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check_sun(tw, "Twilight")
-	_check(absf(tw.environment.ambient_light_energy) < 0.001,
-		"Twilight ambient_light_energy = 0 (có %g)" % tw.environment.ambient_light_energy)
+	_check(tw.environment.ambient_light_energy >= 0.0 and tw.environment.ambient_light_energy <= 0.35,
+		"Twilight ambient = fill nhẹ dịu bóng (có %.2f)" % tw.environment.ambient_light_energy)
 
 	host.queue_free()
 	await get_tree().process_frame
