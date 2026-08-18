@@ -417,8 +417,8 @@ func _jitter(col: Color) -> Color:
 	col.b = clampf(col.b + j, 0.0, 1.0)
 	return col
 
-## Model khúc gỗ sồi = bộ xương thân cây THẬT bỏ lá (thân + cành vươn), được
-## dựng lại từ chính code dựng cây rồi canh giữa + thu nhỏ cỡ món đồ item.
+## Model khúc gỗ sồi = thân cây THẬT bỏ lá/bỏ cành, được dựng lại từ chính code
+## dựng cây rồi canh giữa + thu nhỏ cỡ món đồ item.
 static func build_log(parent: Node3D) -> void:
 	var t := OakProp.new()
 	t._variant = "plains"
@@ -426,7 +426,6 @@ static func build_log(parent: Node3D) -> void:
 	t._base_h = 4.4
 	t._stage = GrowingProp.Stage.MATURE
 	t._build_trunk(t._base_h)
-	t._branch_arms(t._base_h)
 	var positions: Array = []
 	var colors: Array = []
 	for i in range(t._ordered.size()):

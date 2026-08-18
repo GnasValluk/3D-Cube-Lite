@@ -1288,9 +1288,9 @@ static func _mesh_boxes_aabb(pivot: Node3D) -> AABB:
 				result = result.merge(box)
 	return result
 
-## ── Khúc cây (log): model = bộ xương thân cây VOXEL THẬT bỏ lá, dựng lại từ
-## chính code dựng cây của từng loài (OakProp.build_log, ...) — không phải
-## khối gỗ tròn như wood block. ──────────────────────────────────────────────
+## ── Khúc cây (log): model = thân cây VOXEL THẬT (chỉ trụ chính, bỏ lá/bỏ cành),
+## dựng lại từ chính code dựng cây của từng loài (OakProp.build_log, ...) — không
+## phải khối gỗ tròn như wood block. Trụ cây xoay nằm ngang như khúc gỗ để dưới đất. ──
 static func _build_log_icon(p: Node3D, item_id: String) -> void:
 	match item_id:
 		"log_oak": OakProp.build_log(p)
@@ -1299,6 +1299,11 @@ static func _build_log_icon(p: Node3D, item_id: String) -> void:
 		"log_swamp": SwampTreeProp.build_log(p)
 		"log_mangrove": MangroveProp.build_log(p)
 		"log_palm": PalmProp.build_log(p)
+	# build_log dựng trụ thẳng đứng (+Y) rồi canh giữa gốc toạ độ — xoay 90° quanh
+	# trục Z để khúc gỗ nằm ngang (axis dọc theo +X, vẫn canh giữa hình học).
+	var mmi := p.get_node_or_null("LogVisual") as MultiMeshInstance3D
+	if mmi:
+		mmi.rotation_degrees = Vector3(0.0, 0.0, 90.0)
 
 static func _build_wood_icon(p: Node3D, item_id: String) -> void:
 	var top: Color

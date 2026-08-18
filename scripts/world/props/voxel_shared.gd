@@ -97,7 +97,13 @@ static func build_centered(positions: Array, voxel_size: float, colors: Array, t
 	for i in range(n):
 		pos2.append((positions[i] as Vector3 - center) * s)
 		sc2.append(voxel_size * s)
-	return build(pos2, sc2, colors)
+	var res := build(pos2, sc2, colors)
+	if res != null:
+		# AABB thật của model (trước transform của node) — highlight item / quản lý
+		# không đọc lại qua get_instance_transform (không đáng tin sau set_buffer).
+		var ext_s: Vector3 = ext * s
+		res.set_meta("item_aabb", AABB(-ext_s * 0.5, ext_s))
+	return res
 
 ## ── Sway budget: chỉ tính sway cho prop GẦN camera ───────────────────────────
 ## Hàng trăm cây/cỏ biển mỗi cây chạy `_process` + vài sin/cos mỗi frame dù ở

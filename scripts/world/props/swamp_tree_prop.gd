@@ -307,15 +307,14 @@ func _hit_flash() -> void:
 func _get_mesh_instances() -> Array[MeshInstance3D]:
 	return []
 
-## Model khúc gỗ tràm = thân + nhánh THẬT bỏ lá (lọc vỏ voxel TRUNK_SCALE,
-## loại lá/dây leo), built từ chính code dựng cây rồi canh giữa + thu nhỏ.
+## Model khúc gỗ tràm = thân THẬT bỏ lá/bỏ nhánh (lọc vỏ voxel TRUNK_SCALE),
+## built từ chính code dựng cây rồi canh giữa + thu nhỏ.
 static func build_log(parent: Node3D) -> void:
 	var t := SwampTreeProp.new()
 	t._base_h = 4.0
 	t._seed_a = 1.0
 	t._stage = GrowingProp.Stage.MATURE
 	t._trunk_voxels(t._base_h)
-	t._canopy_voxels(t._base_h)
 	var positions: Array = []
 	var colors: Array = []
 	for i in range(t._ordered.size()):

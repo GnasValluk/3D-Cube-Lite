@@ -143,8 +143,8 @@ func _jitter(col: Color) -> Color:
 	col.b = clampf(col.b + j, 0.0, 1.0)
 	return col
 
-## Model khúc gỗ cây rừng rậm = bộ xương thân + nhánh THẬT bỏ lá (tái dùng
-## chính code dựng cây), canh giữa + thu nhỏ cỡ món đồ item drop.
+## Model khúc gỗ cây rừng rậm = thân THẬT bỏ lá/bỏ nhánh (tái dùng chính code
+## dựng cây), canh giữa + thu nhỏ cỡ món đồ item drop.
 static func build_log(parent: Node3D) -> void:
 	var t := DenseTreeProp.new()
 	t._variant = "plains"
@@ -154,7 +154,6 @@ static func build_log(parent: Node3D) -> void:
 	var base_r: float = t._get_base_r()
 	var top_r: float = t._get_top_r()
 	t._trunk_voxels(t._base_h, base_r, top_r)
-	t._branch_voxels(t._base_h)
 	var positions: Array = []
 	var colors: Array = []
 	for i in range(t._ordered.size()):
