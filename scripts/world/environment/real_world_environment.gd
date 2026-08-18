@@ -14,13 +14,13 @@ var _moon_dir := Vector3(0.0, -1.0, 0.0)
 const CYCLE_DURATION: float = 600.0
 
 var _keys: Array[Dictionary] = [
-	{ "h": 0.0, "bg": Color(0.08, 0.10, 0.20), "amb": Color(0.10, 0.12, 0.22), "ae": 0.30,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
+	{ "h": 0.0, "bg": Color(0.12, 0.14, 0.26), "amb": Color(0.16, 0.19, 0.32), "ae": 0.5,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
 	{ "h": 6.0, "bg": Color(0.70, 0.55, 0.45), "amb": Color(0.65, 0.50, 0.40), "ae": 0.8,  "dc": Color(1.0, 0.85, 0.60), "de": 2.5 },
 	{ "h": 8.0, "bg": Color(0.55, 0.78, 0.88), "amb": Color(0.66, 0.62, 0.54), "ae": 1.0, "dc": Color(1.0, 0.95, 0.82), "de": 5.0 },
 	{ "h": 14.0,"bg": Color(0.55, 0.78, 0.88), "amb": Color(0.66, 0.62, 0.54), "ae": 1.2, "dc": Color(1.0, 0.95, 0.82), "de": 5.5 },
 	{ "h": 15.0,"bg": Color(0.70, 0.60, 0.45), "amb": Color(0.65, 0.55, 0.40), "ae": 1.5, "dc": Color(1.0, 0.80, 0.50), "de": 3.5 },
 	{ "h": 18.0,"bg": Color(0.30, 0.22, 0.28), "amb": Color(0.25, 0.20, 0.25), "ae": 0.35,"dc": Color(0.85, 0.60, 0.40), "de": 1.2 },
-	{ "h": 24.0,"bg": Color(0.08, 0.10, 0.20), "amb": Color(0.10, 0.12, 0.22), "ae": 0.30,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
+	{ "h": 24.0,"bg": Color(0.12, 0.14, 0.26), "amb": Color(0.16, 0.19, 0.32), "ae": 0.5,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
 ]
 
 func _get_hour() -> float:
@@ -233,7 +233,7 @@ func _update_sun(h: float, rain_factor: float) -> void:
 		var phase: float = fposmod(days / SkyLight.SYNODIC_MONTH, 1.0)
 		phase_light = lerp(0.55, 1.0, 0.5 * (1.0 - cos(phase * TAU)))
 	_moon.visible = moon_up > 0.01 and night_factor > 0.05
-	_moon.light_energy = 0.55 * moon_up * night_factor * phase_light * rain_factor
+	_moon.light_energy = 0.45 * moon_up * night_factor * phase_light * rain_factor
 
 func _setup_clouds() -> void:
 	_clouds = _VolumetricClouds.new()
@@ -267,8 +267,8 @@ func _update_clouds(h: float, weather: float, day_t: float) -> void:
 	col = col.lerp(Color(1.28, 1.06, 0.80), sun_low * 0.55)
 	col = col.lerp(Color(0.30, 0.34, 0.48), night * 0.9)
 	col = col.lerp(Color(0.56, 0.57, 0.60), weather * 0.9)
-	var bright: float = (1.0 - night * 0.62) * (1.0 - weather * 0.2) * (0.85 + 0.3 * day_t)
-	var threshold: float = 0.42 + night * 0.05 + weather * 0.03
+	var bright: float = (1.0 - night * 0.62) * (1.0 - weather * 0.2) * (0.9 + 0.32 * day_t)
+	var threshold: float = 0.46 + night * 0.05 + weather * 0.03
 	_clouds.update_clouds(light_dir, col, bright, threshold)
 	_clouds.visible = SettingsManager.clouds_enabled if SettingsManager else true
 	if _player == null or not is_instance_valid(_player):
@@ -294,7 +294,7 @@ func _process(delta: float) -> void:
 	SkyLight.update_sky(_sky_mat, h, weather_intensity, float(TimeSystem.get_total_days()) if TimeSystem else -1.0, SettingsManager.clouds_enabled if SettingsManager else true)
 	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
 	# Fill mềm theo ngày/đêm + mưa để bóng dịu, không đen tuyệt.
-	environment.ambient_light_energy = 0.25 * rain_factor * lerp(0.5, 1.0, day_t_real)
+	environment.ambient_light_energy = 0.28 * rain_factor * lerp(0.72, 1.0, day_t_real)
 	_update_sun(h, rain_factor)
 	# Mây thể tích thật thay mây vẽ trên sky shader (tránh trùng hai lớp).
 	_sky_mat.set_shader_parameter("cloud_cover", 0.0)

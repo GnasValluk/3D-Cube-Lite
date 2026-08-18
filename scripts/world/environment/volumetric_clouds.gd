@@ -30,7 +30,7 @@ func _ready() -> void:
 	position = Vector3(0.0, (CLOUD_MIN_Y + CLOUD_MAX_Y) * 0.5, 0.0)
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-static func _build_noise3d(freq: float, octaves: int, w: int, h: int, d: int, seed: int) -> NoiseTexture3D:
+static func _build_noise3d(freq: float, octaves: int, w: int, h: int, d: int, seed: int) -> ImageTexture3D:
 	var n := FastNoiseLite.new()
 	n.noise_type = FastNoiseLite.TYPE_PERLIN
 	n.fractal_type = FastNoiseLite.FRACTAL_FBM
@@ -38,12 +38,9 @@ static func _build_noise3d(freq: float, octaves: int, w: int, h: int, d: int, se
 	n.fractal_octaves = octaves
 	n.fractal_gain = 0.55
 	n.seed = seed
-	var tex := NoiseTexture3D.new()
-	tex.noise = n
-	tex.width = w
-	tex.height = h
-	tex.depth = d
-	tex.seamless = true
+	var slices: Array[Image] = n.get_image_3d(w, h, d)
+	var tex := ImageTexture3D.new()
+	tex.create(slices[0].get_format(), w, h, d, false, slices)
 	return tex
 
 ## Cập nhật ánh sáng + màu mây theo giờ/trời (gọi mỗi frame từ môi trường).

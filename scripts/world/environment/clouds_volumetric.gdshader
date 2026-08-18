@@ -7,10 +7,10 @@ render_mode unshaded, blend_mix, depth_draw_never, cull_disabled;
 // Toàn bộ màu sắc / hướng sáng được đẩy mỗi frame từ VolumetricClouds.
 
 uniform sampler3D cloud_noise_texture;
-uniform float cloud_scale : hint_range(0.001, 0.1) = 0.006;
-uniform float cloud_threshold : hint_range(0.0, 1.0) = 0.42;
-uniform int max_steps : hint_range(16, 200) = 72;
-uniform float step_size : hint_range(0.1, 6.0) = 1.5;
+uniform float cloud_scale : hint_range(0.001, 0.1) = 0.005;
+uniform float cloud_threshold : hint_range(0.0, 1.0) = 0.46;
+uniform int max_steps : hint_range(16, 200) = 96;
+uniform float step_size : hint_range(0.1, 6.0) = 1.1;
 
 // Trôi bay: hướng + tốc độ gió (đẩy từ TIME trong shader).
 uniform vec3 cloud_movement_direction = vec3(0.6, 0.0, 1.0);
@@ -24,7 +24,7 @@ uniform vec3 light_direction = vec3(0.3, 0.8, 0.4);
 uniform vec3 cloud_color : source_color = vec3(1.0, 1.0, 0.98);
 uniform float cloud_brightness : hint_range(0.0, 4.0) = 1.2;
 uniform float shadow_intensity : hint_range(0.0, 1.0) = 0.55;
-uniform float cloud_alpha : hint_range(1.0, 300.0) = 26.0;
+uniform float cloud_alpha : hint_range(1.0, 300.0) = 18.0;
 
 // Lớp trời: độ cao đáy/đỉnh mây (toạ độ world y).
 uniform float cloud_min_y = 55.0;
