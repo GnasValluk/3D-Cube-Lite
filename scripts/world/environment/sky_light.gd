@@ -10,8 +10,8 @@ const SKY_SHADER := preload("res://scripts/world/environment/sky.gdshader")
 
 const DAY_TOP       := Color(0.32, 0.60, 0.94)
 const DAY_HORIZON   := Color(0.78, 0.85, 0.95)
-const NIGHT_TOP     := Color(0.015, 0.018, 0.06)
-const NIGHT_HORIZON := Color(0.08, 0.09, 0.18)
+const NIGHT_TOP     := Color(0.012, 0.014, 0.042)
+const NIGHT_HORIZON := Color(0.045, 0.05, 0.10)
 const GRAY_TOP      := Color(0.45, 0.48, 0.54)
 const GRAY_HORIZON  := Color(0.60, 0.62, 0.66)
 
@@ -146,7 +146,8 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	var moon_dir := Vector3(cos(mp_rad) * cos(my_rad), sin(mp_rad), cos(mp_rad) * sin(my_rad))
 	mat.set_shader_parameter("moon_dir", moon_dir)
 	mat.set_shader_parameter("moon_color", SUN_NIGHT.lerp(GRAY_HORIZON, weather * 0.4))
-	mat.set_shader_parameter("moon_energy", lerp(0.0, 0.14, night_factor) * (1.0 - weather * 0.4))
+	# Trăng dịu nhẹ — đêm tối nhưng vẫn phân biệt được hình trăng trên trời.
+	mat.set_shader_parameter("moon_energy", lerp(0.0, 0.07, night_factor) * (1.0 - weather * 0.4))
 	# Mặt trăng nhỏ + xa: ~0.8° bán kính (nhỏ hơn mặt trời một chút).
 	mat.set_shader_parameter("moon_angle_max", 0.8)
 

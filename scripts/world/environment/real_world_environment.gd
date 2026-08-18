@@ -10,13 +10,13 @@ var _moon_dir := Vector3(0.0, -1.0, 0.0)
 const CYCLE_DURATION: float = 600.0
 
 var _keys: Array[Dictionary] = [
-	{ "h": 0.0, "bg": Color(0.12, 0.14, 0.26), "amb": Color(0.16, 0.19, 0.32), "ae": 0.5,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
+	{ "h": 0.0, "bg": Color(0.12, 0.14, 0.26), "amb": Color(0.10, 0.12, 0.20), "ae": 0.35,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
 	{ "h": 6.0, "bg": Color(0.70, 0.55, 0.45), "amb": Color(0.65, 0.50, 0.40), "ae": 0.8,  "dc": Color(1.0, 0.85, 0.60), "de": 2.5 },
 	{ "h": 8.0, "bg": Color(0.55, 0.78, 0.88), "amb": Color(0.66, 0.62, 0.54), "ae": 1.0, "dc": Color(1.0, 0.95, 0.82), "de": 5.0 },
 	{ "h": 14.0,"bg": Color(0.55, 0.78, 0.88), "amb": Color(0.66, 0.62, 0.54), "ae": 1.2, "dc": Color(1.0, 0.95, 0.82), "de": 5.5 },
 	{ "h": 15.0,"bg": Color(0.70, 0.60, 0.45), "amb": Color(0.65, 0.55, 0.40), "ae": 1.5, "dc": Color(1.0, 0.80, 0.50), "de": 3.5 },
 	{ "h": 18.0,"bg": Color(0.30, 0.22, 0.28), "amb": Color(0.25, 0.20, 0.25), "ae": 0.35,"dc": Color(0.85, 0.60, 0.40), "de": 1.2 },
-	{ "h": 24.0,"bg": Color(0.12, 0.14, 0.26), "amb": Color(0.16, 0.19, 0.32), "ae": 0.5,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
+	{ "h": 24.0,"bg": Color(0.12, 0.14, 0.26), "amb": Color(0.10, 0.12, 0.20), "ae": 0.35,"dc": Color(0.65, 0.70, 0.85), "de": 0.8 },
 ]
 
 func _get_hour() -> float:
@@ -228,7 +228,8 @@ func _update_sun(h: float, rain_factor: float) -> void:
 		var phase: float = fposmod(days / SkyLight.SYNODIC_MONTH, 1.0)
 		phase_light = lerp(0.55, 1.0, 0.5 * (1.0 - cos(phase * TAU)))
 	_moon.visible = moon_up > 0.01 and night_factor > 0.05
-	_moon.light_energy = 0.32 * moon_up * night_factor * phase_light * rain_factor
+	# Trăng rọi sáng vừa phải — đêm phải thật tối, trăng chỉ tông nhẹ để thấy đường.
+	_moon.light_energy = 0.13 * moon_up * night_factor * phase_light * rain_factor
 
 func _reapply_preset() -> void:
 	if environment:
