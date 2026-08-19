@@ -2964,8 +2964,10 @@ func apply_chunk(data: Dictionary) -> void:
 	var bdbytes: PackedByteArray = data.get("block_data_bytes", PackedByteArray())
 	if not bdbytes.is_empty():
 		if data.get("bd_compressed", false):
+			# Kích thước raw có thể là 1× (chunk cũ) hoặc 2× (có offsets nội-ô).
+			# Decompress buffer đủ 2× để nhận cả 2 định dạng.
 			bdbytes = bdbytes.decompress(
-				_cols * _cols * _BlockData.CHUNK_H, FileAccess.COMPRESSION_DEFLATE)
+				_cols * _cols * _BlockData.CHUNK_H * 2, FileAccess.COMPRESSION_DEFLATE)
 		block_data = _BlockData.new()
 		block_data.from_bytes(bdbytes, _cols, _cols)
 
