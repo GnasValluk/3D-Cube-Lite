@@ -185,13 +185,13 @@ sprint={
 
 3d/physics_engine="Jolt Physics"
 
-[threading]
-
-worker_pool/max_threads=6
-
 [rendering]
 
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
 textures/vram_compression/import_etc2_astc=true
 "Cannot create uniform set ... not enough room in the RESOURCES descriptor heap).rendering_device/d3d12/max_resource_descriptors"=32768
+
+[threading]
+
+worker_pool/max_threads=6
