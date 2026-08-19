@@ -616,10 +616,12 @@ func place_blocks_bulk(positions: Array[Vector3], block_ids: Array[int], off: in
 			continue
 		var arr: Array = by_chunk.get(chunk, [])
 		if arr.is_empty():
-			arr = [[], []]
+			var pv: Array[Vector3] = []
+			var pi: Array[int] = []
+			arr = [pv, pi]
 			by_chunk[chunk] = arr
-		(arr[0] as Array).append(p)
-		(arr[1] as Array).append(block_ids[i])
+		(arr[0] as Array[Vector3]).append(p)
+		(arr[1] as Array[int]).append(block_ids[i])
 	var total: int = 0
 	for chunk in by_chunk:
 		var lists: Array = by_chunk[chunk]
