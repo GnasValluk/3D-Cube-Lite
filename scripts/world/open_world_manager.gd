@@ -647,3 +647,10 @@ func get_block(wx: float, wy: float, wz: float) -> int:
 	if chunk.block_data == null: return 0
 	var blk := chunk.world_to_local_block(wx, wy, wz)
 	return chunk.block_data.get_block(blk.x, blk.y, blk.z)
+
+## Offset nội-ô của block tại world position (phục vụ auto-dính khi build).
+func get_block_offset(wx: float, wy: float, wz: float) -> int:
+	var chunk := get_chunk_at(wx, wz)
+	if chunk == null or not chunk.has_method("get_block_offset_at"):
+		return 4
+	return chunk.get_block_offset_at(wx, wy, wz)

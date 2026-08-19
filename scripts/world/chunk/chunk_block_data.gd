@@ -18,10 +18,13 @@ const CHUNK_H: int = Y_MAX - Y_MIN + 1   # = 69
 const SLAB_HEIGHT: float = 0.5
 
 ## Offset nội-ô (sub-cell 0.25): mỗi cell lưu 1 byte.
-## Bit: index = (dxi+1)*3 + (dzi+1), dxi/dzi ∈ -1..1 cho lệch ±0.25 so tâm.
-## 4 = tâm (mặc định). Block có offset được vẽ dịch đi để ghép khít 2 platform/
-## khối nhỏ mà không cần dời sang ô kế.
-const OFF_CENTER: int = 4
+## Grid mịn: dx/dz ∈ -3..3 (bước 0.25) → box tâm lệch ±0.75 so chuẩn. Đủ để
+## 2 khối hộp 0.5 đặt ở 2 ô liền có thể ghép khít nhau (khối khe "nhô sang ô kế").
+## Index = (dx+3)*7 + (dz+3) → 0..48. OFF_CENTER = 24 (dx=dz=0 → tâm ô chuẩn).
+const OFF_CENTER: int = 24
+const OFF_DX_MIN: int = -3
+const OFF_DX_MAX: int = 3
+const OFF_STEP: float = 0.25
 
 var _data: PackedByteArray
 var _off: PackedByteArray
@@ -88,9 +91,15 @@ func set_offset(x: int, y: int, z: int, off: int) -> void:
 static func offset_delta(off: int) -> Vector2:
 	if off == OFF_CENTER:
 		return Vector2.ZERO
-	var dxi: int = off / 3 - 1
-	var dzi: int = off % 3 - 1
-	return Vector2(float(dxi) * 0.25, float(dzi) * 0.25)
+	var dx: int = off / 7 - 3
+	var dz: int = off % 7 - 3
+	return Vector2(float(dx) * OFF_STEP, float(dz) * OFF_STEP)
+
+## Mã hoá offset từ delta (dx, dz unit, bước OFF_STEP). Ép về khoảng ±0.75.
+static func offset_index(delta: Vector2) -> int:
+	var dx: int = clampi(roundi(delta.x / OFF_STEP), OFF_DX_MIN, OFF_DX_MAX)
+	var dz: int = clampi(roundi(delta.y / OFF_STEP), OFF_DX_MIN, OFF_DX_MAX)
+	return (dx + 3) * 7 + (dz + 3)
 
 ## World-Y (float, Godot units) → slab layer index
 ## world_y = 0.5 → layer 1 (0.0-0.5)

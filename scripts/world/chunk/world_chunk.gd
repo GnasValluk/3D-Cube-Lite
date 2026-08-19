@@ -3691,6 +3691,13 @@ func world_to_local_block(wx: float, wy: float, wz: float) -> Vector3i:
 	var ly: int = _BlockData.world_y_to_layer(wy)
 	return Vector3i(lx, ly, lz)
 
+## Offset nội-ô của block tại world position (OFF_CENTER nếu không có / không đặt
+## lệch). Dùng để ép block mới sát cạnh block cũ khi build.
+func get_block_offset_at(wx: float, wy: float, wz: float) -> int:
+	if block_data == null: return _BlockData.OFF_CENTER
+	var blk := world_to_local_block(wx, wy, wz)
+	return block_data.get_offset(blk.x, blk.y, blk.z)
+
 ## Phá block tại world position. Trả về block_id đã xoá (0 = không có gì).
 ## BEDROCK không thể phá vỡ. WATER có thể phá (múc).
 func break_block_at(wx: float, wy: float, wz: float) -> int:

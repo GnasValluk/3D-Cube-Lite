@@ -79,9 +79,6 @@ enum BlockID {
 	STONE_PLATFORM = 63, # Nền đá platform — mỗi ô đầy block (1×0.5×1), đặt 3×3 tạo sàn
 	STONE_WALL_Z   = 64, # Tường đá dày theo Z (1×0.5×0.5) — tường 3×3 dài theo X
 	STONE_WALL_X   = 65, # Tường đá dày theo X (0.5×0.5×1) — tường 3×3 dài theo Z
-	STONE_HALF     = 66, # Đá nửa — 1/2 slab (1×0.25×1), xếp 2 lớp thành 1 slab
-	STONE_QUARTER  = 67, # Đá tư — 1/4 slab (1×0.125×1), xếp 4 lớp thành 1 slab
-	STONE_EIGHTH_2 = 68, # Đá mảnh — 1/8 slab (1×0.0625×1), xếp 8 lớp thành 1 slab
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -141,9 +138,6 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.STONE_PLATFORM: "block_stone_platform",
 	BlockID.STONE_WALL_Z:    "block_stone_wall",
 	BlockID.STONE_WALL_X:    "block_stone_wall",
-	BlockID.STONE_HALF:      "block_stone_half_slab",
-	BlockID.STONE_QUARTER:   "block_stone_quarter_slab",
-	BlockID.STONE_EIGHTH_2:  "block_stone_eighth_slab",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -198,9 +192,6 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"block_stone_wall":        BlockID.STONE_WALL_Z,   # mặc định: tường dài theo X (dày Z)
 	"block_stone_wall_door":   BlockID.STONE_WALL_Z,
 	"block_stone_wall_window": BlockID.STONE_WALL_Z,
-	"block_stone_half_slab":        BlockID.STONE_HALF,
-	"block_stone_quarter_slab":     BlockID.STONE_QUARTER,
-	"block_stone_eighth_slab":      BlockID.STONE_EIGHTH_2,
 }
 
 const VOXEL: float = 1.0
@@ -350,9 +341,6 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.46, 0.46, 0.50),           # 63 STONE_PLATFORM — đá nền platform (khớp STONE)
 	Color(0.46, 0.46, 0.50),           # 64 STONE_WALL_Z — tường đá dày Z
 	Color(0.46, 0.46, 0.50),           # 65 STONE_WALL_X — tường đá dày X
-	Color(0.47, 0.47, 0.51),           # 66 STONE_HALF — đá nửa slab (1/2·0.5)
-	Color(0.48, 0.48, 0.52),           # 67 STONE_QUARTER — đá tư (1/4·0.5)
-	Color(0.49, 0.49, 0.53),           # 68 STONE_EIGHTH_2 — đá mảnh (1/8·0.5)
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -422,9 +410,6 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.04, 0.08, 0.06),           # 63 STONE_PLATFORM (TW palette placeholder)
 	Color(0.04, 0.08, 0.06),           # 64 STONE_WALL_Z (TW palette placeholder)
 	Color(0.04, 0.08, 0.06),           # 65 STONE_WALL_X (TW palette placeholder)
-	Color(0.04, 0.08, 0.06),           # 66 STONE_HALF (TW palette placeholder)
-	Color(0.04, 0.08, 0.06),           # 67 STONE_QUARTER (TW palette placeholder)
-	Color(0.04, 0.08, 0.06),           # 68 STONE_EIGHTH_2 (TW palette placeholder)
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -464,9 +449,6 @@ const BLOCK_SHAPES: Dictionary = {
 	BlockID.STONE_PLATFORM: Vector3(1.0, 0.5, 1.0), # nền đá — đầy cell (dày 0.5)
 	BlockID.STONE_WALL_Z:   Vector3(1.0, 0.5, 0.5), # tường đá — dài X, dày Z 0.5
 	BlockID.STONE_WALL_X:   Vector3(0.5, 0.5, 1.0), # tường đá — dài Z, dày X 0.5
-	BlockID.STONE_HALF:     Vector3(1.0, 0.25, 1.0),   # đá nửa — 1/2 slab (2 lớp = 1 slab)
-	BlockID.STONE_QUARTER:  Vector3(1.0, 0.125, 1.0),  # đá tư — 1/4 slab (4 lớp = 1 slab)
-	BlockID.STONE_EIGHTH_2: Vector3(1.0, 0.0625, 1.0), # đá mảnh — 1/8 slab (8 lớp = 1 slab)
 }
 
 static func is_shaped_block(bid: int) -> bool:
@@ -587,9 +569,6 @@ const BLOCK_HARDNESS: Dictionary = {
 	BlockID.STONE_PLATFORM: 1.2,
 	BlockID.STONE_WALL_Z:   1.2,
 	BlockID.STONE_WALL_X:   1.2,
-	BlockID.STONE_HALF:     1.2,
-	BlockID.STONE_QUARTER:  1.2,
-	BlockID.STONE_EIGHTH_2: 1.2,
 	BlockID.BAUXITE_ORE:  1.3,
 	BlockID.COPPER_ORE:   1.6,
 	BlockID.GOLD_ORE:     1.7,

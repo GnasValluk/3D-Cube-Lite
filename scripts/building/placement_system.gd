@@ -183,6 +183,7 @@ static func _platform_cells(item_id: String, rot_deg: int) -> Dictionary:
 func _build_ghost_platform() -> void:
 	var info := _platform_cells(_item_id, roundi(rad_to_deg(_placement_rotation)))
 	var block_mat := _ghost_mat(Color(0.52, 0.52, 0.56, 0.30), Color(0.30, 0.30, 0.32), 0.0)
+	var off_d := _BlockData.offset_delta(_placement_off)
 	for c in info.cells:
 		var shape: Vector3 = _Data.block_shape(info.block)
 		var mi := MeshInstance3D.new()
@@ -190,7 +191,7 @@ func _build_ghost_platform() -> void:
 		box.size = shape
 		mi.mesh = box
 		mi.material_override = block_mat
-		mi.position = Vector3(c.x + 0.5, float(c.y) * _BlockData.SLAB_HEIGHT + shape.y * 0.5, c.z + 0.5)
+		mi.position = Vector3(c.x + 0.5 + off_d.x, float(c.y) * _BlockData.SLAB_HEIGHT + shape.y * 0.5, c.z + 0.5 + off_d.y)
 		_ghost.add_child(mi)
 
 ## Bàn trạm chế tạo chuyên ngành — đặt như Bàn Chế Tạo (entity trong world).
@@ -535,10 +536,17 @@ func update_placement() -> void:
 	var horiz_off: Vector3 = Vector3(_Data.VOXEL * 0.5, 0, _Data.VOXEL * 0.5) if _is_seed_item(_item_id) else Vector3.ZERO
 	_ghost_pos = snapped + Vector3(0, y_offset, 0) + horiz_off
 	_placement_off = _BlockData.OFF_CENTER
-	if _is_single_block_item(_item_id):
-		# Sub-grid 0.25: chuột nhắm gần mép ô nào trong mặt → đặt block lệch về
-		# mép đó (dxi/dzi ∈ -1..1) để ghép khít platform/khối nhỏ khi xếp cạnh.
-		_placement_off = _pick_cell_offset(snapped, hit_pos)
+	if is_platform_item(_item_id) or _is_single_block_item(_item_id):
+		# Sub-grid 0.25 + auto-dính: nếu nhắm vào mặt 1 block đã đặt, block/tường
+		# mới ép sát cạnh block đó (bỏ khe hở giữa 2 mặt tường ngược nhau). Không
+		# có block để ép thì đặt lệch theo chuột trong ô.
+		var shape_new: Vector3 = Vector3.ZERO
+		if is_platform_item(_item_id):
+			var pinfo := _platform_cells(_item_id, roundi(rad_to_deg(_placement_rotation)))
+			shape_new = _Data.block_shape(pinfo.block)
+		else:
+			shape_new = _Data.block_shape(_Data.ITEM_TO_BLOCK.get(_item_id, 0))
+		_placement_off = _compute_snap_offset(shape_new, snapped, normal, hit_pos)
 	_ghost.global_position = _ghost_pos
 	_ghost.visible = true
 	_ghost_valid = true
@@ -549,16 +557,67 @@ func update_placement() -> void:
 func _is_single_block_item(item_id: String) -> bool:
 	return _Data.ITEM_TO_BLOCK.has(item_id) and not is_platform_item(item_id)
 
-## Chọn offset lệch ±0.25 theo vị trí chuột trong mặt. Trả OFF_CENTER (4) nếu
-## point nằm giữa ô. Index = (dxi+1)*3 + (dzi+1); dxi/dzi ∈ -1..1.
+## Auto-dính: tính offset nội-ô cho block mới sao cho nó ép sát block đang bị
+## nhắm (block cũ). Nếu không có block cũ → tự lệch theo vị trí chuột trong ô.
+## Nếu không thể ép trong dải ±0.75 → dùng vị trí chuột (người chơi tự canh).
+func _compute_snap_offset(shape_new: Vector3, snapped: Vector3, normal: Vector3, hit_pos: Vector3) -> int:
+	var fallback: int = _pick_cell_offset(snapped, hit_pos)
+	if shape_new == Vector3.ZERO:
+		# Block đầy ô không cần dính — vị trí outline đã full cell.
+		return fallback
+	var world_mgr := _find_world_manager()
+	if world_mgr == null or not world_mgr.has_method("get_block") \
+			or not world_mgr.has_method("get_block_offset"):
+		return fallback
+	# Ô đang nhắm = ô đích (snapped) trừ bước theo hướng normal.
+	var hit_x: float = snapped.x + normal.x * _Data.VOXEL
+	var hit_z: float = snapped.z + normal.z * _Data.VOXEL
+	var hit_y: float = snapped.y + normal.y * _BlockData.SLAB_HEIGHT
+	# Tâm ô để get_block/get_block_offset lấy đúng ô (không cạnh tranh biên).
+	var cx: float = floorf(hit_x) + 0.5
+	var cz: float = floorf(hit_z) + 0.5
+	var cy: float = (float(_BlockData.world_y_to_layer(hit_y)) + float(_BlockData.Y_MIN) + 0.5) * _BlockData.SLAB_HEIGHT
+	var bid_old: int = world_mgr.get_block(cx, cy, cz)
+	if bid_old == _Data.BlockID.AIR:
+		return fallback
+	var shape_old: Vector3 = _Data.block_shape(bid_old)
+	if shape_old == Vector3.ZERO:
+		shape_old = Vector3(_Data.VOXEL, _BlockData.SLAB_HEIGHT, _Data.VOXEL)
+	var off_old: int = world_mgr.get_block_offset(cx, cy, cz)
+	var d_old := _BlockData.offset_delta(off_old)
+
+	# Tâm box cũ & box mới (tâm mới = cạnh box cũ + nửa box mới theo normal).
+	var ocx: float = float(floorf(hit_x)) + 0.5 + d_old.x
+	var ocz: float = float(floorf(hit_z)) + 0.5 + d_old.y
+	var ncx: float = snapped.x + 0.5
+	var ncz: float = snapped.z + 0.5
+	if absf(normal.x) > 0.5:
+		var s: float = signf(normal.x)
+		ncx = ocx + shape_old.x * 0.5 * s + shape_new.x * 0.5 * s
+	elif absf(normal.z) > 0.5:
+		var szz: float = signf(normal.z)
+		ncz = ocz + shape_old.z * 0.5 * szz + shape_new.z * 0.5 * szz
+	# Y (normal.y): layer grid 0.5 — offset không hỗ trợ dọc; ô mới phía trên/dưới
+	# đã tự khít theo layer. Bỏ qua.
+
+	# Độ lệch so tâm ô đích.
+	var d_target := Vector2(ncx - (snapped.x + 0.5), ncz - (snapped.z + 0.5))
+	var idx := _BlockData.offset_index(d_target)
+	# Nếu xấp xỉ tâm → dùng trình giữ chuột (tránh tự đính lệch không đáng).
+	if idx == _BlockData.OFF_CENTER and d_target.length() < 0.05:
+		return _BlockData.OFF_CENTER
+	return idx
+
+## Chọn offset lệch ±0.25 theo vị trí chuột trong mặt (fallback khi không có
+## block cũ để ép). Trả OFF_CENTER nếu point nằm giữa ô.
 func _pick_cell_offset(cell_min: Vector3, hit_pos: Vector3) -> int:
 	var fx: float = fposmod(hit_pos.x - cell_min.x, _Data.VOXEL)
 	var fz: float = fposmod(hit_pos.z - cell_min.z, _Data.VOXEL)
-	var dxi: int = clampi(roundi((fx - 0.5) * 4.0), -1, 1)
-	var dzi: int = clampi(roundi((fz - 0.5) * 4.0), -1, 1)
-	if dxi == 0 and dzi == 0:
+	var dxf: float = clampf(roundf((fx - 0.5) * 4.0) * 0.25, -0.25, 0.25)
+	var dzf: float = clampf(roundf((fz - 0.5) * 4.0) * 0.25, -0.25, 0.25)
+	if dxf == 0.0 and dzf == 0.0:
 		return _BlockData.OFF_CENTER
-	return (dxi + 1) * 3 + (dzi + 1)
+	return _BlockData.offset_index(Vector2(dxf, dzf))
 
 ## Giao điểm ray với mặt nước mặc định (y = 0.5) khi không trúng vật nào.
 func _ray_to_water_plane(from: Vector3, dir: Vector3) -> Vector3:
@@ -799,7 +858,7 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 	elif _is_seed_item(item_id):
 		_plant_seed(item_id, pos)
 	elif is_platform_item(item_id):
-		if not _place_platform(item_id, pos):
+		if not _place_platform(item_id, pos, _placement_off):
 			var item_def := ItemDatabase.items_db.get(item_id) as ItemDef
 			if item_def and _player_inv:
 				_player_inv.add_item(item_def, 1)
@@ -824,7 +883,7 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 
 ## Đặt platform (nền/tường 3×3) vào world như nhiều ô block shape. Kiểm tra
 ## toàn bộ vùng trống trước; nếu 1 ô kín → không đặt gì (hoàn item ngược lên).
-func _place_platform(item_id: String, pos: Vector3) -> bool:
+func _place_platform(item_id: String, pos: Vector3, off: int = _BlockData.OFF_CENTER) -> bool:
 	var world_mgr := _find_world_manager()
 	if world_mgr == null or not world_mgr.has_method("place_block"):
 		return false
@@ -838,7 +897,7 @@ func _place_platform(item_id: String, pos: Vector3) -> bool:
 		if cur != _Data.BlockID.AIR and not _Data.is_water(cur):
 			return false
 	for c in info.cells:
-		world_mgr.place_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z), info.block)
+		world_mgr.place_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z), info.block, off)
 	SFXManager.play_block_place()
 	return true
 
