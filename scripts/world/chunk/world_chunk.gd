@@ -3521,9 +3521,13 @@ static func _build_shaped_block_data(bd: _BlockData, cols: int, dim_id: int) -> 
 				var shape: Vector3 = _Data.block_shape(blk)
 				if shape == Vector3.ZERO:
 					continue
+				var off: int = bd.get_offset(x, ly, z)
+				var off_d := _BlockData.offset_delta(off)
 				var bottom: float = float(ly + _BlockData.Y_MIN) * _BlockData.SLAB_HEIGHT
-				var pos := Vector3(wx, bottom + shape.y * 0.5, wz)
-				var mask := _shaped_face_mask(raw, raw_h, raw_w, x, ly, z, blk, shape)
+				var pos := Vector3(wx + off_d.x, bottom + shape.y * 0.5, wz + off_d.y)
+				# Box lệch tâm không gộp mặt (mask 0) để tránh bỏ mặt thừa khi
+				# 2 box lệch nhau không thực sự dính toàn mặt.
+				var mask := 0 if off != _BlockData.OFF_CENTER else _shaped_face_mask(raw, raw_h, raw_w, x, ly, z, blk, shape)
 				_add_shaped_box(st, pos, shape, colors[blk], mask)
 				pos_data.append(pos)
 				size_data.append(shape)
@@ -3704,12 +3708,13 @@ func break_block_at(wx: float, wy: float, wz: float) -> int:
 	return old_id
 
 ## Đặt block tại world position.
-func place_block_at(wx: float, wy: float, wz: float, block_id: int) -> bool:
+func place_block_at(wx: float, wy: float, wz: float, block_id: int, off: int = _BlockData.OFF_CENTER) -> bool:
 	if block_data == null: return false
 	var blk := world_to_local_block(wx, wy, wz)
 	var cur: int = block_data.get_block(blk.x, blk.y, blk.z)
 	if cur != _Data.BlockID.AIR and not _is_water_bid(cur): return false
 	block_data.set_block(blk.x, blk.y, blk.z, block_id)
+	block_data.set_offset(blk.x, blk.y, blk.z, off)
 	_water_tick_timer = 0.0
 	if _is_water_bid(block_id):
 		_has_water = true

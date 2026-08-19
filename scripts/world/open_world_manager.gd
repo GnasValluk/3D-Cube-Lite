@@ -596,10 +596,10 @@ func break_block(wx: float, wy: float, wz: float) -> int:
 	return old
 
 ## Đặt block tại vị trí world. Trả về true nếu thành công.
-func place_block(wx: float, wy: float, wz: float, block_id: int) -> bool:
+func place_block(wx: float, wy: float, wz: float, block_id: int, off: int = 4) -> bool:
 	var chunk := get_chunk_at(wx, wz)
 	if chunk == null: return false
-	var ok: bool = chunk.place_block_at(wx, wy, wz, block_id)
+	var ok: bool = chunk.place_block_at(wx, wy, wz, block_id, off)
 	if ok:
 		_announce_edit(wx, wy, wz, block_id)
 	return ok

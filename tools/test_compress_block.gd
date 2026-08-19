@@ -70,7 +70,7 @@ func _ready() -> void:
 	_check(d0["block_data_bytes"].size() < saved / 8,
 		"cache nén < 12.5%% (raw %d → %d)" % [saved, d0["block_data_bytes"].size()])
 	var restored: PackedByteArray = d0["block_data_bytes"].decompress(
-		32 * 32 * N, FileAccess.COMPRESSION_DEFLATE)
+		raw0.size(), FileAccess.COMPRESSION_DEFLATE)
 	_check(restored == raw0, "decompress khôi phục đúng block_data (khớp raw)")
 	var size1: int = d0["block_data_bytes"].size()
 	_W.compress_block_data(d0)
