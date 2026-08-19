@@ -204,6 +204,17 @@ static func _native_dist() -> Object:
 ## Test hook: ép dùng GDScript S6b để A/B so sánh bit-exact.
 static var _force_s6_gd: bool = false
 
+static var _native_wp: Object = null
+
+## Native WorldProps bridge (S12 plant_props) — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_props() -> Object:
+	if _native_wp == null and ClassDB.class_exists("WorldProps"):
+		_native_wp = ClassDB.instantiate("WorldProps")
+	return _native_wp
+
+## Test hook: ép dùng GDScript S12 (hash) để A/B so sánh bit-exact.
+static var _force_s12_gd: bool = false
+
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	# Thread-safe cache theo ô thế giới: lưới ocean stride-2 (42×42) của 2 chunk
 	# kề nhau overlap ~62% số sample — dùng chung bỏ qua FastNoiseLite FBM lặp.
@@ -660,6 +671,236 @@ static func _cell_hash01(vx: int, vz: int) -> float:
 	x = (x ^ (x >> 17)) * 449984367
 	x = x ^ (x >> 13)
 	return float(x & 0x7FFFFFFF) / 2147483648.0
+
+## S12 GD fallback — mirror native WorldProps (hash deterministic thay randf()).
+## Road check dùng road_grid[i]!=0 — cùng predicate _point_to_seg_d2<=md2 như
+## _is_on_road(world_ox+px, world_oz+pz). Salt hash khớp native world_props.cpp.
+static func _props_gd_fallback(plant_props: Array, biome_grid: Array, height_grid: Array,
+		wdist: PackedInt32Array, rdist: PackedInt32Array, road_grid: PackedByteArray,
+		cols: int, half: float, dim_id: int) -> void:
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				if not _Data.is_grass_tile(biome_grid[vx][vz]):
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				# 8b palm — bờ nước, cấm trên đường
+				var wd: int = wdist[vx * cols + vz]
+				if wd >= 2 and wd <= 3 and _cell_hash01(vx + 4013, vz + 29) < 0.005:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					if road_grid[vx * cols + vz] != 0:
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "palm", "pos": Vector3(px, y, pz), "variant": "river"})
+	# 8c oak — đồng cỏ xa nước ≥2; không guard dim (grass chỉ tồn tại REAL)
+	for vx in range(cols):
+		for vz in range(cols):
+			var oak_bio: int = biome_grid[vx][vz]
+			if not _Data.is_grass_tile(oak_bio):
+				continue
+			var h: float = height_grid[vx][vz]
+			if h <= _Data.WATER_Y:
+				continue
+			if wdist[vx * cols + vz] <= 2:
+				continue
+			var chance: float = 0.0035 if oak_bio == _Data.TileType.GRASS_DIRT else 0.0012
+			if _cell_hash01(vx + 4031, vz + 71) < chance:
+				var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+				var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+				if road_grid[vx * cols + vz] != 0:
+					continue
+				var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+				plant_props.append({"type": "oak", "pos": Vector3(px, y, pz), "variant": "plains"})
+	# 8d cherry_bush
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var bush_bio: int = biome_grid[vx][vz]
+				if not _Data.is_grass_tile(bush_bio):
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if wdist[vx * cols + vz] <= 2:
+					continue
+				var chance: float = 0.0045 if bush_bio == _Data.TileType.GRASS_DIRT else 0.0016
+				if _cell_hash01(vx + 4057, vz + 113) < chance:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					if road_grid[vx * cols + vz] != 0:
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "cherry_bush", "pos": Vector3(px, y, pz), "variant": "plains"})
+	# 8e eggplant — sát đường (rdist<=2), không mọc trên đường
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var eg_bio: int = biome_grid[vx][vz]
+				if not _Data.is_grass_tile(eg_bio):
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if road_grid[vx * cols + vz] != 0:
+					continue
+				if rdist[vx * cols + vz] > 2:
+					continue
+				var chance: float = 0.0024 if eg_bio == _Data.TileType.GRASS_DIRT else 0.0009
+				if _cell_hash01(vx + 4091, vz + 149) < chance:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "eggplant", "pos": Vector3(px, y, pz), "variant": "wild"})
+	# 8f watermelon — gần nước (wdist<=2)
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var wm_bio: int = biome_grid[vx][vz]
+				if not _Data.is_grass_tile(wm_bio):
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if wdist[vx * cols + vz] > 2:
+					continue
+				var chance: float = 0.0016 if wm_bio == _Data.TileType.GRASS_DIRT else 0.0006
+				if _cell_hash01(vx + 4129, vz + 191) < chance:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "watermelon", "pos": Vector3(px, y, pz), "variant": "wild"})
+	# 8g pumpkin — xa nước (wdist>=4)
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var pk_bio: int = biome_grid[vx][vz]
+				if not _Data.is_grass_tile(pk_bio):
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if wdist[vx * cols + vz] <= 3:
+					continue
+				var chance: float = 0.0010 if pk_bio == _Data.TileType.GRASS_DIRT else 0.0004
+				if _cell_hash01(vx + 4177, vz + 227) < chance:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "pumpkin", "pos": Vector3(px, y, pz), "variant": "wild"})
+	# 8h orange — bờ nước (2-3) & trung tâm đồng cỏ; on-road continue cả cell
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var or_bio: int = biome_grid[vx][vz]
+				if not _Data.is_grass_tile(or_bio):
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				var wd2: int = wdist[vx * cols + vz]
+				var near_close: bool = wd2 <= 1
+				var near_far: bool = wd2 >= 2 and wd2 <= 3
+				var spawned := false
+				if near_far and not near_close and _cell_hash01(vx + 4219, vz + 271) < 0.0025:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					if road_grid[vx * cols + vz] != 0:
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "orange_tree", "pos": Vector3(px, y, pz), "variant": "river"})
+					spawned = true
+				if not spawned and or_bio == _Data.TileType.GRASS_DIRT and not near_close and _cell_hash01(vx + 4261, vz + 313) < 0.0016:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					if road_grid[vx * cols + vz] != 0:
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "orange_tree", "pos": Vector3(px, y, pz), "variant": "plains"})
+	# 8i dense_tree
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var dt_bio: int = biome_grid[vx][vz]
+				if not _Data.is_grass_tile(dt_bio):
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if wdist[vx * cols + vz] <= 2:
+					continue
+				if _cell_hash01(vx + 4309, vz + 349) < 0.0012:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					if road_grid[vx * cols + vz] != 0:
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "dense_tree", "pos": Vector3(px, y, pz), "variant": "plains"})
+	# 8j mangrove — đước + thủy trúc + cua bùn; on-road continue cả cell
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				if biome_grid[vx][vz] != _Data.TileType.MANGROVE_MUD:
+					continue
+				var h: float = height_grid[vx][vz]
+				var mx: float = -half + (float(vx) + 0.5) * _Data.VOXEL
+				var mz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
+				if h > _Data.WATER_Y - 1.1 and _cell_hash01(vx, vz) < 0.045:
+					if road_grid[vx * cols + vz] != 0:
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "mangrove", "pos": Vector3(mx, y, mz), "variant": "coast"})
+				if h > _Data.WATER_Y - 1.5 and h <= _Data.WATER_Y + 0.2 and _cell_hash01(vx + 991, vz) < 0.034:
+					var y2 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "cattail", "pos": Vector3(mx, y2, mz), "variant": "mangrove"})
+				if h > _Data.WATER_Y + 0.1 and _cell_hash01(vx + 1817, vz + 331) < 0.010:
+					var y3 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "mud_crab", "pos": Vector3(mx, y3, mz), "variant": "mud"})
+	# 8k spruce — bio băng giá, xa nước ≥2
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var fr_bio: int = biome_grid[vx][vz]
+				if fr_bio != _Data.TileType.FROST and fr_bio != _Data.TileType.FROST_SNOW:
+					continue
+				var h: float = height_grid[vx][vz]
+				if h <= _Data.WATER_Y:
+					continue
+				if wdist[vx * cols + vz] <= 2:
+					continue
+				var chance: float = 0.0065 if fr_bio == _Data.TileType.FROST_SNOW else 0.0035
+				if _cell_hash01(vx + 4357, vz + 383) < chance:
+					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+					if road_grid[vx * cols + vz] != 0:
+						continue
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "spruce", "pos": Vector3(px, y, pz), "variant": "snow"})
+	# 8l swamp — tràm + lác + cua + bèo; on-road continue cả cell
+	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+		for vx in range(cols):
+			for vz in range(cols):
+				var sw_bio: int = biome_grid[vx][vz]
+				if sw_bio != _Data.TileType.SWAMP_MUD and sw_bio != _Data.TileType.SWAMP_DIRT:
+					continue
+				var h: float = height_grid[vx][vz]
+				var px := -half + (float(vx) + 0.5) * _Data.VOXEL
+				var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
+				if road_grid[vx * cols + vz] != 0:
+					continue
+				if h > _Data.WATER_Y + 0.15 and _cell_hash01(vx, vz) < 0.012:
+					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "swamp_tree", "pos": Vector3(px, y, pz), "variant": "marsh"})
+				if h > _Data.WATER_Y - 0.8 and h <= _Data.WATER_Y + 0.7 and _cell_hash01(vx + 131, vz + 77) < 0.045:
+					var y2 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "swamp_sedge", "pos": Vector3(px, y2, pz), "variant": "marsh"})
+				if h > _Data.WATER_Y + 0.1 and _cell_hash01(vx + 2089, vz + 167) < 0.012:
+					var y3 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
+					plant_props.append({"type": "mud_crab", "pos": Vector3(px, y3, pz), "variant": "mud"})
+				if h < _Data.WATER_Y - 0.05 and _cell_hash01(vx + 977, vz + 313) < 0.016:
+					plant_props.append({"type": "duckweed", "pos": Vector3(px, _Data.WATER_Y + 0.03125, pz), "variant": "marsh"})
 
 ## Tìm world pos vùng RỪNG NGẬP MẶN (bùn triều ven biển) gần (wx,wz).
 ## Dùng cho debug teleport "Rừng Ngập Mặn". Trả { "ok", "x", "z" }.
@@ -1784,255 +2025,27 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		mesh_aquatic = st_aq.commit()
 	_prof("S11 aquatic+plants")
 
-	# ── 8b. Palm trees — on grass land, ≥2 cells from water ─────
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
+	# -- 8b..8l. Plant props (native WorldProps fast path) --
+	var wpw := _native_props()
+	if wpw != null and not _force_s12_gd:
+		var biome_flat := PackedInt32Array()
+		var height_flat := PackedFloat64Array()
+		biome_flat.resize(cols * cols)
+		height_flat.resize(cols * cols)
 		for vx in range(cols):
 			for vz in range(cols):
-				if not _Data.is_grass_tile(biome_grid[vx][vz]):
-					continue
-				var h: float = height_grid[vx][vz]
-				if h <= _Data.WATER_Y:
-					continue
-				var wd: int = wdist[vx * cols + vz]
-				if wd >= 2 and wd <= 3 and randf() < 0.005:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					# Cấm mọc trên đường đi
-					if _is_on_road(world_ox + px, world_oz + pz):
-						continue
-					# Sink slightly into terrain, but never below water surface
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "palm", "pos": Vector3(px, y, pz), "variant": "river"})
-
-	# ── 8c. Cây sồi cổ thụ — đồng cỏ, xa nước ≥2 ──────────────────────────
-	for vx in range(cols):
-		for vz in range(cols):
-			var oak_bio: int = biome_grid[vx][vz]
-			if not _Data.is_grass_tile(oak_bio):
-				continue
-			var h: float = height_grid[vx][vz]
-			if h <= _Data.WATER_Y:
-				continue
-			if wdist[vx * cols + vz] <= 2:
-				continue
-			var chance: float = 0.0035 if oak_bio == _Data.TileType.GRASS_DIRT else 0.0012
-			if randf() < chance:
-				var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-				var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-				# Cấm mọc trên đường đi
-				if _is_on_road(world_ox + px, world_oz + pz):
-					continue
-				var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-				var variant := "plains"
-				plant_props.append({"type": "oak", "pos": Vector3(px, y, pz), "variant": variant})
-
-	# ── 8d. Bụi cherry tím dại — đồng cỏ, xa nước ≥2 ──────────────────────────
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				var bush_bio: int = biome_grid[vx][vz]
-				if not _Data.is_grass_tile(bush_bio):
-					continue
-				var h: float = height_grid[vx][vz]
-				if h <= _Data.WATER_Y:
-					continue
-				if wdist[vx * cols + vz] <= 2:
-					continue
-				var chance: float = 0.0045 if bush_bio == _Data.TileType.GRASS_DIRT else 0.0016
-				if randf() < chance:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					if _is_on_road(world_ox + px, world_oz + pz):
-						continue
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "cherry_bush", "pos": Vector3(px, y, pz), "variant": "plains"})
-
-	# ── 8e. Cây cà tím dại — SÁT ĐƯỜNG ĐI (cách đường ≤2 ô), KHÔNG mọc trên đường ──
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				var eg_bio: int = biome_grid[vx][vz]
-				if not _Data.is_grass_tile(eg_bio):
-					continue
-				var h: float = height_grid[vx][vz]
-				if h <= _Data.WATER_Y:
-					continue
-				if road_grid[vx * cols + vz] != 0:
-					continue
-				if rdist[vx * cols + vz] > 2:
-					continue
-				var chance: float = 0.0024 if eg_bio == _Data.TileType.GRASS_DIRT else 0.0009
-				if randf() < chance:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "eggplant", "pos": Vector3(px, y, pz), "variant": "wild"})
-
-	# ── 8f. Cây dưa hấu dại — GẦN nguồn nước (nước cách ≤2 ô), đồng cỏ ──
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				var wm_bio: int = biome_grid[vx][vz]
-				if not _Data.is_grass_tile(wm_bio):
-					continue
-				var h: float = height_grid[vx][vz]
-				if h <= _Data.WATER_Y:
-					continue
-				if wdist[vx * cols + vz] > 2:
-					continue
-				var chance: float = 0.0016 if wm_bio == _Data.TileType.GRASS_DIRT else 0.0006
-				if randf() < chance:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "watermelon", "pos": Vector3(px, y, pz), "variant": "wild"})
-
-	# ── 8g. Dây bí đỏ dại — XA nguồn nước (nước cách ≥3 ô), đồng cỏ ──
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				var pk_bio: int = biome_grid[vx][vz]
-				if not _Data.is_grass_tile(pk_bio):
-					continue
-				var h: float = height_grid[vx][vz]
-				if h <= _Data.WATER_Y:
-					continue
-				if wdist[vx * cols + vz] <= 3:
-					continue
-				# Bí đỏ hiếm hơn — spawn ít lại (≈40% so với trước)
-				var chance: float = 0.0010 if pk_bio == _Data.TileType.GRASS_DIRT else 0.0004
-				if randf() < chance:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "pumpkin", "pos": Vector3(px, y, pz), "variant": "wild"})
-
-	# ── 8h. Cây cam — bờ nước (xa nước 2-3 ô) & trung tâm đồng cỏ tối ────────
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				var or_bio: int = biome_grid[vx][vz]
-				if not _Data.is_grass_tile(or_bio):
-					continue
-				var h: float = height_grid[vx][vz]
-				if h <= _Data.WATER_Y:
-					continue
-				# Bờ nước: nước cách 2-3 ô nhưng không liền kề
-				var wd2: int = wdist[vx * cols + vz]
-				var near_close: bool = wd2 <= 1
-				var near_far: bool = wd2 >= 2 and wd2 <= 3
-				var spawned := false
-				if near_far and not near_close and randf() < 0.0025:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					if _is_on_road(world_ox + px, world_oz + pz):
-						continue
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "orange_tree", "pos": Vector3(px, y, pz), "variant": "river"})
-					spawned = true
-				# Trung tâm đồng cỏ: xa nước ≥2
-				if not spawned and or_bio == _Data.TileType.GRASS_DIRT and not near_close and randf() < 0.0016:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					if _is_on_road(world_ox + px, world_oz + pz):
-						continue
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "orange_tree", "pos": Vector3(px, y, pz), "variant": "plains"})
-
-	# ── 8i. Cây rừng rậm — tán um tùm, xa nước ≥2 trên đồng cỏ ──────────────
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				var dt_bio: int = biome_grid[vx][vz]
-				if not _Data.is_grass_tile(dt_bio):
-					continue
-				var h: float = height_grid[vx][vz]
-				if h <= _Data.WATER_Y:
-					continue
-				if wdist[vx * cols + vz] <= 2:
-					continue
-				if randf() < 0.0012:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					if _is_on_road(world_ox + px, world_oz + pz):
-						continue
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "dense_tree", "pos": Vector3(px, y, pz), "variant": "plains"})
-
-	# ── 8j. RỪNG NGẬP MẶN — đước + thủy trúc + cua bùn trên bãi bùn triều ───
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				if biome_grid[vx][vz] != _Data.TileType.MANGROVE_MUD:
-					continue
-				var h: float = height_grid[vx][vz]
-				var mx: float = -half + (float(vx) + 0.5) * _Data.VOXEL
-				var mz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
-				# Cây đước — bãi bùn gần mực nước, rễ chùm ăn xuống lạch triều
-				if h > _Data.WATER_Y - 1.1 and _cell_hash01(vx, vz) < 0.045:
-					if _is_on_road(world_ox + mx, world_oz + mz):
-						continue
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "mangrove", "pos": Vector3(mx, y, mz), "variant": "coast"})
-				# Thủy trúc (cattail) — bãi bùn ngập nông, mọc thành cụm sát nước
-				if h > _Data.WATER_Y - 1.5 and h <= _Data.WATER_Y + 0.2 and _cell_hash01(vx + 991, vz) < 0.034:
-					var y2 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "cattail", "pos": Vector3(mx, y2, mz), "variant": "mangrove"})
-				# Cua bùn — bãi bùn nhô trên mực nước (mô bùn khô)
-				if h > _Data.WATER_Y + 0.1 and _cell_hash01(vx + 1817, vz + 331) < 0.010:
-					var y3 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "mud_crab", "pos": Vector3(mx, y3, mz), "variant": "mud"})
-
-	# ── 8k. Cây vân sam (thông tuyết) — bio băng giá, xa nước ≥2 ────────────
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				var fr_bio: int = biome_grid[vx][vz]
-				if fr_bio != _Data.TileType.FROST and fr_bio != _Data.TileType.FROST_SNOW:
-					continue
-				var h: float = height_grid[vx][vz]
-				if h <= _Data.WATER_Y:
-					continue
-				if wdist[vx * cols + vz] <= 2:
-					continue
-				var chance: float = 0.0065 if fr_bio == _Data.TileType.FROST_SNOW else 0.0035
-				if randf() < chance:
-					var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-					var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-					if _is_on_road(world_ox + px, world_oz + pz):
-						continue
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "spruce", "pos": Vector3(px, y, pz), "variant": "snow"})
-
-	# ── 8l. RỪNG ĐẦM LẦY — cây tràm + lác nước + bèo ──────────────────────────
-	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		for vx in range(cols):
-			for vz in range(cols):
-				var sw_bio: int = biome_grid[vx][vz]
-				if sw_bio != _Data.TileType.SWAMP_MUD and sw_bio != _Data.TileType.SWAMP_DIRT:
-					continue
-				var h: float = height_grid[vx][vz]
-				var px := -half + (float(vx) + 0.5) * _Data.VOXEL
-				var pz := -half + (float(vz) + 0.5) * _Data.VOXEL
-				if _is_on_road(world_ox + px, world_oz + pz):
-					continue
-				# Cây tràm — mô bùn nhô khỏi mặt nước (cao hơn mực nước); tán lớn nên thưa
-				if h > _Data.WATER_Y + 0.15 and _cell_hash01(vx, vz) < 0.012:
-					var y := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "swamp_tree", "pos": Vector3(px, y, pz), "variant": "marsh"})
-				# Lác nước — bãi bùn ngập nông tới khô, cụm thành bụi
-				if h > _Data.WATER_Y - 0.8 and h <= _Data.WATER_Y + 0.7 and _cell_hash01(vx + 131, vz + 77) < 0.045:
-					var y2 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "swamp_sedge", "pos": Vector3(px, y2, pz), "variant": "marsh"})
-				# Cua bùn — mô bùn khô nhô trên mực nước (như rừng ngập mặn)
-				if h > _Data.WATER_Y + 0.1 and _cell_hash01(vx + 2089, vz + 167) < 0.012:
-					var y3 := maxf(_snap_surface_y(h), _Data.WATER_Y + 0.0625)
-					plant_props.append({"type": "mud_crab", "pos": Vector3(px, y3, pz), "variant": "mud"})
-				# Bèo — vũng nước đứng (thấp hơn mực nước nên ngập), nổi trên mặt
-				if h < _Data.WATER_Y - 0.05 and _cell_hash01(vx + 977, vz + 313) < 0.016:
-					plant_props.append({"type": "duckweed", "pos": Vector3(px, _Data.WATER_Y + 0.03125, pz), "variant": "marsh"})
-
+				var pp_i: int = vx * cols + vz
+				biome_flat[pp_i] = biome_grid[vx][vz]
+				height_flat[pp_i] = height_grid[vx][vz]
+		var props_res2: Array = wpw.props(biome_flat, height_flat, wdist, rdist,
+			road_grid, cols, half, world_ox, world_oz, _Data.WATER_Y)
+		for pp in props_res2:
+			plant_props.append(pp)
+	else:
+		_props_gd_fallback(plant_props, biome_grid, height_grid, wdist, rdist,
+			road_grid, cols, half, dim_id)
 	_prof("S12 plant_props")
+
 
 	# ── 9. Lamp positions ──────────────────────────────────────────────────────
 	var lamp_positions: Array = []

@@ -24,7 +24,8 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	for cc in _chunks:
-		var res: Dictionary = WorldChunk.compute_chunk(cc.x, cc.y, 32, 0, 1.0, 0.0)
+		var dim: int = _Data._Dim.DimensionID.REAL_WORLD
+		var res: Dictionary = WorldChunk.compute_chunk(cc.x, cc.y, 32, dim, false, false)
 		var hg: Array = res["height_grid"]
 		var bg: Array = res["biome_grid"]
 		var rg: PackedByteArray = res["road_grid"]
