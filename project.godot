@@ -185,6 +185,10 @@ sprint={
 
 3d/physics_engine="Jolt Physics"
 
+[threading]
+
+worker_pool/max_threads=6
+
 [rendering]
 
 rendering_device/driver.windows="d3d12"
