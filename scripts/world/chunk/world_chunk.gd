@@ -174,6 +174,14 @@ const MOUNTAIN_LAND_T: float = 0.5
 ## đèn thừa là node chết. Giữ 12 đèn GẦN TÂM chunk nhất cho cảnh quan.
 const MAX_LOTUS_PER_CHUNK: int = 12
 
+static var _native_oc: Object = null
+
+## Native WorldOcean bridge — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_ocean() -> Object:
+	if _native_oc == null and ClassDB.class_exists("WorldOcean"):
+		_native_oc = ClassDB.instantiate("WorldOcean")
+	return _native_oc
+
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	# Thread-safe cache theo ô thế giới: lưới ocean stride-2 (42×42) của 2 chunk
 	# kề nhau overlap ~62% số sample — dùng chung bỏ qua FastNoiseLite FBM lặp.
@@ -472,6 +480,9 @@ static func _prewarm_networks() -> void:
 	_Road._ensure_roads()
 	_River._ensure_rivers()
 	_River._native_warm()
+	var oc := _native_ocean()
+	if oc != null:
+		oc.warm(seed_v)
 	_networks_ready = true
 	_prewarm_running = false
 
@@ -940,19 +951,31 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		oct.resize(oct_total)
 		for pvx in range(oct_total):
 			oct[pvx] = []; oct[pvx].resize(oct_total)
-		for pvx in range(0, oct_total, 2):
-			for pvz in range(0, oct_total, 2):
-				var wx: float = world_ox - half + (float(pvx - OCEAN_PAD) + 0.5) * _Data.VOXEL
-				var wz: float = world_oz - half + (float(pvz - OCEAN_PAD) + 0.5) * _Data.VOXEL
-				oct[pvx][pvz] = _ocean_mask_at(nd, wx, wz)
-		# Fill odd indices by copying nearest computed neighbor
-		for pvx in range(0, oct_total, 2):
-			for pvz in range(0, oct_total, 2):
-				var val: bool = oct[pvx][pvz]
-				if pvx + 1 < oct_total: oct[pvx + 1][pvz] = val
-				if pvz + 1 < oct_total: oct[pvx][pvz + 1] = val
-				if pvx + 1 < oct_total and pvz + 1 < oct_total:
-					oct[pvx + 1][pvz + 1] = val
+		# Native bulk: 1 call thay 1764 `_ocean_mask_at` (noise + islet hash).
+		var oc := _native_ocean()
+		if oc != null:
+			var grid: PackedByteArray = oc.ocean_grid(world_ox - half, world_oz - half, oct_total, SeedSnapshot.ensure())
+			if grid.size() == oct_total * oct_total:
+				for pvx in range(oct_total):
+					var row := pvx * oct_total
+					for pvz in range(oct_total):
+						oct[pvx][pvz] = grid[row + pvz] == 1
+			else:
+				oc = null
+		if oc == null:
+			for pvx in range(0, oct_total, 2):
+				for pvz in range(0, oct_total, 2):
+					var wx: float = world_ox - half + (float(pvx - OCEAN_PAD) + 0.5) * _Data.VOXEL
+					var wz: float = world_oz - half + (float(pvz - OCEAN_PAD) + 0.5) * _Data.VOXEL
+					oct[pvx][pvz] = _ocean_mask_at(nd, wx, wz)
+			# Fill odd indices by copying nearest computed neighbor
+			for pvx in range(0, oct_total, 2):
+				for pvz in range(0, oct_total, 2):
+					var val: bool = oct[pvx][pvz]
+					if pvx + 1 < oct_total: oct[pvx + 1][pvz] = val
+					if pvz + 1 < oct_total: oct[pvx][pvz + 1] = val
+					if pvx + 1 < oct_total and pvz + 1 < oct_total:
+						oct[pvx + 1][pvz + 1] = val
 
 		var oct_small: Array[Array] = []
 		oct_small.resize(total)
