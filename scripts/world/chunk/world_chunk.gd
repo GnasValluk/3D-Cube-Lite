@@ -3710,11 +3710,22 @@ func break_block_at(wx: float, wy: float, wz: float) -> int:
 	_water_tick_timer = 0.0
 	if _is_water_bid(old_id):
 		rebuild_water_mesh()
+	elif _Data.is_shaped_block(old_id):
+		rebuild_shaped_blocks()
 	else:
 		rebuild_mesh(blk)
 	# Kích hoạt water tick ở chunk lân cận nếu block ở biên
 	_trigger_neighbor_water_tick(blk.x, blk.z)
 	return old_id
+
+## Rebuild riêng shaped-block overlay (platform/tường/đá tay đặt) — KHÔNG đụng
+## terrain mesh. Terrain 80ms rebuild chỉ cần khi block đổi heightmap (đào/đắp
+## đất, đá, cỏ...). Shaped block không vào top_ly/terrain → dùng hàm này thay
+## rebuild_mesh() để place/break không giật.
+func rebuild_shaped_blocks() -> void:
+	if block_data == null: return
+	_apply_shaped_block_data(_build_shaped_block_data(block_data, _cols, _dimension_id))
+	block_data.dirty = false
 
 ## Đặt block tại world position.
 func place_block_at(wx: float, wy: float, wz: float, block_id: int, off: int = _BlockData.OFF_CENTER) -> bool:
@@ -3731,11 +3742,15 @@ func place_block_at(wx: float, wy: float, wz: float, block_id: int, off: int = _
 		rebuild_water_mesh()
 	elif _is_water_bid(cur):
 		rebuild_water_mesh()
-		rebuild_mesh(blk)
+		if not _Data.is_shaped_block(block_id):
+			rebuild_mesh(blk)
 	else:
 		if block_id == _Data.BlockID.TILLED_SOIL:
 			_has_soil = true
-		rebuild_mesh(blk)
+		if _Data.is_shaped_block(block_id):
+			rebuild_shaped_blocks()
+		else:
+			rebuild_mesh(blk)
 	_trigger_neighbor_water_tick(blk.x, blk.z)
 	return true
 
@@ -3765,10 +3780,27 @@ func place_blocks_at(positions: Array[Vector3], block_ids: Array[int], off: int 
 		return 0
 	_water_tick_timer = 0.0
 	if touched_water:
+		# Có nước trong batch → rebuild water surface trước, rồi shaped nếu có
 		_has_water = true
 		rebuild_water_mesh()
+		var has_shaped: bool = false
+		for i in range(positions.size()):
+			if _Data.is_shaped_block(block_ids[i]):
+				has_shaped = true
+				break
+		if has_shaped:
+			rebuild_shaped_blocks()
 	else:
-		rebuild_mesh()
+		# Mọi block đều shaped (platform/tường/đá) → KHÔNG rebuild terrain (80ms)
+		var all_shaped: bool = true
+		for i in range(positions.size()):
+			if not _Data.is_shaped_block(block_ids[i]):
+				all_shaped = false
+				break
+		if all_shaped:
+			rebuild_shaped_blocks()
+		else:
+			rebuild_mesh()
 	return changed
 
 ## ── Cuốc đất: GRASS/DARK_GRASS/DIRT/DARK_DIRT → TILLED_SOIL ─────────────────
