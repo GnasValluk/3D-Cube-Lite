@@ -656,9 +656,72 @@ func update_placement() -> void:
 			_log_mi.position = Vector3(_Data.VOXEL * 0.5, lshape.y * 0.5, _Data.VOXEL * 0.5)
 	_ghost.global_position = _ghost_pos
 	_ghost.visible = true
-	_ghost_valid = true
+	_ghost_valid = _check_ghost_valid()
+	_paint_ghost(_ghost_valid)
 	if _is_seed_item(_item_id):
 		_ghost_valid = _can_plant_seed(_item_id, _ghost_pos)
+		_paint_ghost(_ghost_valid)
+
+## Ghost hợp lệ (đặt được) theo loại item build:
+## - Platform: còn ≥1 ô trống để đặt (chồng 1 phần vẫn được, chồng hoàn toàn → đỏ).
+## - Khối đơn: ô đích phải trống/chứa nước.
+## - Log model: luôn hợp lệ (đặt static body, không chạm lưới block).
+func _check_ghost_valid() -> bool:
+	if is_platform_item(_item_id):
+		return _platform_placeable_cells() > 0
+	if _Data.ITEM_TO_BLOCK.has(_item_id):
+		var world_mgr := _find_world_manager()
+		if world_mgr == null or not world_mgr.has_method("get_block"):
+			return true
+		var cur: int = world_mgr.get_block(_ghost_pos.x + 0.001, _ghost_pos.y + 0.001, _ghost_pos.z + 0.001)
+		return cur == _Data.BlockID.AIR or _Data.is_water(cur)
+	return true
+
+## Số ô còn trống (AIR/nước) của pattern platform tại vị trí ghost hiện tại.
+func _platform_placeable_cells() -> int:
+	var world_mgr := _find_world_manager()
+	if world_mgr == null or not world_mgr.has_method("get_block"):
+		return 1
+	var info := _platform_cells(_item_id, roundi(rad_to_deg(_placement_rotation)))
+	var bx: int = floori(_ghost_pos.x)
+	var bz: int = floori(_ghost_pos.z)
+	var ly0: int = _BlockData.world_y_to_layer(_ghost_pos.y)
+	var by: float = (float(ly0) + float(_BlockData.Y_MIN)) * _BlockData.SLAB_HEIGHT
+	var free: int = 0
+	for c in info.cells:
+		var cur: int = world_mgr.get_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z))
+		if cur == _Data.BlockID.AIR or _Data.is_water(cur):
+			free += 1
+	return free
+
+var _ghost_mat_valid: StandardMaterial3D = null
+var _ghost_mat_invalid: StandardMaterial3D = null
+
+## Material phản hồi ghost: XANH = đặt được, ĐỎ = không đặt được.
+func _ghost_feedback_mat(valid: bool) -> StandardMaterial3D:
+	if valid:
+		if _ghost_mat_valid == null:
+			_ghost_mat_valid = _ghost_mat(Color(0.20, 0.80, 0.38, 0.30), Color(0.04, 0.50, 0.20), 0.3)
+		return _ghost_mat_valid
+	if _ghost_mat_invalid == null:
+		_ghost_mat_invalid = _ghost_mat(Color(0.88, 0.16, 0.12, 0.34), Color(0.60, 0.04, 0.03), 0.35)
+	return _ghost_mat_invalid
+
+## Tô màu toàn bộ ghost theo trạng thái hợp lệ (xanh/đỏ) — áp cho mọi child mesh.
+func _paint_ghost(valid: bool) -> void:
+	if _ghost == null:
+		return
+	var mat: StandardMaterial3D = _ghost_feedback_mat(valid)
+	for child in _ghost.get_children():
+		_set_ghost_material(child, mat)
+
+func _set_ghost_material(node: Node, mat: StandardMaterial3D) -> void:
+	if node is MeshInstance3D:
+		(node as MeshInstance3D).material_override = mat
+	elif node is MultiMeshInstance3D:
+		(node as MultiMeshInstance3D).material_override = mat
+	for c in node.get_children():
+		_set_ghost_material(c, mat)
 
 ## Block đặt lẻ 1 ô (nhận offset nội-ô), không phải platform pattern.
 func _is_single_block_item(item_id: String) -> bool:
@@ -979,8 +1042,13 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 		if block_id != 0:
 			var world_mgr: Node = _find_world_manager()
 			if world_mgr and world_mgr.has_method("place_block"):
-				world_mgr.place_block(pos.x, pos.y, pos.z, block_id, _placement_off)
-				SFXManager.play_block_place()
+				if world_mgr.place_block(pos.x, pos.y, pos.z, block_id, _placement_off):
+					SFXManager.play_block_place()
+				else:
+					var bdef := ItemDatabase.items_db.get(item_id) as ItemDef
+					if bdef and _player_inv:
+						_player_inv.add_item(bdef, 1)
+					SFXManager.play_block_break()
 	set_process(false)
 	if _player_inv and _player_inv.get_item_count(item_id) > 0:
 		_item_id = item_id
@@ -1003,12 +1071,13 @@ func _place_platform(item_id: String, pos: Vector3, off: int = _BlockData.OFF_CE
 	var bz: int = floori(pos.z)
 	var ly0: int = _BlockData.world_y_to_layer(pos.y)
 	var by: float = (float(ly0) + float(_BlockData.Y_MIN)) * _BlockData.SLAB_HEIGHT
+	# Chồng 1 phần vẫn đặt được: ô đã có block/nước thì bỏ qua, chỉ lấp ô trống.
+	var placed: int = 0
 	for c in info.cells:
-		var cur: int = world_mgr.get_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z))
-		if cur != _Data.BlockID.AIR and not _Data.is_water(cur):
-			return false
-	for c in info.cells:
-		world_mgr.place_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z), info.block, off)
+		if world_mgr.place_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z), info.block, off):
+			placed += 1
+	if placed == 0:
+		return false
 	SFXManager.play_block_place()
 	return true
 
