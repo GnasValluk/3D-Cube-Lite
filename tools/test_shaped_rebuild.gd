@@ -55,6 +55,7 @@ func _ready() -> void:
 	_check(old_id == _D.BlockID.STONE_PLATFORM, "break shaped trả đúng id")
 	_check(chunk.block_data.get_block(16, tl + 1, 16) == _D.BlockID.AIR, "ô trống lại sau break")
 	_check(terrain_old == chunk._terrain_mesh_instance, "terrain KHÔNG đổi khi break shaped")
+	_check(not chunk._has_shaped_blocks, "cờ shaped tắt khi đã phá hết shaped")
 
 	# ── Đặt biome block (DIRT) → phải rebuild terrain (mesh mới) ──
 	wby = _BD.layer_to_world_y(tl + 2)

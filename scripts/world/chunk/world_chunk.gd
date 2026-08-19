@@ -275,6 +275,7 @@ var _water_mesh_instance: MeshInstance3D = null
 var _aquatic_mesh_instance: MeshInstance3D = null
 var _textured_block_mesh_instances: Dictionary[int, MeshInstance3D] = {}
 var _shaped_block_instances: Array[MeshInstance3D] = []
+var _has_shaped_blocks: bool = false  # Chunk có shaped blocks (skip scan 70K khi không có)
 var _mesh_container: Node3D = null
 var _tavern_built: bool = false
 var _lotus_lights: Array[OmniLight3D] = []
@@ -3044,6 +3045,7 @@ func apply_chunk(data: Dictionary) -> void:
 
 	# Block hình dạng riêng (đá ¼, đá ⅛, đá phiến) — dữ liệu worker tính sẵn
 	_apply_shaped_block_data(data)
+	_has_shaped_blocks = not _shaped_block_instances.is_empty()
 
 	var grass_mm: MultiMesh = data.get("grass_multimesh")
 	if grass_mm:
@@ -3404,11 +3406,19 @@ func apply_decorative(data: Dictionary) -> void:
 ## ── rebuild_mesh: gọi khi block thay đổi (mine/place) ────────────────────────
 ## Chỉ thay thế terrain mesh + collision, không đụng mesh khác (cỏ, nước, ...)
 ## `at` = local block vừa đổi — dùng để cập nhật _top_ly_cache O(1) thay vì scan lại
-func rebuild_mesh(at := Vector3i(-1, -1, -1)) -> void:
+## Build lại terrain mesh. `at` = ô thay đổi (cập nhật top_ly 1 cột); nếu đưa
+## `at_columns` (Array[Vector3i]) thì cập nhật top_ly nhiều cột — tránh full
+## scan 70K ô (~25ms) khi đặt/bulk nhiều biome block.
+func rebuild_mesh(at := Vector3i(-1, -1, -1), at_columns: Array = []) -> void:
 	if block_data == null: return
 
 	# Cập nhật cache top layer cho column bị thay đổi
-	if at.x >= 0 and _top_ly_cache.size() == _cols * _cols \
+	if at_columns.size() > 0 and _top_ly_cache.size() == _cols * _cols:
+		for c in at_columns:
+			var blk: Vector3i = c
+			if blk.x >= 0 and blk.x < _cols and blk.z >= 0 and blk.z < _cols:
+				_update_top_ly_cache(blk)
+	elif at.x >= 0 and _top_ly_cache.size() == _cols * _cols \
 			and at.x < _cols and at.z < _cols:
 		_update_top_ly_cache(at)
 	else:
@@ -3583,9 +3593,10 @@ func _apply_shaped_block_data(data: Dictionary) -> void:
 ## Bản dùng cho rebuild_mesh (khi player phá/đặt block) — hiếm, giữ scan trên
 ## main thread. Load chunk thường dùng _apply_shaped_block_data (worker tính sẵn).
 func _build_shaped_block_nodes() -> void:
-	if block_data == null:
+	if block_data == null or not _has_shaped_blocks:
 		return
 	_apply_shaped_block_data(_build_shaped_block_data(block_data, _cols, _dimension_id))
+	_has_shaped_blocks = not _shaped_block_instances.is_empty()
 
 ## Mask các mặt cần bỏ khi box cùng loại chạm nhau liền kề (tránh z-fight /
 ## mặt thừa giữa các tường/platform cùng block xếp sát). Bỏ mặt chỉ khi box
@@ -3725,6 +3736,7 @@ func break_block_at(wx: float, wy: float, wz: float) -> int:
 func rebuild_shaped_blocks() -> void:
 	if block_data == null: return
 	_apply_shaped_block_data(_build_shaped_block_data(block_data, _cols, _dimension_id))
+	_has_shaped_blocks = not _shaped_block_instances.is_empty()
 	block_data.dirty = false
 
 ## Đặt block tại world position.
@@ -3763,6 +3775,8 @@ func place_blocks_at(positions: Array[Vector3], block_ids: Array[int], off: int 
 		return 0
 	var changed: int = 0
 	var touched_water: bool = false
+	var changed_at: Array[Vector3i] = []
+	var col_set: Dictionary = {}
 	for i in range(positions.size()):
 		var wx: float = positions[i].x
 		var wy: float = positions[i].y
@@ -3774,6 +3788,10 @@ func place_blocks_at(positions: Array[Vector3], block_ids: Array[int], off: int 
 		block_data.set_block(blk.x, blk.y, blk.z, block_ids[i])
 		block_data.set_offset(blk.x, blk.y, blk.z, off)
 		changed += 1
+		var ckey: int = blk.x * _cols + blk.z
+		if not col_set.has(ckey):
+			col_set[ckey] = true
+			changed_at.append(blk)
 		if _is_water_bid(block_ids[i]):
 			touched_water = true
 	if changed == 0:
@@ -3800,7 +3818,8 @@ func place_blocks_at(positions: Array[Vector3], block_ids: Array[int], off: int 
 		if all_shaped:
 			rebuild_shaped_blocks()
 		else:
-			rebuild_mesh()
+			# Biome: cập nhật top_ly từng cột đã đổi rồi build terrain (bỏ scan 25ms)
+			rebuild_mesh(Vector3i(-1, -1, -1), changed_at)
 	return changed
 
 ## ── Cuốc đất: GRASS/DARK_GRASS/DIRT/DARK_DIRT → TILLED_SOIL ─────────────────
