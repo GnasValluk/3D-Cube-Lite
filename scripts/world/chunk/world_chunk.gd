@@ -2907,18 +2907,22 @@ func _init_materials() -> void:
 		var m_t := StandardMaterial3D.new()
 		m_t.vertex_color_use_as_albedo = true
 		m_t.roughness = 0.9; m_t.metallic_specular = 0.0
-		_mat_cache[_dimension_id] = { "terrain": m_t,
-			"terrain_fade": _make_terrain_fade_mat(_dimension_id),
-			"water": _make_water_shader(_dimension_id),
-			"lava": _make_lava_shader(_dimension_id) }
-		return
+		__cache_shaped_mat(_dimension_id, m_t)
 	var m_t := StandardMaterial3D.new()
 	m_t.vertex_color_use_as_albedo = true
 	m_t.roughness = 1.0; m_t.metallic_specular = 0.0
-	_mat_cache[_dimension_id] = { "terrain": m_t,
-		"terrain_fade": _make_terrain_fade_mat(_dimension_id),
-		"water": _make_water_shader(_dimension_id),
-		"lava": _make_lava_shader(_dimension_id) }
+	__cache_shaped_mat(_dimension_id, m_t)
+
+## Tạo vật liệu 2 mặt (cull disabled) riêng cho shaped-block mesh — box hình
+## nhỏ/quầy cần thấy cả mặt trong/mặt bên/mặt dưới khi xoay góc nhìn.
+func __cache_shaped_mat(dim_id: int, m_t: StandardMaterial3D) -> void:
+	var m_shaped := m_t.duplicate() as StandardMaterial3D
+	m_shaped.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_mat_cache[dim_id] = { "terrain": m_t,
+		"terrain_fade": _make_terrain_fade_mat(dim_id),
+		"water": _make_water_shader(dim_id),
+		"lava": _make_lava_shader(dim_id),
+		"shaped": m_shaped }
 
 ## ── apply_chunk: nhận data từ thread, tạo nodes ──────────────────────────────
 func apply_chunk(data: Dictionary) -> void:
@@ -3543,7 +3547,7 @@ func _apply_shaped_block_data(data: Dictionary) -> void:
 	if smesh != null:
 		var mi := MeshInstance3D.new()
 		mi.mesh = smesh
-		mi.material_override = _mat_cache[_dimension_id]["terrain"]
+		mi.material_override = _mat_cache[_dimension_id].get("shaped", _mat_cache[_dimension_id]["terrain"])
 		if _mesh_container != null:
 			_mesh_container.add_child(mi)
 		else:
