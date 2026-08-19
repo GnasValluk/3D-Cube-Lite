@@ -119,6 +119,7 @@ func _ready() -> void:
 			_check(old_stone == 0, "cuốc STONE → 0 (không cuốc được)")
 
 			# ── Khô → đặt nước lên → ẩm → bỏ nước → khô ──
+			chunk.rebuild_soil_mesh()  # till async → build soil mesh ngay khi cần check
 			var mi := chunk._textured_block_mesh_instances.get(_D.BlockID.TILLED_SOIL) as MeshInstance3D
 			_check(mi != null and mi.mesh != null, "có soil mesh instance")
 			_check(_max_red(mi.mesh) > 0.9, "đất khô: tint sáng (r≈1)")

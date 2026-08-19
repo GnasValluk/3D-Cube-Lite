@@ -2607,7 +2607,9 @@ func rebuild_water_mesh() -> void:
 	rebuild_soil_mesh()
 
 ## ── refresh_boundary_water: rebuild water mesh của chunk + 4 lân cận ────────
-func refresh_boundary_water() -> void:
+## force=true: luôn tạo job dù chunk đã hết nước (xoá water mesh) — dùng khi
+## player đặt/múc/lấp nước (edit trực tiếp). Chạy ASYNC qua WaterRebuildQueue.
+func refresh_boundary_water(force: bool = false) -> void:
 	# Thu thập jobs (chunk này + lân cận có nước) trên main thread — chỉ vài
 	# lookup dictionary, rẻ. MESH BUILD CHẠY TRÊN WORKER (WaterRebuildQueue dùng
 	# WorkerThreadPool, giống terrain mesh trong compute_chunk); hàm này chỉ đẩy
@@ -2620,13 +2622,13 @@ func refresh_boundary_water() -> void:
 		return
 	var jobs: Array = []
 	var seen: Dictionary = {}
-	_collect_water_job(chunks, self, jobs, seen)
+	_collect_water_job(chunks, self, jobs, seen, force)
 	for off in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
 		var key := Vector2i(_cx + off.x, _cz + off.y)
 		if chunks.has(key):
 			var nb := chunks[key] as WorldChunk
 			if nb:
-				_collect_water_job(chunks, nb, jobs, seen)
+				_collect_water_job(chunks, nb, jobs, seen, false)
 	if jobs.is_empty():
 		return
 	if is_instance_valid(WaterRebuildQueue):
@@ -2634,12 +2636,12 @@ func refresh_boundary_water() -> void:
 
 ## Gom 1 job rebuild water mesh của chunk `c` (nếu có nước) + refs lân cận.
 ## Chạy trên main thread — chỉ đọc refs, không lock.
-static func _collect_water_job(chunks: Dictionary, c: WorldChunk, jobs: Array, seen: Dictionary) -> void:
+static func _collect_water_job(chunks: Dictionary, c: WorldChunk, jobs: Array, seen: Dictionary, force: bool) -> void:
 	var id := c.get_instance_id()
 	if seen.has(id):
 		return
 	seen[id] = true
-	if not c._has_water or c.block_data == null:
+	if c.block_data == null or (not force and not c._has_water):
 		return
 	var nb: Dictionary = {}
 	for d in [["w", c._cx - 1, c._cz], ["e", c._cx + 1, c._cz], ["n", c._cx, c._cz - 1], ["s", c._cx, c._cz + 1]]:
@@ -2683,6 +2685,7 @@ func _apply_water_mesh(mesh: ArrayMesh) -> void:
 		else:
 			add_child(mi_w)
 		_water_mesh_instance = mi_w
+	# Nước đổi → độ ẩm đất tơi xốp đổi theo (giống rebuild_water_mesh sync)
 	rebuild_soil_mesh()
 
 ## ── Materials ─────────────────────────────────────────────────────────────────
@@ -3720,7 +3723,7 @@ func break_block_at(wx: float, wy: float, wz: float) -> int:
 	block_data.set_block(blk.x, blk.y, blk.z, _Data.BlockID.AIR)
 	_water_tick_timer = 0.0
 	if _is_water_bid(old_id):
-		rebuild_water_mesh()
+		refresh_boundary_water(true)
 	elif _Data.is_shaped_block(old_id):
 		request_shaped_rebuild()
 	else:
@@ -3887,9 +3890,9 @@ func place_block_at(wx: float, wy: float, wz: float, block_id: int, off: int = _
 	if _is_water_bid(block_id):
 		_has_water = true
 		_max_water_ly = maxi(_max_water_ly, blk.y)
-		rebuild_water_mesh()
+		refresh_boundary_water(true)
 	elif _is_water_bid(cur):
-		rebuild_water_mesh()
+		refresh_boundary_water(true)
 		if not _Data.is_shaped_block(block_id):
 			request_biome_rebuild([blk])
 	else:
@@ -3936,7 +3939,7 @@ func place_blocks_at(positions: Array[Vector3], block_ids: Array[int], off: int 
 	if touched_water:
 		# Có nước trong batch → rebuild water surface trước, rồi shaped nếu có
 		_has_water = true
-		rebuild_water_mesh()
+		refresh_boundary_water(true)
 		var has_shaped: bool = false
 		for i in range(positions.size()):
 			if _Data.is_shaped_block(block_ids[i]):
@@ -4121,7 +4124,7 @@ func _trigger_neighbor_water_tick(lx: int, lz: int) -> void:
 			if nb:
 				if nb._has_water:
 					nb._water_tick_timer = 0.0
-					nb.rebuild_water_mesh()
+					nb.refresh_boundary_water()
 				nb.rebuild_soil_mesh()
 	if lx == _cols - 1:
 		var key := Vector2i(_cx + 1, _cz)
@@ -4130,7 +4133,7 @@ func _trigger_neighbor_water_tick(lx: int, lz: int) -> void:
 			if nb:
 				if nb._has_water:
 					nb._water_tick_timer = 0.0
-					nb.rebuild_water_mesh()
+					nb.refresh_boundary_water()
 				nb.rebuild_soil_mesh()
 	if lz == 0:
 		var key := Vector2i(_cx, _cz - 1)
@@ -4139,7 +4142,7 @@ func _trigger_neighbor_water_tick(lx: int, lz: int) -> void:
 			if nb:
 				if nb._has_water:
 					nb._water_tick_timer = 0.0
-					nb.rebuild_water_mesh()
+					nb.refresh_boundary_water()
 				nb.rebuild_soil_mesh()
 	if lz == _cols - 1:
 		var key := Vector2i(_cx, _cz + 1)

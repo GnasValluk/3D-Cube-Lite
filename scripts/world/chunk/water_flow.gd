@@ -194,7 +194,7 @@ static func _cross_notify(cnb: Dictionary, ccols: int, nx: int, nz: int) -> void
 	elif nz >= ccols and cnb.has("s"): nb_chunk = cnb["s"].chunk
 	if nb_chunk != null:
 		nb_chunk._water_tick_timer = 0.0
-		nb_chunk.rebuild_water_mesh()
+		nb_chunk.refresh_boundary_water()
 
 # ── Helper class for cross-chunk block resolution ──────────────────────────────
 class _TxResult:
