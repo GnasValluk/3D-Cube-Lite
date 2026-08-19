@@ -604,6 +604,31 @@ func place_block(wx: float, wy: float, wz: float, block_id: int, off: int = 4) -
 		_announce_edit(wx, wy, wz, block_id)
 	return ok
 
+## Đặt NHIỀU block cùng lúc (pattern platform/tường) — gộp theo chunk để mỗi
+## chunk chỉ rebuild mesh 1 lần (tránh 9–18 rebuild sync gây giật khi place).
+## Trả về tổng số ô thực sự được đặt.
+func place_blocks_bulk(positions: Array[Vector3], block_ids: Array[int], off: int = 4) -> int:
+	var by_chunk: Dictionary = {}
+	for i in range(positions.size()):
+		var p: Vector3 = positions[i]
+		var chunk := get_chunk_at(p.x, p.z)
+		if chunk == null:
+			continue
+		var arr: Array = by_chunk.get(chunk, [])
+		if arr.is_empty():
+			arr = [[], []]
+			by_chunk[chunk] = arr
+		(arr[0] as Array).append(p)
+		(arr[1] as Array).append(block_ids[i])
+	var total: int = 0
+	for chunk in by_chunk:
+		var lists: Array = by_chunk[chunk]
+		total += (chunk as WorldChunk).place_blocks_at(lists[0], lists[1], off)
+	if total > 0 and Net != null and Net.is_active():
+		for i in range(positions.size()):
+			_announce_edit(positions[i].x, positions[i].y, positions[i].z, block_ids[i])
+	return total
+
 ## Cuốc đất tại vị trí world. Trả về block cũ đã cuốc (0 = không cuốc được).
 func till_block(wx: float, wy: float, wz: float) -> int:
 	var chunk := get_chunk_at(wx, wz)

@@ -173,6 +173,7 @@ func _make_ghost() -> void:
 	else:
 		_clear_ghost_children()
 	_ghost.visible = false
+	_ghost_paint_state = -1
 
 	if _item_id == "twilight_gate":
 		_build_ghost_portal()
@@ -657,10 +658,10 @@ func update_placement() -> void:
 	_ghost.global_position = _ghost_pos
 	_ghost.visible = true
 	_ghost_valid = _check_ghost_valid()
-	_paint_ghost(_ghost_valid)
+	_paint_ghost_if_changed(_ghost_valid)
 	if _is_seed_item(_item_id):
 		_ghost_valid = _can_plant_seed(_item_id, _ghost_pos)
-		_paint_ghost(_ghost_valid)
+		_paint_ghost_if_changed(_ghost_valid)
 
 ## Ghost hợp lệ (đặt được) theo loại item build:
 ## - Platform: còn ≥1 ô trống để đặt (chồng 1 phần vẫn được, chồng hoàn toàn → đỏ).
@@ -714,6 +715,16 @@ func _paint_ghost(valid: bool) -> void:
 	var mat: StandardMaterial3D = _ghost_feedback_mat(valid)
 	for child in _ghost.get_children():
 		_set_ghost_material(child, mat)
+
+## Chỉ tô lại khi trạng thái đổi (không set material mỗi frame → đỡ overhead).
+var _ghost_paint_state: int = -1
+
+func _paint_ghost_if_changed(valid: bool) -> void:
+	var s: int = 1 if valid else 0
+	if s == _ghost_paint_state:
+		return
+	_ghost_paint_state = s
+	_paint_ghost(valid)
 
 func _set_ghost_material(node: Node, mat: StandardMaterial3D) -> void:
 	if node is MeshInstance3D:
@@ -1064,7 +1075,7 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 ## toàn bộ vùng trống trước; nếu 1 ô kín → không đặt gì (hoàn item ngược lên).
 func _place_platform(item_id: String, pos: Vector3, off: int = _BlockData.OFF_CENTER) -> bool:
 	var world_mgr := _find_world_manager()
-	if world_mgr == null or not world_mgr.has_method("place_block"):
+	if world_mgr == null or not world_mgr.has_method("place_blocks_bulk"):
 		return false
 	var info := _platform_cells(item_id, roundi(rad_to_deg(_placement_rotation)))
 	var bx: int = floori(pos.x)
@@ -1072,11 +1083,13 @@ func _place_platform(item_id: String, pos: Vector3, off: int = _BlockData.OFF_CE
 	var ly0: int = _BlockData.world_y_to_layer(pos.y)
 	var by: float = (float(ly0) + float(_BlockData.Y_MIN)) * _BlockData.SLAB_HEIGHT
 	# Chồng 1 phần vẫn đặt được: ô đã có block/nước thì bỏ qua, chỉ lấp ô trống.
-	var placed: int = 0
+	# Đặt hàng loạt (bulk) → mỗi chunk chỉ rebuild mesh 1 lần, không giật.
+	var positions: Array[Vector3] = []
+	var bids: Array[int] = []
 	for c in info.cells:
-		if world_mgr.place_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z), info.block, off):
-			placed += 1
-	if placed == 0:
+		positions.append(Vector3(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z)))
+		bids.append(info.block)
+	if world_mgr.place_blocks_bulk(positions, bids, off) == 0:
 		return false
 	SFXManager.play_block_place()
 	return true

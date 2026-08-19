@@ -3739,6 +3739,38 @@ func place_block_at(wx: float, wy: float, wz: float, block_id: int, off: int = _
 	_trigger_neighbor_water_tick(blk.x, blk.z)
 	return true
 
+## Đặt NHIỀU block cùng lúc (pattern platform 3×3 / tường 3×6) — chỉ rebuild
+## mesh MỘT lần thay vì mỗi cell 1 lần rebuild (9–18 rebuild sync đã gây giật).
+## Block nào đã bị chiếm (non-air, non-water) thì bỏ qua, không ghi đè.
+## Trả về số block thực sự được đặt.
+func place_blocks_at(positions: Array[Vector3], block_ids: Array[int], off: int = _BlockData.OFF_CENTER) -> int:
+	if block_data == null or positions.is_empty():
+		return 0
+	var changed: int = 0
+	var touched_water: bool = false
+	for i in range(positions.size()):
+		var wx: float = positions[i].x
+		var wy: float = positions[i].y
+		var wz: float = positions[i].z
+		var blk := world_to_local_block(wx, wy, wz)
+		var cur: int = block_data.get_block(blk.x, blk.y, blk.z)
+		if cur != _Data.BlockID.AIR and not _is_water_bid(cur):
+			continue
+		block_data.set_block(blk.x, blk.y, blk.z, block_ids[i])
+		block_data.set_offset(blk.x, blk.y, blk.z, off)
+		changed += 1
+		if _is_water_bid(block_ids[i]):
+			touched_water = true
+	if changed == 0:
+		return 0
+	_water_tick_timer = 0.0
+	if touched_water:
+		_has_water = true
+		rebuild_water_mesh()
+	else:
+		rebuild_mesh()
+	return changed
+
 ## ── Cuốc đất: GRASS/DARK_GRASS/DIRT/DARK_DIRT → TILLED_SOIL ─────────────────
 ## Trả về block cũ đã cuốc (0 = không cuốc được).
 func till_block_at(wx: float, wy: float, wz: float) -> int:
