@@ -260,9 +260,20 @@ static func _platform_cells(item_id: String, rot_deg: int) -> Dictionary:
 		"block": _Data.BlockID.STONE_WALL_Z if along_x else _Data.BlockID.STONE_WALL_X,
 	}
 
+## Cache cells platform theo (item, xoay) — tránh dựng lại mảng mỗi frame.
+static var _platform_cells_cache: Dictionary = {}
+
+static func _platform_cells_cached(item_id: String, rot_deg: int) -> Dictionary:
+	var key := "%s|%d" % [item_id, rot_deg]
+	var v: Dictionary = _platform_cells_cache.get(key, {})
+	if v.is_empty():
+		v = _platform_cells(item_id, rot_deg)
+		_platform_cells_cache[key] = v
+	return v
+
 ## Ghost 3×3 cho platform — hiển thị đúng vùng lấp theo hướng xoay hiện tại.
 func _build_ghost_platform() -> void:
-	var info := _platform_cells(_item_id, roundi(rad_to_deg(_placement_rotation)))
+	var info := _platform_cells_cached(_item_id, roundi(rad_to_deg(_placement_rotation)))
 	var block_mat := _ghost_mat(Color(0.52, 0.52, 0.56, 0.30), Color(0.30, 0.30, 0.32), 0.0)
 	var off_d := _BlockData.offset_delta(_placement_off)
 	for c in info.cells:
@@ -642,7 +653,7 @@ func update_placement() -> void:
 		# có block để ép thì đặt lệch theo chuột trong ô.
 		var shape_new: Vector3 = Vector3.ZERO
 		if is_platform_item(_item_id):
-			var pinfo := _platform_cells(_item_id, roundi(rad_to_deg(_placement_rotation)))
+			var pinfo := _platform_cells_cached(_item_id, roundi(rad_to_deg(_placement_rotation)))
 			shape_new = _Data.block_shape(pinfo.block)
 		else:
 			shape_new = _Data.block_shape(_Data.ITEM_TO_BLOCK.get(_item_id, 0))
@@ -683,7 +694,7 @@ func _platform_placeable_cells() -> int:
 	var world_mgr := _find_world_manager()
 	if world_mgr == null or not world_mgr.has_method("get_block"):
 		return 1
-	var info := _platform_cells(_item_id, roundi(rad_to_deg(_placement_rotation)))
+	var info := _platform_cells_cached(_item_id, roundi(rad_to_deg(_placement_rotation)))
 	var bx: int = floori(_ghost_pos.x)
 	var bz: int = floori(_ghost_pos.z)
 	var ly0: int = _BlockData.world_y_to_layer(_ghost_pos.y)
@@ -1077,7 +1088,7 @@ func _place_platform(item_id: String, pos: Vector3, off: int = _BlockData.OFF_CE
 	var world_mgr := _find_world_manager()
 	if world_mgr == null or not world_mgr.has_method("place_blocks_bulk"):
 		return false
-	var info := _platform_cells(item_id, roundi(rad_to_deg(_placement_rotation)))
+	var info := _platform_cells_cached(item_id, roundi(rad_to_deg(_placement_rotation)))
 	var bx: int = floori(pos.x)
 	var bz: int = floori(pos.z)
 	var ly0: int = _BlockData.world_y_to_layer(pos.y)
@@ -1131,11 +1142,16 @@ func _make_station(item_id: String) -> CraftingStation:
 		"architecture_table": return _ArchitectureTable.new()
 	return null
 
+var _wm: Node = null
+
 func _find_world_manager() -> Node:
+	if _wm != null and is_instance_valid(_wm):
+		return _wm
 	var p := get_parent()
 	while p:
 		if p.has_node("WorldManager"):
-			return p.get_node("WorldManager")
+			_wm = p.get_node("WorldManager")
+			return _wm
 		p = p.get_parent()
 	return null
 
