@@ -79,26 +79,6 @@ enum BlockID {
 	STONE_PLATFORM = 63, # Nền đá platform — mỗi ô đầy block (1×0.5×1), đặt 3×3 tạo sàn
 	STONE_WALL_Z   = 64, # Tường đá dày theo Z (1×0.5×0.5) — tường 3×3 dài theo X
 	STONE_WALL_X   = 65, # Tường đá dày theo X (0.5×0.5×1) — tường 3×3 dài theo Z
-	# Khúc cây (log) — 6 loài × 3 hướng: nằm dọc X / nằm dọc Z / đứng.
-	# Hướng chọn theo bề mặt khi đặt (normal của ô được nhắm).
-	LOG_OAK_X     = 69, # gỗ sồi — nằm dài theo X (1×0.5×0.5)
-	LOG_OAK_Z     = 70, # gỗ sồi — nằm dài theo Z (0.5×0.5×1)
-	LOG_OAK_ST    = 71, # gỗ sồi — đứng (1×0.5×1)
-	LOG_HARD_X    = 72, # gỗ cứng — nằm dài theo X
-	LOG_HARD_Z    = 73, # gỗ cứng — nằm dài theo Z
-	LOG_HARD_ST   = 74, # gỗ cứng — đứng
-	LOG_SPRUCE_X  = 75, # vân sam — nằm dài theo X
-	LOG_SPRUCE_Z  = 76, # vân sam — nằm dài theo Z
-	LOG_SPRUCE_ST = 77, # vân sam — đứng
-	LOG_SWAMP_X   = 78, # tràm — nằm dài theo X
-	LOG_SWAMP_Z   = 79, # tràm — nằm dài theo Z
-	LOG_SWAMP_ST  = 80, # tràm — đứng
-	LOG_MANGROVE_X = 81, # đước — nằm dài theo X
-	LOG_MANGROVE_Z = 82, # đước — nằm dài theo Z
-	LOG_MANGROVE_ST = 83, # đước — đứng
-	LOG_PALM_X    = 84, # dừa — nằm dài theo X
-	LOG_PALM_Z    = 85, # dừa — nằm dài theo Z
-	LOG_PALM_ST   = 86, # dừa — đứng
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -158,24 +138,6 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.STONE_PLATFORM: "block_stone_platform",
 	BlockID.STONE_WALL_Z:    "block_stone_wall",
 	BlockID.STONE_WALL_X:    "block_stone_wall",
-	BlockID.LOG_OAK_X:     "log_oak",
-	BlockID.LOG_OAK_Z:     "log_oak",
-	BlockID.LOG_OAK_ST:    "log_oak",
-	BlockID.LOG_HARD_X:    "log_hard_wood",
-	BlockID.LOG_HARD_Z:    "log_hard_wood",
-	BlockID.LOG_HARD_ST:   "log_hard_wood",
-	BlockID.LOG_SPRUCE_X:  "log_spruce",
-	BlockID.LOG_SPRUCE_Z:  "log_spruce",
-	BlockID.LOG_SPRUCE_ST: "log_spruce",
-	BlockID.LOG_SWAMP_X:   "log_swamp",
-	BlockID.LOG_SWAMP_Z:   "log_swamp",
-	BlockID.LOG_SWAMP_ST:  "log_swamp",
-	BlockID.LOG_MANGROVE_X: "log_mangrove",
-	BlockID.LOG_MANGROVE_Z: "log_mangrove",
-	BlockID.LOG_MANGROVE_ST: "log_mangrove",
-	BlockID.LOG_PALM_X:    "log_palm",
-	BlockID.LOG_PALM_Z:    "log_palm",
-	BlockID.LOG_PALM_ST:   "log_palm",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -379,28 +341,6 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.46, 0.46, 0.50),           # 63 STONE_PLATFORM — đá nền platform (khớp STONE)
 	Color(0.46, 0.46, 0.50),           # 64 STONE_WALL_Z — tường đá dày Z
 	Color(0.46, 0.46, 0.50),           # 65 STONE_WALL_X — tường đá dày X
-	Color(0, 0, 0, 0),                 # 66 (trống — vùng slab đá đã bỏ)
-	Color(0, 0, 0, 0),                 # 67 (trống)
-	Color(0, 0, 0, 0),                 # 68 (trống)
-	# 69..86 Khúc cây — màu theo loài (3 hướng chung 1 màu)
-	Color(0.62, 0.47, 0.28),           # 69-71 LOG_OAK — gỗ sồi
-	Color(0.62, 0.47, 0.28),
-	Color(0.62, 0.47, 0.28),
-	Color(0.47, 0.36, 0.20),           # 72-74 LOG_HARD — gỗ cứng
-	Color(0.47, 0.36, 0.20),
-	Color(0.47, 0.36, 0.20),
-	Color(0.38, 0.24, 0.12),           # 75-77 LOG_SPRUCE — vân sam
-	Color(0.38, 0.24, 0.12),
-	Color(0.38, 0.24, 0.12),
-	Color(0.42, 0.38, 0.30),           # 78-80 LOG_SWAMP — tràm
-	Color(0.42, 0.38, 0.30),
-	Color(0.42, 0.38, 0.30),
-	Color(0.56, 0.26, 0.14),           # 81-83 LOG_MANGROVE — đước
-	Color(0.56, 0.26, 0.14),
-	Color(0.56, 0.26, 0.14),
-	Color(0.78, 0.70, 0.48),           # 84-86 LOG_PALM — dừa
-	Color(0.78, 0.70, 0.48),
-	Color(0.78, 0.70, 0.48),
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -470,28 +410,6 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.04, 0.08, 0.06),           # 63 STONE_PLATFORM (TW palette placeholder)
 	Color(0.04, 0.08, 0.06),           # 64 STONE_WALL_Z (TW palette placeholder)
 	Color(0.04, 0.08, 0.06),           # 65 STONE_WALL_X (TW palette placeholder)
-	Color(0, 0, 0, 0),                 # 66 (trống)
-	Color(0, 0, 0, 0),                 # 67 (trống)
-	Color(0, 0, 0, 0),                 # 68 (trống)
-	# 69..86 Khúc cây (TW palette placeholder theo màu gỗ)
-	Color(0.08, 0.06, 0.04),
-	Color(0.08, 0.06, 0.04),
-	Color(0.08, 0.06, 0.04),
-	Color(0.07, 0.05, 0.03),
-	Color(0.07, 0.05, 0.03),
-	Color(0.07, 0.05, 0.03),
-	Color(0.06, 0.04, 0.03),
-	Color(0.06, 0.04, 0.03),
-	Color(0.06, 0.04, 0.03),
-	Color(0.07, 0.06, 0.05),
-	Color(0.07, 0.06, 0.05),
-	Color(0.07, 0.06, 0.05),
-	Color(0.08, 0.04, 0.02),
-	Color(0.08, 0.04, 0.02),
-	Color(0.08, 0.04, 0.02),
-	Color(0.10, 0.09, 0.06),
-	Color(0.10, 0.09, 0.06),
-	Color(0.10, 0.09, 0.06),
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -531,13 +449,6 @@ const BLOCK_SHAPES: Dictionary = {
 	BlockID.STONE_PLATFORM: Vector3(1.0, 0.5, 1.0), # nền đá — đầy cell (dày 0.5)
 	BlockID.STONE_WALL_Z:   Vector3(1.0, 0.5, 0.5), # tường đá — dài X, dày Z 0.5
 	BlockID.STONE_WALL_X:   Vector3(0.5, 0.5, 1.0), # tường đá — dài Z, dày X 0.5
-	# Khúc cây: nằm dài X / nằm dài Z / đứng (6 loài × 3 hướng)
-	BlockID.LOG_OAK_X: Vector3(1.0, 0.5, 0.5), BlockID.LOG_OAK_Z: Vector3(0.5, 0.5, 1.0), BlockID.LOG_OAK_ST: Vector3(1.0, 0.5, 1.0),
-	BlockID.LOG_HARD_X: Vector3(1.0, 0.5, 0.5), BlockID.LOG_HARD_Z: Vector3(0.5, 0.5, 1.0), BlockID.LOG_HARD_ST: Vector3(1.0, 0.5, 1.0),
-	BlockID.LOG_SPRUCE_X: Vector3(1.0, 0.5, 0.5), BlockID.LOG_SPRUCE_Z: Vector3(0.5, 0.5, 1.0), BlockID.LOG_SPRUCE_ST: Vector3(1.0, 0.5, 1.0),
-	BlockID.LOG_SWAMP_X: Vector3(1.0, 0.5, 0.5), BlockID.LOG_SWAMP_Z: Vector3(0.5, 0.5, 1.0), BlockID.LOG_SWAMP_ST: Vector3(1.0, 0.5, 1.0),
-	BlockID.LOG_MANGROVE_X: Vector3(1.0, 0.5, 0.5), BlockID.LOG_MANGROVE_Z: Vector3(0.5, 0.5, 1.0), BlockID.LOG_MANGROVE_ST: Vector3(1.0, 0.5, 1.0),
-	BlockID.LOG_PALM_X: Vector3(1.0, 0.5, 0.5), BlockID.LOG_PALM_Z: Vector3(0.5, 0.5, 1.0), BlockID.LOG_PALM_ST: Vector3(1.0, 0.5, 1.0),
 }
 
 static func is_shaped_block(bid: int) -> bool:
@@ -655,16 +566,11 @@ const BLOCK_HARDNESS: Dictionary = {
 	BlockID.STONE_QTR:    1.2,
 	BlockID.STONE_EIGHTH: 1.2,
 	BlockID.STONE_THIN:   1.2,
-	BlockID.STONE_PLATFORM: 1.2,
+		BlockID.STONE_PLATFORM: 1.2,
 	BlockID.STONE_WALL_Z:   1.2,
 	BlockID.STONE_WALL_X:   1.2,
-	# Khúc cây — như gỗ cùng loài, rìu
-	BlockID.LOG_OAK_X: 1.4, BlockID.LOG_OAK_Z: 1.4, BlockID.LOG_OAK_ST: 1.4,
-	BlockID.LOG_HARD_X: 1.6, BlockID.LOG_HARD_Z: 1.6, BlockID.LOG_HARD_ST: 1.6,
-	BlockID.LOG_SPRUCE_X: 1.6, BlockID.LOG_SPRUCE_Z: 1.6, BlockID.LOG_SPRUCE_ST: 1.6,
-	BlockID.LOG_SWAMP_X: 1.4, BlockID.LOG_SWAMP_Z: 1.4, BlockID.LOG_SWAMP_ST: 1.4,
-	BlockID.LOG_MANGROVE_X: 1.4, BlockID.LOG_MANGROVE_Z: 1.4, BlockID.LOG_MANGROVE_ST: 1.4,
-	BlockID.LOG_PALM_X: 1.3, BlockID.LOG_PALM_Z: 1.3, BlockID.LOG_PALM_ST: 1.3,
+
+
 	BlockID.BAUXITE_ORE:  1.3,
 	BlockID.COPPER_ORE:   1.6,
 	BlockID.GOLD_ORE:     1.7,

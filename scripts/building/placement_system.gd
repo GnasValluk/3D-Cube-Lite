@@ -16,37 +16,77 @@ const _OrangeTreeProp = preload("res://scripts/world/props/orange_tree_prop.gd")
 const VOXEL: float = 0.50
 
 ## ── Khúc cây (log) — placement 1 ô, hướng dọc/ngang theo bề mặt nhắm ──────
+## Đặt ra = model khúc cây THẬT (thân voxel, cùng code dựng cây từng loài),
+## không phải block hộp — như item icon khi rơi xuống đất.
 const LOG_ITEMS: Array[String] = [
 	"log_oak", "log_hard_wood", "log_spruce", "log_swamp", "log_mangrove", "log_palm",
 ]
 
-## BlockID của loài log theo thứ tự: [nằm X, nằm Z, đứng].
-const LOG_SPECIES_BASE: Dictionary = {
-	"log_oak": 69,
-	"log_hard_wood": 72,
-	"log_spruce": 75,
-	"log_swamp": 78,
-	"log_mangrove": 81,
-	"log_palm": 84,
+## Class prop dựng thân cây của từng loài (có static build_log).
+const LOG_PROPS: Dictionary = {
+	"log_oak": preload("res://scripts/world/props/oak_prop.gd"),
+	"log_hard_wood": preload("res://scripts/world/props/dense_tree_prop.gd"),
+	"log_spruce": preload("res://scripts/world/props/frost_tree_prop.gd"),
+	"log_swamp": preload("res://scripts/world/props/swamp_tree_prop.gd"),
+	"log_mangrove": preload("res://scripts/world/props/mangrove_prop.gd"),
+	"log_palm": preload("res://scripts/world/props/palm_prop.gd"),
 }
 
 static func is_log_item(item_id: String) -> bool:
 	return item_id in LOG_ITEMS
 
-## Chọn BlockID khúc cây theo hướng bề mặt (normal của ô được nhắm):
-## - Mặt trên/dưới → đứng (trục Y).
+## Trục khúc cây theo hướng bề mặt (normal của ô được nhắm):
+## - Mặt trên/dưới → đứng (ST, trục Y).
 ## - Mặt bên X → nằm dài theo Z.
 ## - Mặt bên Z → nằm dài theo X.
 ## Như Minecraft đặt log: hướng tuỳ mặt block đang chạm.
-static func _log_bid_for(item_id: String, normal: Vector3) -> int:
-	var base: int = LOG_SPECIES_BASE.get(item_id, 0)
-	if base <= 0:
-		return 0
+static func _log_axis_for(normal: Vector3) -> String:
 	if absf(normal.y) >= absf(normal.x) and absf(normal.y) >= absf(normal.z):
-		return base + 2
+		return "ST"
 	if absf(normal.x) > absf(normal.z):
-		return base + 1
-	return base
+		return "Z"
+	return "X"
+
+## Dựng model khúc gỗ (LogVisual) vào node — model thân cây thật của loài.
+func _build_log_visual(parent: Node3D, item_id: String) -> void:
+	var cls = LOG_PROPS.get(item_id)
+	if cls != null and cls.has_method("build_log"):
+		cls.build_log(parent)
+
+## Xoay khúc gỗ theo trục: X dọc trục X, Z dọc trục Z, ST đứng (như icon item).
+func _apply_log_axis(mm_root: Node3D, axis: String) -> void:
+	var mmi := mm_root.get_node_or_null("LogVisual") as MultiMeshInstance3D
+	if mmi == null:
+		return
+	match axis:
+		"X": mmi.rotation_degrees = Vector3(0.0, 0.0, 90.0)
+		"Z": mmi.rotation_degrees = Vector3(0.0, 90.0, 90.0)
+		_: mmi.rotation_degrees = Vector3.ZERO
+
+## Đặt khúc cây xuống thế giới: tạo static body + model thân cây thật (LogVisual)
+## xoay theo trục, kèm collider hộp ước lượng theo hướng.
+func _place_log_model(parent: Node, item_id: String, pos: Vector3, axis: String) -> void:
+	var body := StaticBody3D.new()
+	body.name = "PlacedLog"
+	parent.add_child(body)
+	# Nâng sao cho khúc gỗ nằm/đứng trên bề mặt (model canh giữa gốc).
+	var lift_y := 0.23
+	if axis == "ST":
+		lift_y = 1.0
+	body.global_position = pos + Vector3(0, lift_y, 0)
+	var visual := Node3D.new()
+	visual.name = "LogVisualParent"
+	body.add_child(visual)
+	_build_log_visual(visual, item_id)
+	_apply_log_axis(visual, axis)
+	var cs := CollisionShape3D.new()
+	var bs := BoxShape3D.new()
+	match axis:
+		"X": bs.size = Vector3(2.1, 0.45, 0.45)
+		"Z": bs.size = Vector3(0.45, 0.45, 2.1)
+		_: bs.size = Vector3(0.45, 2.1, 0.45)
+	cs.shape = bs
+	body.add_child(cs)
 
 var _placing: bool = false
 var _item_id: String = ""
@@ -57,9 +97,9 @@ var _placement_rotation: float = 0.0
 ## Offset nội-ô (index encode 0..8, 4 = tâm): block đá nhỏ/hộp đặt lệch theo
 ## grid 0.25 để ghép khít platform — tái ghép khi placeholder chuyển cell.
 var _placement_off: int = _BlockData.OFF_CENTER
-## Khúc cây: BlockID (theo hướng bề mặt) đang aim — đặt thật theo id này.
-var _placement_log_bid: int = 0
-var _pending_log_bid: int = 0
+## Khúc cây: trục (X/Z/ST) đang aim — model xoay theo trục này khi đặt.
+var _placement_log_axis: String = "ST"
+var _pending_log_axis: String = "ST"
 var _log_mi: MeshInstance3D = null
 var _log_box: BoxMesh = null
 var _player_inv: Inventory = null
@@ -157,7 +197,7 @@ func _make_ghost() -> void:
 	elif is_platform_item(_item_id):
 		_build_ghost_platform()
 	elif is_log_item(_item_id):
-		_build_ghost_log(_item_id, Vector3.UP)
+		_build_ghost_log(_item_id, "ST")
 	elif _Data.ITEM_TO_BLOCK.has(_item_id):
 		_build_ghost_block()
 	if is_platform_item(_item_id) or is_log_item(_item_id):
@@ -351,11 +391,9 @@ func _build_ghost_block() -> void:
 	mi.material_override = block_mat
 	_ghost.add_child(mi)
 
-func _build_ghost_log(item_id: String, normal: Vector3) -> void:
-	var bid: int = _log_bid_for(item_id, normal)
-	var shape: Vector3 = _Data.block_shape(bid)
-	if shape == Vector3.ZERO:
-		shape = Vector3(_Data.VOXEL, _BlockData.SLAB_HEIGHT, _Data.VOXEL)
+## Ghost khúc cây = hộp preview theo trục (X dài theo X / Z dài theo Z / ST đứng).
+func _build_ghost_log(item_id: String, axis: String) -> void:
+	var shape: Vector3 = _log_ghost_shape(axis)
 	var block_mat := _ghost_mat(Color(0.75, 0.62, 0.40, 0.30), Color(0.35, 0.25, 0.12), 0.0)
 	_log_mi = MeshInstance3D.new()
 	_log_box = BoxMesh.new()
@@ -364,6 +402,13 @@ func _build_ghost_log(item_id: String, normal: Vector3) -> void:
 	_log_mi.material_override = block_mat
 	_log_mi.position = Vector3(_Data.VOXEL * 0.5, shape.y * 0.5, _Data.VOXEL * 0.5)
 	_ghost.add_child(_log_mi)
+
+## Kích thước hộp ghost của khúc cây theo trục (model item dài ~2.0).
+static func _log_ghost_shape(axis: String) -> Vector3:
+	match axis:
+		"X": return Vector3(2.0, 0.5, 0.5)
+		"Z": return Vector3(0.5, 0.5, 2.0)
+		_: return Vector3(0.5, 2.0, 0.5)
 
 func _build_ghost_portal() -> void:
 	var base_mat := _ghost_mat(Color(0.10, 0.30, 0.30, 0.25), Color(0.06, 0.18, 0.18), 0.2)
@@ -602,9 +647,9 @@ func update_placement() -> void:
 			shape_new = _Data.block_shape(_Data.ITEM_TO_BLOCK.get(_item_id, 0))
 		_placement_off = _compute_snap_offset(shape_new, snapped, normal, hit_pos)
 	elif is_log_item(_item_id):
-		# Khúc cây: hướng dọc/ngang theo bề mặt nhắm; cập nhật box ghost.
-		_placement_log_bid = _log_bid_for(_item_id, normal)
-		var lshape: Vector3 = _Data.block_shape(_placement_log_bid)
+		# Khúc cây: trục dọc/ngang theo bề mặt nhắm; cập nhật box ghost.
+		_placement_log_axis = _log_axis_for(normal)
+		var lshape: Vector3 = _log_ghost_shape(_placement_log_axis)
 		if _log_box:
 			_log_box.size = lshape
 		if _log_mi:
@@ -724,7 +769,7 @@ func confirm_placement() -> bool:
 	_pending_placement = true
 	_pending_item = _item_id
 	_pending_pos = _ghost_pos
-	_pending_log_bid = _placement_log_bid
+	_pending_log_axis = _placement_log_axis
 	_player_inv.remove_item_by_id(_item_id, 1)
 	_remove_ghost()
 	_placing = false
@@ -927,17 +972,8 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 				_player_inv.add_item(item_def, 1)
 			SFXManager.play_block_break()
 	elif is_log_item(item_id):
-		var lid: int = _pending_log_bid
-		if lid <= 0:
-			lid = _log_bid_for(item_id, Vector3.UP)
-		var lworld: Node = _find_world_manager()
-		if lworld and lworld.has_method("place_block") and lworld.place_block(pos.x, pos.y, pos.z, lid):
-			SFXManager.play_block_place()
-		else:
-			var ldef := ItemDatabase.items_db.get(item_id) as ItemDef
-			if ldef and _player_inv:
-				_player_inv.add_item(ldef, 1)
-			SFXManager.play_block_break()
+		_place_log_model(parent, item_id, pos, _pending_log_axis)
+		SFXManager.play_block_place()
 	elif _Data.ITEM_TO_BLOCK.has(item_id):
 		var block_id: int = _Data.ITEM_TO_BLOCK.get(item_id, 0)
 		if block_id != 0:
