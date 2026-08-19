@@ -974,10 +974,14 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		for pvx in range(oct_total):
 			oct[pvx] = []; oct[pvx].resize(oct_total)
 		# Native bulk: 1 call thay 1764 `_ocean_mask_at` (noise + islet hash).
+		# `s3_grid` = lưới ocean thô 0/1 (PackedByteArray, khớp oct_flat cho
+		# land_grid) — native cho thẳng, GD fallback build từ oct.
+		var s3_grid := PackedByteArray()
 		var oc := _native_ocean()
 		if oc != null:
 			var grid: PackedByteArray = oc.ocean_grid(world_ox - half, world_oz - half, oct_total, SeedSnapshot.ensure())
 			if grid.size() == oct_total * oct_total:
+				s3_grid = grid
 				for pvx in range(oct_total):
 					var row := pvx * oct_total
 					for pvz in range(oct_total):
@@ -998,6 +1002,11 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 					if pvz + 1 < oct_total: oct[pvx][pvz + 1] = val
 					if pvx + 1 < oct_total and pvz + 1 < oct_total:
 						oct[pvx + 1][pvz + 1] = val
+			s3_grid.resize(oct_total * oct_total)
+			for pvx in range(oct_total):
+				var row := pvx * oct_total
+				for pvz in range(oct_total):
+					s3_grid[row + pvz] = 1 if oct[pvx][pvz] else 0
 
 		var oct_small: Array[Array] = []
 		oct_small.resize(total)
@@ -1008,29 +1017,37 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 
 		const OCEAN_BUFFER: int = 45
 		var odst := PackedInt32Array()
-		odst.resize(total * total)
-		for i in range(total * total):
-			odst[i] = 0 if oct_small[i / total][i % total] else _Data.CONST_INF
-		_bfs_manhattan(odst, total)
-
 		var shore_dst := PackedInt32Array()
-		shore_dst.resize(total * total)
 		var oct_mask := PackedByteArray()
-		oct_mask.resize(total * total)
-		for pvx in range(total):
-			for pvz in range(total):
-				var is_oc: bool = oct_small[pvx][pvz]
-				oct_mask[pvx * total + pvz] = 1 if is_oc else 0
-				if is_oc:
-					var adj_land: bool = false
-					if pvx > 0 and not oct_small[pvx-1][pvz]: adj_land = true
-					elif pvx < total-1 and not oct_small[pvx+1][pvz]: adj_land = true
-					elif pvz > 0 and not oct_small[pvx][pvz-1]: adj_land = true
-					elif pvz < total-1 and not oct_small[pvx][pvz+1]: adj_land = true
-					shore_dst[pvx * total + pvz] = 1 if adj_land else _Data.CONST_INF
-				else:
-					shore_dst[pvx * total + pvz] = _Data.CONST_INF
-		_bfs_manhattan(shore_dst, total, oct_mask)
+		# Native bulk: 1 call thay 2 BFS Manhattan trên lưới total².
+		var wd3 := _native_dist()
+		if wd3 != null and not _force_s6_gd:
+			var rd3: Dictionary = wd3.ocean_dists(s3_grid, oct_total, total,
+					OCEAN_PAD - _Data.PAD, _Data.CONST_INF)
+			odst = rd3["odst"]
+			shore_dst = rd3["shore_dst"]
+			oct_mask = rd3["oct_mask"]
+		if odst.size() != total * total:
+			odst.resize(total * total)
+			for i in range(total * total):
+				odst[i] = 0 if oct_small[i / total][i % total] else _Data.CONST_INF
+			_bfs_manhattan(odst, total)
+			shore_dst.resize(total * total)
+			oct_mask.resize(total * total)
+			for pvx in range(total):
+				for pvz in range(total):
+					var is_oc: bool = oct_small[pvx][pvz]
+					oct_mask[pvx * total + pvz] = 1 if is_oc else 0
+					if is_oc:
+						var adj_land: bool = false
+						if pvx > 0 and not oct_small[pvx-1][pvz]: adj_land = true
+						elif pvx < total-1 and not oct_small[pvx+1][pvz]: adj_land = true
+						elif pvz > 0 and not oct_small[pvx][pvz-1]: adj_land = true
+						elif pvz < total-1 and not oct_small[pvx][pvz+1]: adj_land = true
+						shore_dst[pvx * total + pvz] = 1 if adj_land else _Data.CONST_INF
+					else:
+						shore_dst[pvx * total + pvz] = _Data.CONST_INF
+			_bfs_manhattan(shore_dst, total, oct_mask)
 		_prof("S3 ocean_mask+bfs")
 
 		# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────
@@ -1038,17 +1055,12 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		var ws4 := _native_land()
 		if ws4 != null and not _force_s4_gd:
 			var bio_flat := PackedInt32Array()
-			var oct_flat := PackedByteArray()
 			bio_flat.resize(total * total)
 			bio_flat.fill(0)
-			oct_flat.resize(oct_total * oct_total)
-			oct_flat.fill(0)
 			for fpx in range(total):
 				for fpz in range(total):
 					bio_flat[fpx * total + fpz] = bio[fpx][fpz]
-			for fpx in range(oct_total):
-				for fpz in range(oct_total):
-					oct_flat[fpx * oct_total + fpz] = 1 if oct[fpx][fpz] else 0
+			var oct_flat: PackedByteArray = s3_grid
 			var res4: Dictionary = ws4.land_grid(world_ox - half, world_oz - half, cols, total,
 					oct_total, SeedSnapshot.ensure(), bio_flat, oct_flat, odst, shore_dst)
 			if res4.size() >= 5 and (res4["biome"] as PackedInt32Array).size() == cols * cols:

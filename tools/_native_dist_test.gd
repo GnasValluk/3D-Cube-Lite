@@ -36,6 +36,15 @@ func _ready() -> void:
 		_compare("bfs rdist", nd["rdist"], gw[1], cc.x, cc.y)
 		_compare("bfs dland", nd["dland"], gw[2], cc.x, cc.y)
 		_compare("bfs hdist", nd["hdist"], gw[3], cc.x, cc.y)
+		# ocean_dists: lưới ocean native → native dists vs GD replication
+		var oc: Object = ClassDB.instantiate("WorldOcean") if ClassDB.class_exists("WorldOcean") else null
+		if oc != null:
+			var o_total: int = cols + 2 * 26
+			var grid: PackedByteArray = oc.ocean_grid(cc.x * 32.0 - 16.0, cc.y * 32.0 - 16.0, o_total, SeedSnapshot.ensure())
+			var od: Dictionary = wd.ocean_dists(grid, o_total, cols + 10, 26 - 5, _Data.CONST_INF)
+			var gd_od := _gd_ocean_dists(grid, o_total, cols + 10, 26 - 5)
+			_compare("ocean odst", od["odst"], gd_od[0], cc.x, cc.y)
+			_compare("ocean shore", od["shore_dst"], gd_od[1], cc.x, cc.y)
 	print("-- SUMMARY: %d failures, %d passes" % [_fails, _passes])
 	get_tree().quit(1 if _fails else 0)
 
@@ -103,6 +112,74 @@ static func _bfs_chebyshev(dmap: PackedInt32Array, cols: int) -> void:
 	for i in range(dmap.size()):
 		if dmap[i] == -1:
 			dmap[i] = _Data.CONST_INF
+
+
+static func _gd_ocean_dists(grid: PackedByteArray, oct_total: int, total: int, shift: int) -> Array:
+	var oct_small: Array[Array] = []
+	oct_small.resize(total)
+	for pvx in range(total):
+		oct_small[pvx] = []; oct_small[pvx].resize(total)
+		for pvz in range(total):
+			oct_small[pvx][pvz] = grid[(pvx + shift) * oct_total + (pvz + shift)] == 1
+	var odst := PackedInt32Array()
+	odst.resize(total * total)
+	for i in range(total * total):
+		odst[i] = 0 if oct_small[i / total][i % total] else _Data.CONST_INF
+	_bfs_manhattan(odst, total)
+	var shore_dst := PackedInt32Array()
+	shore_dst.resize(total * total)
+	var oct_mask := PackedByteArray()
+	oct_mask.resize(total * total)
+	for pvx in range(total):
+		for pvz in range(total):
+			var is_oc: bool = oct_small[pvx][pvz]
+			oct_mask[pvx * total + pvz] = 1 if is_oc else 0
+			if is_oc:
+				var adj_land: bool = false
+				if pvx > 0 and not oct_small[pvx-1][pvz]: adj_land = true
+				elif pvx < total-1 and not oct_small[pvx+1][pvz]: adj_land = true
+				elif pvz > 0 and not oct_small[pvx][pvz-1]: adj_land = true
+				elif pvz < total-1 and not oct_small[pvx][pvz+1]: adj_land = true
+				shore_dst[pvx * total + pvz] = 1 if adj_land else _Data.CONST_INF
+			else:
+				shore_dst[pvx * total + pvz] = _Data.CONST_INF
+	_bfs_manhattan(shore_dst, total, oct_mask)
+	return [odst, shore_dst]
+
+
+static func _bfs_manhattan(dmap: PackedInt32Array, total: int, mask: PackedByteArray = PackedByteArray()) -> void:
+	var use_mask: bool = mask.size() > 0
+	var frontier := PackedInt32Array()
+	for i in range(dmap.size()):
+		if dmap[i] != _Data.CONST_INF:
+			frontier.append(i)
+	var fhead := 0
+	while fhead < frontier.size():
+		var idx: int = frontier[fhead]
+		fhead += 1
+		var nd: int = dmap[idx] + 1
+		var cx: int = idx / total
+		var cz: int = idx % total
+		if cx > 0:
+			var ni: int = idx - total
+			if dmap[ni] == _Data.CONST_INF and (not use_mask or mask[ni] == 1):
+				dmap[ni] = nd
+				frontier.append(ni)
+		if cx < total - 1:
+			var ni: int = idx + total
+			if dmap[ni] == _Data.CONST_INF and (not use_mask or mask[ni] == 1):
+				dmap[ni] = nd
+				frontier.append(ni)
+		if cz > 0:
+			var ni: int = idx - 1
+			if dmap[ni] == _Data.CONST_INF and (not use_mask or mask[ni] == 1):
+				dmap[ni] = nd
+				frontier.append(ni)
+		if cz < total - 1:
+			var ni: int = idx + 1
+			if dmap[ni] == _Data.CONST_INF and (not use_mask or mask[ni] == 1):
+				dmap[ni] = nd
+				frontier.append(ni)
 
 
 func _compare(tag: String, native: PackedInt32Array, gd: PackedInt32Array, cx: int, cz: int) -> void:
