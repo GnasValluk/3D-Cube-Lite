@@ -471,6 +471,7 @@ static func _prewarm_networks() -> void:
 	_networks_seed = seed_v
 	_Road._ensure_roads()
 	_River._ensure_rivers()
+	_River._native_warm()
 	_networks_ready = true
 	_prewarm_running = false
 
@@ -873,14 +874,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	# ── 1. Biome sampling (với padding để stitch biên) ─────────────────────────
 	_prof_reset()
 	var total: int = cols + 2 * _Data.PAD
-	var bio: Array[Array] = []
-	bio.resize(total)
-	for vx in range(total):
-		var row: Array = []; row.resize(total); bio[vx] = row
-		for vz in range(total):
-			var wx: float = world_ox - half + (float(vx - _Data.PAD) + 0.5) * _Data.VOXEL
-			var wz: float = world_oz - half + (float(vz - _Data.PAD) + 0.5) * _Data.VOXEL
-			row[vz] = _Noise._biome_at(wx, wz, dim_id)
+	var bio: Array[Array] = _Noise._biome_grid(world_ox, world_oz, cols, total, dim_id)
 	_prof("S1 biome_sample")
 
 	# ── 2. BFS distance map từ "đất nền" → tính gradient xuống nước ─────────
@@ -1410,6 +1404,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 			orig_heights[ivx] = []; orig_heights[ivx].resize(cols)
 			for ivz in range(cols):
 				orig_heights[ivx][ivz] = height_grid[ivx][ivz]
+		var river_factors := _River.river_distance_factors(
+			world_ox - half, world_oz - half, cols)
 		for ivx in range(cols):
 			for ivz in range(cols):
 				var bg: int = biome_grid[ivx][ivz]
@@ -1417,7 +1413,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 					continue
 				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
 				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-				var factor: float = _River.river_distance_factor(wx, wz)
+				var factor: float = river_factors[ivx * cols + ivz]
 				if factor >= 0.0:
 					var orig_h: float = height_grid[ivx][ivz]
 					var bottom_var: float = _river_noise.get_noise_2d(wx * 0.5, wz * 0.5) * 1.5 * _BlockData.SLAB_HEIGHT
@@ -1569,7 +1565,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				0, _BlockData.CHUNK_H - 1)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_Terrain.build_terrain_mesh(st, bd, cols, dim_id, top_ly_hint)
+	var native_mesh: ArrayMesh = _Terrain.build_terrain_mesh_native(bd, cols, dim_id, top_ly_hint)
+	if native_mesh == null:
+		# Không có DLL native → fallback GDScript cũ (SurfaceTool)
+		_Terrain.build_terrain_mesh(st, bd, cols, dim_id, top_ly_hint)
 	_prof("S8 terrain_mesh")
 
 
@@ -1609,7 +1608,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		village_data = _Village.compute_village(cx, cz, size, dim_id,
 			biome_grid, height_grid, road_grid, river_flag, cols)
 	_prof("S9 grass+village")
-	var mesh := st.commit()
+	var mesh: ArrayMesh = native_mesh if native_mesh != null else st.commit()
 	if mesh == null:
 		return { "mesh": null, "water_mesh": null, "lava_mesh": null, "biome_grid": biome_grid,
 				"cols": cols, "block_data_bytes": bd.to_bytes() }
@@ -2048,6 +2047,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		"shaped_mesh": shaped_data["shaped_mesh"],
 		"shaped_pos": shaped_data["shaped_pos"],
 		"shaped_size": shaped_data["shaped_size"],
+		"bd": bd, "road_grid": road_grid, "reef_mask": reef_mask,
 	}
 
 
@@ -3447,8 +3447,10 @@ func rebuild_mesh(at := Vector3i(-1, -1, -1), at_columns: Array = []) -> void:
 
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_Terrain.build_terrain_mesh(st, block_data, _cols, _dimension_id, _top_ly_cache)
-	var mesh := st.commit()
+	var mesh: ArrayMesh = _Terrain.build_terrain_mesh_native(block_data, _cols, _dimension_id, _top_ly_cache)
+	if mesh == null:
+		_Terrain.build_terrain_mesh(st, block_data, _cols, _dimension_id, _top_ly_cache)
+		mesh = st.commit()
 	if mesh == null: return
 
 	var mi := MeshInstance3D.new()
@@ -3769,8 +3771,11 @@ static func _thread_biome_rebuild(chunk: Node, snap_bd: _BlockData, snap_top: Pa
 	var payload := {}
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	_Terrain.build_terrain_mesh(st, snap_bd, cols, dim_id, snap_top, false)
-	payload["terrain_mesh"] = st.commit()
+	var mesh: ArrayMesh = _Terrain.build_terrain_mesh_native(snap_bd, cols, dim_id, snap_top, false)
+	if mesh == null:
+		_Terrain.build_terrain_mesh(st, snap_bd, cols, dim_id, snap_top, false)
+		mesh = st.commit()
+	payload["terrain_mesh"] = mesh
 	var max_top := 0
 	if snap_top.size() == cols * cols:
 		for v in snap_top:

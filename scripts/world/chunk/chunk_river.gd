@@ -8,6 +8,49 @@ static var _river_ready: bool = false
 static var _int_cache: Dictionary = {}
 static var _river_lock := Mutex.new()
 
+static var _native_rv: Object = null
+static var _rv_seed: int = -1
+
+## Native WorldRiver bridge — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_river() -> Object:
+	if _native_rv == null and ClassDB.class_exists("WorldRiver"):
+		_native_rv = ClassDB.instantiate("WorldRiver")
+	return _native_rv
+
+## Gọi trong prewarm worker thread (sau _ensure_rivers) để dựng index C++ sớm.
+static func _native_warm() -> void:
+	_ensure_rivers()
+	var rv := _native_river()
+	if rv == null:
+		return
+	var s := SeedSnapshot.ensure()
+	if _rv_seed == s:
+		return
+	rv.set_curves(s, _river_curves)
+	_rv_seed = s
+
+## Grid river_distance_factor: 1 call native thay 1024 lần gọi GDScript. Trả
+## PackedFloat32Array cols×cols (thứ tự x-major, wx = wx0 + (x+0.5), wz tương tự).
+## Fallback: loop GDScript cũ (bit-exact).
+static func river_distance_factors(wx0: float, wz0: float, cols: int) -> PackedFloat32Array:
+	_ensure_rivers()
+	var rv := _native_river()
+	if rv != null:
+		var s := SeedSnapshot.ensure()
+		if _rv_seed != s:
+			rv.set_curves(s, _river_curves)
+			_rv_seed = s
+		var res: PackedFloat32Array = rv.factors_grid(wx0, wz0, cols)
+		if res.size() == cols * cols:
+			return res
+	var out := PackedFloat32Array()
+	out.resize(cols * cols)
+	for ivx in range(cols):
+		for ivz in range(cols):
+			out[ivx * cols + ivz] = river_distance_factor(
+				wx0 + (float(ivx) + 0.5), wz0 + (float(ivz) + 0.5))
+	return out
+
 ## Chỉ dùng bởi tool test concurrency: xóa cache để worker rebuild lại từ đầu.
 static func _reset_for_test() -> void:
 	_river_lock.lock()
@@ -16,6 +59,7 @@ static func _reset_for_test() -> void:
 	_river_spatial.clear()
 	_int_cache.clear()
 	_noise_river = null
+	_rv_seed = -1
 	_river_lock.unlock()
 
 static func _intersection(gx: int, gz: int) -> Vector2:

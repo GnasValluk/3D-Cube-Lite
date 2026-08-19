@@ -4,6 +4,14 @@ const _Data = preload("chunk_data.gd")
 
 static var _noise_cache: Dictionary = {}
 
+static var _native_wb: Object = null
+
+## Native WorldBiome bridge — tạo lazy 1 lần; null nếu thiếu DLL.
+static func _native_biome() -> Object:
+	if _native_wb == null and ClassDB.class_exists("WorldBiome"):
+		_native_wb = ClassDB.instantiate("WorldBiome")
+	return _native_wb
+
 ## ── Cache kết quả biome theo ô thế giới (thread-safe) ────────────────────────
 ## `_biome_at` là hàm thuần (chỉ phụ thuộc wx,wz,dim) nhưng mỗi chunk gọi nó cho
 ## lưới padding (32+2*PAD=42²) — các chunk/tile cận kề RE-DO cùng một ô thế giới
@@ -21,8 +29,12 @@ static func _biome_key(dim_id: int, wx: float, wz: float) -> Vector4i:
 static func clear_cache() -> void:
 	_noise_cache.clear()
 	_biome_cache.clear()
+	var wb := _native_biome()
+	if wb != null:
+		wb.clear_cache()
 
 static func _noise_for_dim(dim_id: int) -> Dictionary:
+	_native_biome()
 	if _noise_cache.has(dim_id):
 		return _noise_cache[dim_id]
 
@@ -326,6 +338,10 @@ static func _biome_at(wx: float, wz: float, dim_id: int) -> int:
 	return val
 
 static func _biome_at_uncached(wx: float, wz: float, dim_id: int) -> int:
+	var wb := _native_biome()
+	if wb != null:
+		return wb.biome_at_uncached(wx, wz, dim_id, SeedSnapshot.ensure())
+
 	var nd: Dictionary = _noise_for_dim(dim_id)
 
 	# REAL_WORLD: BIOME THEO Ô (per-column) — lấy noise desert/frost/swamp tại
@@ -372,3 +388,30 @@ static func _biome_at_uncached(wx: float, wz: float, dim_id: int) -> int:
 	var threshold: float = 0.50
 	if n < threshold: return _Data.TileType.TWILIGHT_GRASS
 	return _Data.TileType.TWILIGHT_DIRT
+
+## Bulk biome grid cho S1 trong compute_chunk — dùng native `compute_biome_grid`
+## khi có sẵn (bỏ qua cache per-cell vì native đủ nhanh), fallback về loop cũ.
+static func _biome_grid(world_ox: float, world_oz: float, cols: int, total: int, dim_id: int) -> Array[Array]:
+	var bio: Array[Array] = []
+	bio.resize(total)
+	var wb := _native_biome()
+	if wb != null:
+		var arr: PackedInt32Array = wb.compute_biome_grid(
+			world_ox, world_oz, cols, total, dim_id, SeedSnapshot.ensure())
+		if arr.size() == total * total:
+			var idx := 0
+			for vx in range(total):
+				var row: Array = []
+				row.resize(total)
+				for vz in range(total):
+					row[vz] = arr[idx]
+					idx += 1
+				bio[vx] = row
+			return bio
+	for vx in range(total):
+		var row: Array = []; row.resize(total); bio[vx] = row
+		for vz in range(total):
+			var wx: float = world_ox - (cols * 0.5) + (float(vx - _Data.PAD) + 0.5) * _Data.VOXEL
+			var wz: float = world_oz - (cols * 0.5) + (float(vz - _Data.PAD) + 0.5) * _Data.VOXEL
+			row[vz] = _biome_at(wx, wz, dim_id)
+	return bio

@@ -3,6 +3,21 @@ extends RefCounted
 const _Data  = preload("chunk_data.gd")
 const _BlockData = preload("chunk_block_data.gd")
 
+static var _native_wf: Object = null
+
+## Test hook: ép dùng GDScript (fallback) dù có DLL — để A/B so sánh bit-exact.
+static var _force_gd_fallback: bool = false
+
+## Native WorldFill bridge — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_fill() -> Object:
+	if _native_wf == null and ClassDB.class_exists("WorldFill"):
+		_native_wf = ClassDB.instantiate("WorldFill")
+	return _native_wf
+
+static func _native_fill_clear_cache() -> void:
+	if _native_wf != null:
+		_native_wf.clear_cache()
+
 ## Profiler sub-section (benchmark test bật; mặc định tắt)
 static var _prof: bool = false
 static var _p_last: int = 0
@@ -23,6 +38,44 @@ static func _p(tag: String) -> void:
 ## world_chunk.compute_chunk theo HÌNH THẾ địa hình (hb_rise, khoảng biển, hồ).
 ## fill_blocks chỉ map TileType.YOUNG_GRASS → BlockID.YOUNG_GRASS.
 static func fill_blocks(bd: _BlockData, biome_grid: Array, height_grid: Array,
+		road_grid: PackedByteArray, cols: int, dim_id: int, cx: int = 0, cz: int = 0, size: int = 32,
+		nd: Dictionary = {}, reef_mask: PackedFloat32Array = PackedFloat32Array()) -> void:
+	# Native fast path — flatten grids, 1 call C++, ghi thẳng buffer (nếu có DLL)
+	if _fill_blocks_native(bd, biome_grid, height_grid, road_grid,
+			cols, dim_id, cx, cz, size, nd, reef_mask):
+		return
+	_fill_blocks_gd(bd, biome_grid, height_grid, road_grid,
+			cols, dim_id, cx, cz, size, nd, reef_mask)
+
+## Native S7 fill_blocks — flatten grids → 1 call C++ → ghi thẳng buffer.
+## Trả về true nếu đã fill bằng native (có DLL), false nếu cần fallback GDScript.
+static func _fill_blocks_native(bd: _BlockData, biome_grid: Array, height_grid: Array,
+		road_grid: PackedByteArray, cols: int, dim_id: int, cx: int, cz: int, size: int,
+		nd: Dictionary, reef_mask: PackedFloat32Array) -> bool:
+	if _force_gd_fallback:
+		return false
+	var wf := _native_fill()
+	if wf == null:
+		return false
+	var bio_flat := PackedInt32Array()
+	var hgt_flat := PackedFloat64Array()
+	bio_flat.resize(cols * cols)
+	hgt_flat.resize(cols * cols)
+	for xf in range(cols):
+		var rowa: Array = biome_grid[xf]
+		var rowh: Array = height_grid[xf]
+		for zf in range(cols):
+			bio_flat[xf * cols + zf] = rowa[zf]
+			hgt_flat[xf * cols + zf] = rowh[zf]
+	var has_sea: bool = not nd.is_empty() and nd.has("sea_biome")
+	var res: PackedByteArray = wf.fill_blocks(bio_flat, hgt_flat, road_grid,
+			cols, dim_id, cx, cz, size, reef_mask, has_sea, SeedSnapshot.ensure())
+	if res.size() == bd._data.size():
+		bd._data = res
+		return true
+	return false
+
+static func _fill_blocks_gd(bd: _BlockData, biome_grid: Array, height_grid: Array,
 		road_grid: PackedByteArray, cols: int, dim_id: int, cx: int = 0, cz: int = 0, size: int = 32,
 		nd: Dictionary = {}, reef_mask: PackedFloat32Array = PackedFloat32Array()) -> void:
 	const SLAB := _BlockData.SLAB_HEIGHT  # 0.5
@@ -543,6 +596,40 @@ static func build_terrain_mesh(st: SurfaceTool, bd: _BlockData,
 				_emit_column_run(st, data, cols, layer_size, layer_stride,
 					x, z, run_lo, run_hi, cx_f, cz_f, colors, side_mul, bot_mul)
 	_p("column_runs")
+
+## ── Native GDExtension bridge: build_terrain_mesh qua C++ khi có DLL ──────
+## Trả ArrayMesh từ WorldTerrain.build_terrain_mesh; null nếu không có native
+## (caller giữ fallback SurfaceTool cũ). Mesh vertex/normal/color 100% khớp
+## bản GDScript (đã verify bằng so sánh từng vertex).
+static var _wt: RefCounted = null
+static var _wt_checked: bool = false
+
+static func _wt_instance() -> RefCounted:
+	if not _wt_checked:
+		_wt_checked = true
+		if ClassDB.class_exists("WorldTerrain"):
+			_wt = ClassDB.instantiate("WorldTerrain")
+	return _wt
+
+static func build_terrain_mesh_native(bd: _BlockData, cols: int, dim_id: int,
+		top_ly_hint: PackedInt32Array = PackedInt32Array(),
+		gen_fresh: bool = false) -> ArrayMesh:
+	var wt := _wt_instance()
+	if wt == null:
+		return null
+	var use_rw: bool = dim_id == _Data._Dim.DimensionID.REAL_WORLD
+	var palette := PackedColorArray(_Data.BLOCK_COLORS_RW if use_rw else _Data.BLOCK_COLORS_TW)
+	var res: Dictionary = wt.build_terrain_mesh(bd._data, cols, top_ly_hint, gen_fresh, palette)
+	if res.is_empty():
+		return null
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = res["verts"]
+	arr[Mesh.ARRAY_NORMAL] = res["normals"]
+	arr[Mesh.ARRAY_COLOR] = res["colors"]
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m
 
 ## ── _lod_surface_block: block đại diện của ô biome cho mesh LOD ─────────────
 ## Bản rút gọn của match trong fill_blocks — chỉ cho màu, không ghi block data.
