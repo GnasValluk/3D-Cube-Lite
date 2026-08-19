@@ -76,6 +76,9 @@ enum BlockID {
 	SWAMP_MUD = 60,    # Bùn đầm lầy — nền rừng đầm lầy ẩm thấp, xẻng đào được
 	SWAMP_DIRT = 61,   # Đất đầm lầy — lớp nền bên dưới bùn đầm lầy
 	SWAMP_WOOD = 62,   # Gỗ tràm — vân gỗ nâu xám, chặt từ cây tràm rừng đầm lầy
+	STONE_PLATFORM = 63, # Nền đá platform — mỗi ô đầy block (1×0.5×1), đặt 3×3 tạo sàn
+	STONE_WALL_Z   = 64, # Tường đá dày theo Z (1×0.5×0.5) — tường 3×3 dài theo X
+	STONE_WALL_X   = 65, # Tường đá dày theo X (0.5×0.5×1) — tường 3×3 dài theo Z
 }
 
 ## ── BlockID ↔ item_id mapping ──────────────────────────────────────────
@@ -132,6 +135,9 @@ const BLOCK_TO_ITEM: Dictionary = {
 	BlockID.SWAMP_MUD: "block_swamp_mud",
 	BlockID.SWAMP_DIRT: "block_swamp_dirt",
 	BlockID.SWAMP_WOOD: "swamp_wood",
+	BlockID.STONE_PLATFORM: "block_stone_platform",
+	BlockID.STONE_WALL_Z:    "block_stone_wall",
+	BlockID.STONE_WALL_X:    "block_stone_wall",
 }
 
 ## ── item_id → BlockID mapping (dùng khi place block) ────────────────────
@@ -182,6 +188,10 @@ const ITEM_TO_BLOCK: Dictionary = {
 	"block_swamp_mud": BlockID.SWAMP_MUD,
 	"block_swamp_dirt": BlockID.SWAMP_DIRT,
 	"swamp_wood": BlockID.SWAMP_WOOD,
+	"block_stone_platform":    BlockID.STONE_PLATFORM,
+	"block_stone_wall":        BlockID.STONE_WALL_Z,   # mặc định: tường dài theo X (dày Z)
+	"block_stone_wall_door":   BlockID.STONE_WALL_Z,
+	"block_stone_wall_window": BlockID.STONE_WALL_Z,
 }
 
 const VOXEL: float = 1.0
@@ -328,6 +338,9 @@ const BLOCK_COLORS_RW: Array[Color] = [
 	Color(0.14, 0.18, 0.10),           # 60 SWAMP_MUD — bùn đầm lầy nâu sậm pha xanh rêu
 	Color(0.19, 0.16, 0.09),           # 61 SWAMP_DIRT — đất đầm lầy nâu xám ẩm
 	Color(0.42, 0.38, 0.30),           # 62 SWAMP_WOOD — gỗ tràm nâu xám nhạt
+	Color(0.46, 0.46, 0.50),           # 63 STONE_PLATFORM — đá nền platform (khớp STONE)
+	Color(0.46, 0.46, 0.50),           # 64 STONE_WALL_Z — tường đá dày Z
+	Color(0.46, 0.46, 0.50),           # 65 STONE_WALL_X — tường đá dày X
 ]
 
 const BLOCK_COLORS_TW: Array[Color] = [
@@ -394,6 +407,9 @@ const BLOCK_COLORS_TW: Array[Color] = [
 	Color(0.05, 0.07, 0.04),           # 60 SWAMP_MUD (TW palette placeholder)
 	Color(0.06, 0.05, 0.03),           # 61 SWAMP_DIRT (TW palette placeholder)
 	Color(0.06, 0.05, 0.04),           # 62 SWAMP_WOOD (TW palette placeholder)
+	Color(0.04, 0.08, 0.06),           # 63 STONE_PLATFORM (TW palette placeholder)
+	Color(0.04, 0.08, 0.06),           # 64 STONE_WALL_Z (TW palette placeholder)
+	Color(0.04, 0.08, 0.06),           # 65 STONE_WALL_X (TW palette placeholder)
 ]
 
 ## TRAIL_SINK bỏ — không dùng nữa để tránh void
@@ -430,6 +446,9 @@ const BLOCK_SHAPES: Dictionary = {
 	BlockID.STONE_QTR:    Vector3(0.5, 0.5, 0.5),   # ¼ khối đá
 	BlockID.STONE_EIGHTH: Vector3(0.5, 0.25, 0.5),  # ⅛ khối đá
 	BlockID.STONE_THIN:   Vector3(1.0, 0.2, 1.0),   # tấm mỏng 0.2
+	BlockID.STONE_PLATFORM: Vector3(1.0, 0.5, 1.0), # nền đá — đầy cell (dày 0.5)
+	BlockID.STONE_WALL_Z:   Vector3(1.0, 0.5, 0.5), # tường đá — dài X, dày Z 0.5
+	BlockID.STONE_WALL_X:   Vector3(0.5, 0.5, 1.0), # tường đá — dài Z, dày X 0.5
 }
 
 static func is_shaped_block(bid: int) -> bool:
@@ -547,6 +566,9 @@ const BLOCK_HARDNESS: Dictionary = {
 	BlockID.STONE_QTR:    1.2,
 	BlockID.STONE_EIGHTH: 1.2,
 	BlockID.STONE_THIN:   1.2,
+	BlockID.STONE_PLATFORM: 1.2,
+	BlockID.STONE_WALL_Z:   1.2,
+	BlockID.STONE_WALL_X:   1.2,
 	BlockID.BAUXITE_ORE:  1.3,
 	BlockID.COPPER_ORE:   1.6,
 	BlockID.GOLD_ORE:     1.7,
@@ -597,6 +619,7 @@ static func get_block_hardness(bid: int) -> float:
 static func is_pickaxable(bid: int) -> bool:
 	return bid == BlockID.STONE \
 		or bid == BlockID.STONE_QTR or bid == BlockID.STONE_EIGHTH or bid == BlockID.STONE_THIN \
+		or bid == BlockID.STONE_PLATFORM or bid == BlockID.STONE_WALL_Z or bid == BlockID.STONE_WALL_X \
 		or (bid >= BlockID.COPPER_ORE and bid <= BlockID.PLATINUM_ORE) \
 		or bid == BlockID.COAL_ORE
 

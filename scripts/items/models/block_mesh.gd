@@ -13,7 +13,10 @@ static func block_cube(p: Node3D, item_id: String) -> void:
 
 	if block_id == _DATA.BlockID.TILLED_SOIL:
 		_build_soil_item(p)
-	elif block_id >= _DATA.BlockID.COPPER_ORE and block_id != _DATA.BlockID.YOUNG_GRASS \
+	elif block_id >= _DATA.BlockID.COPPER_ORE and block_id != _DATA.BlockID.STONE_PLATFORM \
+			and block_id != _DATA.BlockID.STONE_WALL_Z \
+			and block_id != _DATA.BlockID.STONE_WALL_X \
+			and block_id != _DATA.BlockID.YOUNG_GRASS \
 			and block_id != _DATA.BlockID.GRASS_DIRT \
 			and block_id != _DATA.BlockID.DESERT_PLATEAU \
 			and block_id != _DATA.BlockID.TWILIGHT_GRASS \

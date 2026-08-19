@@ -69,8 +69,14 @@ func rotate_placement(clockwise: bool = true) -> void:
 	if not _placing or _pending_placement:
 		return
 	_placement_rotation += deg_to_rad(90.0 if clockwise else -90.0)
-	if _ghost:
-		_ghost.rotation.y = _placement_rotation
+	if is_platform_item(_item_id):
+		# Platform tường dựng pattern theo hướng (không phải xoay 1 node đơn) →
+		# rebuild ghost theo hướng mới.
+		_make_ghost()
+		_ghost.visible = _ghost_valid
+	else:
+		if _ghost:
+			_ghost.rotation.y = _placement_rotation
 
 func _clear_ghost_children() -> void:
 	if _ghost == null:
@@ -106,15 +112,80 @@ func _make_ghost() -> void:
 		_build_ghost_crafting_table()
 	elif _is_seed_item(_item_id):
 		_build_ghost_seed()
+	elif is_platform_item(_item_id):
+		_build_ghost_platform()
 	elif _Data.ITEM_TO_BLOCK.has(_item_id):
 		_build_ghost_block()
-	_ghost.rotation.y = _placement_rotation
+	if is_platform_item(_item_id):
+		_ghost.rotation.y = 0.0
+	else:
+		_ghost.rotation.y = _placement_rotation
 
 ## ── Mầm cây ─────────────────────────────────────────────────────────────────
 const SEED_ITEMS: Array[String] = ["coconut_seed", "taro_seed", "seaweed_seed", "seagrass_seed", "eggplant_seed", "watermelon_seed", "pumpkin_seed", "orange_seed"]
 
 static func _is_seed_item(item_id: String) -> bool:
 	return item_id in SEED_ITEMS
+
+## ── Platform xây dựng (nền 3×3 dày 0.5 / tường đứng 3×3 có cửa/cửa sổ) ──────
+## Đặt 1 lần = lấp 1 pattern nhiều ô block (persist qua save như block thường).
+const PLATFORM_ITEMS: Array[String] = [
+	"block_stone_platform", "block_stone_wall", "block_stone_wall_door", "block_stone_wall_window",
+]
+
+static func is_platform_item(item_id: String) -> bool:
+	return item_id in PLATFORM_ITEMS
+
+## Cells (offset ô từ ô gốc) + block_id cho 1 platform theo hướng xoay (độ).
+## Trả về { "cells": Array[Vector3i], "block": int }.
+## - Nền: lưới 3×3 ngang (dx,dz ∈ -1..1) tại tầng đáy, block STONE_PLATFORM.
+## - Tường (và bản có cửa/cửa sổ): 3 ngang × 3 cao, dày 0.5; hướng xoay quyết
+##   định tường dài theo X (block STONE_WALL_Z, dày Z) hay theo Z (STONE_WALL_X).
+##   Bản cửa: bỏ ô giữa dưới (0,0) + ô giữa (0,1) → chừa cửa rộng 1, cao 2.
+##   Bản cửa sổ: bỏ ô giữa (0,1) → chừa 1 ô cửa sổ giữa tường.
+static func _platform_cells(item_id: String, rot_deg: int) -> Dictionary:
+	var cells: Array[Vector3i] = []
+	if item_id == "block_stone_platform":
+		for dx in range(-1, 2):
+			for dz in range(-1, 2):
+				cells.append(Vector3i(dx, 0, dz))
+		return { "cells": cells, "block": _Data.BlockID.STONE_PLATFORM }
+	var along_x: bool = absf(fposmod(rot_deg, 180.0)) < 45.0
+	var gap_open: int = -1
+	var gap_upper: int = -1
+	if item_id == "block_stone_wall_door":
+		gap_open = 0
+		gap_upper = 1
+	elif item_id == "block_stone_wall_window":
+		gap_upper = 1
+	for i in range(-1, 2):
+		for j in range(0, 3):
+			if i == 0 and j == gap_open:
+				continue
+			if i == 0 and j == gap_upper:
+				continue
+			if along_x:
+				cells.append(Vector3i(i, j, 0))
+			else:
+				cells.append(Vector3i(0, j, i))
+	return {
+		"cells": cells,
+		"block": _Data.BlockID.STONE_WALL_Z if along_x else _Data.BlockID.STONE_WALL_X,
+	}
+
+## Ghost 3×3 cho platform — hiển thị đúng vùng lấp theo hướng xoay hiện tại.
+func _build_ghost_platform() -> void:
+	var info := _platform_cells(_item_id, roundi(rad_to_deg(_placement_rotation)))
+	var block_mat := _ghost_mat(Color(0.52, 0.52, 0.56, 0.30), Color(0.30, 0.30, 0.32), 0.0)
+	for c in info.cells:
+		var shape: Vector3 = _Data.block_shape(info.block)
+		var mi := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = shape
+		mi.mesh = box
+		mi.material_override = block_mat
+		mi.position = Vector3(c.x + 0.5, float(c.y) * _BlockData.SLAB_HEIGHT + shape.y * 0.5, c.z + 0.5)
+		_ghost.add_child(mi)
 
 ## Bàn trạm chế tạo chuyên ngành — đặt như Bàn Chế Tạo (entity trong world).
 const STATION_ITEMS: Array[String] = ["tool_table", "mech_table", "farm_table", "chem_table", "magic_table", "kitchen_table", "architecture_table"]
@@ -699,6 +770,12 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 			SFXManager.play_block_place()
 	elif _is_seed_item(item_id):
 		_plant_seed(item_id, pos)
+	elif is_platform_item(item_id):
+		if not _place_platform(item_id, pos):
+			var item_def := ItemDatabase.items_db.get(item_id) as ItemDef
+			if item_def and _player_inv:
+				_player_inv.add_item(item_def, 1)
+			SFXManager.play_block_break()
 	elif _Data.ITEM_TO_BLOCK.has(item_id):
 		var block_id: int = _Data.ITEM_TO_BLOCK.get(item_id, 0)
 		if block_id != 0:
@@ -716,6 +793,26 @@ func _do_placement(item_id: String, pos: Vector3) -> void:
 		_placing = false
 		_item_id = ""
 		get_tree().root.set_meta("building_placement_active", false)
+
+## Đặt platform (nền/tường 3×3) vào world như nhiều ô block shape. Kiểm tra
+## toàn bộ vùng trống trước; nếu 1 ô kín → không đặt gì (hoàn item ngược lên).
+func _place_platform(item_id: String, pos: Vector3) -> bool:
+	var world_mgr := _find_world_manager()
+	if world_mgr == null or not world_mgr.has_method("place_block"):
+		return false
+	var info := _platform_cells(item_id, roundi(rad_to_deg(_placement_rotation)))
+	var bx: int = floori(pos.x)
+	var bz: int = floori(pos.z)
+	var ly0: int = _BlockData.world_y_to_layer(pos.y)
+	var by: float = (float(ly0) + float(_BlockData.Y_MIN)) * _BlockData.SLAB_HEIGHT
+	for c in info.cells:
+		var cur: int = world_mgr.get_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z))
+		if cur != _Data.BlockID.AIR and not _Data.is_water(cur):
+			return false
+	for c in info.cells:
+		world_mgr.place_block(float(bx + c.x), by + float(c.y) * _BlockData.SLAB_HEIGHT, float(bz + c.z), info.block)
+	SFXManager.play_block_place()
+	return true
 
 func _can_place_portal_pos(pos: Vector3) -> bool:
 	var world_mgr := _find_world_manager()

@@ -222,6 +222,12 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_stone_qtr",   "Đá Tư",     ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Đá tư — ¼ khối đá, đặt làm bậc/trang trí", true, 64)
 	_add(db, "block_stone_eighth","Đá Vụn",    ItemDef.Type.BLOCK, Color(0.44, 0.44, 0.48), "🧱", "Đá vụn — ⅛ khối đá, tấm mỏng", true, 64)
 	_add(db, "block_stone_thin",  "Đá Phiến",  ItemDef.Type.BLOCK, Color(0.40, 0.40, 0.44), "🧱", "Đá phiến — dày 0.2 thay vì 0.5 như block thường", true, 64)
+
+	# ── Platform đá (xây dựng) — nền sàn + tường 3×3, tường đặt xoay hướng chuột phải ──
+	_add(db, "block_stone_platform",    "Nền Đá",      ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Nền đá — tấm sàn 3×3 block, dày 0.5, đặt trên mặt đất hoặc chồng tầng", true, 64)
+	_add(db, "block_stone_wall",        "Tường Đá",    ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá — đứng 3 cao × 3 ngang, dày 0.5 block; chuột phải xoay hướng", true, 64)
+	_add(db, "block_stone_wall_door",   "Tường Đá Có Cửa", ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá có cửa — khuyết ô giữa và ô giữa dưới để đặt cửa ra vào; chuột phải xoay hướng", true, 64)
+	_add(db, "block_stone_wall_window", "Tường Đá Có Cửa Sổ", ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá có cửa sổ — chỉ khuyết ô giữa để lấy gió/ánh sáng; chuột phải xoay hướng", true, 64)
 	_add(db, "block_dark_dirt",   "Đất Tối",   ItemDef.Type.BLOCK, Color(0.28, 0.16, 0.06), "🧱", "Khối đất tối",      true, 64)
 	_add(db, "block_sand_deep",   "Cát Sâu",   ItemDef.Type.BLOCK, Color(0.80, 0.66, 0.28), "🧱", "Khối cát sâu",      true, 64)
 	_add(db, "block_trail",       "Đường Mòn", ItemDef.Type.BLOCK, Color(0.76, 0.58, 0.22), "🧱", "Khối đường mòn",    true, 64)
@@ -338,6 +344,8 @@ const WEIGHTS: Dictionary = {
 	"grilled_carp": 0.4, "grilled_perch": 0.35, "grilled_tilapia": 0.5,
 	"grilled_snakehead": 0.7, "grilled_flowerhorn": 0.7, "cooked_crab": 0.25,
 	"grilled_eggplant": 0.15, "baked_pumpkin": 0.15,
+	"block_stone_platform": 0.6, "block_stone_wall": 0.6,
+	"block_stone_wall_door": 0.6, "block_stone_wall_window": 0.6,
 	"experience_orb": 0.02,
 }
 
