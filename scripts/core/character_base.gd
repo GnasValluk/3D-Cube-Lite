@@ -482,6 +482,12 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if not _active or not is_alive or not _is_player:
 		return
 	if _is_building_placing():
+		# Đang đặt khối: cho phép NHẢY (khoá mở), vẫn chặn các hành động khác.
+		if event is InputEventKey:
+			var kk := event as InputEventKey
+			if kk.pressed and not kk.echo and kk.is_action_pressed("jump") \
+					and _freeze_timer <= 0.0 and can_jump():
+				_jbuf = JUMP_BUFFER
 		return
 	if event is InputEventKey:
 		var k := event as InputEventKey

@@ -1092,6 +1092,8 @@ func _is_building_item(def: ItemDef) -> bool:
 		return true
 	if def.id in ["coconut_seed", "taro_seed", "seaweed_seed", "seagrass_seed", "eggplant_seed", "watermelon_seed", "pumpkin_seed"]:
 		return true
+	if def.id in ["log_oak", "log_hard_wood", "log_spruce", "log_swamp", "log_mangrove", "log_palm"]:
+		return true
 	return false
 
 func _setup_world_clock() -> void:

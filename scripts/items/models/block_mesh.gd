@@ -19,6 +19,7 @@ static func block_cube(p: Node3D, item_id: String) -> void:
 			and block_id != _DATA.BlockID.STONE_QTR \
 			and block_id != _DATA.BlockID.STONE_EIGHTH \
 			and block_id != _DATA.BlockID.STONE_THIN \
+			and not (block_id >= _DATA.BlockID.LOG_OAK_X and block_id <= _DATA.BlockID.LOG_PALM_ST) \
 			and block_id != _DATA.BlockID.YOUNG_GRASS \
 			and block_id != _DATA.BlockID.GRASS_DIRT \
 			and block_id != _DATA.BlockID.DESERT_PLATEAU \
