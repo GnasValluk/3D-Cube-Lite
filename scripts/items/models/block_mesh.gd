@@ -16,6 +16,9 @@ static func block_cube(p: Node3D, item_id: String) -> void:
 	elif block_id >= _DATA.BlockID.COPPER_ORE and block_id != _DATA.BlockID.STONE_PLATFORM \
 			and block_id != _DATA.BlockID.STONE_WALL_Z \
 			and block_id != _DATA.BlockID.STONE_WALL_X \
+			and block_id != _DATA.BlockID.STONE_HALF \
+			and block_id != _DATA.BlockID.STONE_QUARTER \
+			and block_id != _DATA.BlockID.STONE_EIGHTH_2 \
 			and block_id != _DATA.BlockID.YOUNG_GRASS \
 			and block_id != _DATA.BlockID.GRASS_DIRT \
 			and block_id != _DATA.BlockID.DESERT_PLATEAU \

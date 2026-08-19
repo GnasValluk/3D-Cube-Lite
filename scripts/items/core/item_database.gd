@@ -228,6 +228,9 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_stone_wall",        "Tường Đá",    ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá — cao 6 block × ngang 3 block (cao 3,0), dày 0.5; chuột phải xoay hướng", true, 64)
 	_add(db, "block_stone_wall_door",   "Tường Đá Có Cửa", ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá có cửa — chừa 4 block cột giữa từ đáy cho cửa ra vào (rộng 1 × cao 2); chuột phải xoay hướng", true, 64)
 	_add(db, "block_stone_wall_window", "Tường Đá Có Cửa Sổ", ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá có cửa sổ — chừa 2 block giữa tường để lấy gió/ánh sáng; chuột phải xoay hướng", true, 64)
+	_add(db, "block_stone_half_slab",   "Đá Nửa",     ItemDef.Type.BLOCK, Color(0.43, 0.43, 0.47), "🧱", "Đá nửa — 1/2 slab (dày 0.25), xếp 2 lớp = 1 block; build bậc/vật liệu mỏng", true, 64)
+	_add(db, "block_stone_quarter_slab","Đá Tư Lát",  ItemDef.Type.BLOCK, Color(0.44, 0.44, 0.48), "🧱", "Đá tư — 1/4 slab (dày 0.125), xếp 4 lớp = 1 block; chi tiết nhỏ", true, 64)
+	_add(db, "block_stone_eighth_slab", "Đá Mảnh",    ItemDef.Type.BLOCK, Color(0.45, 0.45, 0.49), "🧱", "Đá mảnh — 1/8 slab (dày 0.0625), xếp 8 lớp = 1 block; chi tiết cực nhỏ", true, 64)
 	_add(db, "block_dark_dirt",   "Đất Tối",   ItemDef.Type.BLOCK, Color(0.28, 0.16, 0.06), "🧱", "Khối đất tối",      true, 64)
 	_add(db, "block_sand_deep",   "Cát Sâu",   ItemDef.Type.BLOCK, Color(0.80, 0.66, 0.28), "🧱", "Khối cát sâu",      true, 64)
 	_add(db, "block_trail",       "Đường Mòn", ItemDef.Type.BLOCK, Color(0.76, 0.58, 0.22), "🧱", "Khối đường mòn",    true, 64)
@@ -346,6 +349,7 @@ const WEIGHTS: Dictionary = {
 	"grilled_eggplant": 0.15, "baked_pumpkin": 0.15,
 	"block_stone_platform": 0.6, "block_stone_wall": 0.6,
 	"block_stone_wall_door": 0.6, "block_stone_wall_window": 0.6,
+	"block_stone_half_slab": 0.6, "block_stone_quarter_slab": 0.6, "block_stone_eighth_slab": 0.6,
 	"experience_orb": 0.02,
 }
 
