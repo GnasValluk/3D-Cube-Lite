@@ -1,0 +1,69 @@
+# opencode_lite_project_summary.txt
+
+## Goal
+- Triển khai tối ưu chunk kiểu Distant Horizons: (1) LOD theo bán kính (mesh thô vòng ngoài + merge 4×4 chunk xa thành 1 tile mesh), (2) nén block data, (3) gộp props toàn cầu.
+
+## Constraints & Preferences
+- Người dùng nói tiếng Việt; giải thích bằng tiếng Việt.
+- Không phá tối ưu cũ (57b7224, 4b7c54b, 4ad2f43): đèn tắt ban ngày, material/mesh dùng chung, multimesh, worker threads, prewarm materials.
+- Kiểm tra bằng `--headless --path ... tools/<test>.tscn` (autoload báo lỗi nhầm khi dùng `--script` standalone).
+- Godot: `D:\portApp\Godot\Godot_v4.7-stable_win64_console.exe`.
+- Chạy regression sau mỗi bước; commit từng nhóm thay đổi.
+
+## Progress
+### Done
+- **Bước 2 nén block data đã commit `567b506`**:
+  - Đo trước bằng `tools/test_compress_block.gd`: raw 70656 B/chunk (32×69×32) → deflate ~600-1400 B (1-2%, x50); compress ~800µs/chunk, decompress ~130µs.
+  - `world_chunk.gd`: `compress_block_data(data)` static idempotent (nén `block_data_bytes` + cờ `bd_compressed`), gọi ở `apply_chunk` và `ensure_chunk_built`. `apply_chunk` giải nén khi phục hồi `block_data`. `compute_chunk` VẪN trả raw (test `from_bytes` không đổi).
+  - `test_compress_block.gd` PASS (5 check pipeline + 8 chunk ratio). Lakes/swamp/frost/ore/continents/scan PASS. **seagrass FAIL 2 (pre-existing — xác nhận stash chạy bản gốc cũng FAIL)**.
+  - `test_lod_world` PASS (cache→giải nén qua teleport). `test_streaming`: MAX 123.56 (trước 125.37), AVG 38.46 (trước 43.43), spike>90 3 (trước 43). Crash teardown đã biết.
+- **Nhóm LOD per-chunk đã hoàn tất, test và commit `ac9a987`** gồm 18 files / +770 −89:
+  - `chunk_terrain.gd`: `build_lod_mesh` (step=4, top quads + tường dọc `_emit_lod_wall`/`_emit_lod_wall_band`, nước flatten `WATER_Y`, đường `TRAIL`) + `_lod_surface_block`.
+  - `world_chunk.gd`: `_lod_mesh_cache` riêng, `_is_lod`, `setup(..., lod)`, `_thread_build(..., lod)`, `compute_chunk(..., lod_mode)` early-return sau S6a, `apply_chunk` nhánh LOD, PREDELETE tách cache. LOD chunk: `block_data=null`, không registry, không props/nước/cỏ/làng/quặng/đèn.
+  - `open_world_manager.gd`: `LOD_RING_EXTRA=4`, `_pending_lod`, want-set mode 0/1/2, giữ full khi chỉ cần LOD, fix bug player đứng yên không nạp LOD.
+- **Nhóm merge tile 4×4 chunk → 1 tile mesh đã commit `8b85e36`**:
+  - `world_tile.gd` (MỚI): `CHUNKS_PER_SIDE=4`, `TILE_SIZE=128`, `_tile_mesh_cache`/`_tile_mat_cache` tách riêng, `setup` đọc `_lod_mesh_cache` có sẵn hoặc worker `_thread_build`→`compute_chunk(lod=true)`, `_try_combine` gộp 16 ArrayMesh thành 1 (dùng `resize(Mesh.ARRAY_MAX)` — `surface_get_arrays` trả `Array`, không phải Dictionary), PREDELETE xoá cache. Position center `tx*128+64`.
+  - `open_world_manager.gd`: `MERGE_RING_EXTRA=4`, `_horizon()`=vr+LOD+MERGE, `_tile_of/_tile_dist_inner/_tile_dist_outer/_compute_tile_keep/_build_want_sets` (tile giữ khi `d_in>lo && d_out<=hi`), `_tiles/_loading_tiles/_pending_tiles`; enqueue ban đầu trong `_ready`; promote tile `_built` trong `_process` + `_evict_lod_inside(tk)` (gỡ mọi chunk-node trong tile, kể cả full cũ sót sau teleport — tránh z-fight); `_start_loading_tile`; `_evict_loading_chunk`; submit full 1 + LOD 1 + tile 1/frame. **Lưu ý: từng có lỗi indent mất tab ở dòng `if dist_moved < 0.25` (đã sửa lại).**
+  - `test_lod_world.gd` mở rộng 4 phần: A dict LOD, B node sync, C unit tile (1 MeshInstance3D, AABB 128), D manager (529 slot phủ kín, cache đếm khớp, teleport giữ full). Khai báo `want: Dictionary` tường minh (tránh lỗi infer khi method không compile).
+  - Kết quả: `TOTAL | PASS | 0 failures` (crash 0xC0000005 chỉ ở teardown sau khi in PASS — lỗi worker-teardown đã biết).
+  - Regression: `test_streaming` MAX 125.37ms (tốt hơn 168.94 cũ) AVG 43.43ms; `test_perf_world_stream` in đủ `[perf] done`; cả 2 crash teardown sau PASS/done.
+
+### In Progress
+- (none — chuẩn bị Bước 3 gộp props toàn cầu)
+
+### Blocked
+- (none)
+
+## Key Decisions
+- **Chunk LOD = null `block_data`**: consumer đã null-check; LOD chỉ cần `_size`/`_cols`. Bỏ hẳn `fill_blocks`.
+- **Cache tách 3 lớp**: `_mesh_cache` (full) / `_lod_mesh_cache` (LOD thô) / `_tile_mesh_cache` (tile gộp) — không đè nguồn sự thật.
+- **LOD chunk không vào `_chunk_registry`**; `_unregister_chunk` chỉ với full.
+- **Mode swap**: giữ full ở vòng LOD (chống thrash); evict khi `want==0` (ngoài hoặc tile phủ) hoặc `want>mode` (LOD→full).
+- **Tile phủ ≠ chunk rời**: tile giữ khi mọi chunk `d_in>lo`; tile `_built` → gỡ chunks bên trong.
+- **Giới hạn nạp**: 1 full + 1 LOD + 1 tile/frame, sort gần-player trước.
+- **Dùng `Array` cho surface_get_arrays**: Godot 4.7 trả `Array`, `get(key, default)` chỉ dùng được cho Dictionary — đã đổi sang `a[Mesh.ARRAY_VERTEX] if a[...] else Packed...()`.
+
+## Next Steps
+1. **Bước 3: gộp props toàn cầu** — xem cách chunk phát sinh MultiMesh props (`grass_blade_data`, `plant_props`), tìm chỗ `MultiMeshInstance3D` per-chunk → chuyển sang MultiMesh gộp theo loại global (1 node cho N chunk) hoặc chia vùng. Khảo sát `open_world_manager`/`world_chunk`/`chunk_terrain` trước.
+2. Chạy regression sau mỗi bước (`test_lod_world`, `test_streaming`, `test_perf_world_stream`, `test_compress_block`, nhóm biome).
+3. Commit từng bước; sau cùng benchmark node/draw call trước-sau.
+
+## Critical Context
+- `compute_chunk(... lod)` LOD return: `{"lod": true, "mesh", "biome_grid", "height_grid", "river_flag", "road_grid", "cols", "block_data_bytes": PackedByteArray(), "has_water": false, ... rỗng}`. Dict full không có `"lod"`; `apply_chunk` dùng `data.get("lod", false)`.
+- `setup(cx, cz, size, dimension_id=TWILIGHT, sync=false, lod=false)`.
+- Vùng chân trời (vr=SettingsManager.chunk_view, test ép =3): full Chebyshev ≤ `vr`; LOD thô `vr < d ≤ vr+4` (trừ tile phủ); tile `vr+4 < d_in` và `d_out ≤ vr+8`; ngoài → evict.
+- `WorldTile._thread_build` nhận `tile: Node`, `call_deferred("_receive_chunk", ...)`, `_try_combine` khi đủ 16.
+- `_mesh_cache`/`_lod_mesh_cache` giữ dict; LOD PREDELETE xoá `_lod_mesh_cache`, full xoá `_mesh_cache`, tile xoá `_tile_mesh_cache`.
+- Unit: chunk 32×32 block, slab 0.5, `WATER_Y=0.5`, `VOXEL=1.0`, `Y_MIN=-18`, `CHUNK_H=69`.
+- Teardown crash 0xC0000005 sau khi test in PASS/done = lỗi worker-teardown đã biết, không phải regression logic.
+- Git HEAD `8b85e36` (sau nhóm tile). Working tree sạch.
+- `world_tile.gd` dùng `surface_get_arrays(0)` → `Array`; `Mesh.ARRAY_*` là index int vào Array.
+
+## Relevant Files
+- `scripts/world/chunk/world_tile.gd`: MỚI (commit 8b85e36) — tile LOD 4×4.
+- `scripts/world/open_world_manager.gd`: MERGE_RING_EXTRA, `_pending_tiles`/`_tiles`/`_loading_tiles`, `_build_want_sets`/`_compute_tile_keep`, promote tile, evict, submit.
+- `scripts/world/chunk/world_chunk.gd`: LOD per-chunk đã commit; dòng 720 `_pending_mutex.lock()` — nếu Mutex null thì do test chạy `--script` sai (phải dùng tscn).
+- `scripts/world/chunk/chunk_terrain.gd`: `build_lod_mesh`/`_lod_surface_block`.
+- `tools/test_lod_world.{gd,tscn}`: PASS 0 failures — test 3 lớp.
+- `tools/test_streaming.gd` / `tools/test_perf_world_stream.gd`: regression benchmark.
+- `scripts/world/chunk/chunk_block_data.gd`: `CHUNK_H=69` — dùng cho Bước 2 nén block data.
