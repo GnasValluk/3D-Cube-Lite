@@ -182,6 +182,17 @@ static func _native_ocean() -> Object:
 		_native_oc = ClassDB.instantiate("WorldOcean")
 	return _native_oc
 
+static var _native_wl: Object = null
+
+## Native WorldLand bridge (S4 biome_grid+height) — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_land() -> Object:
+	if _native_wl == null and ClassDB.class_exists("WorldLand"):
+		_native_wl = ClassDB.instantiate("WorldLand")
+	return _native_wl
+
+## Test hook: ép dùng GDScript S4 để A/B so sánh bit-exact.
+static var _force_s4_gd: bool = false
+
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	# Thread-safe cache theo ô thế giới: lưới ocean stride-2 (42×42) của 2 chunk
 	# kề nhau overlap ~62% số sample — dùng chung bỏ qua FastNoiseLite FBM lặp.
@@ -1011,394 +1022,433 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		_bfs_manhattan(shore_dst, total, oct_mask)
 		_prof("S3 ocean_mask+bfs")
 
-		# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────────
-		const MAX_OCEAN_DEPTH_DIST: int = 30
-		for ivx in range(cols):
-			var pvx: int = ivx + _Data.PAD
-			for ivz in range(cols):
-				var pvz: int = ivz + _Data.PAD
-				var base_bio: int = bio[pvx][pvz]
-				var od: int = odst[pvx * total + pvz]
-
-				if od == 0:
-					biome_grid[ivx][ivz] = _Data.TileType.OCEAN_DEEP
-					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-					var sd: int = shore_dst[pvx * total + pvz]
-					if sd == _Data.CONST_INF: sd = MAX_OCEAN_DEPTH_DIST
-					var raw_depth_t: float = clamp(float(sd - 1) / float(MAX_OCEAN_DEPTH_DIST - 1), 0.0, 1.0)
-
-					# 3 chế độ địa hình: thềm → sườn → đồng bằng sâu
-					var shelf_var: float = nd["sea_large"].get_noise_2d(wx * 0.5, wz * 0.5) * 0.08
-					var shelf_end: float = 0.12 + shelf_var
-					var slope_end: float = 0.32 + shelf_var * 0.5
-
-					var base_h: float
-					if raw_depth_t < shelf_end:
-						var st: float = raw_depth_t / shelf_end
-						base_h = lerp(-0.3, -1.5, st)
-					elif raw_depth_t < slope_end:
-						var st: float = (raw_depth_t - shelf_end) / max(slope_end - shelf_end, 0.01)
-						st = st * st  # dốc tăng dần
-						base_h = lerp(-1.5, -5.0, st)
-					else:
-						var st: float = (raw_depth_t - slope_end) / max(1.0 - slope_end, 0.01)
-						base_h = lerp(-5.0, -8.5, st)
-
-					# Cấu trúc lớn: sống núi, bồn trũng (amplitude tăng theo depth)
-					var large_n: float = nd["sea_large"].get_noise_2d(wx, wz)
-					base_h += large_n * (0.15 + raw_depth_t * 1.2)
-
-					# Núi ngầm (Seamount) — núi lửa ngầm cao vút, xuất hiện khắp nơi
-					var mt_n: float = nd["sea_mountain"].get_noise_2d(wx * 0.5, wz * 0.5)
-					var mt_h: float = max(0.0, mt_n) * 8.0
-					base_h += mt_h
-
-					# Hẻm núi (canyon) — rãnh cắt vào thềm/sườn lục địa
-					var c1: float = nd["sea_rough"].get_noise_2d(wx * 3.0, wz * 0.35)
-					if c1 > 0.40:
-						var c_h: float = (c1 - 0.40) / 0.60
-						var c2: float = nd["sea_rough"].get_noise_2d(wx * 0.35, wz * 3.0)
-						if c2 > 0.40:
-							c_h = max(c_h, (c2 - 0.40) / 0.60)
-						base_h -= c_h * c_h * (0.4 + raw_depth_t * 0.8)
-
-					# Nhấp nhô tầm trung: mạnh ở vùng thềm/sườn, nhẹ ở đồng bằng
-					var rough_n: float = nd["sea_rough"].get_noise_2d(wx, wz)
-					var rough_scale: float = 1.0 - raw_depth_t * 0.6  # gần bờ gồ ghề hơn
-					base_h += rough_n * 0.25 * rough_scale
-
-					# Khe rãnh hẹp (trench) — vực sâu hiếm gặp
-					var trench_n: float = nd["sea_rough"].get_noise_2d(wx * 4.0, wz * 0.5)
-					var trench_t: float = clamp((abs(trench_n) - 0.55) / 0.25, 0.0, 1.0)
-					var trench_mask: float = trench_t * trench_t * (3.0 - 2.0 * trench_t)
-					base_h -= trench_mask * (0.3 + raw_depth_t * 1.0)
-
-					# Bãi đá ngầm (Reef) — đá nhô cao rải rác khắp đáy biển
-					var rf_n: float = (nd["reef"].get_noise_2d(wx, wz) + 1.0) * 0.5
-					if rf_n > 0.40:
-						var rf_h: float = (rf_n - 0.40) / 0.60
-						rf_h = rf_h * 4.0
-						base_h += rf_h
-						reef_mask[ivx * cols + ivz] = rf_h * 0.3
-
-					# Chặn không trồi lên quá mặt nước
-					height_grid[ivx][ivz] = min(base_h, _Data.WATER_Y - 0.1)
-				elif od <= _Data.BEACH_WIDTH:
-					var beach_t: float = float(od - 1) / float(maxi(_Data.BEACH_WIDTH - 1, 1))
-					biome_grid[ivx][ivz] = _Data.TileType.SAND_WHITE
-					var wx2: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-					var wz2: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-					var warp_n: float = (nd["warp"].get_noise_2d(wx2 * 3.0, wz2 * 3.0) + 1.0) * 0.5
-					var noise_offset: float = (warp_n - 0.5) * 0.3
-					height_grid[ivx][ivz] = clamp(
-						lerp(_Data.WATER_Y, _Data.VOXEL - 0.15, beach_t) + noise_offset,
-						_Data.WATER_Y - 0.1, _Data.VOXEL - 0.08)
-					beach_mask[ivx * cols + ivz] = 1
+		# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────
+		var s4_native_ok := false
+		var ws4 := _native_land()
+		if ws4 != null and not _force_s4_gd:
+			var bio_flat := PackedInt32Array()
+			var oct_flat := PackedByteArray()
+			bio_flat.resize(total * total)
+			bio_flat.fill(0)
+			oct_flat.resize(oct_total * oct_total)
+			oct_flat.fill(0)
+			for fpx in range(total):
+				for fpz in range(total):
+					bio_flat[fpx * total + fpz] = bio[fpx][fpz]
+			for fpx in range(oct_total):
+				for fpz in range(oct_total):
+					oct_flat[fpx * oct_total + fpz] = 1 if oct[fpx][fpz] else 0
+			var res4: Dictionary = ws4.land_grid(world_ox - half, world_oz - half, cols, total,
+					oct_total, SeedSnapshot.ensure(), bio_flat, oct_flat, odst, shore_dst)
+			if res4.size() >= 5 and (res4["biome"] as PackedInt32Array).size() == cols * cols:
+				s4_native_ok = true
+				var b4: PackedInt32Array = res4["biome"]
+				var h4: PackedFloat64Array = res4["height"]
+				var bc4: PackedByteArray = res4["beach"]
+				var rf4: PackedFloat32Array = res4["reef"]
+				var dm4: PackedByteArray = res4["dmask"]
+				if h4.size() == cols * cols and bc4.size() == cols * cols \
+						and rf4.size() == cols * cols and dm4.size() == total * total:
+					for gpx in range(cols):
+						for gpz in range(cols):
+							var gi: int = gpx * cols + gpz
+							biome_grid[gpx][gpz] = b4[gi]
+							height_grid[gpx][gpz] = h4[gi]
+							beach_mask[gi] = bc4[gi]
+							reef_mask[gi] = rf4[gi]
+					for gpx in range(total * total):
+						dmask[gpx] = dm4[gpx]
 				else:
-					# ── LỤC ĐỊA: ĐỊA HÌNH DÙNG CHUNG TRƯỚC, BIOME VẼ SAU ─────────
-					# Mọi biome đất liền dùng CHUNG một công thức địa hình đồi
-					# thoải (highland + highland_terr). Biome chỉ thay đổi "sơn bề
-					# mặt" (loại block) chứ không can thiệp chiều cao → không còn
-					# vết cắt cao độ tại ranh giới biome/biên chunk. (Biome nào
-					# cần địa hình đặc biệt sẽ được code riêng ở cập nhật sau.)
-					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-
-					# (1) Địa hình chung — đồi thoải rolling hills
-					var hb: float = (nd["highland"].get_noise_2d(wx, wz) + 1.0) * 0.5
-					var ht: float = (nd["highland_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
-					var hb_rise: float = clamp((hb - 0.55) / 0.35, 0.0, 1.0)
-					hb_rise = hb_rise * hb_rise * (3.0 - 2.0 * hb_rise)
-					height_grid[ivx][ivz] = 1.0 + hb_rise * 3.0 + ht * hb_rise * 1.2
-					# (1b) Vùng trũng (basin) — lòng chảo hạ thấp cục bộ trong đất
-					# liền: vùng bát nhỏ mềm, mép thoải (smoothstep). Đáy được giữ
-					# TRÊN mực nước để không tự sinh nước/phá đồng cỏ khô.
-					# Noise tần thấp nên trũng âm lan rộng; nhiều trũng nông.
-					var bsn: float = (nd["basin"].get_noise_2d(wx, wz) + 1.0) * 0.5
-					var bsn_t: float = clamp((bsn - 0.55) / 0.20, 0.0, 1.0)
-					bsn_t = bsn_t * bsn_t * (3.0 - 2.0 * bsn_t)
-					if bsn_t > 0.0:
-						height_grid[ivx][ivz] = maxf(height_grid[ivx][ivz] - bsn_t * 1.5, _Data.WATER_Y + 0.35)
-
-					# (1c) Vùng NÚI VỪA — đắp cao 4..9 block trên nền đồi, ranh mềm
-					# (smoothstep theo noise "mountain") để tạo dải núi rộng, đỉnh
-					# không cắt thẳng.
-					var mtn: float = (nd["mountain"].get_noise_2d(wx, wz) + 1.0) * 0.5
-					var mtn_t: float = clamp((mtn - 0.58) / 0.14, 0.0, 1.0)
-					mtn_t = mtn_t * mtn_t * (3.0 - 2.0 * mtn_t)
-					if mtn_t > 0.0:
-						var mtn_amp: float = 3.5 + ht * 5.5   # 3.5..9.0
-						height_grid[ivx][ivz] += mtn_t * mtn_amp
-
-# (2) Vẽ biome SAU — chỉ đổi surface, không đổi height
-					if base_bio == _Data.TileType.DESERT:
-						# ── SA MẠC: chỉ toàn CÁT các loại (không đất nâu) ────────
-						#   - Mặt cát nền (DESERT) + cồn cát đậm (SAND_DEEP) rải theo
-						#     độ nhô; ranh giới giữa 2 loại UỐN CONG bởi noise + dải
-						#     loang (giống hiệu ứng cỏ non ở đồng):
-						#       hb_rise thấp    → DESERT (cát sáng nền)
-						#       hb_rise cao 	→ SAND_DEEP (cát đậm đỉnh cồn)
-						#     Khoảng 0.52→0.66: SAND_DEEP loang dần (noise nhanh,
-						#     đốm mật độ tăng theo độ cao) — không cắt thẳng.
-						var warp_d: float = (nd["patch_var"].get_noise_2d(wx, wz) - 0.5) * 0.10
-						var eff_d: float = hb_rise + warp_d
-						var sd_t: float = clamp((eff_d - 0.56) / 0.10, 0.0, 1.0)
-						if sd_t >= 1.0:
-							biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP
-						elif sd_t > 0.0:
-							var loang_d: float = (nd["highland_terr"].get_noise_2d(wx * 3.0 + 5.0, wz * 3.0 + 5.0) + 1.0) * 0.5
-							biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP if loang_d < sd_t else _Data.TileType.DESERT
-						else:
-							# Nền thấp sa mạc: đốm NHỎ — cồn cát đậm (SAND_DEEP) và cát
-							# phai mờ (PALE_SAND) lỏng nền cát sáng (DESERT). patch2 tần
-							# số cao → đốm rải rác vừa phải, không thành mảng gây rối.
-							var p2: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							if p2 > 0.82:
-								biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP
-							elif p2 > 0.72:
-								biome_grid[ivx][ivz] = _Data.TileType.PALE_SAND
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.DESERT
-					elif base_bio == _Data.TileType.FROST:
-						# ── BĂNG GIÁ: vùng tuyết lạnh ─────────────────────────
-						# Địa hình dùng CHUNG (đồi thoải) như mọi biome đất liền.
-						# Sơn bề mặt: FROST (tuyết nền), FROST_SNOW (đốm tuyết dày
-						# theo patch2). Hồ nội địa vẫn là nước thường (SILT/MUDDY_SAND)
-						# carve xuống mực nước như hồ đồng cỏ — nước KHÔNG đóng băng.
-						var is_frost_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
-						var lake_f: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-						if not is_frost_ocean and lake_f > 0.68 \
-								and (od == _Data.CONST_INF or od > 40):
-							var lake_type_f: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
-							if lake_type_f > 0.50:
-								biome_grid[ivx][ivz] = _Data.TileType.SILT
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
-							height_grid[ivx][ivz] = _Data.WATER_Y - (1.0 + (lake_f - 0.68) * 8.0)
-						else:
-							var p2_f: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							if p2_f > 0.78:
-								biome_grid[ivx][ivz] = _Data.TileType.FROST_SNOW
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.FROST
-					elif base_bio == _Data.TileType.SWAMP:
-						# ── RỪNG ĐẦM LẦY: đầm lầy ngập nước nông ──────────────────
-						# Địa hình KHÔNG dùng chung đồi thoải: hạ dần xuống sát mực
-						# nước (WATER_Y ±) → bãi lầy ngập/nổi xen kẽ. Bề mặt bùn
-						# sình (SWAMP_MUD); mô bùn cao khô ráo (SWAMP_DIRT) chỗ
-						# swamp_terr cao; hố thấp hơn mặt nước thành vũng nước đen
-						# (nước vẫn fill theo WATER_Y — đầm lầy có nước đứng).
-						# Blending biên theo swamp noise: rìa đầm (sw vừa qua ngưỡng)
-						# vẫn giữ địa hình đồi dần lún xuống, lõi đầm (sw cao) dẹt
-						# bằng mặt nước → ranh giới không còn vách đứng.
-						var sw_v: float = (nd["swamp"].get_noise_2d(wx, wz) + 1.0) * 0.5
-						var sw_terr: float = (nd["swamp_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
-						var sw_t: float = clamp((sw_v - 0.57) / 0.22, 0.0, 1.0)
-						sw_t = sw_t * sw_t * (3.0 - 2.0 * sw_t)
-						var orig_h: float = height_grid[ivx][ivz]
-						# Hạ nền bãi lầy xuống sát mực nước → vũng nước đen HIỆN RÕ
-						# khắp đầm (trước đây nền +0.30 cao hơn mực nước nên khó thấy hồ).
-						var swamp_flat: float = _Data.WATER_Y + 0.10 + (sw_terr - 0.5) * 2.0
-						# Hồ đầm lầy — carve sâu thành vũng nước đứng; ngưỡng n_lake THẤP
-						# hơn hồ đồng cỏ (0.58) → số lượng hồ ở đầm lầy nhiều hơn hẳn.
-						var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-						if lv > 0.58:
-							swamp_flat = _Data.WATER_Y - (1.1 + (lv - 0.58) * 7.0)
-						height_grid[ivx][ivz] = lerp(orig_h, swamp_flat, sw_t)
-						# Vũng ngập: mực nước đứng trên bùn; chỉ mô cao mới nhô lên
-						if swamp_flat <= _Data.WATER_Y:
-							biome_grid[ivx][ivz] = _Data.TileType.SWAMP_MUD
-						elif sw_terr > 0.66:
-							biome_grid[ivx][ivz] = _Data.TileType.SWAMP_DIRT
-						else:
-							biome_grid[ivx][ivz] = _Data.TileType.SWAMP_MUD
-					else:
-						# ── ĐỒNG BẰNG CỎ: block phân theo HÌNH THẾ địa hình ──
-						#   - Sát bãi biển (cách bờ ≤6) → cỏ ven biển (100% GRASS)
-						#   - Trũng thấp (hb_rise nhỏ)  → DARK_GRASS (ẩm mát)
-						#   - Đồi cao (hb_rise ≥ 0.52) → YOUNG_GRASS, ranh giới uốn cong theo noise
-#     + dải loang 0.56→0.68 (cỏ non loang xuống vài block, không cắt thẳng)
-						#   - Sườn thoải → GRASS; nền giữa → GRASS_DIRT
-						#   - Cụm đất trống/cỏ rậm theo noise "patch_var" (tần thấp)
-						var is_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
-						var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-						if not is_ocean and lake_val > 0.68 and (od == _Data.CONST_INF or od > 40):
-							var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
-							if lake_type_val > 0.50:
-								biome_grid[ivx][ivz] = _Data.TileType.SILT
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
-							# Hồ carve — nước thấp hơn mặt đất đồng
-							height_grid[ivx][ivz] = _Data.WATER_Y - (1.0 + (lake_val - 0.68) * 8.0)
-						elif od <= _Data.BEACH_WIDTH + 6:
-							# Dải bờ khô gần biển: đất cát pha ẩm chuyển dần ra cỏ
-							if od <= _Data.BEACH_WIDTH + 2:
-								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.GRASS
-						elif hb_rise < 0.20:
-							# Trũng ẩm nội địa — cỏ đậm, giữ hơi ẩm. Vùng đất THẤP
-							# có BÃI ĐẤT LỚN (đất thổ) theo noise tần rất thấp
-							# (n_patch_dirt): 1 vùng đất rộng hàng chục ô trộn NHIỀU
-							# loại đất như DIRT/GRASS_DIRT/YOUNG_GRASS/DARK_GRASS.
-							# Không còn bãi đá (STONE_PATCH) lởm chởm trên mặt đất.
-							var df_low: float = (nd["patch_dirt"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							if df_low > 0.55:
-								_soil_field_block(ivx, ivz, wx, wz, nd, biome_grid)
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
-						elif hb_rise >= 0.52:
-							# ── ĐỒI CỎ / ĐỈNH: YOUNG_GRASS nhưng KHÔNG cắt thẳng ──
-							# Ranh giới bị uốn cong bởi noise (warp) → mép đồi lượn
-							# theo địa hình chứ không chạy đúng theo một độ cao cố định.
-							# Từ chân đồi 0.56 lên đỉnh 0.68 có dải LOANG: cỏ non chỉ
-							# xuất hiện ở những chỗ "đủ cao" (noise < yg_t) → rìa đồi
-							# thưa đốm cỏ non, lên cao dày dần — chuyển mềm vài block.
-							var warp_v: float = (nd["patch_var"].get_noise_2d(wx, wz) - 0.5) * 0.10
-							var eff_h: float = hb_rise + warp_v
-							var yg_t: float = clamp((eff_h - 0.56) / 0.12, 0.0, 1.0)
-							if yg_t >= 1.0:
-								biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
-							elif yg_t > 0.0:
-								# Dải loang: noise tần nhanh làm đốm, mật độ theo độ cao
-								var loang: float = (nd["highland_terr"].get_noise_2d(wx * 3.0 + 5.0, wz * 3.0 + 5.0) + 1.0) * 0.5
-								biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS if loang < yg_t else _Data.TileType.GRASS
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.GRASS
-						elif hb_rise < 0.45:
-							# Sườn thoải — cỏ xanh tươi mượt; vài đốm cỏ già (vàng rạ)
-							# loang theo patch2 (tần số cao) để không thành mảng lớn.
-							var p2_s: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							if p2_s > 0.84:
-								biome_grid[ivx][ivz] = _Data.TileType.DRY_GRASS
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.GRASS
-						else:
-							# Nền giữa — đồng cỏ hỗn; BÃI ĐẤT LỚN theo n_patch_dirt
-							# (tần rất thấp → vùng đất thổ rộng hàng chục ô) trộn
-							# nhiều loại đất; ngoài bãi là cỏ già / cỏ thưa loang theo
-							# patch_var để vùng đồng bằng có những mảng đất thật.
-							var dv3: float = (nd["patch_dirt"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							if dv3 > 0.54:
-								_soil_field_block(ivx, ivz, wx, wz, nd, biome_grid)
-								continue
-							var dv2: float = (nd["patch_var"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							var p2_n: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
-							if dv2 > 0.62:
-								biome_grid[ivx][ivz] = _Data.TileType.DIRT
-							elif dv2 < 0.22:
-								biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
-							elif p2_n > 0.88:
-								biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
-							elif p2_n > 0.80:
-								biome_grid[ivx][ivz] = _Data.TileType.DRY_GRASS
-							elif p2_n < 0.16:
-								biome_grid[ivx][ivz] = _Data.TileType.SPARSE_GRASS
-							else:
-								biome_grid[ivx][ivz] = _Data.TileType.GRASS_DIRT
-					# Đỉnh núi cao (sau khi biome paint xong) → bề mặt đá lộ thiên
-					if mtn_t > 0.62 and _Data.is_grass_tile(biome_grid[ivx][ivz]):
-						biome_grid[ivx][ivz] = _Data.TileType.STONE_PATCH
-
-		# ── 3a1b. MANGROVE — rừng ngập mặn intertidal dọc bờ biển ────────────
-		# Vệt bùn triều chạy 2 bên mực nước: thềm bùn ngập ăn ra biển, bãi bùn
-		# ăn vào đất liền vài block. Độ cao kéo về mực triều (WATER_Y) → bãi
-		# bùn ngập/nổi xen kẽ theo noise; chỗ terr cao thành mô bùn khô ráo.
-		const MANGROVE_SEA_RANGE: float = 20.0   # ăn ra thềm biển (bùn ngập)
-		const MANGROVE_LAND_RANGE: float = 19.0  # ăn sâu vào đất liền (bãi bùn)
-		const MANGROVE_STRENGTH: float = 0.33    # ngưỡng trở thành rừng đước
-		for ivx in range(cols):
-			var pvx: int = ivx + _Data.PAD
-			for ivz in range(cols):
-				var pvz: int = ivz + _Data.PAD
-				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-				var mg: float = (nd["mangrove"].get_noise_2d(wx, wz) + 1.0) * 0.5
-				var mg_mask: float = clamp((mg - 0.42) / 0.28, 0.0, 1.0)
-				if mg_mask <= 0.0: continue
-				var is_oc: bool = oct_small[pvx][pvz]
-				var pos: float
-				if is_oc:
-					var sd: int = shore_dst[pvx * total + pvz]
-					if sd == _Data.CONST_INF: continue
-					pos = -float(sd)
-				else:
-					pos = float(odst[pvx * total + pvz] - 1)
-				var t_edge: float = clamp(-pos / MANGROVE_SEA_RANGE, 0.0, 1.0) if pos < 0.0 \
-					else clamp(pos / MANGROVE_LAND_RANGE, 0.0, 1.0)
-				var strength: float = mg_mask * (1.0 - t_edge)
-				if strength < MANGROVE_STRENGTH: continue
-				var inner: float = (nd["mangrove_inner"].get_noise_2d(wx, wz) + 1.0) * 0.5
-				var terr: float = (nd["mangrove_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
-				biome_grid[ivx][ivz] = _Data.TileType.MANGROVE_MUD
-				if is_oc:
-					# Thềm bùn ngập: đáy nông gần mặt nước; chỗ terr cao nổi mô bùn
-					height_grid[ivx][ivz] = min(
-						lerp(_Data.WATER_Y - 1.15, _Data.WATER_Y + 0.65, terr) + inner * 0.3,
-						_Data.WATER_Y + 0.9)
-				else:
-					# Bãi bùn lục địa: hạ xuống mực triều, lạch nước ngập xen kẽ
-					height_grid[ivx][ivz] = lerp(_Data.WATER_Y - 0.5, _Data.WATER_Y + 0.95, terr) + inner * 0.35
-
-		# ── 3a2. Hồ ĐỒNG CỎ: đáy thoải theo khoảng cách từ bờ (BFS padded,
-		# hàn liền qua biên chunk; ring 0 = WATER_Y như hồ cát dựa trên dst) ──
-		var lake_mask: PackedByteArray = PackedByteArray()
-		lake_mask.resize(total * total)
-		lake_mask.fill(0)
-		for pvx in range(total):
-			for pvz in range(total):
-				if bio[pvx][pvz] == _Data.TileType.DESERT:
-					dmask[pvx * total + pvz] = 1
-				if bio[pvx][pvz] != _Data.TileType.GRASS_DIRT: continue
-				if oct[pvx + OCEAN_PAD - _Data.PAD][pvz + OCEAN_PAD - _Data.PAD]: continue
-				var wx: float = world_ox - half + (float(pvx - _Data.PAD) + 0.5) * _Data.VOXEL
-				var wz: float = world_oz - half + (float(pvz - _Data.PAD) + 0.5) * _Data.VOXEL
-				var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-				var odv: int = odst[pvx * total + pvz]
-				if lv > 0.68 and (odv == _Data.CONST_INF or odv > 40):
-					lake_mask[pvx * total + pvz] = 1
-		var ldist: PackedInt32Array = PackedInt32Array()
-		ldist.resize(total * total)
-		ldist.fill(-1)
-		var frontier: Array[Vector2i] = []
-		for pvx in range(total):
-			for pvz in range(total):
-				if lake_mask[pvx * total + pvz] == 0: continue
-				var touching_land := false
-				for d4 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-					var nx: int = pvx + d4.x
-					var nz: int = pvz + d4.y
-					if nx < 0 or nx >= total or nz < 0 or nz >= total: continue
-					if lake_mask[nx * total + nz] == 0:
-						touching_land = true
-						break
-				if touching_land:
-					ldist[pvx * total + pvz] = 0
-					frontier.append(Vector2i(pvx, pvz))
-		var fhead := 0
-		while fhead < frontier.size():
-			var c: Vector2i = frontier[fhead]
-			fhead += 1
-			var cd: int = ldist[c.x * total + c.y] + 1
-			for d4 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-				var nx: int = c.x + d4.x
-				var nz: int = c.y + d4.y
-				if nx < 0 or nx >= total or nz < 0 or nz >= total: continue
-				if lake_mask[nx * total + nz] == 0: continue
-				if ldist[nx * total + nz] != -1: continue
-				ldist[nx * total + nz] = cd
-				frontier.append(Vector2i(nx, nz))
-		for ivx in range(cols):
-			for ivz in range(cols):
+					s4_native_ok = false
+		if not s4_native_ok:
+			# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────────
+			const MAX_OCEAN_DEPTH_DIST: int = 30
+			for ivx in range(cols):
 				var pvx: int = ivx + _Data.PAD
-				var pvz: int = ivz + _Data.PAD
-				if lake_mask[pvx * total + pvz] == 0: continue
-				var sd: float = minf(float(ldist[pvx * total + pvz]), float(_Data.PAD)) * _BlockData.SLAB_HEIGHT
-				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-				var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
-				height_grid[ivx][ivz] = _Data.WATER_Y - minf(1.0 + (lv - 0.68) * 8.0, sd)
+				for ivz in range(cols):
+					var pvz: int = ivz + _Data.PAD
+					var base_bio: int = bio[pvx][pvz]
+					var od: int = odst[pvx * total + pvz]
+
+					if od == 0:
+						biome_grid[ivx][ivz] = _Data.TileType.OCEAN_DEEP
+						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+						var sd: int = shore_dst[pvx * total + pvz]
+						if sd == _Data.CONST_INF: sd = MAX_OCEAN_DEPTH_DIST
+						var raw_depth_t: float = clamp(float(sd - 1) / float(MAX_OCEAN_DEPTH_DIST - 1), 0.0, 1.0)
+
+						# 3 chế độ địa hình: thềm → sườn → đồng bằng sâu
+						var shelf_var: float = nd["sea_large"].get_noise_2d(wx * 0.5, wz * 0.5) * 0.08
+						var shelf_end: float = 0.12 + shelf_var
+						var slope_end: float = 0.32 + shelf_var * 0.5
+
+						var base_h: float
+						if raw_depth_t < shelf_end:
+							var st: float = raw_depth_t / shelf_end
+							base_h = lerp(-0.3, -1.5, st)
+						elif raw_depth_t < slope_end:
+							var st: float = (raw_depth_t - shelf_end) / max(slope_end - shelf_end, 0.01)
+							st = st * st  # dốc tăng dần
+							base_h = lerp(-1.5, -5.0, st)
+						else:
+							var st: float = (raw_depth_t - slope_end) / max(1.0 - slope_end, 0.01)
+							base_h = lerp(-5.0, -8.5, st)
+
+						# Cấu trúc lớn: sống núi, bồn trũng (amplitude tăng theo depth)
+						var large_n: float = nd["sea_large"].get_noise_2d(wx, wz)
+						base_h += large_n * (0.15 + raw_depth_t * 1.2)
+
+						# Núi ngầm (Seamount) — núi lửa ngầm cao vút, xuất hiện khắp nơi
+						var mt_n: float = nd["sea_mountain"].get_noise_2d(wx * 0.5, wz * 0.5)
+						var mt_h: float = max(0.0, mt_n) * 8.0
+						base_h += mt_h
+
+						# Hẻm núi (canyon) — rãnh cắt vào thềm/sườn lục địa
+						var c1: float = nd["sea_rough"].get_noise_2d(wx * 3.0, wz * 0.35)
+						if c1 > 0.40:
+							var c_h: float = (c1 - 0.40) / 0.60
+							var c2: float = nd["sea_rough"].get_noise_2d(wx * 0.35, wz * 3.0)
+							if c2 > 0.40:
+								c_h = max(c_h, (c2 - 0.40) / 0.60)
+							base_h -= c_h * c_h * (0.4 + raw_depth_t * 0.8)
+
+						# Nhấp nhô tầm trung: mạnh ở vùng thềm/sườn, nhẹ ở đồng bằng
+						var rough_n: float = nd["sea_rough"].get_noise_2d(wx, wz)
+						var rough_scale: float = 1.0 - raw_depth_t * 0.6  # gần bờ gồ ghề hơn
+						base_h += rough_n * 0.25 * rough_scale
+
+						# Khe rãnh hẹp (trench) — vực sâu hiếm gặp
+						var trench_n: float = nd["sea_rough"].get_noise_2d(wx * 4.0, wz * 0.5)
+						var trench_t: float = clamp((abs(trench_n) - 0.55) / 0.25, 0.0, 1.0)
+						var trench_mask: float = trench_t * trench_t * (3.0 - 2.0 * trench_t)
+						base_h -= trench_mask * (0.3 + raw_depth_t * 1.0)
+
+						# Bãi đá ngầm (Reef) — đá nhô cao rải rác khắp đáy biển
+						var rf_n: float = (nd["reef"].get_noise_2d(wx, wz) + 1.0) * 0.5
+						if rf_n > 0.40:
+							var rf_h: float = (rf_n - 0.40) / 0.60
+							rf_h = rf_h * 4.0
+							base_h += rf_h
+							reef_mask[ivx * cols + ivz] = rf_h * 0.3
+
+						# Chặn không trồi lên quá mặt nước
+						height_grid[ivx][ivz] = min(base_h, _Data.WATER_Y - 0.1)
+					elif od <= _Data.BEACH_WIDTH:
+						var beach_t: float = float(od - 1) / float(maxi(_Data.BEACH_WIDTH - 1, 1))
+						biome_grid[ivx][ivz] = _Data.TileType.SAND_WHITE
+						var wx2: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+						var wz2: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+						var warp_n: float = (nd["warp"].get_noise_2d(wx2 * 3.0, wz2 * 3.0) + 1.0) * 0.5
+						var noise_offset: float = (warp_n - 0.5) * 0.3
+						height_grid[ivx][ivz] = clamp(
+							lerp(_Data.WATER_Y, _Data.VOXEL - 0.15, beach_t) + noise_offset,
+							_Data.WATER_Y - 0.1, _Data.VOXEL - 0.08)
+						beach_mask[ivx * cols + ivz] = 1
+					else:
+						# ── LỤC ĐỊA: ĐỊA HÌNH DÙNG CHUNG TRƯỚC, BIOME VẼ SAU ─────────
+						# Mọi biome đất liền dùng CHUNG một công thức địa hình đồi
+						# thoải (highland + highland_terr). Biome chỉ thay đổi "sơn bề
+						# mặt" (loại block) chứ không can thiệp chiều cao → không còn
+						# vết cắt cao độ tại ranh giới biome/biên chunk. (Biome nào
+						# cần địa hình đặc biệt sẽ được code riêng ở cập nhật sau.)
+						var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+						var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+
+						# (1) Địa hình chung — đồi thoải rolling hills
+						var hb: float = (nd["highland"].get_noise_2d(wx, wz) + 1.0) * 0.5
+						var ht: float = (nd["highland_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
+						var hb_rise: float = clamp((hb - 0.55) / 0.35, 0.0, 1.0)
+						hb_rise = hb_rise * hb_rise * (3.0 - 2.0 * hb_rise)
+						height_grid[ivx][ivz] = 1.0 + hb_rise * 3.0 + ht * hb_rise * 1.2
+						# (1b) Vùng trũng (basin) — lòng chảo hạ thấp cục bộ trong đất
+						# liền: vùng bát nhỏ mềm, mép thoải (smoothstep). Đáy được giữ
+						# TRÊN mực nước để không tự sinh nước/phá đồng cỏ khô.
+						# Noise tần thấp nên trũng âm lan rộng; nhiều trũng nông.
+						var bsn: float = (nd["basin"].get_noise_2d(wx, wz) + 1.0) * 0.5
+						var bsn_t: float = clamp((bsn - 0.55) / 0.20, 0.0, 1.0)
+						bsn_t = bsn_t * bsn_t * (3.0 - 2.0 * bsn_t)
+						if bsn_t > 0.0:
+							height_grid[ivx][ivz] = maxf(height_grid[ivx][ivz] - bsn_t * 1.5, _Data.WATER_Y + 0.35)
+
+						# (1c) Vùng NÚI VỪA — đắp cao 4..9 block trên nền đồi, ranh mềm
+						# (smoothstep theo noise "mountain") để tạo dải núi rộng, đỉnh
+						# không cắt thẳng.
+						var mtn: float = (nd["mountain"].get_noise_2d(wx, wz) + 1.0) * 0.5
+						var mtn_t: float = clamp((mtn - 0.58) / 0.14, 0.0, 1.0)
+						mtn_t = mtn_t * mtn_t * (3.0 - 2.0 * mtn_t)
+						if mtn_t > 0.0:
+							var mtn_amp: float = 3.5 + ht * 5.5   # 3.5..9.0
+							height_grid[ivx][ivz] += mtn_t * mtn_amp
+
+		# (2) Vẽ biome SAU — chỉ đổi surface, không đổi height
+						if base_bio == _Data.TileType.DESERT:
+							# ── SA MẠC: chỉ toàn CÁT các loại (không đất nâu) ────────
+							#   - Mặt cát nền (DESERT) + cồn cát đậm (SAND_DEEP) rải theo
+							#     độ nhô; ranh giới giữa 2 loại UỐN CONG bởi noise + dải
+							#     loang (giống hiệu ứng cỏ non ở đồng):
+							#       hb_rise thấp    → DESERT (cát sáng nền)
+							#       hb_rise cao 	→ SAND_DEEP (cát đậm đỉnh cồn)
+							#     Khoảng 0.52→0.66: SAND_DEEP loang dần (noise nhanh,
+							#     đốm mật độ tăng theo độ cao) — không cắt thẳng.
+							var warp_d: float = (nd["patch_var"].get_noise_2d(wx, wz) - 0.5) * 0.10
+							var eff_d: float = hb_rise + warp_d
+							var sd_t: float = clamp((eff_d - 0.56) / 0.10, 0.0, 1.0)
+							if sd_t >= 1.0:
+								biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP
+							elif sd_t > 0.0:
+								var loang_d: float = (nd["highland_terr"].get_noise_2d(wx * 3.0 + 5.0, wz * 3.0 + 5.0) + 1.0) * 0.5
+								biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP if loang_d < sd_t else _Data.TileType.DESERT
+							else:
+								# Nền thấp sa mạc: đốm NHỎ — cồn cát đậm (SAND_DEEP) và cát
+								# phai mờ (PALE_SAND) lỏng nền cát sáng (DESERT). patch2 tần
+								# số cao → đốm rải rác vừa phải, không thành mảng gây rối.
+								var p2: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+								if p2 > 0.82:
+									biome_grid[ivx][ivz] = _Data.TileType.SAND_DEEP
+								elif p2 > 0.72:
+									biome_grid[ivx][ivz] = _Data.TileType.PALE_SAND
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.DESERT
+						elif base_bio == _Data.TileType.FROST:
+							# ── BĂNG GIÁ: vùng tuyết lạnh ─────────────────────────
+							# Địa hình dùng CHUNG (đồi thoải) như mọi biome đất liền.
+							# Sơn bề mặt: FROST (tuyết nền), FROST_SNOW (đốm tuyết dày
+							# theo patch2). Hồ nội địa vẫn là nước thường (SILT/MUDDY_SAND)
+							# carve xuống mực nước như hồ đồng cỏ — nước KHÔNG đóng băng.
+							var is_frost_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
+							var lake_f: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+							if not is_frost_ocean and lake_f > 0.68 \
+									and (od == _Data.CONST_INF or od > 40):
+								var lake_type_f: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
+								if lake_type_f > 0.50:
+									biome_grid[ivx][ivz] = _Data.TileType.SILT
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+								height_grid[ivx][ivz] = _Data.WATER_Y - (1.0 + (lake_f - 0.68) * 8.0)
+							else:
+								var p2_f: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+								if p2_f > 0.78:
+									biome_grid[ivx][ivz] = _Data.TileType.FROST_SNOW
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.FROST
+						elif base_bio == _Data.TileType.SWAMP:
+							# ── RỪNG ĐẦM LẦY: đầm lầy ngập nước nông ──────────────────
+							# Địa hình KHÔNG dùng chung đồi thoải: hạ dần xuống sát mực
+							# nước (WATER_Y ±) → bãi lầy ngập/nổi xen kẽ. Bề mặt bùn
+							# sình (SWAMP_MUD); mô bùn cao khô ráo (SWAMP_DIRT) chỗ
+							# swamp_terr cao; hố thấp hơn mặt nước thành vũng nước đen
+							# (nước vẫn fill theo WATER_Y — đầm lầy có nước đứng).
+							# Blending biên theo swamp noise: rìa đầm (sw vừa qua ngưỡng)
+							# vẫn giữ địa hình đồi dần lún xuống, lõi đầm (sw cao) dẹt
+							# bằng mặt nước → ranh giới không còn vách đứng.
+							var sw_v: float = (nd["swamp"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							var sw_terr: float = (nd["swamp_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
+							var sw_t: float = clamp((sw_v - 0.57) / 0.22, 0.0, 1.0)
+							sw_t = sw_t * sw_t * (3.0 - 2.0 * sw_t)
+							var orig_h: float = height_grid[ivx][ivz]
+							# Hạ nền bãi lầy xuống sát mực nước → vũng nước đen HIỆN RÕ
+							# khắp đầm (trước đây nền +0.30 cao hơn mực nước nên khó thấy hồ).
+							var swamp_flat: float = _Data.WATER_Y + 0.10 + (sw_terr - 0.5) * 2.0
+							# Hồ đầm lầy — carve sâu thành vũng nước đứng; ngưỡng n_lake THẤP
+							# hơn hồ đồng cỏ (0.58) → số lượng hồ ở đầm lầy nhiều hơn hẳn.
+							var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+							if lv > 0.58:
+								swamp_flat = _Data.WATER_Y - (1.1 + (lv - 0.58) * 7.0)
+							height_grid[ivx][ivz] = lerp(orig_h, swamp_flat, sw_t)
+							# Vũng ngập: mực nước đứng trên bùn; chỉ mô cao mới nhô lên
+							if swamp_flat <= _Data.WATER_Y:
+								biome_grid[ivx][ivz] = _Data.TileType.SWAMP_MUD
+							elif sw_terr > 0.66:
+								biome_grid[ivx][ivz] = _Data.TileType.SWAMP_DIRT
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.SWAMP_MUD
+						else:
+							# ── ĐỒNG BẰNG CỎ: block phân theo HÌNH THẾ địa hình ──
+							#   - Sát bãi biển (cách bờ ≤6) → cỏ ven biển (100% GRASS)
+							#   - Trũng thấp (hb_rise nhỏ)  → DARK_GRASS (ẩm mát)
+							#   - Đồi cao (hb_rise ≥ 0.52) → YOUNG_GRASS, ranh giới uốn cong theo noise
+		#     + dải loang 0.56→0.68 (cỏ non loang xuống vài block, không cắt thẳng)
+							#   - Sườn thoải → GRASS; nền giữa → GRASS_DIRT
+							#   - Cụm đất trống/cỏ rậm theo noise "patch_var" (tần thấp)
+							var is_ocean: bool = oct[ivx + OCEAN_PAD][ivz + OCEAN_PAD]
+							var lake_val: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+							if not is_ocean and lake_val > 0.68 and (od == _Data.CONST_INF or od > 40):
+								var lake_type_val: float = (n_lake_type.get_noise_2d(wx, wz) + 1.0) * 0.5
+								if lake_type_val > 0.50:
+									biome_grid[ivx][ivz] = _Data.TileType.SILT
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+								# Hồ carve — nước thấp hơn mặt đất đồng
+								height_grid[ivx][ivz] = _Data.WATER_Y - (1.0 + (lake_val - 0.68) * 8.0)
+							elif od <= _Data.BEACH_WIDTH + 6:
+								# Dải bờ khô gần biển: đất cát pha ẩm chuyển dần ra cỏ
+								if od <= _Data.BEACH_WIDTH + 2:
+									biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.GRASS
+							elif hb_rise < 0.20:
+								# Trũng ẩm nội địa — cỏ đậm, giữ hơi ẩm. Vùng đất THẤP
+								# có BÃI ĐẤT LỚN (đất thổ) theo noise tần rất thấp
+								# (n_patch_dirt): 1 vùng đất rộng hàng chục ô trộn NHIỀU
+								# loại đất như DIRT/GRASS_DIRT/YOUNG_GRASS/DARK_GRASS.
+								# Không còn bãi đá (STONE_PATCH) lởm chởm trên mặt đất.
+								var df_low: float = (nd["patch_dirt"].get_noise_2d(wx, wz) + 1.0) * 0.5
+								if df_low > 0.55:
+									_soil_field_block(ivx, ivz, wx, wz, nd, biome_grid)
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
+							elif hb_rise >= 0.52:
+								# ── ĐỒI CỎ / ĐỈNH: YOUNG_GRASS nhưng KHÔNG cắt thẳng ──
+								# Ranh giới bị uốn cong bởi noise (warp) → mép đồi lượn
+								# theo địa hình chứ không chạy đúng theo một độ cao cố định.
+								# Từ chân đồi 0.56 lên đỉnh 0.68 có dải LOANG: cỏ non chỉ
+								# xuất hiện ở những chỗ "đủ cao" (noise < yg_t) → rìa đồi
+								# thưa đốm cỏ non, lên cao dày dần — chuyển mềm vài block.
+								var warp_v: float = (nd["patch_var"].get_noise_2d(wx, wz) - 0.5) * 0.10
+								var eff_h: float = hb_rise + warp_v
+								var yg_t: float = clamp((eff_h - 0.56) / 0.12, 0.0, 1.0)
+								if yg_t >= 1.0:
+									biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
+								elif yg_t > 0.0:
+									# Dải loang: noise tần nhanh làm đốm, mật độ theo độ cao
+									var loang: float = (nd["highland_terr"].get_noise_2d(wx * 3.0 + 5.0, wz * 3.0 + 5.0) + 1.0) * 0.5
+									biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS if loang < yg_t else _Data.TileType.GRASS
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.GRASS
+							elif hb_rise < 0.45:
+								# Sườn thoải — cỏ xanh tươi mượt; vài đốm cỏ già (vàng rạ)
+								# loang theo patch2 (tần số cao) để không thành mảng lớn.
+								var p2_s: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+								if p2_s > 0.84:
+									biome_grid[ivx][ivz] = _Data.TileType.DRY_GRASS
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.GRASS
+							else:
+								# Nền giữa — đồng cỏ hỗn; BÃI ĐẤT LỚN theo n_patch_dirt
+								# (tần rất thấp → vùng đất thổ rộng hàng chục ô) trộn
+								# nhiều loại đất; ngoài bãi là cỏ già / cỏ thưa loang theo
+								# patch_var để vùng đồng bằng có những mảng đất thật.
+								var dv3: float = (nd["patch_dirt"].get_noise_2d(wx, wz) + 1.0) * 0.5
+								if dv3 > 0.54:
+									_soil_field_block(ivx, ivz, wx, wz, nd, biome_grid)
+									continue
+								var dv2: float = (nd["patch_var"].get_noise_2d(wx, wz) + 1.0) * 0.5
+								var p2_n: float = (nd["patch2"].get_noise_2d(wx, wz) + 1.0) * 0.5
+								if dv2 > 0.62:
+									biome_grid[ivx][ivz] = _Data.TileType.DIRT
+								elif dv2 < 0.22:
+									biome_grid[ivx][ivz] = _Data.TileType.DARK_GRASS
+								elif p2_n > 0.88:
+									biome_grid[ivx][ivz] = _Data.TileType.YOUNG_GRASS
+								elif p2_n > 0.80:
+									biome_grid[ivx][ivz] = _Data.TileType.DRY_GRASS
+								elif p2_n < 0.16:
+									biome_grid[ivx][ivz] = _Data.TileType.SPARSE_GRASS
+								else:
+									biome_grid[ivx][ivz] = _Data.TileType.GRASS_DIRT
+						# Đỉnh núi cao (sau khi biome paint xong) → bề mặt đá lộ thiên
+						if mtn_t > 0.62 and _Data.is_grass_tile(biome_grid[ivx][ivz]):
+							biome_grid[ivx][ivz] = _Data.TileType.STONE_PATCH
+
+			# ── 3a1b. MANGROVE — rừng ngập mặn intertidal dọc bờ biển ────────────
+			# Vệt bùn triều chạy 2 bên mực nước: thềm bùn ngập ăn ra biển, bãi bùn
+			# ăn vào đất liền vài block. Độ cao kéo về mực triều (WATER_Y) → bãi
+			# bùn ngập/nổi xen kẽ theo noise; chỗ terr cao thành mô bùn khô ráo.
+			const MANGROVE_SEA_RANGE: float = 20.0   # ăn ra thềm biển (bùn ngập)
+			const MANGROVE_LAND_RANGE: float = 19.0  # ăn sâu vào đất liền (bãi bùn)
+			const MANGROVE_STRENGTH: float = 0.33    # ngưỡng trở thành rừng đước
+			for ivx in range(cols):
+				var pvx: int = ivx + _Data.PAD
+				for ivz in range(cols):
+					var pvz: int = ivz + _Data.PAD
+					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+					var mg: float = (nd["mangrove"].get_noise_2d(wx, wz) + 1.0) * 0.5
+					var mg_mask: float = clamp((mg - 0.42) / 0.28, 0.0, 1.0)
+					if mg_mask <= 0.0: continue
+					var is_oc: bool = oct_small[pvx][pvz]
+					var pos: float
+					if is_oc:
+						var sd: int = shore_dst[pvx * total + pvz]
+						if sd == _Data.CONST_INF: continue
+						pos = -float(sd)
+					else:
+						pos = float(odst[pvx * total + pvz] - 1)
+					var t_edge: float = clamp(-pos / MANGROVE_SEA_RANGE, 0.0, 1.0) if pos < 0.0 \
+						else clamp(pos / MANGROVE_LAND_RANGE, 0.0, 1.0)
+					var strength: float = mg_mask * (1.0 - t_edge)
+					if strength < MANGROVE_STRENGTH: continue
+					var inner: float = (nd["mangrove_inner"].get_noise_2d(wx, wz) + 1.0) * 0.5
+					var terr: float = (nd["mangrove_terr"].get_noise_2d(wx, wz) + 1.0) * 0.5
+					biome_grid[ivx][ivz] = _Data.TileType.MANGROVE_MUD
+					if is_oc:
+						# Thềm bùn ngập: đáy nông gần mặt nước; chỗ terr cao nổi mô bùn
+						height_grid[ivx][ivz] = min(
+							lerp(_Data.WATER_Y - 1.15, _Data.WATER_Y + 0.65, terr) + inner * 0.3,
+							_Data.WATER_Y + 0.9)
+					else:
+						# Bãi bùn lục địa: hạ xuống mực triều, lạch nước ngập xen kẽ
+						height_grid[ivx][ivz] = lerp(_Data.WATER_Y - 0.5, _Data.WATER_Y + 0.95, terr) + inner * 0.35
+
+			# ── 3a2. Hồ ĐỒNG CỎ: đáy thoải theo khoảng cách từ bờ (BFS padded,
+			# hàn liền qua biên chunk; ring 0 = WATER_Y như hồ cát dựa trên dst) ──
+			var lake_mask: PackedByteArray = PackedByteArray()
+			lake_mask.resize(total * total)
+			lake_mask.fill(0)
+			for pvx in range(total):
+				for pvz in range(total):
+					if bio[pvx][pvz] == _Data.TileType.DESERT:
+						dmask[pvx * total + pvz] = 1
+					if bio[pvx][pvz] != _Data.TileType.GRASS_DIRT: continue
+					if oct[pvx + OCEAN_PAD - _Data.PAD][pvz + OCEAN_PAD - _Data.PAD]: continue
+					var wx: float = world_ox - half + (float(pvx - _Data.PAD) + 0.5) * _Data.VOXEL
+					var wz: float = world_oz - half + (float(pvz - _Data.PAD) + 0.5) * _Data.VOXEL
+					var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+					var odv: int = odst[pvx * total + pvz]
+					if lv > 0.68 and (odv == _Data.CONST_INF or odv > 40):
+						lake_mask[pvx * total + pvz] = 1
+			var ldist: PackedInt32Array = PackedInt32Array()
+			ldist.resize(total * total)
+			ldist.fill(-1)
+			var frontier: Array[Vector2i] = []
+			for pvx in range(total):
+				for pvz in range(total):
+					if lake_mask[pvx * total + pvz] == 0: continue
+					var touching_land := false
+					for d4 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+						var nx: int = pvx + d4.x
+						var nz: int = pvz + d4.y
+						if nx < 0 or nx >= total or nz < 0 or nz >= total: continue
+						if lake_mask[nx * total + nz] == 0:
+							touching_land = true
+							break
+					if touching_land:
+						ldist[pvx * total + pvz] = 0
+						frontier.append(Vector2i(pvx, pvz))
+			var fhead := 0
+			while fhead < frontier.size():
+				var c: Vector2i = frontier[fhead]
+				fhead += 1
+				var cd: int = ldist[c.x * total + c.y] + 1
+				for d4 in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+					var nx: int = c.x + d4.x
+					var nz: int = c.y + d4.y
+					if nx < 0 or nx >= total or nz < 0 or nz >= total: continue
+					if lake_mask[nx * total + nz] == 0: continue
+					if ldist[nx * total + nz] != -1: continue
+					ldist[nx * total + nz] = cd
+					frontier.append(Vector2i(nx, nz))
+			for ivx in range(cols):
+				for ivz in range(cols):
+					var pvx: int = ivx + _Data.PAD
+					var pvz: int = ivz + _Data.PAD
+					if lake_mask[pvx * total + pvz] == 0: continue
+					var sd: float = minf(float(ldist[pvx * total + pvz]), float(_Data.PAD)) * _BlockData.SLAB_HEIGHT
+					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+					var lv: float = (n_lake.get_noise_2d(wx, wz) + 1.0) * 0.5
+					height_grid[ivx][ivz] = _Data.WATER_Y - minf(1.0 + (lv - 0.68) * 8.0, sd)
 
 	else:
 		# ── Non-REAL_WORLD: giữ logic cũ ────────────────────────────────────
