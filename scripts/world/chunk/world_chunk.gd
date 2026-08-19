@@ -193,6 +193,17 @@ static func _native_land() -> Object:
 ## Test hook: ép dùng GDScript S4 để A/B so sánh bit-exact.
 static var _force_s4_gd: bool = false
 
+static var _native_wd: Object = null
+
+## Native WorldDist bridge (S6b BFS) — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_dist() -> Object:
+	if _native_wd == null and ClassDB.class_exists("WorldDist"):
+		_native_wd = ClassDB.instantiate("WorldDist")
+	return _native_wd
+
+## Test hook: ép dùng GDScript S6b để A/B so sánh bit-exact.
+static var _force_s6_gd: bool = false
+
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	# Thread-safe cache theo ô thế giới: lưới ocean stride-2 (42×42) của 2 chunk
 	# kề nhau overlap ~62% số sample — dùng chung bỏ qua FastNoiseLite FBM lặp.
@@ -1581,37 +1592,44 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	var rdist := PackedInt32Array()
 	var dland := PackedInt32Array()
 	var hdist := PackedInt32Array()
-	wdist.resize(cols * cols); wdist.fill(-1)
-	rdist.resize(cols * cols); rdist.fill(-1)
-	dland.resize(cols * cols); dland.fill(-1)
-	hdist.resize(cols * cols); hdist.fill(-1)
-	for vx in range(cols):
-		for vz in range(cols):
-			var i2: int = vx * cols + vz
-			if height_grid[vx][vz] <= _Data.WATER_Y:
-				wdist[i2] = 0
-			if road_grid.size() > 0 and road_grid[i2] != 0:
-				rdist[i2] = 0
-			if biome_grid[vx][vz] == _Data.TileType.DESERT and height_grid[vx][vz] > _Data.WATER_Y:
-				dland[i2] = 0
-			# Sườn dốc (chân núi/đồi): ô có chênh cao ≥ ngưỡng với ô kề 8-hướng
-			# → seed cho BFS hdist. Cỏ lúa được phép mọc thêm vùng này (dưới đồi).
-			var h0: float = height_grid[vx][vz]
-			for dq in [[-1, 0], [1, 0], [0, -1], [0, 1]]:
-				var qx: int = vx + dq[0]
-				var qz: int = vz + dq[1]
-				if qx < 0 or qz < 0 or qx >= cols or qz >= cols:
-					continue
-				if absf(height_grid[qx][qz] - h0) >= _Data.VOXEL * 0.75:
-					hdist[i2] = 0
-					break
-	_bfs_chebyshev(wdist, cols)
+	var wdx := _native_dist()
+	if wdx != null and not _force_s6_gd:
+		var res_d: Dictionary = wdx.bfs_grids(height_grid, biome_grid, road_grid,
+				cols, _Data.WATER_Y, _Data.VOXEL, _Data.CONST_INF, _Data.TileType.DESERT)
+		wdist = res_d["wdist"]
+		rdist = res_d["rdist"]
+		dland = res_d["dland"]
+		hdist = res_d["hdist"]
+	else:
+		wdist.resize(cols * cols); wdist.fill(-1)
+		rdist.resize(cols * cols); rdist.fill(-1)
+		dland.resize(cols * cols); dland.fill(-1)
+		hdist.resize(cols * cols); hdist.fill(-1)
+		for vx in range(cols):
+			for vz in range(cols):
+				var i2: int = vx * cols + vz
+				if height_grid[vx][vz] <= _Data.WATER_Y:
+					wdist[i2] = 0
+				if road_grid.size() > 0 and road_grid[i2] != 0:
+					rdist[i2] = 0
+				if biome_grid[vx][vz] == _Data.TileType.DESERT and height_grid[vx][vz] > _Data.WATER_Y:
+					dland[i2] = 0
+				# Sườn dốc (chân núi/đồi): ô có chênh cao ≥ ngưỡng với ô kề 8-hướng
+				# → seed cho BFS hdist. Cỏ lúa được phép mọc thêm vùng này (dưới đồi).
+				var h0: float = height_grid[vx][vz]
+				for dq in [[-1, 0], [1, 0], [0, -1], [0, 1]]:
+					var qx: int = vx + dq[0]
+					var qz: int = vz + dq[1]
+					if qx < 0 or qz < 0 or qx >= cols or qz >= cols:
+						continue
+					if absf(height_grid[qx][qz] - h0) >= _Data.VOXEL * 0.75:
+						hdist[i2] = 0
+						break
+		_bfs_chebyshev(wdist, cols)
+		_bfs_chebyshev(rdist, cols)
+		_bfs_chebyshev(dland, cols)
+		_bfs_chebyshev(hdist, cols)
 	_prof("S6b bfs_water")
-	_bfs_chebyshev(rdist, cols)
-	_prof("S6c bfs_road")
-	_bfs_chebyshev(dland, cols)
-	_bfs_chebyshev(hdist, cols)
-	_prof("S6 road+bfs4x")
 
 
 # ── 5. Tạo ChunkBlockData từ biome + height ────────────────────────────────
