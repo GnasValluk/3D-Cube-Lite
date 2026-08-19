@@ -193,26 +193,46 @@ static func is_on_river(wx: float, wz: float) -> bool:
 # Returns -1 if not on river, else 0.0 (centerline) → 1.0 (outer bank edge)
 static func river_distance_factor(wx: float, wz: float) -> float:
 	_ensure_rivers()
-	var cell_sz: float = 8.0
-	var pos: Vector2 = Vector2(wx, wz)
+	var cell_sz := 8.0
 	var c0: int = floori(wx / cell_sz)
 	var d0: int = floori(wz / cell_sz)
+	# Cache static containers vào local → GDScript không phải resolve member đọc
+	# mỗi lần (hot loop gọi hàm này 1024 lần/chunk trong compute_chunk).
+	var spat: Dictionary = _river_spatial
+	var curves: Array[PackedVector2Array] = _river_curves
+	var bank_w2: float = _bank_width * _bank_width
 	var min_dist2: float = INF
 	for dx in range(-1, 2):
 		for dz in range(-1, 2):
-			var segs: PackedInt32Array = _river_spatial.get(Vector2i(c0 + dx, d0 + dz), PackedInt32Array())
-			if segs.is_empty():
-				continue
+			var segs: PackedInt32Array = spat.get(Vector2i(c0 + dx, d0 + dz), PackedInt32Array())
 			for skey in segs:
 				var ci: int = skey / 10000
 				var i: int = skey % 10000
-				var wp: PackedVector2Array = _river_curves[ci]
+				var wp: PackedVector2Array = curves[ci]
 				if i >= wp.size() - 1:
 					continue
-				var d2: float = _point_to_seg_d2(pos, wp[i], wp[i + 1])
+				# Inline _point_to_seg_d2 (tránh 3 Vector2 Variant nhập/trả).
+				var ax: float = wp[i].x
+				var ay: float = wp[i].y
+				var bx: float = wp[i + 1].x
+				var by: float = wp[i + 1].y
+				var abx: float = bx - ax
+				var aby: float = by - ay
+				var len2: float = abx * abx + aby * aby
+				var px: float
+				var py: float
+				if len2 == 0.0:
+					px = wx - ax
+					py = wz - ay
+				else:
+					var t: float = clamp(((wx - ax) * abx + (wz - ay) * aby) / len2, 0.0, 1.0)
+					var cx: float = ax + abx * t
+					var cy: float = ay + aby * t
+					px = wx - cx
+					py = wz - cy
+				var d2: float = px * px + py * py
 				if d2 < min_dist2:
 					min_dist2 = d2
-	var bank_w2: float = _bank_width * _bank_width
 	if min_dist2 > bank_w2:
 		return -1.0
 	return sqrt(min_dist2) / _bank_width
