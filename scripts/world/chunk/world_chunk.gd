@@ -3722,22 +3722,158 @@ func break_block_at(wx: float, wy: float, wz: float) -> int:
 	if _is_water_bid(old_id):
 		rebuild_water_mesh()
 	elif _Data.is_shaped_block(old_id):
-		rebuild_shaped_blocks()
+		request_shaped_rebuild()
 	else:
-		rebuild_mesh(blk)
+		request_biome_rebuild([blk])
 	# Kích hoạt water tick ở chunk lân cận nếu block ở biên
 	_trigger_neighbor_water_tick(blk.x, blk.z)
 	return old_id
 
-## Rebuild riêng shaped-block overlay (platform/tường/đá tay đặt) — KHÔNG đụng
-## terrain mesh. Terrain 80ms rebuild chỉ cần khi block đổi heightmap (đào/đắp
-## đất, đá, cỏ...). Shaped block không vào top_ly/terrain → dùng hàm này thay
-## rebuild_mesh() để place/break không giật.
-func rebuild_shaped_blocks() -> void:
-	if block_data == null: return
-	_apply_shaped_block_data(_build_shaped_block_data(block_data, _cols, _dimension_id))
+## ── Rebuild terrain ASYNC (biome block place/break) ─────────────────────────
+## Terrain rebuild full ~50ms. Thay vì chạy đồng bộ gây giật mỗi lần đặt/đào
+## block đất/đá/cỏ, ta: cập nhật top_ly NGAY (rẻ) → dựng terrain/ore/shaped
+## mesh trong WorkerThreadPool → áp vào main qua call_deferred (chỉ commit ~1ms
+## + trimesh ~2ms + swap node). Nhiều edit trong cùng khoảng build → 1 rebuild
+## (coalesce qua _rebuild_dirty_again).
+var _rebuild_scheduled: bool = false
+var _rebuild_dirty_again: bool = false
+
+func request_biome_rebuild(ats: Array) -> void:
+	if block_data == null:
+		return
+	if _top_ly_cache.size() == _cols * _cols:
+		for c in ats:
+			var blk: Vector3i = c
+			if blk.x >= 0 and blk.x < _cols and blk.z >= 0 and blk.z < _cols:
+				_update_top_ly_cache(blk)
+	else:
+		_top_ly_cache = _build_top_ly_cache()
+	if _rebuild_scheduled:
+		_rebuild_dirty_again = true
+		return
+	_rebuild_scheduled = true
+	var snap_bd := _BlockData.new()
+	snap_bd.init(_cols, _cols)
+	snap_bd._data = block_data._data.duplicate()
+	snap_bd._off = block_data._off.duplicate()
+	var snap_top: PackedInt32Array = _top_ly_cache.duplicate()
+	_track_task(WorkerThreadPool.add_task(
+		_thread_biome_rebuild.bind(self, snap_bd, snap_top, _cols, _dimension_id),
+		true, "biome_rebuild"))
+
+static func _thread_biome_rebuild(chunk: Node, snap_bd: _BlockData, snap_top: PackedInt32Array,
+		cols: int, dim_id: int) -> void:
+	var payload := {}
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_Terrain.build_terrain_mesh(st, snap_bd, cols, dim_id, snap_top, false)
+	payload["terrain_mesh"] = st.commit()
+	var max_top := 0
+	if snap_top.size() == cols * cols:
+		for v in snap_top:
+			max_top = maxi(max_top, v)
+	payload["ore_meshes"] = _build_textured_block_meshes(snap_bd, cols, max_top)
+	payload["shaped"] = _build_shaped_block_data(snap_bd, cols, dim_id)
+	if chunk == null or not is_instance_valid(chunk) or not chunk.is_inside_tree():
+		return
+	chunk.call_deferred("_apply_biome_rebuild", payload)
+
+func _apply_biome_rebuild(payload: Dictionary) -> void:
+	_rebuild_scheduled = false
+	if block_data == null or not is_inside_tree():
+		return
+	# Xoá collision + terrain mesh cũ (giữ overlay nước/cỏ/thuỷ sinh)
+	for ch in get_children():
+		if ch is StaticBody3D:
+			ch.queue_free()
+	if _terrain_mesh_instance != null and is_instance_valid(_terrain_mesh_instance):
+		_terrain_mesh_instance.queue_free()
+		_terrain_mesh_instance = null
+	var tm: ArrayMesh = payload.get("terrain_mesh")
+	if tm == null:
+		_rebuild_dirty_again = false
+		return
+	var mi := MeshInstance3D.new()
+	mi.mesh = tm
+	if _fade_state and _mat_cache[_dimension_id].has("terrain_fade"):
+		mi.material_override = _mat_cache[_dimension_id]["terrain_fade"]
+	else:
+		mi.material_override = _mat_cache[_dimension_id]["terrain"]
+	if _mesh_container != null:
+		_mesh_container.add_child(mi)
+	else:
+		add_child(mi)
+	_terrain_mesh_instance = mi
+	var body := StaticBody3D.new()
+	var col := CollisionShape3D.new()
+	col.shape = tm.create_trimesh_shape()
+	body.add_child(col)
+	add_child(body)
+	# Ore overlay (textured block)
+	for bid in _textured_block_mesh_instances:
+		var old := _textured_block_mesh_instances[bid]
+		if is_instance_valid(old):
+			old.queue_free()
+	_textured_block_mesh_instances.clear()
+	var ore: Dictionary = payload.get("ore_meshes", {})
+	for bid in ore:
+		var om: ArrayMesh = ore[bid]
+		if om == null:
+			continue
+		var mi_o := MeshInstance3D.new()
+		mi_o.mesh = om
+		mi_o.material_override = _get_textured_block_material(bid)
+		mi_o.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if _mesh_container != null:
+			_mesh_container.add_child(mi_o)
+		else:
+			add_child(mi_o)
+		_textured_block_mesh_instances[bid] = mi_o
+	rebuild_soil_mesh()
+	_apply_shaped_block_data(payload.get("shaped", {}))
 	_has_shaped_blocks = not _shaped_block_instances.is_empty()
 	block_data.dirty = false
+	if _rebuild_dirty_again:
+		_rebuild_dirty_again = false
+		request_biome_rebuild([])
+
+## ── Shaped rebuild ASYNC (platform/tường/đá tay đặt) ────────────────────────
+## Tương tự biome: dựng shaped overlay data trong worker, áp main qua deferred
+## (xoá micro-stutter ~17ms khi đặt platform). Coalesce edit liên tiếp.
+var _shaped_scheduled: bool = false
+var _shaped_dirty: bool = false
+
+func request_shaped_rebuild() -> void:
+	if block_data == null:
+		return
+	if _shaped_scheduled:
+		_shaped_dirty = true
+		return
+	_shaped_scheduled = true
+	var snap_bd := _BlockData.new()
+	snap_bd.init(_cols, _cols)
+	snap_bd._data = block_data._data.duplicate()
+	snap_bd._off = block_data._off.duplicate()
+	_track_task(WorkerThreadPool.add_task(
+		_thread_shaped_rebuild.bind(self, snap_bd, _cols, _dimension_id),
+		true, "shaped_rebuild"))
+
+static func _thread_shaped_rebuild(chunk: Node, snap_bd: _BlockData, cols: int, dim_id: int) -> void:
+	var payload := _build_shaped_block_data(snap_bd, cols, dim_id)
+	if chunk == null or not is_instance_valid(chunk) or not chunk.is_inside_tree():
+		return
+	chunk.call_deferred("_apply_shaped_rebuild", payload)
+
+func _apply_shaped_rebuild(payload: Dictionary) -> void:
+	_shaped_scheduled = false
+	if block_data == null or not is_inside_tree():
+		return
+	_apply_shaped_block_data(payload)
+	_has_shaped_blocks = not _shaped_block_instances.is_empty()
+	block_data.dirty = false
+	if _shaped_dirty:
+		_shaped_dirty = false
+		request_shaped_rebuild()
 
 ## Đặt block tại world position.
 func place_block_at(wx: float, wy: float, wz: float, block_id: int, off: int = _BlockData.OFF_CENTER) -> bool:
@@ -3755,14 +3891,14 @@ func place_block_at(wx: float, wy: float, wz: float, block_id: int, off: int = _
 	elif _is_water_bid(cur):
 		rebuild_water_mesh()
 		if not _Data.is_shaped_block(block_id):
-			rebuild_mesh(blk)
+			request_biome_rebuild([blk])
 	else:
 		if block_id == _Data.BlockID.TILLED_SOIL:
 			_has_soil = true
 		if _Data.is_shaped_block(block_id):
-			rebuild_shaped_blocks()
+			request_shaped_rebuild()
 		else:
-			rebuild_mesh(blk)
+			request_biome_rebuild([blk])
 	_trigger_neighbor_water_tick(blk.x, blk.z)
 	return true
 
@@ -3807,7 +3943,7 @@ func place_blocks_at(positions: Array[Vector3], block_ids: Array[int], off: int 
 				has_shaped = true
 				break
 		if has_shaped:
-			rebuild_shaped_blocks()
+			request_shaped_rebuild()
 	else:
 		# Mọi block đều shaped (platform/tường/đá) → KHÔNG rebuild terrain (80ms)
 		var all_shaped: bool = true
@@ -3816,10 +3952,10 @@ func place_blocks_at(positions: Array[Vector3], block_ids: Array[int], off: int 
 				all_shaped = false
 				break
 		if all_shaped:
-			rebuild_shaped_blocks()
+			request_shaped_rebuild()
 		else:
-			# Biome: cập nhật top_ly từng cột đã đổi rồi build terrain (bỏ scan 25ms)
-			rebuild_mesh(Vector3i(-1, -1, -1), changed_at)
+			# Biome: cập nhật top_ly từng cột ngay, dựng mesh trong worker thread
+			request_biome_rebuild(changed_at)
 	return changed
 
 ## ── Cuốc đất: GRASS/DARK_GRASS/DIRT/DARK_DIRT → TILLED_SOIL ─────────────────
@@ -3832,7 +3968,7 @@ func till_block_at(wx: float, wy: float, wz: float) -> int:
 	block_data.set_block(blk.x, blk.y, blk.z, _Data.BlockID.TILLED_SOIL)
 	_has_soil = true
 	_water_tick_timer = 0.0
-	rebuild_mesh(blk)
+	request_biome_rebuild([blk])
 	return old_id
 
 ## ── rebuild_soil_mesh: rebuild overlay đất tơi xốp (khô/ẩm theo nước) ───────

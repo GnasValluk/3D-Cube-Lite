@@ -48,24 +48,28 @@ func _ready() -> void:
 	_check(ok, "place shaped ok")
 	_check(chunk.block_data.get_block(16, tl + 1, 16) == _D.BlockID.STONE_PLATFORM, "block shaped lưu đúng")
 	_check(terrain_old == chunk._terrain_mesh_instance, "terrain mesh KHÔNG đổi (light path)")
-	_check(chunk._shaped_block_instances.size() >= 1, "shaped mesh overlay đã cập nhật")
+	await _W.wait_for_tasks_async(get_tree())
+	await get_tree().process_frame
+	_check(chunk._shaped_block_instances.size() >= 1, "shaped mesh overlay đã cập nhật (async apply)")
 
 	# ── Phá platform (shaped) → light path ──
 	var old_id: int = chunk.break_block_at(16.5, wby, 16.5)
 	_check(old_id == _D.BlockID.STONE_PLATFORM, "break shaped trả đúng id")
 	_check(chunk.block_data.get_block(16, tl + 1, 16) == _D.BlockID.AIR, "ô trống lại sau break")
 	_check(terrain_old == chunk._terrain_mesh_instance, "terrain KHÔNG đổi khi break shaped")
+	await _W.wait_for_tasks_async(get_tree())
+	await get_tree().process_frame
 	_check(not chunk._has_shaped_blocks, "cờ shaped tắt khi đã phá hết shaped")
 
-	# ── Đặt biome block (DIRT) → phải rebuild terrain (mesh mới) ──
+	# ── Đặt biome block (DIRT) → rebuild ASYNC (worker thread) ──
 	wby = _BD.layer_to_world_y(tl + 2)
 	var ok2: bool = chunk.place_block_at(16.5, wby, 16.5, _D.BlockID.DIRT, _BD.OFF_CENTER)
 	_check(ok2, "place biome ok")
-	_check(terrain_old != chunk._terrain_mesh_instance, "biome block → terrain mesh ĐỔI (rebuild full)")
+	_check(chunk._top_ly_cache[16 * 32 + 16] == tl + 2, "top_ly nâng NGAY (sync, trước mesh apply)")
+	await _W.wait_for_tasks_async(get_tree())
+	await get_tree().process_frame
+	_check(terrain_old != chunk._terrain_mesh_instance, "biome block → terrain mesh ĐỔI (rebuild async)")
 	_check(chunk.block_data.get_block(16, tl + 2, 16) == _D.BlockID.DIRT, "block biome lưu đúng")
-
-	# ── Top_ly cache được nâng lên khi đặt biome block ──
-	_check(chunk._top_ly_cache[16 * 32 + 16] == tl + 2, "top_ly nâng lên (rebuild full)")
 
 	chunk.queue_free()
 	print("== test_shaped_rebuild %s (%d fail) ==" % ["PASS" if _failures == 0 else "FAIL", _failures])
