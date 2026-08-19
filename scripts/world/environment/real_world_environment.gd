@@ -202,6 +202,9 @@ func _update_sun(h: float, rain_factor: float) -> void:
 	var sunset_t: float = clamp(1.0 - absf(h - 17.0) / 3.0, 0.0, 1.0)
 	var warm: float = maxf(sunrise_t, sunset_t)
 	_sun.light_color = Color(1.0, 0.94, 0.78).lerp(Color(1.0, 0.62, 0.30), warm * 0.8)
+	# Tông ấm buổi sáng kéo tới ~13h: trưa sáng dịu như 8–9h, không bạc gắt.
+	var morning_w: float = clamp(1.0 - absf(h - 8.5) / 5.0, 0.0, 1.0)
+	_sun.light_color = _sun.light_color.lerp(Color(1.00, 0.90, 0.72), morning_w * 0.30)
 	# Energy trưa giữ bằng mức lúc ~9h (không tăng tiếp) + hạ nhẹ so với
 	# trước (1.6→1.45) để trưa dịu, không chói gắt.
 	var energy_t: float = minf(day_t, 0.725)

@@ -51,7 +51,8 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	var night_factor: float = 1.0 - day_t
 
 	# Trạng thái sáng/chiều: morning đỉnh lúc 8h, evening đỉnh lúc 17h.
-	var morning: float = clamp(1.0 - abs(hour - 8.0) / 3.5, 0.0, 1.0)
+	# Rộng 6h → tông ấm buổi sáng kéo tới ~14h, trưa không bị trắng gắt.
+	var morning: float = clamp(1.0 - abs(hour - 8.0) / 6.0, 0.0, 1.0)
 	var evening_t: float = clamp(1.0 - abs(hour - 17.0) / 3.0, 0.0, 1.0)
 	# Golden hour chiều: đỉnh 16.5h, rộng hơn → vàng cam bắt đầu từ ~14h,
 	# không chỉ phút cuối trước khi tối.
@@ -92,7 +93,8 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	mat.set_shader_parameter("sky_top_color", top_color)
 	mat.set_shader_parameter("sky_horizon_color", hor_color)
 	mat.set_shader_parameter("sky_curve", 0.5)
-	mat.set_shader_parameter("sky_energy", lerp(0.6, 1.2, day_t) * (1.0 - weather * 0.35))
+	var sky_energy_day: float = lerp(0.6, 1.2, minf(day_t, 0.72))
+	mat.set_shader_parameter("sky_energy", sky_energy_day * (1.0 - weather * 0.35))
 
 	# Đất dưới chân trời: chân trời đất HÒA cùng màu trời (haze khí quyển) để
 	# không còn dải xám phân cách, chỉ tối dần xuống dưới thành tông đất ấm.
@@ -114,6 +116,8 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	sun_kind = sun_kind.lerp(sun_high, clamp((sun_t - 0.50) / 0.40, 0.0, 1.0))
 	# Buổi sáng: ấm vàng hơn; buổi chiều gần hoàng hôn: cam đỏ rực.
 	sun_kind = sun_kind.lerp(Color(1.0, 0.90, 0.62), morning * 0.35)
+	# Trưa giữ tông buổi sáng (không bạc gắt): phủ vàng ấm dịu khắp trưa.
+	sun_kind = sun_kind.lerp(Color(1.0, 0.92, 0.68), morning * 0.25)
 	sun_kind = sun_kind.lerp(Color(1.0, 0.48, 0.16), golden_hour * 0.75)
 	var sun_color := sun_kind.lerp(GRAY_HORIZON, weather * 0.7)
 	# Ngả về tông trời đêm (xanh-trăng) CHỈ khi mặt trời đã lặn hẳn, không làm
@@ -129,7 +133,9 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	var sun_dir := Vector3(cos(pitch_rad) * cos(yaw_rad), sin(pitch_rad), cos(pitch_rad) * sin(yaw_rad))
 	mat.set_shader_parameter("sun_dir", sun_dir)
 	mat.set_shader_parameter("sun_color", sun_color)
-	mat.set_shader_parameter("sun_energy", lerp(0.0, 2.1, day_t) * (1.0 - weather * 0.55))
+	# Nắng không gắt lúc trưa: giữ năng lượng ở mức ~9h sáng (min day_t 0.72).
+	var sun_e_noon: float = lerp(0.0, 2.1, minf(day_t, 0.72))
+	mat.set_shader_parameter("sun_energy", sun_e_noon * (1.0 - weather * 0.55))
 	# Mặt trời nhỏ + xa: chỉ ~1.1° (bán kính), quầng mềm trong shader.
 	mat.set_shader_parameter("sun_angle_max", 1.1)
 	mat.set_shader_parameter("sun_curve", 0.1)
