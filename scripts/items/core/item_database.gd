@@ -224,10 +224,10 @@ static func create_item_db() -> Dictionary:
 	_add(db, "block_stone_thin",  "Đá Phiến",  ItemDef.Type.BLOCK, Color(0.40, 0.40, 0.44), "🧱", "Đá phiến — dày 0.2 thay vì 0.5 như block thường", true, 64)
 
 	# ── Platform đá (xây dựng) — nền sàn + tường 3×3, tường đặt xoay hướng chuột phải ──
-	_add(db, "block_stone_platform",    "Nền Đá",      ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Nền đá — tấm sàn 3×3 block, dày 0.5, đặt trên mặt đất hoặc chồng tầng", true, 64)
-	_add(db, "block_stone_wall",        "Tường Đá",    ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá — đứng 3 cao × 3 ngang, dày 0.5 block; chuột phải xoay hướng", true, 64)
-	_add(db, "block_stone_wall_door",   "Tường Đá Có Cửa", ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá có cửa — khuyết ô giữa và ô giữa dưới để đặt cửa ra vào; chuột phải xoay hướng", true, 64)
-	_add(db, "block_stone_wall_window", "Tường Đá Có Cửa Sổ", ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá có cửa sổ — chỉ khuyết ô giữa để lấy gió/ánh sáng; chuột phải xoay hướng", true, 64)
+	_add(db, "block_stone_platform",    "Nền Đá",      ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Nền đá — tấm sàn 3×3 block (mỗi ô 1 slab), dày 0.5, đặt trên mặt đất hoặc chồng tầng", true, 64)
+	_add(db, "block_stone_wall",        "Tường Đá",    ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá — cao 6 block × ngang 3 block (cao 3,0), dày 0.5; chuột phải xoay hướng", true, 64)
+	_add(db, "block_stone_wall_door",   "Tường Đá Có Cửa", ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá có cửa — chừa 4 block cột giữa từ đáy cho cửa ra vào (rộng 1 × cao 2); chuột phải xoay hướng", true, 64)
+	_add(db, "block_stone_wall_window", "Tường Đá Có Cửa Sổ", ItemDef.Type.BLOCK, Color(0.42, 0.42, 0.46), "🧱", "Tường đá có cửa sổ — chừa 2 block giữa tường để lấy gió/ánh sáng; chuột phải xoay hướng", true, 64)
 	_add(db, "block_dark_dirt",   "Đất Tối",   ItemDef.Type.BLOCK, Color(0.28, 0.16, 0.06), "🧱", "Khối đất tối",      true, 64)
 	_add(db, "block_sand_deep",   "Cát Sâu",   ItemDef.Type.BLOCK, Color(0.80, 0.66, 0.28), "🧱", "Khối cát sâu",      true, 64)
 	_add(db, "block_trail",       "Đường Mòn", ItemDef.Type.BLOCK, Color(0.76, 0.58, 0.22), "🧱", "Khối đường mòn",    true, 64)

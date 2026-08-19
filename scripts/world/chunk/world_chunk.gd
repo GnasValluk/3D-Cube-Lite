@@ -3519,7 +3519,8 @@ static func _build_shaped_block_data(bd: _BlockData, cols: int, dim_id: int) -> 
 					continue
 				var bottom: float = float(ly + _BlockData.Y_MIN) * _BlockData.SLAB_HEIGHT
 				var pos := Vector3(wx, bottom + shape.y * 0.5, wz)
-				_add_shaped_box(st, pos, shape, colors[blk])
+				var mask := _shaped_face_mask(raw, raw_h, raw_w, x, ly, z, blk, shape)
+				_add_shaped_box(st, pos, shape, colors[blk], mask)
 				pos_data.append(pos)
 				size_data.append(shape)
 	var mesh: ArrayMesh = null
@@ -3576,23 +3577,63 @@ func _build_shaped_block_nodes() -> void:
 		return
 	_apply_shaped_block_data(_build_shaped_block_data(block_data, _cols, _dimension_id))
 
-## Vẽ hộp 6 mặt bằng màu block (top sáng, side tối, đáy tối nhất).
-static func _add_shaped_box(st: SurfaceTool, center: Vector3, size: Vector3, top_col: Color) -> void:
+## Mask các mặt cần bỏ khi box cùng loại chạm nhau liền kề (tránh z-fight /
+## mặt thừa giữa các tường/platform cùng block xếp sát). Bỏ mặt chỉ khi box
+## lấp kín cả ô theo hướng đó (shape đầy cell) → 2 box thật sự dính nhau.
+const _F_BOT := 1
+const _F_TOP := 2
+const _F_NZ := 4
+const _F_PZ := 8
+const _F_NX := 16
+const _F_PX := 32
+
+static func _shaped_face_mask(raw: PackedByteArray, raw_h: int, raw_w: int,
+		x: int, ly: int, z: int, blk: int, shape: Vector3) -> int:
+	var mask := 0
+	var row: int = raw_h * raw_w
+	var idx: int = x * row + ly * raw_w + z
+	if shape.y >= _BlockData.SLAB_HEIGHT:
+		if ly > 0 and raw[idx - raw_w] == blk:
+			mask |= _F_BOT
+		if ly + 1 < raw_h and raw[idx + raw_w] == blk:
+			mask |= _F_TOP
+	if shape.x >= _Data.VOXEL:
+		if x > 0 and raw[idx - row] == blk:
+			mask |= _F_NX
+		if x + 1 < raw_w and raw[idx + row] == blk:
+			mask |= _F_PX
+	if shape.z >= _Data.VOXEL:
+		if z > 0 and raw[idx - 1] == blk:
+			mask |= _F_NZ
+		if z + 1 < raw_w and raw[idx + 1] == blk:
+			mask |= _F_PZ
+	return mask
+
+## Vẽ hộp 6 mặt bằng màu block (top sáng, side tối, đáy tối nhất). `mask` cho
+## phép bỏ mặt dính với block cùng loại × `size` đầy ô (đã merge các platform).
+static func _add_shaped_box(st: SurfaceTool, center: Vector3, size: Vector3,
+		top_col: Color, mask: int = 0) -> void:
 	var h: Vector3 = size * 0.5
 	var side_col := _Data.block_side_color(top_col)
 	var bot_col := Color(top_col.r * 0.35, top_col.g * 0.35, top_col.b * 0.35, top_col.a)
-	_Terrain._add_quad(st, center + Vector3(0, h.y, 0),
-		Vector3(h.x, 0, 0), Vector3(0, 0, h.z), Vector3(0, 1, 0), top_col)
-	_Terrain._add_quad(st, center - Vector3(0, h.y, 0),
-		Vector3(h.x, 0, 0), Vector3(0, 0, h.z), Vector3(0, -1, 0), bot_col)
-	_Terrain._add_quad(st, center + Vector3(0, 0, h.z),
-		Vector3(h.x, 0, 0), Vector3(0, h.y, 0), Vector3(0, 0, 1), side_col)
-	_Terrain._add_quad(st, center - Vector3(0, 0, h.z),
-		Vector3(h.x, 0, 0), Vector3(0, h.y, 0), Vector3(0, 0, -1), side_col)
-	_Terrain._add_quad(st, center + Vector3(h.x, 0, 0),
-		Vector3(0, 0, h.z), Vector3(0, h.y, 0), Vector3(1, 0, 0), side_col)
-	_Terrain._add_quad(st, center - Vector3(h.x, 0, 0),
-		Vector3(0, 0, h.z), Vector3(0, h.y, 0), Vector3(-1, 0, 0), side_col)
+	if not mask & _F_TOP:
+		_Terrain._add_quad(st, center + Vector3(0, h.y, 0),
+			Vector3(h.x, 0, 0), Vector3(0, 0, h.z), Vector3(0, 1, 0), top_col)
+	if not mask & _F_BOT:
+		_Terrain._add_quad(st, center - Vector3(0, h.y, 0),
+			Vector3(h.x, 0, 0), Vector3(0, 0, h.z), Vector3(0, -1, 0), bot_col)
+	if not mask & _F_PZ:
+		_Terrain._add_quad(st, center + Vector3(0, 0, h.z),
+			Vector3(h.x, 0, 0), Vector3(0, h.y, 0), Vector3(0, 0, 1), side_col)
+	if not mask & _F_NZ:
+		_Terrain._add_quad(st, center - Vector3(0, 0, h.z),
+			Vector3(h.x, 0, 0), Vector3(0, h.y, 0), Vector3(0, 0, -1), side_col)
+	if not mask & _F_PX:
+		_Terrain._add_quad(st, center + Vector3(h.x, 0, 0),
+			Vector3(0, 0, h.z), Vector3(0, h.y, 0), Vector3(1, 0, 0), side_col)
+	if not mask & _F_NX:
+		_Terrain._add_quad(st, center - Vector3(h.x, 0, 0),
+			Vector3(0, 0, h.z), Vector3(0, h.y, 0), Vector3(-1, 0, 0), side_col)
 
 ## ── Cập nhật _top_ly_cache cho 1 column sau khi block đổi ────────────────────
 func _update_top_ly_cache(at: Vector3i) -> void:

@@ -138,11 +138,14 @@ static func is_platform_item(item_id: String) -> bool:
 
 ## Cells (offset ô từ ô gốc) + block_id cho 1 platform theo hướng xoay (độ).
 ## Trả về { "cells": Array[Vector3i], "block": int }.
+## Quy ước block trong game = 1 slab (cao 0.5):
 ## - Nền: lưới 3×3 ngang (dx,dz ∈ -1..1) tại tầng đáy, block STONE_PLATFORM.
-## - Tường (và bản có cửa/cửa sổ): 3 ngang × 3 cao, dày 0.5; hướng xoay quyết
-##   định tường dài theo X (block STONE_WALL_Z, dày Z) hay theo Z (STONE_WALL_X).
-##   Bản cửa: bỏ ô giữa dưới (0,0) + ô giữa (0,1) → chừa cửa rộng 1, cao 2.
-##   Bản cửa sổ: bỏ ô giữa (0,1) → chừa 1 ô cửa sổ giữa tường.
+## - Tường (và bản có cửa/cửa sổ): ngang 3 × cao 6 (6 slab = 3.0), dày 0.5;
+##   hướng xoay quyết định tường dài theo X (block STONE_WALL_Z, dày Z) hay
+##   theo Z (block STONE_WALL_X).
+##   Bản cửa ra vào: bỏ 4 block cột giữa từ đáy lên (j 0..3) → chừa cửa rộng 1,
+##   cao 2 (4 slab).
+##   Bản cửa sổ: bỏ 2 block cột giữa ở giữa tường (j 2..3) → chừa 1 ô cửa sổ.
 static func _platform_cells(item_id: String, rot_deg: int) -> Dictionary:
 	var cells: Array[Vector3i] = []
 	if item_id == "block_stone_platform":
@@ -151,18 +154,17 @@ static func _platform_cells(item_id: String, rot_deg: int) -> Dictionary:
 				cells.append(Vector3i(dx, 0, dz))
 		return { "cells": cells, "block": _Data.BlockID.STONE_PLATFORM }
 	var along_x: bool = absf(fposmod(rot_deg, 180.0)) < 45.0
-	var gap_open: int = -1
-	var gap_upper: int = -1
+	var gap_lo: int = -1
+	var gap_hi: int = -1
 	if item_id == "block_stone_wall_door":
-		gap_open = 0
-		gap_upper = 1
+		gap_lo = 0
+		gap_hi = 3
 	elif item_id == "block_stone_wall_window":
-		gap_upper = 1
+		gap_lo = 2
+		gap_hi = 3
 	for i in range(-1, 2):
-		for j in range(0, 3):
-			if i == 0 and j == gap_open:
-				continue
-			if i == 0 and j == gap_upper:
+		for j in range(0, 6):
+			if i == 0 and j >= gap_lo and j <= gap_hi:
 				continue
 			if along_x:
 				cells.append(Vector3i(i, j, 0))
