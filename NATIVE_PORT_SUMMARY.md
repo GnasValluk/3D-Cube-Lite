@@ -128,6 +128,13 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
   - Copy-back chỉ cell sông (`rf5[i] != 0`) khi `s4_native_ok` + flat size đủ (native chỉ đổi cell sông; cell khác == grids hiện tại từ S4) → S5c apply+copy 0.16-0.45 → 0.07-0.45ms (chunk(1,0) vẫn nặng vì nhiều river cell).
 - A/B: `_native_river_override_test` 10/10 PASS + `_native_river_test` 0 fail; full 14 regression suites green.
 - Profile (seed 20260802, 3 chunk): S5a factors 0.09-0.32 (river_distance_factors C++), S5b flatten 0.02-0.03, S5c apply+copy 0.07-0.45, S5 river (native apply_river) 0.03-0.08; S5 total ~0.28-0.58 → ~0.28-0.49ms.
+- Commit `6cb3865` (S5 marshalling opt) — DLL + world_chunk.gd + NATIVE_PORT_SUMMARY.md.
+
+### S10/S7/S4-copy khảo sát thêm — kết luận: đã tối ưu sát
+- S10 water_mesh split (marker tạm): S10a has_water+water_skip (GD loops) 0.10-0.11, S10b native call (build_water_mesh C++) 0.11-0.16, S10c from_arrays (engine add_surface_from_arrays) 0.22-0.49ms → giống S8: phần lớn là engine upload không cắt được.
+- S7 fill_blocks split (Time print tạm trong `_fill_blocks_native`): flatten GD (bio/hgt flat từ grids) 0.09-0.12, native fill_blocks C++ 0.09-0.12ms → cả 2 đều nhỏ, không đáng port flatten (chỉ ~0.1ms).
+- S4 copy-back (marker tạm S4b/S4c): copy 32² (biome+height+beach+reef) ≈ 0.15-0.2ms + dmask 42² 0.06ms — cần thiết vì S5-S13 đọc Array[Array]; không tách được khỏi computation S4 (land_grid native 0.56-0.66ms là chính).
+- S6b bfs_water đã native (bfs_grids). S1 biome_sample 0.51-0.55ms = native compute_biome_grid noise stack thật — khó cắt hơn nữa.
 
 ### S8 khảo sát sâu (WorldTerrain timers) — kết luận: đã tối ưu sát
 - Split GD bằng marker tạm S8a top_ly / S8b native build: S8a 0.14-0.22ms (loop GD top_ly_hint), S8b 0.83-2.97ms.
@@ -135,18 +142,19 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
 - Kết luận: S8 đã tối ưu sát — `surf` là upload vertex thật của engine (không cắt được), geom/pack hợp lý. S8a top_ly (loop GD) 0.14-0.22ms có thể chuyển C++ sau nhưng ưu tiên thấp — không đào sâu thêm, chuyển sang S5/S10.
 
 ## Đang làm
-- (không — đang xét tiếp hotspot, ưu tiên S10 water_mesh / S1 / S4 copy-back)
+- (không — đã khảo sát S8/S10/S7/S4-copy/S5-marshalling: các hotspot còn lại đều là computation thật hoặc engine upload không cắt được; cân nhắc chuyển hướng sang xử lý hàng loạt chunk / cache toàn cục thay vì per-chunk)
 
 ## Hotspot hiện tại (test_prof_chunk, non-first chunks — bỏ artifact chunk đầu)
 Sau S11a/S12/S9/S2/S10/S5/S8/S3-marshalling/S13b-scan/S1S2-flat-bio/S4-lake-cache, các phase còn lại lớn nhất (chunk(0,0) khi không đầu): S10 water_mesh 0.37-0.80, S1 biome_sample 0.52-0.56, S4 biome_grid+height 0.80-0.91 (land_grid 0.56-0.66 computation thật + copy-back 0.21), S8 terrain_mesh 0.87-1.97 (sau khảo sát: surf engine + geom/pack hợp lý — đã tối ưu sát, không đào sâu nữa), S5 river 0.28-0.49 (sau marshalling tối ưu), S3 ocean_mask+bfs 0.13-0.33, S11 aquatic+plants 0.30-0.36. S13b ore 0.03-0.06, S13c tavern ~0.02.
 Lưu ý: chunk ĐẦU TIÊN trong 1 tiến trình luôn có S2 ~8ms (artifact harness: stdout flush/GC đầu compute — verified bằng reorder: chunk đầu nào cũng ~8ms, còn là 0.7-1.1ms).
 
 ## Next steps (candidates)
-1. S8 terrain_mesh — KHẢO SÁT XONG: surf (engine add_surface_from_arrays) 0.47-1.05ms không cắt được; geom/pack hợp lý; S8a top_ly 0.14-0.22ms có thể chuyển C++ nếu muốn (ưu tiên thấp).
-2. S5 river — XONG: marshalling 0.28→0.02-0.03 (reuse b4/h4), copy-back chỉ cell sông, orig_heights lazy (capture trước override); S5 0.44-0.82→0.28-0.49ms.
-3. S10 water_mesh (0.37-0.80ms) — đã native; phần còn lại engine ArrayMesh + GD surface assign.
-4. S1 biome_sample (0.52-0.56ms) — native compute_biome_grid rồi; noise stack thật, khó cắt hơn nữa.
-5. S4 copy-back 0.21ms — GD loop copy flat→Array[Array] (biome/height 32² + dmask 42²); có thể giảm nếu S5-S13 đọc flat trực tiếp (như đã làm S2/S4).
+1. S8/S10 terrain+water — KHẢO SÁT XONG: engine add_surface_from_arrays upload không cắt được; các GD loop nhỏ (S8a top_ly 0.14-0.22, S10a has_water+skip 0.10-0.11) có thể chuyển C++ nếu muốn (ưu tiên thấp).
+2. S5 river — XONG (marshalling opt, commit `6cb3865`).
+3. S7 fill_blocks — KHẢO SÁT XONG: flatten 0.09-0.12 + native 0.09-0.12; không đáng port flatten.
+4. S1 biome_sample (0.51-0.55ms) — native compute_biome_grid; noise stack thật, khó cắt hơn nữa.
+5. S4 copy-back 0.15-0.2ms + dmask 0.06ms — cần cho S5-S13; không tách được.
+6. Ý tưởng mới: batching nhiều chunk / cache noise toàn cục / worker thread khi generate nhiều chunk — giảm qua per-chunk đã bão hòa.
 
 ## Triển khai tiếp
 2. S13c tavern/village — bỏ qua (663 dòng, ~0.6ms, deterministic).
