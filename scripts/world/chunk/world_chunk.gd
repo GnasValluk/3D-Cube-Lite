@@ -226,6 +226,17 @@ static func _native_grass() -> Object:
 ## Test hook: ép dùng GDScript S9 để A/B so sánh bit-exact.
 static var _force_s9_gd: bool = false
 
+static var _native_bd: Object = null
+
+## Native WorldBfsDst bridge (S2 bfs_dst) — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_bfsdst() -> Object:
+	if _native_bd == null and ClassDB.class_exists("WorldBfsDst"):
+		_native_bd = ClassDB.instantiate("WorldBfsDst")
+	return _native_bd
+
+## Test hook: ép dùng GDScript S2 để A/B so sánh bit-exact.
+static var _force_s2_gd: bool = false
+
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	# Thread-safe cache theo ô thế giới: lưới ocean stride-2 (42×42) của 2 chunk
 	# kề nhau overlap ~62% số sample — dùng chung bỏ qua FastNoiseLite FBM lặp.
@@ -682,6 +693,24 @@ static func _cell_hash01(vx: int, vz: int) -> float:
 	x = (x ^ (x >> 17)) * 449984367
 	x = x ^ (x >> 13)
 	return float(x & 0x7FFFFFFF) / 2147483648.0
+
+## S2 GD fallback — mirror native WorldBfsDst.bfs_dst (bit-exact).
+static func _bfsdst_gd_fallback(bio: Array, total: int, base_tile: int, edge_tile: int) -> PackedInt32Array:
+	var dst := PackedInt32Array()
+	dst.resize(total * total)
+	for i in range(total * total):
+		dst[i] = 0 if bio[i / total][i % total] == base_tile else _Data.CONST_INF
+	for vx in range(total):
+		for vz in range(total):
+			if bio[vx][vz] != edge_tile: continue
+			if (vx > 0 and bio[vx - 1][vz] == base_tile) \
+			or (vx < total - 1 and bio[vx + 1][vz] == base_tile) \
+			or (vz > 0 and bio[vx][vz - 1] == base_tile) \
+			or (vz < total - 1 and bio[vx][vz + 1] == base_tile):
+				dst[vx * total + vz] = 1
+	if base_tile != edge_tile:
+		_bfs_manhattan(dst, total)
+	return dst
 
 ## S9 GD fallback — mirror native WorldGrass.add_grass_chunk (bit-exact).
 static func _grass_gd_fallback(grass_xforms: Array, grass_colors: Array,
@@ -1197,19 +1226,11 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		base_tile = _Data.TileType.GRASS_DIRT
 		edge_tile = _Data.TileType.GRASS_DIRT
 	var dst := PackedInt32Array()
-	dst.resize(total * total)
-	for i in range(total * total):
-		dst[i] = 0 if bio[i / total][i % total] == base_tile else _Data.CONST_INF
-	for vx in range(total):
-		for vz in range(total):
-			if bio[vx][vz] != edge_tile: continue
-			if (vx > 0 and bio[vx-1][vz] == base_tile) \
-			or (vx < total-1 and bio[vx+1][vz] == base_tile) \
-			or (vz > 0 and bio[vx][vz-1] == base_tile) \
-			or (vz < total-1 and bio[vx][vz+1] == base_tile):
-				dst[vx * total + vz] = 1
-	if base_tile != edge_tile:
-		_bfs_manhattan(dst, total)
+	var bd2 := _native_bfsdst()
+	if bd2 != null and not _force_s2_gd:
+		dst = bd2.bfs_dst(bio, total, base_tile, edge_tile, _Data.CONST_INF)
+	else:
+		dst = _bfsdst_gd_fallback(bio, total, base_tile, edge_tile)
 	_prof("S2 bfs_dst")
 
 
