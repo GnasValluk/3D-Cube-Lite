@@ -253,6 +253,32 @@ static func _aquatic_mesh_from_arrays(verts: PackedVector3Array,
 	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 	return m
 
+## Native WorldOre bridge (S13b textured-block/ore overlays) — lazy tạo 1 lần.
+static var _native_ore: Object = null
+static func _native_ore_mesh() -> Object:
+	if _native_ore == null and ClassDB.class_exists("WorldOre"):
+		_native_ore = ClassDB.instantiate("WorldOre")
+	return _native_ore
+
+## Test hook: ép dùng GDScript _build_textured_block_meshes (S13b) để A/B.
+static var _force_s13_gd: bool = false
+
+## Wrap {verts, normals, colors, uvs} native 1 loại ore → ArrayMesh (miền UV).
+static func _ore_mesh_from_arrays(verts: PackedVector3Array,
+		normals: PackedVector3Array, colors: PackedColorArray,
+		uvs: PackedVector2Array) -> ArrayMesh:
+	if verts.is_empty():
+		return null
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts
+	arr[Mesh.ARRAY_NORMAL] = normals
+	arr[Mesh.ARRAY_COLOR] = colors
+	arr[Mesh.ARRAY_TEX_UV] = uvs
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m
+
 ## Native WorldWater bridge (S10 water_mesh) — lazy tạo 1 lần; null nếu thiếu DLL.
 static var _native_wt: Object = null
 static func _native_watermesh() -> Object:
@@ -2230,7 +2256,19 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				break
 	var ore_meshes: Dictionary[int, ArrayMesh] = {}
 	if not fast_mode and _ORES_GENERATION_ENABLED and has_ore_blocks:
-		ore_meshes = _build_textured_block_meshes(bd, cols, max_top_ly)
+		var ore_native := not _force_s13_gd
+		var ore_obj: Object = _native_ore_mesh() if ore_native else null
+		ore_native = ore_native and ore_obj != null
+		if ore_native:
+			var ores: Dictionary = ore_obj.build_textured_block_mesh(bd._data, cols, max_top_ly)
+			for bid in ores:
+				var om: Dictionary = ores[bid]
+				var om_mesh := _ore_mesh_from_arrays(om["verts"], om["normals"],
+						om["colors"], om["uvs"])
+				if om_mesh:
+					ore_meshes[int(bid)] = om_mesh
+		else:
+			ore_meshes = _build_textured_block_meshes(bd, cols, max_top_ly)
 	_prof("S13b ore")
 
 	# ── 10b. Shaped blocks (đá ¼/⅛/phiến) — BỎ SCAN ở generation ────────────
