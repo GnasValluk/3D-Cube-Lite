@@ -2318,25 +2318,30 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	# cũ chỉ theo ore_hill_info → chunk núi đá có quặng nhưng không có đồi sẽ bị
 	# bỏ qua toàn bộ scan → quặng hiển thị màu trơn (không texture).
 	# Kiểm tra rẻ: chỉ soi một lớp bề mặt theo top_ly_hint (kể cả cho vùng đồi).
+	var ore_native := not _force_s13_gd
+	var ore_obj: Object = _native_ore_mesh() if ore_native else null
+	ore_native = ore_native and ore_obj != null
 	var max_top_ly: int = 0
-	for vx in range(cols):
-		for vz in range(cols):
-			max_top_ly = maxi(max_top_ly, top_ly_hint[vx * cols + vz])
 	var has_ore_blocks: bool = ore_hill_info.get("cx", -1) >= 0
-	if not has_ore_blocks:
+	if ore_native:
+		var scan: PackedInt32Array = ore_obj.scan_textured_blocks(bd._data, cols, top_ly_hint)
+		max_top_ly = scan[0]
+		has_ore_blocks = has_ore_blocks or scan[1] == 1
+	else:
 		for vx in range(cols):
 			for vz in range(cols):
-				var ly: int = top_ly_hint[vx * cols + vz]
-				if ly >= 0 and _TEXTURED_BLOCK_IDS.has(bd.get_block(vx, ly, vz)):
-					has_ore_blocks = true
+				max_top_ly = maxi(max_top_ly, top_ly_hint[vx * cols + vz])
+		if not has_ore_blocks:
+			for vx in range(cols):
+				for vz in range(cols):
+					var ly: int = top_ly_hint[vx * cols + vz]
+					if ly >= 0 and _TEXTURED_BLOCK_IDS.has(bd.get_block(vx, ly, vz)):
+						has_ore_blocks = true
+						break
+				if has_ore_blocks:
 					break
-			if has_ore_blocks:
-				break
 	var ore_meshes: Dictionary[int, ArrayMesh] = {}
 	if not fast_mode and _ORES_GENERATION_ENABLED and has_ore_blocks:
-		var ore_native := not _force_s13_gd
-		var ore_obj: Object = _native_ore_mesh() if ore_native else null
-		ore_native = ore_native and ore_obj != null
 		if ore_native:
 			var ores: Dictionary = ore_obj.build_textured_block_mesh(bd._data, cols, max_top_ly)
 			for bid in ores:
