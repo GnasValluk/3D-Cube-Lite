@@ -1,9 +1,10 @@
 extends Node
 
-# A/B: WorldGrass.add_grass_chunk (C++) vs `_grass_gd_fallback` (GDScript) — so
-# sánh grass_blade_data của compute_chunk chạy native vs _force_s9_gd=true.
+# A/B: WorldGrass.add_grass_chunk + add_seagrass_chunk (C++) vs
+# _grass_gd_fallback + _Grass.add_voxel_seagrass (GDScript) — so sánh
+# grass_blade_data của compute_chunk chạy native vs _force_s9_gd/_force_s11_gd.
 # Cả 2 path deterministic (sin-noise + LCG, không randf) → xforms/colors phải
-# bit-exact. Seagrass (S11, vẫn GD) append vào cùng mảng sau S9 ở cả 2 path.
+# bit-exact. Seagrass (S11) native append vào cùng mảng sau S9 ở cả 2 path.
 
 var _fails: int = 0
 var _passes: int = 0
@@ -25,14 +26,17 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	WorldChunk._force_s9_gd = true
+	WorldChunk._force_s11_gd = true
 	var dim: int = _Data._Dim.DimensionID.REAL_WORLD
 	var gd_total: int = 0
 	var na_total: int = 0
 	for cc in _chunks:
 		var res_gd: Dictionary = WorldChunk.compute_chunk(cc.x, cc.y, 32, dim, false, false)
 		WorldChunk._force_s9_gd = false
+		WorldChunk._force_s11_gd = false
 		var res_na: Dictionary = WorldChunk.compute_chunk(cc.x, cc.y, 32, dim, false, false)
 		WorldChunk._force_s9_gd = true
+		WorldChunk._force_s11_gd = true
 		var na_d: Dictionary = res_na.get("grass_blade_data", {})
 		var gd_d: Dictionary = res_gd.get("grass_blade_data", {})
 		var na: Array = na_d.get("xforms", [])

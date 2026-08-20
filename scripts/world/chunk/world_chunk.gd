@@ -226,6 +226,9 @@ static func _native_grass() -> Object:
 ## Test hook: ép dùng GDScript S9 để A/B so sánh bit-exact.
 static var _force_s9_gd: bool = false
 
+## Test hook: ép dùng GDScript add_voxel_seagrass (S11) để A/B so sánh bit-exact.
+static var _force_s11_gd: bool = false
+
 static var _native_bd: Object = null
 
 ## Native WorldBfsDst bridge (S2 bfs_dst) — lazy tạo 1 lần; null nếu thiếu DLL.
@@ -2041,6 +2044,9 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		var st_aq := SurfaceTool.new()
 		st_aq.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var sg_native := not _force_s11_gd
+		var sg_obj: Object = _native_grass() if sg_native else null
+		sg_native = sg_native and sg_obj != null
 		for vx in range(cols):
 			for vz in range(cols):
 				var b: int = biome_grid[vx][vz]
@@ -2065,7 +2071,7 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				# đi theo add_aquatic_plants (chạy cho MỌI ô nước: hồ SILT/SAND/
 				# MUDDY_SAND lẫn biển nông, tự lọc is_ocean bên trong).
 				var aq_biome: int = b
-				if b == _Data.TileType.OCEAN_DEEP:
+				if b == _Data.TileType.OCEAN_DEEP and not sg_native:
 					var sea_wx: float = world_ox - half + (float(vx) + 0.5) * _Data.VOXEL
 					var sea_wz: float = world_oz - half + (float(vz) + 0.5) * _Data.VOXEL
 					_Grass.add_voxel_seagrass(vx, vz, pos2, grass_xforms, grass_colors,
@@ -2073,6 +2079,24 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
 					aq_biome == _Data.TileType.SILT, aq_biome, lotus_lights, plant_props, is_river, is_desert_water)
 		mesh_aquatic = st_aq.commit()
+		if sg_native:
+			var hflat_sg := PackedFloat64Array()
+			var bflat_sg := PackedInt32Array()
+			hflat_sg.resize(cols * cols)
+			bflat_sg.resize(cols * cols)
+			for vx in range(cols):
+				for vz in range(cols):
+					var si: int = vx * cols + vz
+					hflat_sg[si] = height_grid[vx][vz]
+					bflat_sg[si] = biome_grid[vx][vz]
+			var sgres: Dictionary = sg_obj.add_seagrass_chunk(half, cols,
+					hflat_sg, bflat_sg, _Data.WATER_Y, _Data.VOXEL, world_ox, world_oz)
+			var sgx: Array = sgres["xforms"]
+			var sgc: Array = sgres["colors"]
+			for x3 in sgx:
+				grass_xforms.append(x3)
+			for c3 in sgc:
+				grass_colors.append(c3)
 	_prof("S11 aquatic+plants")
 
 	# -- 8b..8l. Plant props (native WorldProps fast path) --
