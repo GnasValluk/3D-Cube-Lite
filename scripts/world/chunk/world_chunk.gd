@@ -53,6 +53,33 @@ static func _is_lava_bid(bid: int) -> bool:
 static func _snap_surface_y(h: float) -> float:
 	return floorf(h / _BlockData.SLAB_HEIGHT) * _BlockData.SLAB_HEIGHT
 
+## ── Build `oct` (Array[Array] 84²) từ s3_grid khi native ocean cho thẳng ──────
+## Chỉ gọi trong GD fallback (dist BFS / S4 fallback) — native path không cần.
+static func _oct_from_grid(s3_grid: PackedByteArray, oct_total: int) -> Array[Array]:
+	var out: Array[Array] = []
+	out.resize(oct_total)
+	for pvx in range(oct_total):
+		var row: Array = []
+		row.resize(oct_total)
+		out[pvx] = row
+		var base: int = pvx * oct_total
+		for pvz in range(oct_total):
+			row[pvz] = s3_grid[base + pvz] == 1
+	return out
+
+## ── Build `oct_small` (total²) từ `oct` (cắt viền OCEAN_PAD-PAD) ─────────────
+static func _oct_small_from_oct(oct: Array[Array], oct_total: int, total: int,
+		pad_shift: int) -> Array[Array]:
+	var out: Array[Array] = []
+	out.resize(total)
+	for pvx in range(total):
+		var row: Array = []
+		row.resize(total)
+		out[pvx] = row
+		for pvz in range(total):
+			row[pvz] = oct[pvx + pad_shift][pvz + pad_shift]
+	return out
+
 ## ── BFS đa nguồn (4-láng giềng, Manhattan) — thay multi-pass distance map ─────
 ## Nguồn = ô có giá trị != CONST_INF (0 cho source, sẵn giá trị band đầu nếu cần).
 ## Lan chỉ vào ô có mask==1 (mask rỗng → mọi ô). Kết quả y hệt multi-pass cũ.
@@ -1348,10 +1375,6 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		# ── Ocean mask (BFS padded) — stride 2, ~75% fewer noise calls ─────────
 		const OCEAN_PAD: int = 26
 		var oct_total: int = cols + 2 * OCEAN_PAD
-		var oct: Array[Array] = []
-		oct.resize(oct_total)
-		for pvx in range(oct_total):
-			oct[pvx] = []; oct[pvx].resize(oct_total)
 		# Native bulk: 1 call thay 1764 `_ocean_mask_at` (noise + islet hash).
 		# `s3_grid` = lưới ocean thô 0/1 (PackedByteArray, khớp oct_flat cho
 		# land_grid) — native cho thẳng, GD fallback build từ oct.
@@ -1361,13 +1384,16 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 			var grid: PackedByteArray = oc.ocean_grid(world_ox - half, world_oz - half, oct_total, SeedSnapshot.ensure())
 			if grid.size() == oct_total * oct_total:
 				s3_grid = grid
-				for pvx in range(oct_total):
-					var row := pvx * oct_total
-					for pvz in range(oct_total):
-						oct[pvx][pvz] = grid[row + pvz] == 1
 			else:
 				oc = null
+		# `oct` (Array[Array] 84²) + `oct_small` (total²) chỉ cần khi một GD
+		# fallback chạy (oc==null, hoặc dist/land fallback). Build lazy để native
+		# path không tốn ~0.7ms marshalling vô ích.
+		var oct: Array[Array] = []
 		if oc == null:
+			oct.resize(oct_total)
+			for pvx in range(oct_total):
+				oct[pvx] = []; oct[pvx].resize(oct_total)
 			for pvx in range(0, oct_total, 2):
 				for pvz in range(0, oct_total, 2):
 					var wx: float = world_ox - half + (float(pvx - OCEAN_PAD) + 0.5) * _Data.VOXEL
@@ -1386,13 +1412,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				var row := pvx * oct_total
 				for pvz in range(oct_total):
 					s3_grid[row + pvz] = 1 if oct[pvx][pvz] else 0
-
+		# Build oct_small + BFS fallback chỉ khi native dist không chạy được.
 		var oct_small: Array[Array] = []
-		oct_small.resize(total)
-		for pvx in range(total):
-			oct_small[pvx] = []; oct_small[pvx].resize(total)
-			for pvz in range(total):
-				oct_small[pvx][pvz] = oct[pvx + OCEAN_PAD - _Data.PAD][pvz + OCEAN_PAD - _Data.PAD]
 
 		const OCEAN_BUFFER: int = 45
 		var odst := PackedInt32Array()
@@ -1407,22 +1428,30 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 			shore_dst = rd3["shore_dst"]
 			oct_mask = rd3["oct_mask"]
 		if odst.size() != total * total:
+			# GD fallback: build oct/oct_small từ s3_grid (native ocean đã cho thẳng).
+			var oct_fb: Array[Array] = oct
+			if oct_fb.is_empty():
+				oct_fb = _oct_from_grid(s3_grid, oct_total)
+				oct = oct_fb
+			var oct_small_fb: Array[Array] = oct_small
+			if oct_small_fb.is_empty():
+				oct_small_fb = _oct_small_from_oct(oct_fb, oct_total, total, OCEAN_PAD - _Data.PAD)
 			odst.resize(total * total)
 			for i in range(total * total):
-				odst[i] = 0 if oct_small[i / total][i % total] else _Data.CONST_INF
+				odst[i] = 0 if oct_small_fb[i / total][i % total] else _Data.CONST_INF
 			_bfs_manhattan(odst, total)
 			shore_dst.resize(total * total)
 			oct_mask.resize(total * total)
 			for pvx in range(total):
 				for pvz in range(total):
-					var is_oc: bool = oct_small[pvx][pvz]
+					var is_oc: bool = oct_small_fb[pvx][pvz]
 					oct_mask[pvx * total + pvz] = 1 if is_oc else 0
 					if is_oc:
 						var adj_land: bool = false
-						if pvx > 0 and not oct_small[pvx-1][pvz]: adj_land = true
-						elif pvx < total-1 and not oct_small[pvx+1][pvz]: adj_land = true
-						elif pvz > 0 and not oct_small[pvx][pvz-1]: adj_land = true
-						elif pvz < total-1 and not oct_small[pvx][pvz+1]: adj_land = true
+						if pvx > 0 and not oct_small_fb[pvx-1][pvz]: adj_land = true
+						elif pvx < total-1 and not oct_small_fb[pvx+1][pvz]: adj_land = true
+						elif pvz > 0 and not oct_small_fb[pvx][pvz-1]: adj_land = true
+						elif pvz < total-1 and not oct_small_fb[pvx][pvz+1]: adj_land = true
 						shore_dst[pvx * total + pvz] = 1 if adj_land else _Data.CONST_INF
 					else:
 						shore_dst[pvx * total + pvz] = _Data.CONST_INF
@@ -1463,6 +1492,12 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				else:
 					s4_native_ok = false
 		if not s4_native_ok:
+			# GD fallback: đảm bảo oct/oct_small được build (native ocean chỉ cho
+			# s3_grid mà không xây 2 Array[Array] này).
+			if oct.is_empty():
+				oct = _oct_from_grid(s3_grid, oct_total)
+			if oct_small.is_empty():
+				oct_small = _oct_small_from_oct(oct, oct_total, total, OCEAN_PAD - _Data.PAD)
 			# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────────
 			const MAX_OCEAN_DEPTH_DIST: int = 30
 			for ivx in range(cols):
