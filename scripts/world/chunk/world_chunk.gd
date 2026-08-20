@@ -229,6 +229,30 @@ static var _force_s9_gd: bool = false
 ## Test hook: ép dùng GDScript add_voxel_seagrass (S11) để A/B so sánh bit-exact.
 static var _force_s11_gd: bool = false
 
+## Native WorldAquatic bridge (S11b aquatic plants) — lazy tạo 1 lần; null nếu thiếu DLL.
+static var _native_aq: Object = null
+static func _native_aquatic() -> Object:
+	if _native_aq == null and ClassDB.class_exists("WorldAquatic"):
+		_native_aq = ClassDB.instantiate("WorldAquatic")
+	return _native_aq
+
+## Test hook: ép dùng GDScript _Aquatic.add_aquatic_plants (S11b) để A/B so sánh bit-exact.
+static var _force_s11a_gd: bool = false
+
+## Wrap {verts, normals, colors} native aquatic → ArrayMesh (giống _water_mesh_from_arrays).
+static func _aquatic_mesh_from_arrays(verts: PackedVector3Array,
+		normals: PackedVector3Array, colors: PackedColorArray) -> ArrayMesh:
+	if verts.is_empty():
+		return null
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts
+	arr[Mesh.ARRAY_NORMAL] = normals
+	arr[Mesh.ARRAY_COLOR] = colors
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m
+
 ## Native WorldWater bridge (S10 water_mesh) — lazy tạo 1 lần; null nếu thiếu DLL.
 static var _native_wt: Object = null
 static func _native_watermesh() -> Object:
@@ -2072,43 +2096,69 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	var lotus_lights: Array[Vector3] = []
 	var plant_props: Array[Dictionary] = []
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
-		var st_aq := SurfaceTool.new()
-		st_aq.begin(Mesh.PRIMITIVE_TRIANGLES)
 		var sg_native := not _force_s11_gd
 		var sg_obj: Object = _native_grass() if sg_native else null
 		sg_native = sg_native and sg_obj != null
-		for vx in range(cols):
-			for vz in range(cols):
-				var b: int = biome_grid[vx][vz]
-				var h: float = height_grid[vx][vz]
-				# Hồ: SAND/SAND_WHITE/SILT/MUDDY_SAND; biển nông: OCEAN_DEEP
-				if b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE \
-						and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND \
-						and b != _Data.TileType.OCEAN_DEEP: continue
-				if h > _Data.WATER_Y: continue
-				var px2: float = -half + (float(vx) + 0.5) * _Data.VOXEL
-				var pz2: float = -half + (float(vz) + 0.5) * _Data.VOXEL
-				var pos2 := Vector3(px2, h, pz2)
-				var is_river: bool = river_flag[vx * cols + vz] == 1
-				# Cấm môn ngọt ở sa mạc: ô thuộc vùng DESERT (mask theo base_bio,
-				# chính xác qua biên chunk) HOẶC có đất sa mạc trong 3 ô (hồ cát
-				# giáp ranh sa mạc cũng bị cấm).
-				var is_desert_water: bool = dmask[(vx + _Data.PAD) * total + (vz + _Data.PAD)] == 1
-				if not is_desert_water and (b == _Data.TileType.SAND or b == _Data.TileType.MUDDY_SAND):
-					if dland[vx * cols + vz] <= 3:
-						is_desert_water = true
-				# Cỏ biển multimesh — chỉ đáy biển nông OCEAN_DEEP; rong/taro/lotus
-				# đi theo add_aquatic_plants (chạy cho MỌI ô nước: hồ SILT/SAND/
-				# MUDDY_SAND lẫn biển nông, tự lọc is_ocean bên trong).
-				var aq_biome: int = b
-				if b == _Data.TileType.OCEAN_DEEP and not sg_native:
-					var sea_wx: float = world_ox - half + (float(vx) + 0.5) * _Data.VOXEL
-					var sea_wz: float = world_oz - half + (float(vz) + 0.5) * _Data.VOXEL
-					_Grass.add_voxel_seagrass(vx, vz, pos2, grass_xforms, grass_colors,
-						cols, _Data.WATER_Y - h, sea_wx, sea_wz)
-				_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
-					aq_biome == _Data.TileType.SILT, aq_biome, lotus_lights, plant_props, is_river, is_desert_water)
-		mesh_aquatic = st_aq.commit()
+		var aq_native := not _force_s11a_gd
+		var aq_obj: Object = _native_aquatic() if aq_native else null
+		aq_native = aq_native and aq_obj != null
+		if aq_native:
+			var bflat_aq := PackedInt32Array()
+			var hflat_aq := PackedFloat64Array()
+			bflat_aq.resize(cols * cols)
+			hflat_aq.resize(cols * cols)
+			for vx in range(cols):
+				for vz in range(cols):
+					var ai: int = vx * cols + vz
+					bflat_aq[ai] = biome_grid[vx][vz]
+					hflat_aq[ai] = height_grid[vx][vz]
+			var aqres: Dictionary = aq_obj.build_aquatic(cx, cz, cols,
+					total, _Data.PAD, half, _Data.VOXEL, _Data.WATER_Y,
+					bflat_aq, hflat_aq, river_flag, dmask, dland)
+			mesh_aquatic = _aquatic_mesh_from_arrays(aqres["verts"],
+					aqres["normals"], aqres["colors"])
+			for lv in aqres["lotus_lights"]:
+				lotus_lights.append(lv)
+			for pp in aqres["plant_props"]:
+				plant_props.append(pp)
+		# Loop chỉ cần chạy khi 1 trong 2 còn GD: aquatic plants (chưa native)
+		# hoặc seagrass (đang force _force_s11_gd). Cả 2 native → skip hẳn.
+		if not aq_native or not sg_native:
+			var st_aq := SurfaceTool.new()
+			st_aq.begin(Mesh.PRIMITIVE_TRIANGLES)
+			for vx in range(cols):
+				for vz in range(cols):
+					var b: int = biome_grid[vx][vz]
+					var h: float = height_grid[vx][vz]
+					# Hồ: SAND/SAND_WHITE/SILT/MUDDY_SAND; biển nông: OCEAN_DEEP
+					if b != _Data.TileType.SAND and b != _Data.TileType.SAND_WHITE \
+							and b != _Data.TileType.SILT and b != _Data.TileType.MUDDY_SAND \
+							and b != _Data.TileType.OCEAN_DEEP: continue
+					if h > _Data.WATER_Y: continue
+					var px2: float = -half + (float(vx) + 0.5) * _Data.VOXEL
+					var pz2: float = -half + (float(vz) + 0.5) * _Data.VOXEL
+					var pos2 := Vector3(px2, h, pz2)
+					var is_river: bool = river_flag[vx * cols + vz] == 1
+					# Cấm môn ngọt ở sa mạc: ô thuộc vùng DESERT (mask theo base_bio,
+					# chính xác qua biên chunk) HOẶC có đất sa mạc trong 3 ô (hồ cát
+					# giáp ranh sa mạc cũng bị cấm).
+					var is_desert_water: bool = dmask[(vx + _Data.PAD) * total + (vz + _Data.PAD)] == 1
+					if not is_desert_water and (b == _Data.TileType.SAND or b == _Data.TileType.MUDDY_SAND):
+						if dland[vx * cols + vz] <= 3:
+							is_desert_water = true
+					# Cỏ biển multimesh — chỉ đáy biển nông OCEAN_DEEP; rong/taro/lotus
+					# đi theo add_aquatic_plants (chạy cho MỌI ô nước: hồ SILT/SAND/
+					# MUDDY_SAND lẫn biển nông, tự lọc is_ocean bên trong).
+					if b == _Data.TileType.OCEAN_DEEP and not sg_native:
+						var sea_wx: float = world_ox - half + (float(vx) + 0.5) * _Data.VOXEL
+						var sea_wz: float = world_oz - half + (float(vz) + 0.5) * _Data.VOXEL
+						_Grass.add_voxel_seagrass(vx, vz, pos2, grass_xforms, grass_colors,
+							cols, _Data.WATER_Y - h, sea_wx, sea_wz)
+					if not aq_native:
+						_Aquatic.add_aquatic_plants(st_aq, cx, cz, size, vx, vz, pos2, h_vox,
+							b == _Data.TileType.SILT, b, lotus_lights, plant_props, is_river, is_desert_water)
+			if not aq_native:
+				mesh_aquatic = st_aq.commit()
 		if sg_native:
 			var hflat_sg := PackedFloat64Array()
 			var bflat_sg := PackedInt32Array()
