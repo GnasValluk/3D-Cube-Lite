@@ -204,6 +204,9 @@ static func _native_dist() -> Object:
 ## Test hook: ép dùng GDScript S6b để A/B so sánh bit-exact.
 static var _force_s6_gd: bool = false
 
+## Test hook: ép dùng GDScript S5 (river override) để A/B so sánh bit-exact.
+static var _force_s5_gd: bool = false
+
 static var _native_wp: Object = null
 
 ## Native WorldProps bridge (S12 plant_props) — lazy tạo 1 lần; null nếu thiếu DLL.
@@ -1878,55 +1881,86 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				orig_heights[ivx][ivz] = height_grid[ivx][ivz]
 		var river_factors := _River.river_distance_factors(
 			world_ox - half, world_oz - half, cols)
-		for ivx in range(cols):
-			for ivz in range(cols):
-				var bg: int = biome_grid[ivx][ivz]
-				if bg == _Data.TileType.OCEAN_DEEP:
-					continue
-				var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
-				var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
-				var factor: float = river_factors[ivx * cols + ivz]
-				if factor >= 0.0:
-					var orig_h: float = height_grid[ivx][ivz]
-					var bottom_var: float = _river_noise.get_noise_2d(wx * 0.5, wz * 0.5) * 1.5 * _BlockData.SLAB_HEIGHT
-					var deep_h: float = _Data.WATER_Y - 6.0 * _BlockData.SLAB_HEIGHT + bottom_var
-					var t: float = clamp(factor, 0.0, 1.0)
-					t = t * t * (3.0 - 2.0 * t)
-					if orig_h <= _Data.WATER_Y:
-						height_grid[ivx][ivz] = lerp(deep_h, orig_h, t)
-					else:
-						height_grid[ivx][ivz] = lerp(deep_h, max(orig_h, _Data.WATER_Y - 0.1), t)
-					if t < 0.4:
-						var bed_n: float = (_river_bed_noise.get_noise_2d(wx * 1.5, wz * 1.5) + 1.0) * 0.5
-						if bed_n < 0.25:
-							biome_grid[ivx][ivz] = _Data.TileType.SAND
-						elif bed_n < 0.55:
-							biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
-						else:
-							biome_grid[ivx][ivz] = _Data.TileType.SILT
-					else:
-						biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
-					river_flag[ivx * cols + ivz] = 1
-		# Flatten river banks at lake boundary
-		var dirs4: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
-		for ivx in range(cols):
-			for ivz in range(cols):
-				if river_flag[ivx * cols + ivz] == 0:
-					continue
-				if height_grid[ivx][ivz] <= _Data.WATER_Y:
-					continue
-				var adjacent_to_lake: bool = false
-				for d in dirs4:
-					var nx: int = ivx + d.x
-					var nz: int = ivz + d.y
-					if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
+		var r5_native := not _force_s5_gd
+		var r5_obj: Object = _River._native_river() if r5_native else null
+		r5_native = r5_native and r5_obj != null
+		if r5_native:
+			# Native 1 call: đẩy flat biome/height, native ghi đè river + flatten
+			# bank như GD. Trả về nguyên cụm để GD chỉ copy ngược lại grids.
+			var bflat5 := PackedInt32Array()
+			var hflat5 := PackedFloat64Array()
+			bflat5.resize(cols * cols)
+			hflat5.resize(cols * cols)
+			for ivx in range(cols):
+				var ri: int = ivx * cols
+				for ivz in range(cols):
+					bflat5[ri + ivz] = biome_grid[ivx][ivz]
+					hflat5[ri + ivz] = height_grid[ivx][ivz]
+			var res5: Dictionary = r5_obj.apply_river(world_ox - half, world_oz - half,
+					cols, SeedSnapshot.ensure(), bflat5, hflat5, river_factors)
+			var b5: PackedInt32Array = res5.get("biome", PackedInt32Array())
+			var h5: PackedFloat64Array = res5.get("height", PackedFloat64Array())
+			var f5: PackedByteArray = res5.get("river_flag", PackedByteArray())
+			if b5.size() == cols * cols and h5.size() == cols * cols and f5.size() == cols * cols:
+				for ivx in range(cols):
+					var ri: int = ivx * cols
+					for ivz in range(cols):
+						biome_grid[ivx][ivz] = b5[ri + ivz]
+						height_grid[ivx][ivz] = h5[ri + ivz]
+						river_flag[ri + ivz] = f5[ri + ivz]
+			else:
+				r5_native = false
+		if not r5_native:
+			for ivx in range(cols):
+				for ivz in range(cols):
+					var bg: int = biome_grid[ivx][ivz]
+					if bg == _Data.TileType.OCEAN_DEEP:
 						continue
-					if orig_heights[nx][nz] <= _Data.WATER_Y and height_grid[nx][nz] <= _Data.WATER_Y:
-						adjacent_to_lake = true
-						break
-				if adjacent_to_lake:
-					height_grid[ivx][ivz] = _Data.WATER_Y - 0.1
-					biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+					var wx: float = world_ox - half + (float(ivx) + 0.5) * _Data.VOXEL
+					var wz: float = world_oz - half + (float(ivz) + 0.5) * _Data.VOXEL
+					var factor: float = river_factors[ivx * cols + ivz]
+					if factor >= 0.0:
+						var orig_h: float = height_grid[ivx][ivz]
+						var bottom_var: float = _river_noise.get_noise_2d(wx * 0.5, wz * 0.5) * 1.5 * _BlockData.SLAB_HEIGHT
+						var deep_h: float = _Data.WATER_Y - 6.0 * _BlockData.SLAB_HEIGHT + bottom_var
+						var t: float = clamp(factor, 0.0, 1.0)
+						t = t * t * (3.0 - 2.0 * t)
+						if orig_h <= _Data.WATER_Y:
+							height_grid[ivx][ivz] = lerp(deep_h, orig_h, t)
+						else:
+							height_grid[ivx][ivz] = lerp(deep_h, max(orig_h, _Data.WATER_Y - 0.1), t)
+						if t < 0.4:
+							var bed_n: float = (_river_bed_noise.get_noise_2d(wx * 1.5, wz * 1.5) + 1.0) * 0.5
+							if bed_n < 0.25:
+								biome_grid[ivx][ivz] = _Data.TileType.SAND
+							elif bed_n < 0.55:
+								biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+							else:
+								biome_grid[ivx][ivz] = _Data.TileType.SILT
+						else:
+							biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
+						river_flag[ivx * cols + ivz] = 1
+		if not r5_native:
+			# Flatten river banks at lake boundary (native đã làm việc này)
+			var dirs4: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
+			for ivx in range(cols):
+				for ivz in range(cols):
+					if river_flag[ivx * cols + ivz] == 0:
+						continue
+					if height_grid[ivx][ivz] <= _Data.WATER_Y:
+						continue
+					var adjacent_to_lake: bool = false
+					for d in dirs4:
+						var nx: int = ivx + d.x
+						var nz: int = ivz + d.y
+						if nx < 0 or nx >= cols or nz < 0 or nz >= cols:
+							continue
+						if orig_heights[nx][nz] <= _Data.WATER_Y and height_grid[nx][nz] <= _Data.WATER_Y:
+							adjacent_to_lake = true
+							break
+					if adjacent_to_lake:
+						height_grid[ivx][ivz] = _Data.WATER_Y - 0.1
+						biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
 	_prof("S5 river")
 
 
