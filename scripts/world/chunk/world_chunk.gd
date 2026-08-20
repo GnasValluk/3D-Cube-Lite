@@ -1380,6 +1380,10 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	var height_grid: Array[Array] = []
 	height_grid.resize(cols)
 
+	var s4_native_ok := false
+	var b4 := PackedInt32Array()
+	var h4 := PackedFloat64Array()
+
 	var beach_mask: PackedByteArray
 	beach_mask.resize(cols * cols)
 	beach_mask.fill(0)
@@ -1491,7 +1495,6 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		_prof("S3 ocean_mask+bfs")
 
 		# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────
-		var s4_native_ok := false
 		var ws4 := _native_land()
 		if ws4 != null and not _force_s4_gd:
 			var bio_flat4 := bio_flat
@@ -1507,8 +1510,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 					oct_total, SeedSnapshot.ensure(), bio_flat4, oct_flat, odst, shore_dst)
 			if res4.size() >= 5 and (res4["biome"] as PackedInt32Array).size() == cols * cols:
 				s4_native_ok = true
-				var b4: PackedInt32Array = res4["biome"]
-				var h4: PackedFloat64Array = res4["height"]
+				b4 = res4["biome"]
+				h4 = res4["height"]
 				var bc4: PackedByteArray = res4["beach"]
 				var rf4: PackedFloat32Array = res4["reef"]
 				var dm4: PackedByteArray = res4["dmask"]
@@ -1947,11 +1950,6 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		_ensure_river_noise()
 		river_flag.resize(cols * cols)
 		var orig_heights: Array[Array] = []
-		orig_heights.resize(cols)
-		for ivx in range(cols):
-			orig_heights[ivx] = []; orig_heights[ivx].resize(cols)
-			for ivz in range(cols):
-				orig_heights[ivx][ivz] = height_grid[ivx][ivz]
 		var river_factors := _River.river_distance_factors(
 			world_ox - half, world_oz - half, cols)
 		var r5_native := not _force_s5_gd
@@ -1960,30 +1958,57 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		if r5_native:
 			# Native 1 call: đẩy flat biome/height, native ghi đè river + flatten
 			# bank như GD. Trả về nguyên cụm để GD chỉ copy ngược lại grids.
-			var bflat5 := PackedInt32Array()
-			var hflat5 := PackedFloat64Array()
-			bflat5.resize(cols * cols)
-			hflat5.resize(cols * cols)
-			for ivx in range(cols):
-				var ri: int = ivx * cols
-				for ivz in range(cols):
-					bflat5[ri + ivz] = biome_grid[ivx][ivz]
-					hflat5[ri + ivz] = height_grid[ivx][ivz]
+			var bflat5: PackedInt32Array
+			var hflat5: PackedFloat64Array
+			if s4_native_ok and b4.size() == cols * cols and h4.size() == cols * cols:
+				# grid chưa bị sửa từ sau S4 native → reuse thẳng flat khỏi rebuild
+				bflat5 = b4
+				hflat5 = h4
+			else:
+				bflat5 = PackedInt32Array()
+				hflat5 = PackedFloat64Array()
+				bflat5.resize(cols * cols)
+				hflat5.resize(cols * cols)
+				for ivx in range(cols):
+					var ri: int = ivx * cols
+					for ivz in range(cols):
+						bflat5[ri + ivz] = biome_grid[ivx][ivz]
+						hflat5[ri + ivz] = height_grid[ivx][ivz]
 			var res5: Dictionary = r5_obj.apply_river(world_ox - half, world_oz - half,
-					cols, SeedSnapshot.ensure(), bflat5, hflat5, river_factors)
+				cols, SeedSnapshot.ensure(), bflat5, hflat5, river_factors)
 			var b5: PackedInt32Array = res5.get("biome", PackedInt32Array())
 			var h5: PackedFloat64Array = res5.get("height", PackedFloat64Array())
 			var f5: PackedByteArray = res5.get("river_flag", PackedByteArray())
 			if b5.size() == cols * cols and h5.size() == cols * cols and f5.size() == cols * cols:
-				for ivx in range(cols):
-					var ri: int = ivx * cols
-					for ivz in range(cols):
-						biome_grid[ivx][ivz] = b5[ri + ivz]
-						height_grid[ivx][ivz] = h5[ri + ivz]
-						river_flag[ri + ivz] = f5[ri + ivz]
+				if s4_native_ok and bflat5.size() == cols * cols and hflat5.size() == cols * cols:
+					# Native chỉ đổi cell sông (rf!=0) — cell khác == bflat5/hflat5
+					# (= grids hiện tại từ S4) → chỉ copy lại cell sông.
+					for ivx in range(cols):
+						var ri: int = ivx * cols
+						for ivz in range(cols):
+							if f5[ri + ivz] == 0:
+								continue
+							biome_grid[ivx][ivz] = b5[ri + ivz]
+							height_grid[ivx][ivz] = h5[ri + ivz]
+							river_flag[ri + ivz] = 1
+				else:
+					for ivx in range(cols):
+						var ri: int = ivx * cols
+						for ivz in range(cols):
+							biome_grid[ivx][ivz] = b5[ri + ivz]
+							height_grid[ivx][ivz] = h5[ri + ivz]
+							river_flag[ri + ivz] = f5[ri + ivz]
 			else:
 				r5_native = false
 		if not r5_native:
+			# GD-only: capture PRE-river heights (nước), dùng cho bank flatten.
+			# Build TRƯỚC khi override mutate height_grid — nếu sau thì orig_heights
+			# chứa height đã đào sông → flatten sai (flatten thừa ô không có hồ).
+			orig_heights.resize(cols)
+			for ivx in range(cols):
+				orig_heights[ivx] = []; orig_heights[ivx].resize(cols)
+				for ivz in range(cols):
+					orig_heights[ivx][ivz] = height_grid[ivx][ivz]
 			for ivx in range(cols):
 				for ivz in range(cols):
 					var bg: int = biome_grid[ivx][ivz]
@@ -2014,7 +2039,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 							biome_grid[ivx][ivz] = _Data.TileType.MUDDY_SAND
 						river_flag[ivx * cols + ivz] = 1
 		if not r5_native:
-			# Flatten river banks at lake boundary (native đã làm việc này)
+			# Flatten river banks at lake boundary (native đã làm việc này).
+			# orig_heights đã được capture TRƯỚC override ở trên ≈ pre-river heights.
 			var dirs4: Array[Vector2i] = [Vector2i(1,0), Vector2i(-1,0), Vector2i(0,1), Vector2i(0,-1)]
 			for ivx in range(cols):
 				for ivz in range(cols):

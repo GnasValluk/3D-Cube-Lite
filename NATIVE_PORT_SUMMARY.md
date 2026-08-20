@@ -26,7 +26,7 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
 | S11a aquatic plants (WorldAquatic.build_aquatic) | (S11a) | S11 aquatic+plants 2.0-2.75→0.38-0.39ms; A/B 11/11 suites green (aquatic 28/28: mesh 108-0 verts, lotus_lights, plant_props 0-33 bit-exact) |
 | S13b ore (WorldOre.build_textured_block_mesh) | (S13b) | S13b ore 0.79-0.80→0.68-0.70ms; A/B 13/13 (ore ids + mesh verts/normals/colors/uvs bit-exact; chunk(5,-3) 20+33, chunk(-3,7) 17) |
 | S6a road_grid (WorldRoad.paint_grid) | (S6a) | S6a road_grid 0.13-0.80→0.14-0.25ms; A/B 10/10 (801 road cells native=gd bit-exact) |
-| S5 river override (WorldRiver.apply_river) | (S5) | S5 river 0.42-0.53ms (bỏ hẳn loop GD); A/B 9/9 bit-exact (chunk(0,0) 14 river cells, chunk(5,-3) 242 cells) |
+| S5 river override (WorldRiver.apply_river) | (S5) | S5 river 0.42-0.53→0.28-0.49ms (bỏ hẳn loop GD + marshalling); A/B 9/9 bit-exact (chunk(0,0) 14 river cells, chunk(5,-3) 242 cells) |
 | S8 terrain_mesh (WorldTerrain.build_terrain_mesh_mesh) | (S8) | S8 1.08-1.38→0.98-1.19ms (ArrayMesh C++ trực tiếp, bỏ Dictionary round-trip); bit-exact 0/12282 mismatch vs GD fallback; 13 regression suites green |
 | S3 marshalling lazy (bỏ oct/oct_small GD khi native) | (S3) | S3 ocean_mask+bfs 0.91-1.30→0.13-0.33ms; oct/oct_small (Array[Array] 84²+total²) build lazy chỉ khi GD fallback chạy; native path không còn ~0.7ms marshalling vô ích; 9/9 forced-GD A/B bit-exact + 12 suites green |
 | S13b gate scan (WorldOre.scan_textured_blocks) | (S13b2) | S13b ore 0.68-0.70→0.03-0.06ms; scan gate (max_top_ly + has_ore_blocks) chuyển sang C++ — GD chỉ còn 2 loop get_block/column khi forced-gd; A/B 13/13 + 13 regression suites green |
@@ -120,19 +120,35 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
 - A/B: `_native_land_test` 9/9 PASS maxdiff 0.0 (biome+height+reef). 14 regression suites green (thêm `_native_bfsdst_test` 15 PASS).
 - Profile (seed 20260802, 3 chunk): S4 land_grid 0.77-1.03 → 0.56-0.66ms; S4 total ~1.0-1.4 → 0.80-0.91ms (prep 0.02 + call + copy-back 0.21).
 
+### S5 marshalling tối ưu chi tiết (world_chunk.gd S5 block)
+- Trước: dù `apply_river` đã native, GD vẫn (a) rebuild `bflat5/hflat5` từ grids 32², (b) build `orig_heights` vô điều kiện, (c) copy-back toàn bộ 32² biome/height/river_flag → ~0.26ms marshalling không cần thiết.
+- Sau:
+  - Hoist `s4_native_ok`/`b4`/`h4` lên function scope (trước `if dim_id == REAL_WORLD` — GDScript block-scope không chia sẻ giữa S4 và S5) → S5 reuse `b4/h4` thẳng làm `bflat5/hflat5` (grid không đổi từ sau S4 native) khi `s4_native_ok`; else rebuild như cũ. S5b flatten 0.28 → 0.02-0.03ms.
+  - `orig_heights` build lazy vào nhánh `not r5_native` (bản gốc build mọi path) — nhưng phải capture NGAY TRƯỚC river override loop (override mutate `height_grid` cho cell sông). Bug gặp khi đặt build SAU override: `orig_heights` chứa height đã đào sông → flatten thừa ô (nghĩ neighbor là hồ) → `_native_river_override_test` 2 fail (8 pass) ở các ô sông giáp bờ chunk(0,0)/(5,-3), gd=0.400000 (WATER_Y-0.1) vs nat 0.53-1.12. Fix = build trước override → 10/10 PASS.
+  - Copy-back chỉ cell sông (`rf5[i] != 0`) khi `s4_native_ok` + flat size đủ (native chỉ đổi cell sông; cell khác == grids hiện tại từ S4) → S5c apply+copy 0.16-0.45 → 0.07-0.45ms (chunk(1,0) vẫn nặng vì nhiều river cell).
+- A/B: `_native_river_override_test` 10/10 PASS + `_native_river_test` 0 fail; full 14 regression suites green.
+- Profile (seed 20260802, 3 chunk): S5a factors 0.09-0.32 (river_distance_factors C++), S5b flatten 0.02-0.03, S5c apply+copy 0.07-0.45, S5 river (native apply_river) 0.03-0.08; S5 total ~0.28-0.58 → ~0.28-0.49ms.
+
+### S8 khảo sát sâu (WorldTerrain timers) — kết luận: đã tối ưu sát
+- Split GD bằng marker tạm S8a top_ly / S8b native build: S8a 0.14-0.22ms (loop GD top_ly_hint), S8b 0.83-2.97ms.
+- Thêm timer C++ trong `build_terrain_mesh_mesh` (`Time::get_ticks_usec` + print `[tdbg] geom/pack/surf/verts`): geom (greedy mesher) 174-885µs, pack (fill_packed_arrays) 61-286µs, surf (engine `add_surface_from_arrays`) 468-1054µs, verts 7026-12282.
+- Kết luận: S8 đã tối ưu sát — `surf` là upload vertex thật của engine (không cắt được), geom/pack hợp lý. S8a top_ly (loop GD) 0.14-0.22ms có thể chuyển C++ sau nhưng ưu tiên thấp — không đào sâu thêm, chuyển sang S5/S10.
+
 ## Đang làm
-- (không — đang xét tiếp hotspot, ưu tiên S8 terrain_mesh / S5 river / S10 water_mesh)
+- (không — đang xét tiếp hotspot, ưu tiên S10 water_mesh / S1 / S4 copy-back)
 
 ## Hotspot hiện tại (test_prof_chunk, non-first chunks — bỏ artifact chunk đầu)
-Sau S11a/S12/S9/S2/S10/S5/S8/S3-marshalling/S13b-scan/S1S2-flat-bio/S4-lake-cache, các phase còn lại lớn nhất (chunk(0,0) khi không đầu): S8 terrain_mesh 0.87-1.97, S5 river 0.44-0.82, S10 water_mesh 0.37-0.80, S1 biome_sample 0.52-0.56, S4 biome_grid+height 0.80-0.91 (land_grid 0.56-0.66 computation thật + copy-back 0.21), S3 ocean_mask+bfs 0.13-0.33, S11 aquatic+plants 0.30-0.36. S13b ore 0.03-0.04, S13c tavern ~0.02.
+Sau S11a/S12/S9/S2/S10/S5/S8/S3-marshalling/S13b-scan/S1S2-flat-bio/S4-lake-cache, các phase còn lại lớn nhất (chunk(0,0) khi không đầu): S10 water_mesh 0.37-0.80, S1 biome_sample 0.52-0.56, S4 biome_grid+height 0.80-0.91 (land_grid 0.56-0.66 computation thật + copy-back 0.21), S8 terrain_mesh 0.87-1.97 (sau khảo sát: surf engine + geom/pack hợp lý — đã tối ưu sát, không đào sâu nữa), S5 river 0.28-0.49 (sau marshalling tối ưu), S3 ocean_mask+bfs 0.13-0.33, S11 aquatic+plants 0.30-0.36. S13b ore 0.03-0.06, S13c tavern ~0.02.
 Lưu ý: chunk ĐẦU TIÊN trong 1 tiến trình luôn có S2 ~8ms (artifact harness: stdout flush/GC đầu compute — verified bằng reorder: chunk đầu nào cũng ~8ms, còn là 0.7-1.1ms).
 
 ## Next steps (candidates)
-1. S8 terrain_mesh (0.87-1.97ms) — ArrayMesh C++ trực tiếp rồi, engine build mesh + GD surface assign là phần còn lại; xem còn giảm được gì (surface format, pre-alloc).
-2. S5 river (0.44-0.82ms) — đã native apply_river; phần còn lại có thể là loop GD set height/biome sau river override.
+1. S8 terrain_mesh — KHẢO SÁT XONG: surf (engine add_surface_from_arrays) 0.47-1.05ms không cắt được; geom/pack hợp lý; S8a top_ly 0.14-0.22ms có thể chuyển C++ nếu muốn (ưu tiên thấp).
+2. S5 river — XONG: marshalling 0.28→0.02-0.03 (reuse b4/h4), copy-back chỉ cell sông, orig_heights lazy (capture trước override); S5 0.44-0.82→0.28-0.49ms.
 3. S10 water_mesh (0.37-0.80ms) — đã native; phần còn lại engine ArrayMesh + GD surface assign.
 4. S1 biome_sample (0.52-0.56ms) — native compute_biome_grid rồi; noise stack thật, khó cắt hơn nữa.
 5. S4 copy-back 0.21ms — GD loop copy flat→Array[Array] (biome/height 32² + dmask 42²); có thể giảm nếu S5-S13 đọc flat trực tiếp (như đã làm S2/S4).
+
+## Triển khai tiếp
 2. S13c tavern/village — bỏ qua (663 dòng, ~0.6ms, deterministic).
 3. S9 tiếp: native trả flat `PackedFloat32Array` n×16 cho `_multimesh_buffer` trực tiếp (bỏ Variant boxing ~1.5ms+).
 4. S13b ore — mesh build đã native; gate scan 0.68→0.03-0.06ms.
@@ -144,6 +160,7 @@ Lưu ý: chunk ĐẦU TIÊN trong 1 tiến trình luôn có S2 ~8ms (artifact ha
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_aquatic.{h,cpp}` — native S11a.
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_ore.{h,cpp}` — native S13b (build_textured_block_mesh + scan_textured_blocks).
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_river.{h,cpp}` — native S5 (apply_river + factors_grid + set_curves).
+- `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_terrain.{h,cpp}` — native S8 (build_terrain_mesh_mesh; tạm có timer `[tdbg]` cần gỡ trước build cuối).
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_bfsdst.{h,cpp}` — native S2 (bfs_dst Array + bfs_dst_flat).
 - `scripts\world\chunk\chunk_grass.gd` — nguồn tham chiếu (264 dòng, deterministic).
 - `scripts\world\chunk\chunk_aquatic.gd` — nguồn tham chiếu S11a (383 dòng, deterministic).
