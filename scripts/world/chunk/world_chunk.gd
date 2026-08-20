@@ -215,6 +215,17 @@ static func _native_props() -> Object:
 ## Test hook: ép dùng GDScript S12 (hash) để A/B so sánh bit-exact.
 static var _force_s12_gd: bool = false
 
+static var _native_g2: Object = null
+
+## Native WorldGrass bridge (S9 grass) — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_grass() -> Object:
+	if _native_g2 == null and ClassDB.class_exists("WorldGrass"):
+		_native_g2 = ClassDB.instantiate("WorldGrass")
+	return _native_g2
+
+## Test hook: ép dùng GDScript S9 để A/B so sánh bit-exact.
+static var _force_s9_gd: bool = false
+
 static func _ocean_mask_at(nd: Dictionary, wx: float, wz: float) -> bool:
 	# Thread-safe cache theo ô thế giới: lưới ocean stride-2 (42×42) của 2 chunk
 	# kề nhau overlap ~62% số sample — dùng chung bỏ qua FastNoiseLite FBM lặp.
@@ -671,6 +682,31 @@ static func _cell_hash01(vx: int, vz: int) -> float:
 	x = (x ^ (x >> 17)) * 449984367
 	x = x ^ (x >> 13)
 	return float(x & 0x7FFFFFFF) / 2147483648.0
+
+## S9 GD fallback — mirror native WorldGrass.add_grass_chunk (bit-exact).
+static func _grass_gd_fallback(grass_xforms: Array, grass_colors: Array,
+		half: float, cols: int, fast_mode: bool, height_grid: Array, biome_grid: Array,
+		wdist: PackedInt32Array, hdist: PackedInt32Array, road_grid: PackedByteArray) -> void:
+	for vx in range(cols):
+		for vz in range(cols):
+			var h: float = height_grid[vx][vz]
+			var px: float = -half + (float(vx) + 0.5) * _Data.VOXEL
+			var pz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
+			var pos := Vector3(px, h, pz)
+			var is_road: bool = road_grid.size() > 0 and road_grid[vx * cols + vz] != 0
+			var i_g: int = vx * cols + vz
+			var near_water: bool = wdist[i_g] <= 3
+			var hill_foot: bool = hdist[i_g] != _Data.CONST_INF and hdist[i_g] <= 2
+			if not fast_mode and not is_road and h >= _Data.VOXEL * 0.9 \
+					and (near_water or hill_foot) \
+					and not (height_grid[vx][vz] <= _Data.WATER_Y) \
+					and biome_grid[vx][vz] != _Data.TileType.DESERT \
+					and biome_grid[vx][vz] != _Data.TileType.FROST \
+					and biome_grid[vx][vz] != _Data.TileType.FROST_SNOW \
+					and biome_grid[vx][vz] != _Data.TileType.SWAMP \
+					and biome_grid[vx][vz] != _Data.TileType.SWAMP_MUD \
+					and biome_grid[vx][vz] != _Data.TileType.SWAMP_DIRT:
+				_Grass.add_voxel_grass(vx, vz, pos, grass_xforms, grass_colors, cols, wdist, hdist)
 
 ## S12 GD fallback — mirror native WorldProps (hash deterministic thay randf()).
 ## Road check dùng road_grid[i]!=0 — cùng predicate _point_to_seg_d2<=md2 như
@@ -1919,32 +1955,25 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	# ── 6b. Detail mesh — đường mòn, sỏi cát, hoạ tiết đất ──────────────────
 	var grass_xforms: Array = []
 	var grass_colors: Array = []
-	for vx in range(cols):
-		for vz in range(cols):
-			var h: float = height_grid[vx][vz]
-			var px: float = -half + (float(vx) + 0.5) * _Data.VOXEL
-			var pz: float = -half + (float(vz) + 0.5) * _Data.VOXEL
-			var pos := Vector3(px, h, pz)
-			var is_road: bool = road_grid.size() > 0 and road_grid[vx * cols + vz] != 0
-
-			# (đã bỏ hoạ tiết: đường mòn add_trail_detail, sỏi/cát rời add_sand_gravel,
-#  gò đất add_dirt_mounds — theo yêu cầu)
-
-			# Cỏ lúa: mọc gần nước (wdist≤3) hoặc chân núi/đồi (hdist≤2).
-			# Chân dốc mọc trên mọi nền đất ngoài sa mạc/đá ngầm/đường.
-			var i_g: int = vx * cols + vz
-			var near_water: bool = wdist[i_g] <= 3
-			var hill_foot: bool = hdist[i_g] != _Data.CONST_INF and hdist[i_g] <= 2
-			if not fast_mode and not is_road and h >= _Data.VOXEL * 0.9 \
-					and (near_water or hill_foot) \
-					and not (height_grid[vx][vz] <= _Data.WATER_Y) \
-					and biome_grid[vx][vz] != _Data.TileType.DESERT \
-					and biome_grid[vx][vz] != _Data.TileType.FROST \
-					and biome_grid[vx][vz] != _Data.TileType.FROST_SNOW \
-					and biome_grid[vx][vz] != _Data.TileType.SWAMP \
-					and biome_grid[vx][vz] != _Data.TileType.SWAMP_MUD \
-					and biome_grid[vx][vz] != _Data.TileType.SWAMP_DIRT:
-				_Grass.add_voxel_grass(vx, vz, pos, grass_xforms, grass_colors, cols, wdist, hdist)
+	var g2 := _native_grass()
+	if g2 != null and not _force_s9_gd:
+		var height_flat_g := PackedFloat64Array()
+		var biome_flat_g := PackedInt32Array()
+		height_flat_g.resize(cols * cols)
+		biome_flat_g.resize(cols * cols)
+		for vx in range(cols):
+			for vz in range(cols):
+				var gi: int = vx * cols + vz
+				height_flat_g[gi] = height_grid[vx][vz]
+				biome_flat_g[gi] = biome_grid[vx][vz]
+		var gres: Dictionary = g2.add_grass_chunk(half, cols, fast_mode,
+				height_flat_g, biome_flat_g, wdist, hdist, road_grid,
+				_Data.WATER_Y, _Data.VOXEL, _Data.CONST_INF)
+		grass_xforms = gres["xforms"]
+		grass_colors = gres["colors"]
+	else:
+		_grass_gd_fallback(grass_xforms, grass_colors, half, cols, fast_mode,
+				height_grid, biome_grid, wdist, hdist, road_grid)
 
 	# ── 6d. Quán rượu — bên mép đường tại ngã 3 / ngã tư (không trên đường) ──
 	var village_data: Dictionary = { "has": false, "xforms": [], "colors": [], "info": {} }
