@@ -67,6 +67,22 @@ static func _oct_from_grid(s3_grid: PackedByteArray, oct_total: int) -> Array[Ar
 			row[pvz] = s3_grid[base + pvz] == 1
 	return out
 
+## ── Build `bio` (Array[Array] total²) từ bio_flat khi GD fallback cần ────────
+## Native path giữ `bio` rỗng (chỉ dùng bio_flat); S4 GD fallback / non-REAL
+## branch đọc bio[pvx][pvz] → build lazy ở đây, không tốn 42² wrap mỗi chunk.
+static func _bio_from_flat(bio_flat: PackedInt32Array, total: int) -> Array[Array]:
+	var out: Array[Array] = []
+	out.resize(total)
+	var idx := 0
+	for pvx in range(total):
+		var row: Array = []
+		row.resize(total)
+		for pvz in range(total):
+			row[pvz] = bio_flat[idx]
+			idx += 1
+		out[pvx] = row
+	return out
+
 ## ── Build `oct_small` (total²) từ `oct` (cắt viền OCEAN_PAD-PAD) ─────────────
 static func _oct_small_from_oct(oct: Array[Array], oct_total: int, total: int,
 		pad_shift: int) -> Array[Array]:
@@ -1321,7 +1337,19 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	# ── 1. Biome sampling (với padding để stitch biên) ─────────────────────────
 	_prof_reset()
 	var total: int = cols + 2 * _Data.PAD
-	var bio: Array[Array] = _Noise._biome_grid(world_ox, world_oz, cols, total, dim_id)
+	# Native path: lấy flat bio thẳng (tránh wrap Array[Array] 42² rồi S4
+	# re-flatten lại). `bio_flat` dùng được cho S2 (bfs_dst_flat) + S4 (land_grid);
+	# `bio` (Array[Array]) chỉ build khi một GD fallback cần (S4 fallback).
+	var bio_flat := PackedInt32Array()
+	var bio: Array[Array] = []
+	var b1 := _Noise._native_biome()
+	if b1 != null:
+		var arr: PackedInt32Array = b1.compute_biome_grid(
+			world_ox, world_oz, cols, total, dim_id, SeedSnapshot.ensure())
+		if arr.size() == total * total:
+			bio_flat = arr
+	if bio_flat.is_empty():
+		bio = _Noise._biome_grid(world_ox, world_oz, cols, total, dim_id)
 	_prof("S1 biome_sample")
 
 	# ── 2. BFS distance map từ "đất nền" → tính gradient xuống nước ─────────
@@ -1335,9 +1363,13 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		edge_tile = _Data.TileType.GRASS_DIRT
 	var dst := PackedInt32Array()
 	var bd2 := _native_bfsdst()
-	if bd2 != null and not _force_s2_gd:
+	if bd2 != null and not _force_s2_gd and not bio_flat.is_empty():
+		dst = bd2.bfs_dst_flat(bio_flat, total, base_tile, edge_tile, _Data.CONST_INF)
+	elif bd2 != null and not _force_s2_gd and bio_flat.is_empty() and not bio.is_empty():
 		dst = bd2.bfs_dst(bio, total, base_tile, edge_tile, _Data.CONST_INF)
 	else:
+		if bio.is_empty():
+			bio = _bio_from_flat(bio_flat, total)
 		dst = _bfsdst_gd_fallback(bio, total, base_tile, edge_tile)
 	_prof("S2 bfs_dst")
 
@@ -1462,15 +1494,17 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		var s4_native_ok := false
 		var ws4 := _native_land()
 		if ws4 != null and not _force_s4_gd:
-			var bio_flat := PackedInt32Array()
-			bio_flat.resize(total * total)
-			bio_flat.fill(0)
-			for fpx in range(total):
-				for fpz in range(total):
-					bio_flat[fpx * total + fpz] = bio[fpx][fpz]
+			var bio_flat4 := bio_flat
+			if bio_flat4.is_empty():
+				bio_flat4 = PackedInt32Array()
+				bio_flat4.resize(total * total)
+				bio_flat4.fill(0)
+				for fpx in range(total):
+					for fpz in range(total):
+						bio_flat4[fpx * total + fpz] = bio[fpx][fpz]
 			var oct_flat: PackedByteArray = s3_grid
 			var res4: Dictionary = ws4.land_grid(world_ox - half, world_oz - half, cols, total,
-					oct_total, SeedSnapshot.ensure(), bio_flat, oct_flat, odst, shore_dst)
+					oct_total, SeedSnapshot.ensure(), bio_flat4, oct_flat, odst, shore_dst)
 			if res4.size() >= 5 and (res4["biome"] as PackedInt32Array).size() == cols * cols:
 				s4_native_ok = true
 				var b4: PackedInt32Array = res4["biome"]
@@ -1498,6 +1532,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 				oct = _oct_from_grid(s3_grid, oct_total)
 			if oct_small.is_empty():
 				oct_small = _oct_small_from_oct(oct, oct_total, total, OCEAN_PAD - _Data.PAD)
+			if bio.is_empty():
+				bio = _bio_from_flat(bio_flat, total)
 			# ── Single pass: biển → bãi biển → lục địa (có hồ) ────────────────
 			const MAX_OCEAN_DEPTH_DIST: int = 30
 			for ivx in range(cols):
@@ -1889,6 +1925,8 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 
 	else:
 		# ── Non-REAL_WORLD: giữ logic cũ ────────────────────────────────────
+		if bio.is_empty():
+			bio = _bio_from_flat(bio_flat, total)
 		for ivx in range(cols):
 			var pvx: int = ivx + _Data.PAD
 			for ivz in range(cols):
