@@ -619,16 +619,9 @@ static func build_terrain_mesh_native(bd: _BlockData, cols: int, dim_id: int,
 		return null
 	var use_rw: bool = dim_id == _Data._Dim.DimensionID.REAL_WORLD
 	var palette := PackedColorArray(_Data.BLOCK_COLORS_RW if use_rw else _Data.BLOCK_COLORS_TW)
-	var res: Dictionary = wt.build_terrain_mesh(bd._data, cols, top_ly_hint, gen_fresh, palette)
-	if res.is_empty():
+	var m = wt.build_terrain_mesh_mesh(bd._data, cols, top_ly_hint, gen_fresh, palette)
+	if m == null or m.get_surface_count() == 0:
 		return null
-	var arr := []
-	arr.resize(Mesh.ARRAY_MAX)
-	arr[Mesh.ARRAY_VERTEX] = res["verts"]
-	arr[Mesh.ARRAY_NORMAL] = res["normals"]
-	arr[Mesh.ARRAY_COLOR] = res["colors"]
-	var m := ArrayMesh.new()
-	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
 	return m
 
 ## ── _lod_surface_block: block đại diện của ô biome cho mesh LOD ─────────────
