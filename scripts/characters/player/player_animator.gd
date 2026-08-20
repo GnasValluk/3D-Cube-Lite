@@ -24,18 +24,43 @@ var _svel: Dictionary = {}
 
 ## Spring giảm chấn — target là giá trị chạy, pos trả về có thể vượt (overshoot)
 ## rồi dao động nhẹ về target → cảm giác đàn hồi.
+##
+## Áp dụng nghiệm đóng dạng (analytic solution) của bộ dao động đường và sau
+## được giảm chấn — ổn định TUYỆT ĐỐI (năng lượng không bao giờ tăng) dù delta
+## lớn hay target thay đổi khung nào. Trước đây dùng Euler tường minh + công
+## thức vận tốc sai → tiêm năng lượng khi target di chuyển (idle/walk) → khớp
+## bay ra ngoài. Dùng nghiệm đúng của  ẍ + 2zw·ẋ + w²·x = 0  (x = pos - target,
+## trong 1 bước coi target cố định), cập nhật vận tốc đúng → không tích lũy năng lượng.
 func _spring(name: String, target: float, freq: float, zeta: float, delta: float) -> float:
-	var pos: float = _spos.get(name, target)
-	var vel: float = _svel.get(name, 0.0)
+	if delta <= 0.0 or freq <= 0.0:
+		_spos[name] = target
+		_svel[name] = 0.0
+		return target
+	var x: float = _spos.get(name, target) - target          # x0 = pos - target
+	var v: float = _svel.get(name, 0.0)                       # v0
 	var w: float = TAU * freq
-	var st: float = w * w
-	var damp: float = 2.0 * zeta * w
-	var acc: float = -st * (pos - target) - damp * vel
-	vel += acc * delta
-	pos += vel * delta
-	_spos[name] = pos
-	_svel[name] = vel
-	return pos
+	var z: float = clamp(zeta, 0.0, 1.0)
+	var zw: float = z * w
+	var e: float = exp(-zw * delta)
+	if z < 0.9999:
+		var wd: float = w * sqrt(1.0 - z * z)
+		var wd_dt: float = wd * delta
+		var c: float = cos(wd_dt)
+		var s: float = sin(wd_dt)
+		var x_new: float = e * (x * c + (v + zw * x) / wd * s)
+		var v_new: float = e * (v * c - (v * zw + w * w * x) / wd * s)
+		_spos[name] = x_new + target
+		_svel[name] = v_new
+		return _spos[name]
+	else:
+		# Tiểu điệp (ζ ≈ 1): 0 overshoot, vẫn ổn định.
+		# x(t) = (x0 + (v0 + w·x0)·dt)·e^(-w·dt);  v(t) = e^(-w·dt)·[(v0 + w·x0) - w·x(t)]
+		var wd_dt: float = w * delta
+		var x_new: float = e * (x * (1.0 + wd_dt) + v * delta)
+		var v_new: float = e * ((v + w * x) - w * x_new)
+		_spos[name] = x_new + target
+		_svel[name] = v_new
+		return _spos[name]
 
 ## Vũ khí tự điều khiển tay riêng (update_pose chạy sau animator trong _process):
 ## animator nhường tay để tránh giằng co (spring freq cao dễ "giành" lại pose).
@@ -157,7 +182,7 @@ func _walk(delta: float, t: float, mult: float) -> void:
 	mesh.head.rotation.z = _spring("head_z", sin(cyc * 0.5) * 0.05, 5.0, 0.8, delta)
 	mesh.head.rotation.x = _spring("head_x", -0.05 * mult, 5.0, 0.9, delta)
 	mesh.backpack.position.z = _spring("bp_z", -0.02 + abs(sin(cyc * 0.5)) * 0.015, 5.0, 0.9, delta)
-	mesh.backpack.rotation.x += sin(cyc * 0.5) * 0.04
+	mesh.backpack.rotation.x = sin(cyc * 0.5) * 0.04
 
 	# Tay đánh nhịp chéo với chân đối diện (vũ khí tự pose tay thì nhường)
 	if not _weapon_owns_arms():
@@ -288,7 +313,7 @@ func _swim(delta: float, t: float) -> void:
 	mesh.foot_l.rotation.x = _spring("foot_l_x", -0.2, 6.0, 1.0, delta)
 	mesh.foot_r.rotation.x = _spring("foot_r_x", -0.2, 6.0, 1.0, delta)
 	var kick: float = abs(sin(cyc * 1.5))
-	mesh.rig.position.y += kick * 0.02
+	mesh.rig.position.y = _spring("rig_y", 0.02 + kick * 0.02, 6.0, 1.0, delta)
 
 # ── Ăn / nhai ──────────────────────────────────────────────────────────────
 func _eat(delta: float, t: float) -> void:

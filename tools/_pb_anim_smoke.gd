@@ -60,12 +60,43 @@ func _ready() -> void:
 		_fake_base.set_state(s)
 		_run_state(s, 0.5)
 		_run_state(s, 1.7)
+		# Chạy lâu để spring (nếu nổ) bùng — check magnitude giới hạn.
+		_run_state(s, 4.0)
+		_check_bounds(s)
 
 	if _errors == 0:
 		print("PB_ANIM_OK: all joints animated, no errors")
 	else:
 		print("PB_ANIM_FAIL: %d checks failed" % _errors)
 	get_tree().quit(0 if _errors == 0 else 1)
+
+const ROT_BOUND := 2.2
+const POS_BOUND := 0.5
+
+func _check_bounds(s) -> void:
+	var joints := [
+		_mesh.rig, _mesh.pelvis, _mesh.body, _mesh.torso, _mesh.neck, _mesh.head,
+		_mesh.arm_l, _mesh.arm_r, _mesh.elbow_l, _mesh.elbow_r,
+		_mesh.leg_l, _mesh.leg_r, _mesh.knee_l, _mesh.knee_r, _mesh.shin_l, _mesh.shin_r,
+		_mesh.ankle_l, _mesh.ankle_r, _mesh.foot_l, _mesh.foot_r, _mesh.backpack,
+	]
+	for j in joints:
+		if j == null:
+			continue
+		var r: Vector3 = j.rotation
+		var p: Vector3 = j.position
+		if not (is_finite(r.x) and is_finite(r.y) and is_finite(r.z)):
+			printerr("PB_BOOM: state=%d joint=%s rot NaN/inf" % [s, j.name])
+			_errors += 1
+		elif abs(r.x) > ROT_BOUND or abs(r.y) > ROT_BOUND or abs(r.z) > ROT_BOUND:
+			printerr("PB_BOOM: state=%d joint=%s rot=%s" % [s, j.name, r])
+			_errors += 1
+		if not (is_finite(p.x) and is_finite(p.y) and is_finite(p.z)):
+			printerr("PB_BOOM: state=%d joint=%s pos NaN/inf" % [s, j.name])
+			_errors += 1
+		elif abs(p.x) > POS_BOUND or abs(p.y) > POS_BOUND or abs(p.z) > POS_BOUND:
+			printerr("PB_BOOM: state=%d joint=%s pos=%s" % [s, j.name, p])
+			_errors += 1
 
 func _run_state(s, dur: float) -> void:
 	var t0: float = _fake_base.fake_time
