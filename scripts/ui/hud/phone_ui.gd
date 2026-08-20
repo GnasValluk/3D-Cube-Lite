@@ -788,7 +788,7 @@ func _build_fashion_screen() -> void:
 	top.add_child(title)
 	_fashion_screen.add_child(top)
 
-	var current_skin: String = SettingsData.player_skin if SettingsData and not SettingsData.player_skin.is_empty() else "cora"
+	var current_skin: String = SettingsData.player_skin if SettingsData and not SettingsData.player_skin.is_empty() else _PlayerSkin.FALLBACK_ID
 
 	var cy: float = 46
 	_fashion_screen2 = Control.new()

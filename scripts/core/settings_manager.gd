@@ -23,7 +23,7 @@ static var touch_enabled: bool = false
 static var joystick_sensitivity: float = 1.0
 static var button_scale: float = 1.0
 static var device_mode: int = 0
-static var player_skin: String = "cora"
+static var player_skin: String = "player_block"
 static var chunk_view: int = 3
 static var distant_view: bool = true
 static var key_bindings: Dictionary = {
@@ -109,7 +109,7 @@ func load_settings() -> void:
 	joystick_sensitivity = config.get_value(SECTION, "joystick_sensitivity", 1.0)
 	button_scale = config.get_value(SECTION, "button_scale", 1.0)
 	device_mode = config.get_value(SECTION, "device_mode", 0)
-	player_skin = config.get_value(SECTION, "player_skin", "cora")
+	player_skin = config.get_value(SECTION, "player_skin", "player_block")
 	chunk_view = config.get_value(SECTION, "chunk_view", 3)
 	distant_view = config.get_value(SECTION, "distant_view", true)
 	var saved_keys: Dictionary = config.get_value(SECTION, "key_bindings", {})

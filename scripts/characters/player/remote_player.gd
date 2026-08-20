@@ -179,14 +179,28 @@ func _physics_process(delta: float) -> void:
 	rotation.y = lerp_angle(rotation.y, _target_yaw, minf(1.0, delta * 12.0))
 	if _mesh == null or _mesh.rig == null:
 		return
-	# Walk swing đơn giản (tay/chân đung đưa khi di chuyển).
+	# Walk swing: đùi đung đưa, gối gập khi chân vung tới, cổ chân/bàn chân
+	# giữ bàn chân không quá chổng đi — khớp-driven nhẹ cho remote.
 	if _moving:
 		_anim_t += delta * 9.0
 		var s: float = sin(_anim_t)
+		var knee_bend: float = 0.5 * max(0.0, sin(_anim_t))
 		if _mesh.leg_l:
 			_mesh.leg_l.rotation.x = s * 0.5
 		if _mesh.leg_r:
 			_mesh.leg_r.rotation.x = -s * 0.5
+		if _mesh.knee_l:
+			_mesh.knee_l.rotation.x = 0.4 * max(0.0, -s) + 0.1
+		if _mesh.knee_r:
+			_mesh.knee_r.rotation.x = 0.4 * max(0.0, s) + 0.1
+		if _mesh.ankle_l:
+			_mesh.ankle_l.rotation.x = s * 0.15
+		if _mesh.ankle_r:
+			_mesh.ankle_r.rotation.x = -s * 0.15
+		if _mesh.foot_l:
+			_mesh.foot_l.rotation.x = s * 0.08
+		if _mesh.foot_r:
+			_mesh.foot_r.rotation.x = -s * 0.08
 		if _mesh.arm_l:
 			_mesh.arm_l.rotation.x = -s * 0.4
 		if _mesh.arm_r:
@@ -197,6 +211,18 @@ func _physics_process(delta: float) -> void:
 			_mesh.leg_l.rotation.x = 0.0
 		if _mesh.leg_r:
 			_mesh.leg_r.rotation.x = 0.0
+		if _mesh.knee_l:
+			_mesh.knee_l.rotation.x = 0.0
+		if _mesh.knee_r:
+			_mesh.knee_r.rotation.x = 0.0
+		if _mesh.ankle_l:
+			_mesh.ankle_l.rotation.x = 0.0
+		if _mesh.ankle_r:
+			_mesh.ankle_r.rotation.x = 0.0
+		if _mesh.foot_l:
+			_mesh.foot_l.rotation.x = 0.0
+		if _mesh.foot_r:
+			_mesh.foot_r.rotation.x = 0.0
 		if _mesh.arm_l:
 			_mesh.arm_l.rotation.x = 0.0
 		if _mesh.arm_r:

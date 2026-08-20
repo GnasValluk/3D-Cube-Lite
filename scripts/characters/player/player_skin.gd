@@ -33,41 +33,18 @@ const DEFAULT_PALETTE: Dictionary = {
 
 ## Danh sách skin — chỉ thêm entry mới vào đây. icon = emoji hiển thị trên
 ## App Thời trang trong điện thoại (đặt: 🧴, 👗, 🦊, ...).
+## Hiện tại chỉ còn 1 skin mặc định (rig khối khớp).
 const SKINS: Array[Dictionary] = [
 	{
-		"id": "cora",
-		"name": "Cora",
-		"icon": "🎀",
-		"mesh_script": "res://scripts/characters/player/cora_mesh.gd",
+		"id": "player_block",
+		"name": "Khối Khớp",
+		"icon": "🧍",
+		"mesh_script": "res://scripts/characters/player/player_block_mesh.gd",
 		"palette": DEFAULT_PALETTE,
-	},
-	{
-		"id": "nguyen",
-		"name": "Nguyễn",
-		"icon": "🪖",
-		"mesh_script": "res://scripts/characters/player/nguyen_mesh.gd",
-		"palette": {
-			"skin":       Color(0.86, 0.68, 0.50),
-			"hair":       Color(0.14, 0.12, 0.10),
-			"hair_dark":  Color(0.08, 0.07, 0.06),
-			"eye_white":  Color(0.98, 0.96, 0.94),
-			"eye_iris":   Color(0.32, 0.20, 0.10),
-			"eye_pupil":  Color(0.08, 0.05, 0.04),
-			"eye_glint":  Color(1.00, 1.00, 1.00),
-			"blush":      Color(0.80, 0.62, 0.48),
-			"shirt":      Color(0.28, 0.38, 0.20),
-			"collar":     Color(0.20, 0.28, 0.14),
-			"ribbon":     Color(0.82, 0.10, 0.10),
-			"skirt":      Color(0.20, 0.30, 0.14),
-			"skirt_dark": Color(0.14, 0.22, 0.10),
-			"socks":      Color(0.30, 0.38, 0.22),
-			"shoes":      Color(0.42, 0.28, 0.16),
-			"hair_tie":   Color(0.22, 0.30, 0.16),
-		},
 	},
 ]
 
-const FALLBACK_ID: String = "cora"
+const FALLBACK_ID: String = "player_block"
 
 static func all() -> Array[Dictionary]:
 	return SKINS
@@ -86,7 +63,7 @@ static func display_name(skin_id: String) -> String:
 	return get_skin(skin_id).get("name", FALLBACK_ID.capitalize())
 
 ## Tạo mesh instance đúng loại cho skin_id.
-## Mỗi skin có thể có mesh_script riêng — fallback về CoraMesh nếu không khai báo.
+## Mỗi skin có thể có mesh_script riêng — fallback về PlayerBlockMesh nếu không khai báo.
 static func make_mesh(skin_id: String) -> PlayerMesh:
 	var s := get_skin(skin_id)
 	var script_path: String = s.get("mesh_script", "")
@@ -94,5 +71,5 @@ static func make_mesh(skin_id: String) -> PlayerMesh:
 		var scr = load(script_path)
 		if scr:
 			return scr.new() as PlayerMesh
-	# Fallback: CoraMesh
-	return preload("res://scripts/characters/player/cora_mesh.gd").new()
+	# Fallback: PlayerBlockMesh
+	return preload("res://scripts/characters/player/player_block_mesh.gd").new()

@@ -1,6 +1,6 @@
 extends Node
 
-## Render Cora + Nguyen skin hiện tại ra PNG (front + side) để đánh giá chi tiết.
+## Render skin hiện tại ra PNG (front + side) để đánh giá chi tiết.
 
 const _Skin = preload("res://scripts/characters/player/player_skin.gd")
 

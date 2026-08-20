@@ -33,6 +33,20 @@ var boot_r_pivot:      Node3D
 var ring_pivot:        Node3D
 var back_gear_pivot:   Node3D
 
+## ── Khớp (joints) — rig khối khớp. Subclass PHẢI gán trong build(). ────────
+var pelvis:   Node3D  # khớp hông/xương chậu (parent của chân + torso)
+var neck:     Node3D  # khớp cổ (giữa torso và đầu)
+var elbow_l:  Node3D  # khớp khuỷu tay trái
+var elbow_r:  Node3D  # khớp khuỷu tay phải
+var knee_l:   Node3D  # khớp đầu gối trái (parent của cẳng chân trái)
+var knee_r:   Node3D  # khớp đầu gối phải
+var shin_l:   Node3D  # cẳng chân trái (giữa gối và cổ chân)
+var shin_r:   Node3D  # cẳng chân phải
+var ankle_l:  Node3D  # khớp cổ chân trái (parent của bàn chân trái)
+var ankle_r:  Node3D  # khớp cổ chân phải
+var foot_l:   Node3D  # bàn chân trái
+var foot_r:   Node3D  # bàn chân phải
+
 ## Thiết lập palette trước khi build.
 func set_palette(palette: Dictionary) -> void:
 	_palette = palette
