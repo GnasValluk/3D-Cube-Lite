@@ -19,7 +19,44 @@ static func _reset_for_test() -> void:
 	_road_spatial.clear()
 	_int_cache.clear()
 	_node_has_cache.clear()
+	_rd_seed = -1
 	_road_lock.unlock()
+
+static var _native_rd: Object = null
+static var _rd_seed: int = -1
+
+## Native WorldRoad bridge (S6a road_grid) — lazy tạo 1 lần; null nếu thiếu DLL.
+static func _native_road() -> Object:
+	if _native_rd == null and ClassDB.class_exists("WorldRoad"):
+		_native_rd = ClassDB.instantiate("WorldRoad")
+	return _native_rd
+
+## Gọi trong prewarm worker thread (sau _ensure_roads) để dựng index C++ sớm.
+static func _native_warm() -> void:
+	_ensure_roads()
+	var rd := _native_road()
+	if rd == null:
+		return
+	var s := SeedSnapshot.ensure()
+	if _rd_seed == s:
+		return
+	rd.set_curves(s, _road_curves)
+	_rd_seed = s
+
+## Paint road_grid qua native: 1 call thay gather + segment loop GDScript.
+## Trả PackedByteArray cols×cols x-major; rỗng nếu native không có → caller
+## fallback paint_road_grid GDScript.
+static func paint_road_grid_native(wx0: float, wz0: float, size: int,
+		cols: int) -> PackedByteArray:
+	_ensure_roads()
+	var rd := _native_road()
+	if rd == null:
+		return PackedByteArray()
+	var s := SeedSnapshot.ensure()
+	if _rd_seed != s:
+		rd.set_curves(s, _road_curves)
+		_rd_seed = s
+	return rd.paint_grid(wx0, wz0, size, cols)
 
 ## 4 hướng nối của node lưới (has[d]: d=0→E, 1→S, 2→W, 3→N), luôn ≥2.
 ## Deterministic theo SeedSnapshot — dùng chung với _ensure_roads().

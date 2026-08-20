@@ -612,6 +612,7 @@ static func _prewarm_networks() -> void:
 	_Road._ensure_roads()
 	_River._ensure_rivers()
 	_River._native_warm()
+	_Road._native_warm()
 	var oc := _native_ocean()
 	if oc != null:
 		oc.warm(seed_v)
@@ -1933,7 +1934,15 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	if dim_id == _Data._Dim.DimensionID.REAL_WORLD:
 		road_grid.resize(cols * cols)
 		road_grid.fill(0)
-		_Road.paint_road_grid(road_grid, cols, size, cx, cz)
+		if _force_s6_gd:
+			_Road.paint_road_grid(road_grid, cols, size, cx, cz)
+		else:
+			var rd_nat: PackedByteArray = _Road.paint_road_grid_native(
+					world_ox - half, world_oz - half, size, cols)
+			if rd_nat.size() == cols * cols:
+				road_grid = rd_nat
+			else:
+				_Road.paint_road_grid(road_grid, cols, size, cx, cz)
 		for ivx in range(cols):
 			for ivz in range(cols):
 				if biome_grid[ivx][ivz] == _Data.TileType.OCEAN_DEEP:
