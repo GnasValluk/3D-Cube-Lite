@@ -30,6 +30,8 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
 | S8 terrain_mesh (WorldTerrain.build_terrain_mesh_mesh) | (S8) | S8 1.08-1.38→0.98-1.19ms (ArrayMesh C++ trực tiếp, bỏ Dictionary round-trip); bit-exact 0/12282 mismatch vs GD fallback; 13 regression suites green |
 | S3 marshalling lazy (bỏ oct/oct_small GD khi native) | (S3) | S3 ocean_mask+bfs 0.91-1.30→0.13-0.33ms; oct/oct_small (Array[Array] 84²+total²) build lazy chỉ khi GD fallback chạy; native path không còn ~0.7ms marshalling vô ích; 9/9 forced-GD A/B bit-exact + 12 suites green |
 | S13b gate scan (WorldOre.scan_textured_blocks) | (S13b2) | S13b ore 0.68-0.70→0.03-0.06ms; scan gate (max_top_ly + has_ore_blocks) chuyển sang C++ — GD chỉ còn 2 loop get_block/column khi forced-gd; A/B 13/13 + 13 regression suites green |
+| S1+S2 flat bio (WorldBfsDst.bfs_dst_flat) | (S1S2) | S2 bfs_dst 0.12-0.28→0.03-0.13ms (bỏ Variant boxing từng cell); S1 giữ bio flat từ native (bỏ wrap 42²→Array[Array] + S4 re-flatten); A/B bfsdst 15/15 + land 0-fail + 13 suites green |
+| S4 lake-noise cache (WorldLand.land_grid) | (S4-opt) | S4 land_grid 0.77-1.03→0.56-0.66ms (S4 total ~1.0-1.4→0.80-0.91ms); lake noise (5-octave FBM) tính trước swap-cache `lake_at` 1 lần/ô thay vì 3 lần (main pass + lake mask + lake fill); thử std::thread rows → revert (spawn/join overhead ≈ thời gian song song, không thắng); A/B land 9/9 maxdiff 0.0 + 14 suites green |
 
 ### S9 grass chi tiết (`710b047`)
 - `src\world_grass.{h,cpp}`: `WorldGrass::add_grass_chunk(half, cols, fast_mode, height(PackedFloat64Array), biome(PackedInt32Array), wdist, hdist, road, water_y, voxel, const_inf)` → `{xforms: Array[Transform3D], colors: Array[Color]}`.
@@ -92,6 +94,12 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
 - Profile (seed 20260802): native_mesh 0.98-1.19ms vs GD fallback 7.9-14.8ms; hint loop 0.13-0.16ms.
 - Lưu ý: tốc độ ~bằng path Dictionary cũ (cpp_marshal 0.33-0.43 + arr_mesh 0.73-0.95) — hiệu quả chính là bỏ 2 lớp marshal Variant, không tối ưu mesher (buildphase chỉ ~0.3ms).
 
+### S1+S2 flat bio chi tiết (WorldBfsDst.bfs_dst_flat)
+- Trước: `chunk_noise._biome_grid` gọi native `compute_biome_grid` (trả flat PackedInt32Array) rồi GD wrap 42²→`Array[Array]` bio; S2 native `bfs_dst` đọc từng cell qua Variant boxing (`bio_at`), S4 native re-flatten bio→bio_flat (~0.16ms).
+- Sau: compute_chunk S1 giữ thẳng flat native (nếu có DLL) — `bio_flat` dùng trực tiếp cho S2 (`bfs_dst_flat`) + S4 (`land_grid`); `bio` Array[Array] chỉ build lazy qua `_bio_from_flat` khi GD fallback chạy (S4 fallback / non-REAL branch / force-gd). Add `WorldBfsDst::bfs_dst_flat` (đọc flat trực tiếp, giữ `bfs_dst` bọc-flatten cho test).
+- A/B: `_native_bfsdst_test` 15/15 (REAL + TWILIGHT), biome/land/dist/ocean/fill 0-fail, tổng 13 suites green.
+- Profile (seed 20260802): S2 0.12-0.28→0.03-0.13ms; S1 ~0.55-0.74 (nhẹ hơn). S4 vẫn 0.82-1.42 (đa phần land_grid computation thật).
+
 ### S13b gate scan chi tiết (WorldOre.scan_textured_blocks)
 - Trước: dù chunk KHÔNG có ore, GD vẫn chạy 2 scan loop tốn ~0.68-0.70ms/chunk: (1) `max_top_ly` = max top_ly_hint over cols², (2) `has_ore_blocks` = top-layer textured-block check qua `bd.get_block` (bounded calls `_TEXTURED_BLOCK_IDS`). Phần lớn là chi phí GDScript function-call `get_block` (bounds-check + index) × cols².
 - Sau: thêm `WorldOre::scan_textured_blocks(data(PackedByteArray), cols, top_ly_hint)` → `PackedInt32Array [max_top_ly, has_ore]` — scan 1 pass C++: max top_ly_hint + lookup `seen[256]` texture-id table tại lớp top_ly_hint (đúng 1 lớp, không scan depth). GD giữ `ore_hill_info.cx>=0` làm OR gate (không đụng tới — cheap).
@@ -105,18 +113,30 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
 - Native path đầy đủ (ocean+dist+land C++) không còn đụng Array[Array] nào — s3_grid/odst/shore_dst/oct_mask đi thẳng bằng Packed arrays.
 - A/B: `_native_land_test` (force S4 GD giữ native ocean+dist) + probe tạm force `_force_s6_gd` — 9/9 chunk biome/height/river_flag bit-exact maxdiff 0; 12 regression suites green.
 
+### S4 lake-noise cache chi tiết (WorldLand.land_grid)
+- Trước: noise `lake` (5-octave FBM) được gọi GetNoise tới 3 lần cho cùng 1 ô (32²): main pass (nhánh FROST/SWAMP/GRASSLAND), lake mask loop (total² = 42², tìm ô hồ trên GRASS_DIRT), lake fill loop (lại từng ô lm≠0). ≈ 2× công thừa của noise đắt nhất trong stack.
+- Sau: thêm lambda `lake_at(pvx,pvz)` với cache mảng `lake_raw[total*total]` (sentinel −2) — mỗi ô chỉ tính lake 1 lần; 3 loop cùng đọc cache. Toạ độ đồng nhất `wx0+(pvx-PAD)+0.5` (các loop vốn đã dùng cùng công thức → bit-exact aut và không đổi output).
+- Thử song song hoá main loop theo hàng `std::thread` (cols=32, 12 core): spawn+join 11 threads ~0.3-0.9ms ≈ thời gian computation (1024 ô / 12 luồng + FBM bandwidth-bound trên cùng LUT), và thread bên trong per-chunk còn cạnh tranh WorkerThreadPool của game (nhiều chunk chạy song song) → hoàn lại, chỉ giữ cache.
+- A/B: `_native_land_test` 9/9 PASS maxdiff 0.0 (biome+height+reef). 14 regression suites green (thêm `_native_bfsdst_test` 15 PASS).
+- Profile (seed 20260802, 3 chunk): S4 land_grid 0.77-1.03 → 0.56-0.66ms; S4 total ~1.0-1.4 → 0.80-0.91ms (prep 0.02 + call + copy-back 0.21).
+
 ## Đang làm
-- (không — S13b gate scan vừa xong; đang xét tiếp hotspot)
+- (không — đang xét tiếp hotspot, ưu tiên S8 terrain_mesh / S5 river / S10 water_mesh)
 
 ## Hotspot hiện tại (test_prof_chunk, non-first chunks — bỏ artifact chunk đầu)
-Sau S11a/S12/S9/S2/S10/S5/S8/S3-marshalling/S13b-scan, các phase còn lại lớn nhất (chunk(0,0) khi không đầu): S4 biome_grid+height 0.90-1.12 (land_grid native — computation thật), S8 terrain_mesh 0.93-2.18, S5 river 0.46-0.61, S3 ocean_mask+bfs 0.14-0.34, S10 water_mesh 0.39-0.87, S11 aquatic+plants 0.31-0.37, S13b ore 0.03-0.06 ("đã xong" về mặt lý thuyết nhưng gate scan còn nhỏ). S13c tavern nhỏ (~0.03).
+Sau S11a/S12/S9/S2/S10/S5/S8/S3-marshalling/S13b-scan/S1S2-flat-bio/S4-lake-cache, các phase còn lại lớn nhất (chunk(0,0) khi không đầu): S8 terrain_mesh 0.87-1.97, S5 river 0.44-0.82, S10 water_mesh 0.37-0.80, S1 biome_sample 0.52-0.56, S4 biome_grid+height 0.80-0.91 (land_grid 0.56-0.66 computation thật + copy-back 0.21), S3 ocean_mask+bfs 0.13-0.33, S11 aquatic+plants 0.30-0.36. S13b ore 0.03-0.04, S13c tavern ~0.02.
 Lưu ý: chunk ĐẦU TIÊN trong 1 tiến trình luôn có S2 ~8ms (artifact harness: stdout flush/GC đầu compute — verified bằng reorder: chunk đầu nào cũng ~8ms, còn là 0.7-1.1ms).
 
 ## Next steps (candidates)
-1. S4 biome_grid+height (0.90-1.12ms) + S8 terrain_mesh (0.93-2.18ms) — còn lại lớn nhất; S4 land_grid native là computation thật (824 ô × noise stack) — đã đo split: bio_flat 0.16 + land_grid_call 0.60-0.79 + copy-back 0.22-0.23 (marshalling GD ~0.37ms, khó cắt vì biome_grid/height_grid là Array[Array]).
+1. S8 terrain_mesh (0.87-1.97ms) — ArrayMesh C++ trực tiếp rồi, engine build mesh + GD surface assign là phần còn lại; xem còn giảm được gì (surface format, pre-alloc).
+2. S5 river (0.44-0.82ms) — đã native apply_river; phần còn lại có thể là loop GD set height/biome sau river override.
+3. S10 water_mesh (0.37-0.80ms) — đã native; phần còn lại engine ArrayMesh + GD surface assign.
+4. S1 biome_sample (0.52-0.56ms) — native compute_biome_grid rồi; noise stack thật, khó cắt hơn nữa.
+5. S4 copy-back 0.21ms — GD loop copy flat→Array[Array] (biome/height 32² + dmask 42²); có thể giảm nếu S5-S13 đọc flat trực tiếp (như đã làm S2/S4).
 2. S13c tavern/village — bỏ qua (663 dòng, ~0.6ms, deterministic).
 3. S9 tiếp: native trả flat `PackedFloat32Array` n×16 cho `_multimesh_buffer` trực tiếp (bỏ Variant boxing ~1.5ms+).
-4. S13b ore — mesh build đã native; gate scan mới xong 0.68→0.03-0.06ms.
+4. S13b ore — mesh build đã native; gate scan 0.68→0.03-0.06ms.
+5. S1+S2 flat bio — ĐÃ XONG (xem trên).
 
 ## Relevant files
 - `scripts\world\chunk\world_chunk.gd` — S9 wrapper + fallback (~683-709, 1955-1980), S12 (2022+), S11a bridge (_native_aquatic/_force_s11a_gd/_aquatic_mesh_from_arrays) + aquatic loop (~2094-2175), `_cell_hash01`, `_multimesh_buffer`.
@@ -124,6 +144,7 @@ Lưu ý: chunk ĐẦU TIÊN trong 1 tiến trình luôn có S2 ~8ms (artifact ha
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_aquatic.{h,cpp}` — native S11a.
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_ore.{h,cpp}` — native S13b (build_textured_block_mesh + scan_textured_blocks).
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_river.{h,cpp}` — native S5 (apply_river + factors_grid + set_curves).
+- `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_bfsdst.{h,cpp}` — native S2 (bfs_dst Array + bfs_dst_flat).
 - `scripts\world\chunk\chunk_grass.gd` — nguồn tham chiếu (264 dòng, deterministic).
 - `scripts\world\chunk\chunk_aquatic.gd` — nguồn tham chiếu S11a (383 dòng, deterministic).
 - `scripts\world\chunk\village.gd` — giữ GD.
