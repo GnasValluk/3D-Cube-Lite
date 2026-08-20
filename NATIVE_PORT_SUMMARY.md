@@ -32,6 +32,7 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
 | S13b gate scan (WorldOre.scan_textured_blocks) | (S13b2) | S13b ore 0.68-0.70→0.03-0.06ms; scan gate (max_top_ly + has_ore_blocks) chuyển sang C++ — GD chỉ còn 2 loop get_block/column khi forced-gd; A/B 13/13 + 13 regression suites green |
 | S1+S2 flat bio (WorldBfsDst.bfs_dst_flat) | (S1S2) | S2 bfs_dst 0.12-0.28→0.03-0.13ms (bỏ Variant boxing từng cell); S1 giữ bio flat từ native (bỏ wrap 42²→Array[Array] + S4 re-flatten); A/B bfsdst 15/15 + land 0-fail + 13 suites green |
 | S4 lake-noise cache (WorldLand.land_grid) | (S4-opt) | S4 land_grid 0.77-1.03→0.56-0.66ms (S4 total ~1.0-1.4→0.80-0.91ms); lake noise (5-octave FBM) tính trước swap-cache `lake_at` 1 lần/ô thay vì 3 lần (main pass + lake mask + lake fill); thử std::thread rows → revert (spawn/join overhead ≈ thời gian song song, không thắng); A/B land 9/9 maxdiff 0.0 + 14 suites green |
+| S1 biome noise cache (WorldBiome) | (S1-cache) | chunk kề reuse → S1 0.51-0.55→0.42-0.44ms (chunk(1,0) sau (0,0)); open-addressing 32K per NoiseSet, reset 50%, hash fix; 14 regression suites green bit-exact; chunk đầu trả ~0.3ms alloc 1 lần |
 
 ### S9 grass chi tiết (`710b047`)
 - `src\world_grass.{h,cpp}`: `WorldGrass::add_grass_chunk(half, cols, fast_mode, height(PackedFloat64Array), biome(PackedInt32Array), wdist, hdist, road, water_y, voxel, const_inf)` → `{xforms: Array[Transform3D], colors: Array[Color]}`.
@@ -141,8 +142,17 @@ Port per-chunk GDScript hot spots sang Godot 4.7 GDExtension DLL (`C:\Users\gnas
 - Thêm timer C++ trong `build_terrain_mesh_mesh` (`Time::get_ticks_usec` + print `[tdbg] geom/pack/surf/verts`): geom (greedy mesher) 174-885µs, pack (fill_packed_arrays) 61-286µs, surf (engine `add_surface_from_arrays`) 468-1054µs, verts 7026-12282.
 - Kết luận: S8 đã tối ưu sát — `surf` là upload vertex thật của engine (không cắt được), geom/pack hợp lý. S8a top_ly (loop GD) 0.14-0.22ms có thể chuyển C++ sau nhưng ưu tiên thấp — không đào sâu thêm, chuyển sang S5/S10.
 
+### S1 biome noise cache toàn cục chi tiết (WorldBiome)
+- Trước: `compute_biome_grid` tính lại noise cho mọi ô 42² mỗi chunk — 2 chunk KỀ nhau sample trùng ~10 cột thế giới (chồng PAD) → tính lặp ~420 ô.
+- Sau: thêm cell-cache vào mỗi `NoiseSet` (fixed-size open addressing linear probe): key = `_cell_key(wx,wz)` trộn cả 2 toạ độ (lần đầu `ix<<32 ^ iz` SAIBỞI slot chỉ mask low 18 bit → mọi ô collide vào ~43 slot → reset liên tục → sửa hash trộn `lo = ix*0x9E3779B1 + iz`, `hi = iz*0x85EBCA6B + ix`), `_CELL_CAP = 1<<15` (32K, đủ reuse vài chunk kề, nhỏ để nằm gọn cache CPU + reset chi phí thấp), `KEY_EMPTY = ~0ULL`, lookup probe ≤8, reset bảng khi đầy 50% (không double — cache chỉ cần reuse vùng lân cận).
+- 2-pass đầu (lookup dưới cmtx → compute miss → insert dưới lock) TỐN overhead vector + 2 lock ⇒ chuyển 1-pass giữ lock cả grid (test sync; game gen từng chunk nối tiếp) — nhanh hơn và đơn giản hơn.
+- `clear_cache()` (đổi seed) reset cả bảng; `cache_ensure_alloc` defer chỉ khởi tạo khi dùng (lần đầu 1 process ~0.3-0.6ms penalty).
+- A/B: full 14 regression suites green (land 9/9, river_override 10/10, ...) — bit-exact, không đổi output.
+- Profile (seed 20260802, 3 chunk): chunk ĐẦU 0.67-0.89ms (1 lần alloc penalty và ~14.5%), chunk kề (0,0)→(1,0) reuse 0.42-0.44ms (baseline ~0.51-0.55, field thắng ~0.1ms), chunk xa (-302,-230) 0.52-0.61 (chỉ lookup rechạy, không reuse). Lợi ích thực trên chunk kề, nằm gần nhiễu (~1% chunk total 6-10ms) — giữ vì rẻ và đúng.
+- Vì chunk kề có ~420/1764 ô reuse nhưng biome noise chỉ chiếm 0.51-0.55/6-10ms, cache chỉ ~0.1ms; ý tưởng mở rộng sang land/lake noise (S4 lake đã tự cache trong chunk) không còn dư để hưởng lợi cross-chunk — dừng ở mức khả quan này.
+
 ## Đang làm
-- (không — đã khảo sát S8/S10/S7/S4-copy/S5-marshalling: các hotspot còn lại đều là computation thật hoặc engine upload không cắt được; cân nhắc chuyển hướng sang xử lý hàng loạt chunk / cache toàn cục thay vì per-chunk)
+- (không — cache noise toàn cục S1 đã xong ở trên; các hotspot còn lại là computation thật hoặc engine upload không cắt được; cân nhắc batching nhiều chunk / worker thread khi generate)
 
 ## Hotspot hiện tại (test_prof_chunk, non-first chunks — bỏ artifact chunk đầu)
 Sau S11a/S12/S9/S2/S10/S5/S8/S3-marshalling/S13b-scan/S1S2-flat-bio/S4-lake-cache, các phase còn lại lớn nhất (chunk(0,0) khi không đầu): S10 water_mesh 0.37-0.80, S1 biome_sample 0.52-0.56, S4 biome_grid+height 0.80-0.91 (land_grid 0.56-0.66 computation thật + copy-back 0.21), S8 terrain_mesh 0.87-1.97 (sau khảo sát: surf engine + geom/pack hợp lý — đã tối ưu sát, không đào sâu nữa), S5 river 0.28-0.49 (sau marshalling tối ưu), S3 ocean_mask+bfs 0.13-0.33, S11 aquatic+plants 0.30-0.36. S13b ore 0.03-0.06, S13c tavern ~0.02.
@@ -152,9 +162,9 @@ Lưu ý: chunk ĐẦU TIÊN trong 1 tiến trình luôn có S2 ~8ms (artifact ha
 1. S8/S10 terrain+water — KHẢO SÁT XONG: engine add_surface_from_arrays upload không cắt được; các GD loop nhỏ (S8a top_ly 0.14-0.22, S10a has_water+skip 0.10-0.11) có thể chuyển C++ nếu muốn (ưu tiên thấp).
 2. S5 river — XONG (marshalling opt, commit `6cb3865`).
 3. S7 fill_blocks — KHẢO SÁT XONG: flatten 0.09-0.12 + native 0.09-0.12; không đáng port flatten.
-4. S1 biome_sample (0.51-0.55ms) — native compute_biome_grid; noise stack thật, khó cắt hơn nữa.
+4. S1 biome_sample (0.51-0.55ms) — ĐÃ LÀM cache noise toàn cục (xem S1-cache): chunk kề 0.42-0.44ms.
 5. S4 copy-back 0.15-0.2ms + dmask 0.06ms — cần cho S5-S13; không tách được.
-6. Ý tưởng mới: batching nhiều chunk / cache noise toàn cục / worker thread khi generate nhiều chunk — giảm qua per-chunk đã bão hòa.
+6. Ý tưởng mới: batching nhiều chunk / worker thread khi generate nhiều chunk — giảm qua per-chunk đã bão hòa.
 
 ## Triển khai tiếp
 2. S13c tavern/village — bỏ qua (663 dòng, ~0.6ms, deterministic).
@@ -168,7 +178,8 @@ Lưu ý: chunk ĐẦU TIÊN trong 1 tiến trình luôn có S2 ~8ms (artifact ha
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_aquatic.{h,cpp}` — native S11a.
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_ore.{h,cpp}` — native S13b (build_textured_block_mesh + scan_textured_blocks).
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_river.{h,cpp}` — native S5 (apply_river + factors_grid + set_curves).
-- `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_terrain.{h,cpp}` — native S8 (build_terrain_mesh_mesh; tạm có timer `[tdbg]` cần gỡ trước build cuối).
+- `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_terrain.{h,cpp}` — native S8 (build_terrain_mesh_mesh).
+- `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_biome.{h,cpp}` — native S1 (compute_biome_grid + cache noise toàn cục).
 - `C:\Users\gnasv\AppData\Local\Temp\opencode\src\world_bfsdst.{h,cpp}` — native S2 (bfs_dst Array + bfs_dst_flat).
 - `scripts\world\chunk\chunk_grass.gd` — nguồn tham chiếu (264 dòng, deterministic).
 - `scripts\world\chunk\chunk_aquatic.gd` — nguồn tham chiếu S11a (383 dòng, deterministic).
