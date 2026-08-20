@@ -229,6 +229,30 @@ static var _force_s9_gd: bool = false
 ## Test hook: ép dùng GDScript add_voxel_seagrass (S11) để A/B so sánh bit-exact.
 static var _force_s11_gd: bool = false
 
+## Native WorldWater bridge (S10 water_mesh) — lazy tạo 1 lần; null nếu thiếu DLL.
+static var _native_wt: Object = null
+static func _native_watermesh() -> Object:
+	if _native_wt == null and ClassDB.class_exists("WorldWater"):
+		_native_wt = ClassDB.instantiate("WorldWater")
+	return _native_wt
+
+## Test hook: ép dùng GDScript _build_water_mesh (S10) để A/B so sánh bit-exact.
+static var _force_s10_gd: bool = false
+
+## Wrap {verts, normals, colors} native → ArrayMesh (giống build_terrain_mesh_native).
+static func _water_mesh_from_arrays(verts: PackedVector3Array,
+		normals: PackedVector3Array, colors: PackedColorArray) -> ArrayMesh:
+	if verts.is_empty():
+		return null
+	var arr := []
+	arr.resize(Mesh.ARRAY_MAX)
+	arr[Mesh.ARRAY_VERTEX] = verts
+	arr[Mesh.ARRAY_NORMAL] = normals
+	arr[Mesh.ARRAY_COLOR] = colors
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arr)
+	return m
+
 static var _native_bd: Object = null
 
 ## Native WorldBfsDst bridge (S2 bfs_dst) — lazy tạo 1 lần; null nếu thiếu DLL.
@@ -2025,7 +2049,13 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 		for wx_ in range(cols):
 			for wz_ in range(cols):
 				water_skip[wx_ * cols + wz_] = 1 if height_grid[wx_][wz_] > _Data.WATER_Y else 0
-		mesh_water = _build_water_mesh(bd, cols, dim_id, h_vox, half, {}, _gen_water_top_layer(), water_skip)
+		var wm := _native_watermesh()
+		if wm != null and not _force_s10_gd:
+			var wres: Dictionary = wm.build_water_mesh(bd._data, cols, h_vox, half,
+					_gen_water_top_layer(), water_skip)
+			mesh_water = _water_mesh_from_arrays(wres["verts"], wres["normals"], wres["colors"])
+		else:
+			mesh_water = _build_water_mesh(bd, cols, dim_id, h_vox, half, {}, _gen_water_top_layer(), water_skip)
 	_prof("S10 water_mesh")
 
 	# ── 7b. Lava mesh — lava do người chơi đổ (xô lava), bao giờ cũng áp
