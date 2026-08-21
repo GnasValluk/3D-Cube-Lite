@@ -60,6 +60,14 @@ static func revive(character: CharacterBase) -> void:
 	character._death_timer = 0.0
 	character._hit_timer = 0.0
 	character._invul_timer = 0.0
+	# Reset fall/floor tracking để frame hồi sinh xuống đất được đánh giá lại
+	# (trước đây _falling còn true + _fall_start_y cũ → trigger damage/collision
+	# nhầm hoặc kẹt trong trạng thái chưa bao giờ "chạm đất").
+	character._was_floor = false
+	character._coyote = 0.0
+	character._falling = false
+	character._fall_start_y = 0.0
+	character._time = 0.0
 	character.set_physics_process(true)
 	character.set_process_unhandled_input(true)
 	character.set_process_unhandled_key_input(true)

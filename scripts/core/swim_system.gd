@@ -5,7 +5,9 @@ const SURFACE_FLOAT_SPEED: float = 1.0
 
 static func swim_physics(character: CharacterBase, delta: float) -> void:
 	var dir := character._read_input()
-	var spd: float = character.move_speed * 0.55 * character.get_speed_multiplier()
+	# Dưới lòng nước ấn "chạy nhanh" → chuyển sang bơi (SWIM) + bơi nhanh hơn
+	var sprinting: bool = character._is_player and Input.is_action_pressed("sprint")
+	var spd: float = character.move_speed * (0.85 if sprinting else 0.55) * character.get_speed_multiplier()
 	var accel: float = character.acceleration * 0.6
 	var frict: float = character.friction * 0.5
 
@@ -32,7 +34,7 @@ static func swim_physics(character: CharacterBase, delta: float) -> void:
 		character.velocity.z = move_toward(character.velocity.z, dir.z * spd, accel * delta)
 		character.rotation.y = lerp_angle(character.rotation.y, atan2(dir.x, dir.z), delta * 10.0)
 		if character._attack_timer <= 0.0:
-			character._state = CharacterBase.State.WALK
+			character._state = CharacterBase.State.SWIM if sprinting else CharacterBase.State.WALK
 	else:
 		character.velocity.x = move_toward(character.velocity.x, 0.0, frict * delta)
 		character.velocity.z = move_toward(character.velocity.z, 0.0, frict * delta)

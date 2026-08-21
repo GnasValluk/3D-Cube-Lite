@@ -33,7 +33,7 @@ var _mats: Array[StandardMaterial3D] = []
 # ── Build ─────────────────────────────────────────────────────────────────────
 func build(root: CharacterBody3D) -> void:
 	_make_materials()
-	rig = make_rig(root, 0.08)
+	rig = make_rig(root, 0.31)
 	_build_pelvis()
 	_build_legs()
 	_build_body()

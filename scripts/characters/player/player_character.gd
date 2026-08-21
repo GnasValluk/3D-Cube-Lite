@@ -13,6 +13,7 @@ const _Halberd := preload("player_halberd.gd")
 const _Fishing := preload("player_fishing.gd")
 const _TavernDoor := preload("res://scripts/world/chunk/tavern_door.gd")
 const _Skin := preload("res://scripts/characters/player/player_skin.gd")
+const _WorldChunk := preload("res://scripts/world/chunk/world_chunk.gd")
 
 var _mesh: PlayerMesh
 var _anim: PlayerAnimator
@@ -576,8 +577,22 @@ func _do_respawn() -> void:
 	_stop_eating()
 	if _bow_aiming:
 		_Bow.cancel_aim(self)
-	global_position = WORLD_SPAWN_POS
 	velocity = Vector3.ZERO
+	# Đặt lại vị trí sinh tại WORLD_SPAWN_POS nhưng ép đặt trên mặt đất thật.
+	# Trước đây set_toan bộ toán tử ở y=3 cố định → nếu chunk sinh đang
+	# stream/chưa có StaticBody3D thì player rơi xuyên void vô hạn (floor
+	# protection chỉ bắn lên y=3, quay lại rơi — death loop). Sample chiều cao
+	# đất thật (đã build chunk) để không bị kẹt trong không trung/không collision.
+	var spawn: Vector3 = WORLD_SPAWN_POS
+	_WorldChunk.ensure_chunk_built(spawn.x, spawn.z)
+	var ground_y: float = _WorldChunk.sample_ground_height(spawn.x, spawn.z)
+	if ground_y != -INF:
+		# Đặt chân capsule (dưới cùng = col.position.y - (height)/2 ~0.55*SCALE)
+		# lên đúng mặt đất + offset nhỏ để không bị kẹt trong block.
+		spawn.y = ground_y + (PLAYER_SCALE * 0.60)
+	# Nếu không có height (chunk chưa ready): giữ y=3 fallback + rely vào frame
+	# tới _physics_process sẽ rơi nhẹ và land (tránh spawn trong hư không lâu).
+	global_position = spawn
 	food = max_food
 	oxygen = max_oxygen
 	stamina = max_stamina
@@ -585,7 +600,7 @@ func _do_respawn() -> void:
 	oxygen_changed.emit(int(oxygen), int(max_oxygen))
 	stamina_changed.emit(stamina, max_stamina)
 	revive()
-	# Miễn nhiễm sau hồi sinh để slime đang canh ở điểm spawn không giết lại
+	# Miến nhiễm sau hồi sinh để slime đang canh ở điểm spawn không giết lại
 	# ngay lập tức (death loop vô hạn khi không có i-frame). `_invul_timer` chỉ
 	# bị trừ một lần trong _physics_process → 5.0 này là đúng 5.0s thực tế
 	# (trước đây bị trừ cả _process lẫn _physics_process nên chỉ ~2.5s).
