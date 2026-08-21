@@ -2471,16 +2471,16 @@ static func compute_chunk(cx: int, cz: int, size: int, dim_id: int,
 	# loop đổ transforms+colors vào set_buffer cho hàng nghìn lá cỏ mất 10-17ms
 	# mỗi chunk → frame spike). Ở đây chạy song song với frame, apply_chunk chỉ
 	# bọc MultiMeshInstance3D.
-	# LÁ MỚI: mỗi lá = 1 instance của lưới LÁ CONG duy nhất (thay nhiều voxel) —
-	# gradient màu trộn trong vertex, sway shader đọc COLOR.a như cũ.
 	var grass_multimesh: MultiMesh = null
 	if not grass_xforms.is_empty():
-		var gmesh := _Grass.make_blade_mesh()
-		gmesh.surface_set_material(0, _get_grass_mat())
+		var gres := _get_grass_resources()
+		var gcube := gres[0] as BoxMesh
+		var gmat := gres[1] as Material
+		gcube.material = gmat
 		var gmm := MultiMesh.new()
 		gmm.transform_format = MultiMesh.TRANSFORM_3D
 		gmm.use_colors = true
-		gmm.mesh = gmesh
+		gmm.mesh = gcube
 		gmm.instance_count = grass_xforms.size()
 		_multimesh_buffer(gmm, grass_xforms, grass_colors)
 		grass_multimesh = gmm
@@ -3293,7 +3293,6 @@ static func _get_grass_resources() -> Array:
 ## tránh race lazy-init static khi nhiều worker cùng gọi _get_grass_resources.
 static func prewarm_grass_resources() -> void:
 	_get_grass_resources()
-	_Grass.make_blade_mesh()
 
 ## ── Cache dùng chung cho làng/cầu voxel (shaded): 1 BoxMesh + 1 material ────
 static var _village_box: BoxMesh = null

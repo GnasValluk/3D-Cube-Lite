@@ -6,9 +6,16 @@ var _sun: DirectionalLight3D = null
 var _moon: DirectionalLight3D = null
 var _sun_dir := Vector3(0.0, 1.0, 0.0)
 var _moon_dir := Vector3(0.0, -1.0, 0.0)
-## Tầng mây trôi ở y=25 (bám theo người chơi, noise neo tọa độ thế giới)
-var _clouds: MeshInstance3D = null
-var _cloud_mat: ShaderMaterial = null
+## TẦNG MÂY KHỐI ở y=25: các MẢNG KHỐI box dày (kiểu voxel) trôi chậm,
+## wrap vô tận quanh người chơi theo chu kỳ SPAN.
+var _cloud_holder: Node3D = null
+var _cloud_mm_res: MultiMesh = null
+var _cloud_smat: StandardMaterial3D = null
+var _cloud_pos := PackedVector3Array()
+var _cloud_scale: Array[Vector3] = []
+var _cloud_wind := Vector3.ZERO
+const CLOUD_SPAN: float = 1500.0
+const CLOUD_Y: float = 25.0
 
 const CYCLE_DURATION: float = 600.0
 
@@ -168,23 +175,90 @@ func _setup_lights() -> void:
 		if l:
 			l.light_energy = 0.0
 
-## ── TẦNG MÂY TRÔI y=25 ────────────────────────────────────────────────────────
-## Plane lớn (900m) bám theo người chơi theo phương x/z; shader lấy noise theo
-## tọa độ THẾ GIỚI nên hình mây đứng yên so với đất, chỉ trôi nhờ uniform gió.
+## ── TẦNG MÂY KHỐI y=25 — các MẢNG KHỐI box dày kiểu voxel ────────────────────
+## ~52 cụm, mỗi cụm 2-4 slab box chồng lệch (rộng 9-38m, dày ~3-5m) trải trên
+## diện 1500×1500. Mỗi frame: wrap vị trí quanh người chơi theo chu kỳ SPAN
+## (trường mây vô tận) + trôi chậm theo gió. Màu tint theo giờ qua albedo.
 func _setup_clouds() -> void:
-	if _clouds != null:
+	if _cloud_holder != null:
 		return
-	_cloud_mat = ShaderMaterial.new()
-	_cloud_mat.shader = load("res://scripts/world/environment/cloud.gdshader")
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(900, 900)
-	_clouds = MeshInstance3D.new()
-	_clouds.name = "CloudLayer"
-	_clouds.mesh = plane
-	_clouds.material_override = _cloud_mat
-	_clouds.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	_clouds.position.y = 25.0
-	add_child(_clouds)
+	_cloud_holder = Node3D.new()
+	_cloud_holder.name = "CloudLayer"
+	_cloud_holder.position.y = CLOUD_Y
+	add_child(_cloud_holder)
+
+	_cloud_smat = StandardMaterial3D.new()
+	_cloud_smat.vertex_color_use_as_albedo = true
+	_cloud_smat.roughness = 1.0
+	_cloud_smat.metallic = 0.0
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 20240613
+	var xf: Array = []
+	var cls: Array = []
+	for ci in range(52):
+		var cx: float = rng.randf_range(-CLOUD_SPAN, CLOUD_SPAN) * 0.5
+		var cz: float = rng.randf_range(-CLOUD_SPAN, CLOUD_SPAN) * 0.5
+		var slabs: int = 2 + rng.randi_range(0, 2)
+		var cw: float = rng.randf_range(16.0, 38.0)
+		var cd: float = rng.randf_range(10.0, 26.0)
+		var thick: float = rng.randf_range(2.6, 4.4)
+		for si in range(slabs):
+			var w: float = cw * rng.randf_range(0.55, 1.00)
+			var d: float = cd * rng.randf_range(0.55, 1.00)
+			var ox: float = rng.randf_range(-cw * 0.28, cw * 0.28)
+			var oz: float = rng.randf_range(-cd * 0.28, cd * 0.28)
+			var oy: float = rng.randf_range(-0.5, 0.9)
+			var sc := Vector3(w, thick * rng.randf_range(0.8, 1.25), d)
+			xf.append(Transform3D(Basis().scaled(sc), Vector3(cx + ox, oy, cz + oz)))
+			var shade: float = rng.randf_range(0.86, 1.06)
+			cls.append(Color(shade, shade, shade * 1.02))
+
+	var cube := BoxMesh.new()
+	cube.size = Vector3.ONE
+	cube.material = _cloud_smat
+	_cloud_mm_res = MultiMesh.new()
+	_cloud_mm_res.transform_format = MultiMesh.TRANSFORM_3D
+	_cloud_mm_res.use_colors = true
+	_cloud_mm_res.mesh = cube
+	_cloud_mm_res.instance_count = xf.size()
+	_cloud_pos.resize(xf.size())
+	for i in range(xf.size()):
+		var tf: Transform3D = xf[i]
+		_cloud_mm_res.set_instance_transform(i, tf)
+		_cloud_mm_res.set_instance_color(i, cls[i])
+		_cloud_pos[i] = tf.origin
+		_cloud_scale.append(tf.basis.get_scale())
+
+	var mmi := MultiMeshInstance3D.new()
+	mmi.multimesh = _cloud_mm_res
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_cloud_holder.add_child(mmi)
+
+## Mỗi frame: trôi theo gió + wrap quanh camera; tint màu theo giờ.
+func _update_clouds(delta: float, h: float, day_t: float, weather: float) -> void:
+	if _cloud_holder == null or _cloud_mm_res == null or _cloud_mm_res.instance_count == 0:
+		return
+	_cloud_wind += Vector3(7.0, 0.0, -2.5) * delta
+	var cam := get_viewport().get_camera_3d()
+	var px: float = cam.global_position.x if cam != null else 0.0
+	var pz: float = cam.global_position.z if cam != null else 0.0
+	var half := CLOUD_SPAN * 0.5
+	for i in range(_cloud_pos.size()):
+		var raw := _cloud_pos[i] + _cloud_wind
+		raw.x = px + fposmod(raw.x - px + half, CLOUD_SPAN) - half
+		raw.z = pz + fposmod(raw.z - pz + half, CLOUD_SPAN) - half
+		raw.y = CLOUD_Y
+		var sc := _cloud_scale[i]
+		_cloud_mm_res.set_instance_transform(i, Transform3D(
+			Basis(Vector3(sc.x, 0, 0), Vector3(0, sc.y, 0), Vector3(0, 0, sc.z)), raw))
+	# Tint: ngày trắng, chiều vàng cam, đêm xám tối; mưa xám đục
+	var warm: float = clampf(1.0 - absf(h - 17.0) / 2.6, 0.0, 1.0)
+	var c := Color(0.12, 0.14, 0.24).lerp(Color(0.99, 0.99, 1.0), day_t)
+	c = c.lerp(Color(0.95, 0.62, 0.34), warm * clampf(day_t + 0.12, 0.0, 1.0) * 0.9)
+	if weather > 0.0:
+		c = c.lerp(Color(0.45, 0.47, 0.52), weather * 0.6)
+	_cloud_smat.albedo_color = c
 
 func _ensure_sun() -> void:
 	if _sun != null:
@@ -193,12 +267,7 @@ func _ensure_sun() -> void:
 	_sun.name = "SunLight"
 	_sun.light_color = Color(1.0, 0.95, 0.85)
 	_sun.shadow_enabled = true
-	# SHADOW DỊU: giảm cường độ bóng + mềm cạnh (bớt nhiễu răng cưa)
-	_sun.shadow_opacity = 0.55
-	_sun.shadow_blur = 5.0
-	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	_sun.directional_shadow_blend_splits = true
-	_sun.directional_shadow_max_distance = 140.0
+	_sun.shadow_blur = 4.0
 	add_child(_sun)
 
 	_moon = DirectionalLight3D.new()
@@ -207,7 +276,6 @@ func _ensure_sun() -> void:
 	_moon.light_energy = 0.0
 	_moon.shadow_enabled = true
 	_moon.shadow_blur = 6.0
-	_moon.shadow_opacity = 0.45
 	_moon.visible = false
 	add_child(_moon)
 
@@ -281,55 +349,14 @@ func _process(delta: float) -> void:
 	SkyLight.update_sky(_sky_mat, h, weather_intensity, float(TimeSystem.get_total_days()) if TimeSystem else -1.0)
 	environment.ambient_light_color = k["amb"].lerp(Color(0.08, 0.10, 0.14), weather_intensity * 0.7)
 	# Fill mềm theo ngày/đêm + mưa để bóng dịu, không đen tuyệt.
-	environment.ambient_light_energy = 0.30 * rain_factor * lerp(0.72, 1.0, day_t_real)
+	environment.ambient_light_energy = 0.28 * rain_factor * lerp(0.72, 1.0, day_t_real)
 	_update_sun(h, rain_factor)
 
-	# ── HAZE KHI QUYỂN kiểu ảnh tham chiếu (giờ vàng) ──────────────────────────
-	# Sương mỏng luôn có, dày thêm lúc golden hour; fog_sun_scatter làm SƯƠNG
-	# PHÁT SÁNG về phía mặt trời → quầng nắng ấm phủ cảnh như ảnh.
-	var golden_h: float = clampf(1.0 - absf(h - 16.75) / 3.2, 0.0, 1.0)
-	var morning_h: float = clampf(1.0 - absf(h - 7.0) / 2.6, 0.0, 1.0)
-	var warm_haze: float = maxf(golden_h, morning_h) * day_t_real
-	var night_f: float = 1.0 - day_t_real
-	environment.fog_density = 0.0042 * day_t_real \
-		+ warm_haze * 0.0095 \
-		+ weather_intensity * 0.010
-	# Sương phát sáng về phía mặt trời — yếu tố chính của look "golden hour"
-	environment.fog_sun_scatter = 0.38 + warm_haze * 0.42
-	# Chân trời hoà vào trời qua fog nhẹ (mép phân cách biến mất)
-	environment.fog_sky_affect = 0.12 + warm_haze * 0.10
-	var haze_warm := Color(1.00, 0.78, 0.52)
-	var haze_day := Color(0.82, 0.86, 0.92)
-	var haze_night := Color(0.05, 0.07, 0.13)
-	environment.fog_light_color = haze_night.lerp(haze_day, day_t_real).lerp(
-		haze_warm, warm_haze * 0.75)
-
-	# ── CẬP NHẬT MÂY (màu theo giờ + độ phủ theo mưa) ────────────────────────
-	if _cloud_mat != null:
-		var day_col := Color(0.99, 0.99, 1.00)
-		var dusk_col := Color(1.00, 0.70, 0.42)
-		var night_col := Color(0.10, 0.12, 0.20)
-		var shade_day := Color(0.62, 0.66, 0.76)
-		var shade_night := Color(0.06, 0.08, 0.14)
-		var cc := night_col.lerp(day_col, day_t_real)
-		cc = cc.lerp(dusk_col, warm_haze * 0.85)
-		var sc := shade_night.lerp(shade_day, day_t_real)
-		sc = sc.lerp(Color(0.55, 0.38, 0.30), warm_haze * 0.5)
-		_cloud_mat.set_shader_parameter("cloud_color", cc)
-		_cloud_mat.set_shader_parameter("shade_color", sc)
-		_cloud_mat.set_shader_parameter("coverage",
-			clampf(0.50 + weather_intensity * 0.24 - warm_haze * 0.04, 0.30, 0.85))
-		_cloud_mat.set_shader_parameter("alpha_mult",
-			clampf(0.88 - weather_intensity * 0.25, 0.35, 1.0))
-		# Mây bám theo người chơi (x/z), cao cố định y=25
-		if _clouds != null:
-			var cam := get_viewport().get_camera_3d()
-			if cam != null:
-				_clouds.global_position.x = cam.global_position.x
-				_clouds.global_position.z = cam.global_position.z
-				_clouds.global_position.y = 25.0
-
+	environment.fog_density = weather_intensity * 0.012
 	environment.fog_height_density = weather_intensity * 0.08
+
+	# ── MÂY KHỐI: tint màu theo giờ + trôi/wrap quanh người chơi ────────────
+	_update_clouds(delta, h, day_t_real, weather_intensity)
 
 func get_cycle_progress() -> float:
 	if TimeSystem:
