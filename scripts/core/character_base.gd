@@ -1032,6 +1032,7 @@ func _do_melee_hit() -> void:
 				"iron_greatsword": range_scale = 1.75; angle_threshold = 0.15
 				"giao_dai": range_scale = 1.7
 				"iron_halberd": range_scale = 1.9; angle_threshold = 0.15
+				"iron_scythe": range_scale = 1.8; angle_threshold = 0.12
 				"axe": range_scale = 1.3
 				"iron_sword": range_scale = 1.2
 				"pickaxe", "shovel", "hoe": range_scale = 1.1

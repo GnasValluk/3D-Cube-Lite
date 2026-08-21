@@ -33,6 +33,11 @@ const CHAINS := {
 		{"dur": 0.82, "hit": 0.38, "lunge": 9.0},   # ĐÒN CUỐI: rút đà → đâm thẳng
 		                                            # + LƯỚT trước mặt quét sát thương
 	],
+	"iron_scythe": [
+		{"dur": 0.52, "hit": 0.44, "lunge": 3.4},   # gặt ngang trái → phải
+		{"dur": 0.54, "hit": 0.46, "lunge": 3.4},   # gặt ngược phải → trái
+		{"dur": 0.72, "hit": 0.48, "lunge": 5.0},   # xoay người gặt kết
+	],
 	"axe": [
 		{"dur": 0.60, "hit": 0.42, "lunge": 1.8},   # chop phải
 		{"dur": 0.62, "hit": 0.44, "lunge": 1.8},   # chop trái
@@ -64,6 +69,7 @@ const CHARGED := {
 	"leather_gloves":  {"dur": 0.64, "hit": 0.40, "lunge": 5.8, "mult": 2.1},  # thượng công chạm trời
 	"iron_greatsword": {"dur": 1.00, "hit": 0.52, "lunge": 5.2, "mult": 2.3},  # nhảy đập đất
 	"iron_halberd":    {"dur": 0.92, "hit": 0.48, "lunge": 9.0, "mult": 2.2},  # lốc xoáy song kích
+	"iron_scythe":     {"dur": 0.96, "hit": 0.50, "lunge": 7.0, "mult": 2.25}, # LIỀM CHẾT xoay tròn gặt
 	"axe":             {"dur": 0.88, "hit": 0.46, "lunge": 4.6, "mult": 2.3},  # chém xoay nặng
 	"pickaxe":         {"dur": 0.84, "hit": 0.44, "lunge": 4.8, "mult": 2.2},  # khoan đục lao tới
 	"shovel":          {"dur": 0.76, "hit": 0.42, "lunge": 4.2, "mult": 2.0},  # vẩy đất nặng

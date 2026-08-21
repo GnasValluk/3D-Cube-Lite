@@ -142,8 +142,10 @@ func _ensure_highlight() -> void:
 	_block_highlight.visible = false
 	add_child(_block_highlight)
 
-## Vũ khí được PARRY bằng chuột phải (kiếm/đại kiếm/kích sắt).
-const PARRY_WEAPONS := ["iron_sword", "iron_greatsword", "iron_halberd"]
+## Vũ khí được PARRY bằng chuột phải (kiếm/đại kiếm/kích/lưỡi hái).
+const PARRY_WEAPONS := ["iron_sword", "iron_greatsword", "iron_halberd", "iron_scythe"]
+## Vũ khí 2 HAND — KHÔNG đeo được phụ kiện cầm tay (khiên/đèn pin)
+const TWO_HANDED_WEAPONS := ["iron_greatsword", "iron_scythe"]
 
 func _can_parry() -> bool:
 	return equipped_weapon != null and equipped_weapon.id in PARRY_WEAPONS
@@ -851,11 +853,11 @@ func get_equipped_by_slot(idx: int) -> ItemDef:
 	return arr[idx] as ItemDef
 
 func set_equipped_by_slot(idx: int, item: ItemDef) -> void:
-	# Đại kiếm 2 tay + đang cầm phụ kiện tay → tự gỡ phụ kiện trước
-	if item != null and item.id == "iron_greatsword" and equipped_sub != null \
+	# Vũ khí 2 TAY + đang cầm phụ kiện tay → tự gỡ phụ kiện trước
+	if item != null and item.id in TWO_HANDED_WEAPONS and equipped_sub != null \
 			and equipped_sub.id in ["iron_shield", "flashlight"]:
 		equipped_sub = null
-		_scroll_inventory_message("(Buông phụ kiện tay để vung Đại Kiếm!)")
+		_scroll_inventory_message("(Buông phụ kiện tay để vung vũ khí 2 tay!)")
 	match idx:
 		0: equipped_head = item
 		1: equipped_body = item
@@ -863,12 +865,12 @@ func set_equipped_by_slot(idx: int, item: ItemDef) -> void:
 		3: equipped_feet = item
 		4: equipped_back = item
 		5:
-			# ĐẠI KIỂM 2 TAY: không đeo được phụ kiện CẦM TAY (khiên/đèn pin) —
+			# Vũ khí 2 TAY: không đeo được phụ kiện CẦM TAY (khiên/đèn pin) —
 			# nhẫn/vòng trang sức vẫn đeo bình thường.
 			if item != null and equipped_weapon != null \
-					and equipped_weapon.id == "iron_greatsword" \
+					and equipped_weapon.id in TWO_HANDED_WEAPONS \
 					and item.id in ["iron_shield", "flashlight"]:
-				_scroll_inventory_message("(Đại Kiếm cần 2 tay — không cầm thêm phụ kiện!)")
+				_scroll_inventory_message("(Vũ khí 2 tay — không cầm thêm phụ kiện!)")
 				_update_armor_mesh()
 				return
 			equipped_sub = item

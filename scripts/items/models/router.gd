@@ -40,6 +40,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"baked_pumpkin": _build_baked_pumpkin_icon(parent)
 		"fishing_rod": ToolsMesh.fishing_rod_drop(parent)
 		"iron_greatsword": ToolsMesh.greatsword_drop(parent)
+		"iron_scythe": ToolsMesh.iron_scythe_drop(parent)
 		"iron_halberd": ToolsMesh.iron_halberd_drop(parent)
 		"leather_gloves": ToolsMesh.gauntlet_drop(parent)
 		"iron_helmet": _build_iron_helmet_icon(parent)

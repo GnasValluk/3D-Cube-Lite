@@ -613,6 +613,29 @@ func _ready() -> void:
 		_check(p._charged_mult > 1.35,
 			"sát thương nhân theo mức vận (x%.2f)" % p._charged_mult)
 
+	# ── 24. LƯỠI HÁI SẮT: chain 3 đòn + 2 tay chặn khiên + pose 2 tay ───────
+	if db2.has("iron_scythe"):
+		p.equipped_weapon = db2["iron_scythe"]
+		p._update_weapon_mesh()
+		await _wait_frames(3)
+		var sc_chain: Array = _Combos.chain_for("iron_scythe")
+		_check(sc_chain.size() == 3, "lưỡi hái có chain 3 đòn (got=%d)" % sc_chain.size())
+		var sc_spec: Dictionary = _Combos.charged_for("iron_scythe")
+		_check(sc_spec.mult >= 2.2, "trọng kích LIỀM CHẾT mult=%.2f" % sc_spec.mult)
+		if db2.has("iron_shield"):
+			p.set_equipped_by_slot(5, db2["iron_shield"])
+			await _wait_frames(2)
+			_check(p.equipped_sub == null,
+				"lưỡi hái 2 tay → KHÔNG đeo được khiên (sub=%s)" % str(p.equipped_sub))
+		p._charge_pending = false
+		p._charging = false
+		p._combo_chain = sc_chain
+		p._begin_combo_step(0)
+		await _wait_frames(8)
+		var sc_arm: float = absf(mesh_node.arm_r.rotation.x) + absf(mesh_node.arm_l.rotation.x)
+		_check(p._state == p.State.ATTACK and sc_arm > 1.0,
+			"pose gặt dùng CẢ HAI TAY (arm=%.2f)" % sc_arm)
+
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 
 func _all_mi_hidden(pivot: Node3D) -> bool:

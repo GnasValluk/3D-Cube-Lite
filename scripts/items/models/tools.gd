@@ -13,6 +13,7 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"iron_sword":    _build_kiem(pivot)
 		"fishing_rod": _build_can_cau(pivot)
 		"iron_greatsword": _build_dai_kiem(pivot)
+		"iron_scythe": _build_luoi_hai(pivot)
 		"iron_halberd": _build_iron_halberd(pivot)
 		# leather_gloves KHÔNG dựng vào weapon_pivot — PlayerCharacter gọi
 		# build_glove_hand thay thế khối bàn tay cả 2 bên.
@@ -279,6 +280,56 @@ static func _build_dai_kiem(p: Node3D) -> void:
 	# Đường chạm khắc trang trí hai bên fuller
 	_box(p, Vector3(0.034, 0.52, 0), Vector3(0.002, 0.44, 0.028), _mat(Color(0.50, 0.52, 0.60)))
 	_box(p, Vector3(-0.034, 0.52, 0), Vector3(0.002, 0.44, 0.028), _mat(Color(0.50, 0.52, 0.60)))
+
+## ── Lưỡi Hái Sắt — cán dài 2 tay + lưỡi liềm cong sắc (kiểu tử thần gặt) ─────
+static func _build_luoi_hai(p: Node3D) -> void:
+	var wood := _mat(Color(0.32, 0.19, 0.09))
+	var wrap := _mat(Color(0.20, 0.12, 0.06))
+	var iron := _mat(Color(0.52, 0.54, 0.60))
+	var iron_d := _mat(Color(0.30, 0.31, 0.35))
+	var edge := _mat(Color(0.87, 0.89, 0.95))
+	# Cán dài dọc +Y, bọc da phần cầm dưới
+	_cyl(p, Vector3(0, -0.16, 0), 0.040, 0.18, wrap)
+	_cyl(p, Vector3(0, 0.16, 0), 0.032, 0.82, wood)
+	# Đệm tay giữa cán (điểm tựa tay trái)
+	_cyl(p, Vector3(0, 0.02, 0), 0.046, 0.05, iron_d)
+	# Khớp sắt nối lưỡi ở đỉnh cán
+	_cyl(p, Vector3(0, 0.60, 0), 0.048, 0.08, iron)
+	_box(p, Vector3(0, 0.65, 0), Vector3(0.09, 0.032, 0.09), iron_d)
+	# Lưỡi LIỀM: chuỗi đoạn cong quét ~112° rồi cụp xuống, thon & sắc dần
+	var segs := 7
+	var prev := Vector3(0.03, 0.66, 0.0)
+	for i in range(segs):
+		var t1: float = float(i + 1) / float(segs)
+		var ang: float = t1 * PI * 0.62
+		var drop: float = t1 * t1 * 0.34
+		var nxt := Vector3(cos(ang) * 0.47 + 0.02, 0.66 - drop, sin(ang) * 0.11)
+		var dir := (nxt - prev).normalized()
+		var seg_len: float = prev.distance_to(nxt) + 0.02
+		var node := Node3D.new()
+		node.position = (prev + nxt) * 0.5
+		node.basis = Basis.looking_at(dir, Vector3.UP)
+		p.add_child(node)
+		var mcol: StandardMaterial3D = iron if i % 2 == 0 else iron_d
+		var th: float = 0.050 - t1 * 0.014
+		_box(node, Vector3.ZERO, Vector3(th + 0.004, 0.048 - t1 * 0.012, seg_len), mcol)
+		# Mép SẮC phía dưới lưỡi ở 1/3 cuối
+		if i >= segs - 3:
+			_box(node, Vector3(0, -0.030, 0), Vector3(0.050, 0.014, seg_len), edge)
+		prev = nxt
+
+## Drop / display lưỡi hái (voxel nhỏ)
+static func iron_scythe_drop(p: Node3D) -> void:
+	var wood := Color(0.32, 0.19, 0.09)
+	var iron := Color(0.52, 0.54, 0.60)
+	var edge := Color(0.86, 0.88, 0.94)
+	ItemMeshShared.add_cube(p, 0, -4, 0, 1.0, 3.0, 1.0, wood)
+	ItemMeshShared.add_cube(p, 0, -1, 0, 1.1, 4.5, 1.1, wood)
+	ItemMeshShared.add_cube(p, 0, 2, 0, 1.5, 1.2, 1.5, iron)
+	ItemMeshShared.add_cube(p, 2, 3.2, 0, 3.6, 1.0, 1.0, iron)
+	ItemMeshShared.add_cube(p, 5, 2.4, 0, 3.0, 0.9, 0.9, iron)
+	ItemMeshShared.add_cube(p, 7.4, 1.1, 0, 2.6, 0.8, 0.8, iron)
+	ItemMeshShared.add_cube(p, 9.2, -0.6, 0, 2.4, 0.7, 0.7, edge)
 
 # ── Kích Sắt (Iron Halberd) — cán dài, lưỡi búa + mũi nhọn ─────────────────
 static func _build_iron_halberd(p: Node3D) -> void:

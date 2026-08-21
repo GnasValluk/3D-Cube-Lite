@@ -863,6 +863,46 @@ const _POSE_GS := [
 			"wp.x": 142.0, "wp.y": 16.0, "wp.z": -12.0}},
 ]
 
+# Lưỡi hái — GẶT: hai nhịp quét ngang rộng + xoay người gặt kết (lưỡi liềm)
+const _POSE_SCYTHE := [
+	{"w1": 0.32, "w2": 0.56,
+		"wind":   {"rig.y": -0.44, "rig.x": 0.04, "body.x": 0.08, "head.y": -0.30,
+			"arm_r.x": -1.45, "arm_r.z": 0.42, "elbow_r.x": -1.05,
+			"arm_l.x": -1.10, "arm_l.z": 0.48, "elbow_l.x": -1.15,
+			"wp.x": 38.0, "wp.y": -74.0, "wp.z": 80.0},
+		"strike": {"rig.y": 0.52, "rig.x": 0.14, "body.x": 0.16, "head.y": 0.36,
+			"arm_r.x": 0.64, "arm_r.z": -0.46, "elbow_r.x": -0.12,
+			"arm_l.x": -0.55, "arm_l.z": 0.56, "elbow_l.x": -0.40,
+			"wp.x": 158.0, "wp.y": 32.0, "wp.z": -22.0},
+		"follow": {"rig.y": 0.32, "body.x": 0.10, "head.y": 0.18,
+			"arm_r.x": 0.35, "arm_r.z": -0.28, "elbow_r.x": -0.38,
+			"wp.x": 138.0, "wp.y": 14.0, "wp.z": -10.0}},
+	{"w1": 0.32, "w2": 0.56,
+		"wind":   {"rig.y": 0.46, "rig.x": 0.06, "body.x": 0.08, "head.y": 0.32,
+			"arm_r.x": -1.50, "arm_r.z": -0.46, "elbow_r.x": -1.00,
+			"arm_l.x": -1.05, "arm_l.z": 0.50, "elbow_l.x": -1.10,
+			"wp.x": 38.0, "wp.y": 76.0, "wp.z": -82.0},
+		"strike": {"rig.y": -0.54, "rig.x": 0.14, "body.x": 0.16, "head.y": -0.38,
+			"arm_r.x": 0.66, "arm_r.z": 0.48, "elbow_r.x": -0.10,
+			"arm_l.x": -0.52, "elbow_l.x": -0.42,
+			"wp.x": 160.0, "wp.y": -34.0, "wp.z": 24.0},
+		"follow": {"rig.y": -0.34, "body.x": 0.10, "head.y": -0.18,
+			"arm_r.x": 0.38, "elbow_r.x": -0.36,
+			"wp.x": 140.0, "wp.y": -14.0, "wp.z": 10.0}},
+	{"w1": 0.36, "w2": 0.60,
+		"wind":   {"rig.y": -0.58, "rig.x": 0.10, "body.x": 0.12, "head.y": -0.42,
+			"arm_r.x": -1.70, "arm_r.z": 0.50, "elbow_r.x": -0.90,
+			"arm_l.x": -1.20, "arm_l.z": 0.55, "elbow_l.x": -1.05,
+			"wp.x": 28.0, "wp.y": -88.0, "wp.z": 90.0},
+		"strike": {"rig.y": 0.72, "rig.x": 0.20, "body.x": 0.20, "head.y": 0.55,
+			"arm_r.x": 0.82, "arm_r.z": -0.54, "elbow_r.x": -0.08,
+			"arm_l.x": -0.60, "elbow_l.x": -0.38,
+			"wp.x": 166.0, "wp.y": 38.0, "wp.z": -28.0},
+		"follow": {"rig.y": 0.44, "rig.x": 0.14, "head.y": 0.26,
+			"arm_r.x": 0.45, "elbow_r.x": -0.34,
+			"wp.x": 146.0, "wp.y": 18.0, "wp.z": -12.0}},
+]
+
 # Halberd: đâm xa, chém trục, quét ngang
 const _POSE_HALBERD := [
 	{"w1": 0.34, "w2": 0.50,
@@ -921,6 +961,7 @@ func _pose_table(wid: String) -> Array:
 		"leather_gloves": return _POSE_GLOVES
 		"iron_greatsword": return _POSE_GS
 		"iron_halberd": return _POSE_HALBERD
+		"iron_scythe": return _POSE_SCYTHE
 		"axe", "pickaxe": return _POSE_HEAVY
 		"shovel", "hoe": return _POSE_TOOL
 	return _POSE_SWORD
@@ -1102,8 +1143,9 @@ func _attack(delta: float, _t: float) -> void:
 		_trail_released = true
 		if _trail != null and is_instance_valid(_trail):
 			_trail.stop_recording()
-	if wid == "iron_greatsword" or wid == "axe" or wid == "pickaxe" or wid == "iron_halberd":
-		SFXManager.play_attack_strong()
+		if wid == "iron_greatsword" or wid == "axe" or wid == "pickaxe" \
+				or wid == "iron_halberd" or wid == "iron_scythe":
+			SFXManager.play_attack_strong()
 	else:
 		SFXManager.play_attack_weak()
 		if wid == "leather_gloves":
@@ -1131,6 +1173,8 @@ func _start_trail(wid: String) -> void:
 			tip_y = 1.05; life = 0.34; col = Color(0.80, 0.88, 1.00)
 		"iron_halberd":
 			tip_y = 0.82; life = 0.30; col = Color(0.65, 0.75, 0.85)
+		"iron_scythe":
+			tip_y = 0.92; life = 0.34; col = Color(0.72, 0.70, 0.95)   # tím nhạt tử thần
 		"axe":
 			tip_y = 0.44; life = 0.26; col = Color(1.00, 0.98, 0.92)
 		"pickaxe":
@@ -1276,6 +1320,18 @@ func _charged_blend(prog: float, delta: float, wid: String) -> void:
 					"arm_r.x": -0.75, "elbow_r.x": -0.10, "arm_l.x": -0.65, "elbow_l.x": -0.30,
 					"wp.x": 96.0, "wp.y": 0.0, "wp.z": 0.0},
 				"follow": {"rig.y": 0.55, "arm_r.x": -0.55}}
+		"iron_scythe":
+			# LIỀM CHẾT: xoay tròn gặt quanh thân (vòng ~200°) rồi vung kết lên
+			table = {"w1": 0.20, "w2": 0.62,
+				"wind":   {"rig.y": -1.10, "rig.x": 0.10, "body.x": 0.12,
+					"arm_r.x": -1.60, "elbow_r.x": -0.70, "arm_l.x": -1.30,
+					"wp.x": 40.0, "wp.y": -80.0, "wp.z": 84.0},
+				"strike": {"rig.y": 2.20, "rig.x": 0.16, "body.x": 0.18, "head.y": 0.60,
+					"arm_r.x": 0.85, "elbow_r.x": -0.08,
+					"wp.x": 168.0, "wp.y": 34.0, "wp.z": -24.0},
+				"follow": {"rig.y": 1.40, "rig.x": -0.10, "head.x": -0.16,
+					"arm_r.x": -1.90, "elbow_r.x": -0.30,
+					"wp.x": 30.0, "wp.y": 0.0, "wp.z": 0.0}}
 		"axe":
 			table = {"w1": 0.28, "w2": 0.56,
 				"wind":   {"rig.x": -0.20, "rig.y": -0.30},
