@@ -1,5 +1,7 @@
 class_name PlayerAnimator
 
+const _TrailVFX := preload("res://scripts/characters/player/slash_trail_vfx.gd")
+
 ## Animator khớp-driven cho rig khối khớp (PlayerBlockMesh).
 ## Dùng khớp thật: cổ (neck), vai (arm_l/r), khuỷu (elbow_l/r), xương chậu
 ## (pelvis), hông (leg_l/r), gối (knee_l/r), cổ chân (ankle_l/r), bàn chân
@@ -18,8 +20,40 @@ var sleep_shoulder_drop: float = 0.04
 var mesh: PlayerMesh
 var base: CharacterBase
 var player: PlayerCharacter
-var _slash_spawned: bool = false
 var _last_remaining: float = 0.0
+
+# ── Pha bước (gait phase) ───────────────────────────────────────────────────
+## Pha bước tích lũy theo tốc độ ngang THỰC của nhân vật (không phải theo t
+## cố định) → tần số tay chân khớp với vận tốc, bàn chân không trượt đất.
+var _gait_phase: float = 0.0
+var _gait_rate: float = 6.5
+
+func _advance_gait(delta: float) -> float:
+	var sp: float = Vector2(base.velocity.x, base.velocity.z).length()
+	# ~1.75 rad mỗi mét: tần số khớp tốc độ để bàn chân KHÔNG trượt đất.
+	var target: float = clamp(sp * 1.75, 5.0, 15.5)
+	# Làm mượt tần số để chuyển idle↔walk↔sprint không giật pha bước.
+	_gait_rate = lerpf(_gait_rate, target, minf(1.0, delta * 5.0))
+	_gait_phase += _gait_rate * delta
+	return _gait_phase
+
+## Chu kỳ gối đúng sinh học — PHÂN BIỆT pha vung / pha trụ qua cờ `swinging`
+## (s giảm = đang vung tới trước; s tăng = đang trụ đạp sau):
+##  • Vung  : co SÂU giữa pha vung (gót gập lên) rồi DUỖI THẲNG cẳng chân
+##            vươn tới trước khi chạm gót — hết trượt patanh
+##  • Trụ   : lún nhẹ ngay sau tiếp đất (loading response) rồi gần thẳng đẩy sau
+func _gait_knee(s: float, knee_amp: float, swinging: bool) -> float:
+	if swinging:
+		var u: float = clampf(-s, 0.0, 1.0)   # 0 = dưới thân → 1 = chạm gót
+		# Co sâu giữa vung (u≈0.48) rồi DUỖI THẲNG dần tới lúc chạm (u→0.94)
+		var co: float = knee_amp * (smoothstep(0.05, 0.48, u) * (1.0 - smoothstep(0.55, 0.94, u)))
+		var load: float = 0.24 * smoothstep(0.82, 0.98, u)
+		return 0.08 + co + load
+	else:
+		# Chân trụ: lún gối hấp thụ ngay sau tiếp đất, gần thẳng khi đạp
+		var load2: float = 0.20 * exp(-pow((s + 0.75) / 0.30, 2.0))
+		var push: float = 0.14 * exp(-pow((s - 0.95) / 0.25, 2.0))
+		return 0.08 + load2 + push
 
 # ── Spring state (secondary motion) ─────────────────────────────────────────
 var _spos: Dictionary = {}
@@ -70,6 +104,10 @@ func _spring(name: String, target: float, freq: float, zeta: float, delta: float
 const _ARMS_OWNED_WEAPONS: Array[String] = ["ak_12", "m200", "crossbow", "watermelon_cannon", "pumpkin_mortar"]
 
 func _weapon_owns_arms() -> bool:
+	# Câu cá: khi đang thả câu/cầm cần chờ, pose cần do PlayerFishing điều khiển
+	if player != null and player._fishing_active \
+			and player.equipped_weapon != null and player.equipped_weapon.id == "fishing_rod":
+		return true
 	return player != null and player.equipped_weapon != null \
 		and _ARMS_OWNED_WEAPONS.has(player.equipped_weapon.id)
 
@@ -78,13 +116,40 @@ func setup(m: PlayerMesh, b: CharacterBase) -> void:
 	base = b
 	player = b as PlayerCharacter
 
+## Xoá sạch tư thế + trạng thái spring (gọi khi hồi sinh): animation chết gập
+## người rig.rotation.x ~1.35 rad bằng lerp thẳng vào node, KHÔNG đi qua spring
+## → nếu không reset, khớp giữ tư thế nằm và spring nhảy cóc từ giá trị cũ.
+func reset_pose() -> void:
+	_spos.clear()
+	_svel.clear()
+	_gait_phase = 0.0
+	_gait_rate = 6.5
+	_kill_trail()
+	_trail_released = true
+	_last_remaining = 0.0
+	if mesh == null:
+		return
+	for j in [mesh.rig, mesh.pelvis, mesh.body, mesh.torso, mesh.neck, mesh.head,
+			mesh.arm_l, mesh.arm_r, mesh.elbow_l, mesh.elbow_r,
+			mesh.leg_l, mesh.leg_r, mesh.knee_l, mesh.knee_r,
+			mesh.ankle_l, mesh.ankle_r, mesh.foot_l, mesh.foot_r,
+			mesh.backpack]:
+		if j != null and is_instance_valid(j):
+			j.rotation = Vector3.ZERO
+	if mesh.pelvis != null and is_instance_valid(mesh.pelvis):
+		mesh.pelvis.position = Vector3(0, 0.47, 0)
+	if mesh.rig != null and is_instance_valid(mesh.rig):
+		mesh.rig.position = Vector3(0, 0.02, 0)
+	if mesh.backpack != null and is_instance_valid(mesh.backpack):
+		mesh.backpack.position = Vector3(0, 0.10, -0.13)
+
 func animate(delta: float) -> void:
 	var t: float = base._time
 	match base._state:
 		CharacterBase.State.IDLE:
 			_idle(delta, t)
 		CharacterBase.State.WALK:
-			_walk(delta, t, 1.0)
+			_walk(delta, t)
 		CharacterBase.State.SPRINT:
 			_sprint(delta, t)
 		CharacterBase.State.CROUCH:
@@ -93,6 +158,12 @@ func animate(delta: float) -> void:
 			_dash(delta, t)
 		CharacterBase.State.ATTACK:
 			_attack(delta, t)
+		CharacterBase.State.RECOVERY:
+			_recovery(delta, t)
+		CharacterBase.State.AIR_ATTACK:
+			_air_attack(delta, t)
+		CharacterBase.State.PARRY:
+			_parry(delta, t)
 		CharacterBase.State.JUMP:
 			_air(delta, t, true)
 		CharacterBase.State.FALL:
@@ -105,6 +176,15 @@ func animate(delta: float) -> void:
 			_swim(delta, t)
 		CharacterBase.State.EAT:
 			_eat(delta, t)
+	# ── Lưới an toàn thế cầm vũ khí ──────────────────────────────────────────
+	# HIT/DASH/EAT... ngắt giữa đòn sẽ bỏ qua recovery → weapon_pivot kẹt ở góc
+	# chém, kiếm cầm lệch hẳn. Mọi state KHÔNG phải đánh đều ép wp về IDLE_WP.
+	if base._state != CharacterBase.State.ATTACK \
+			and base._state != CharacterBase.State.AIR_ATTACK \
+			and not _weapon_owns_arms() \
+			and mesh.weapon_pivot != null and is_instance_valid(mesh.weapon_pivot):
+		mesh.weapon_pivot.rotation_degrees = \
+			mesh.weapon_pivot.rotation_degrees.lerp(IDLE_WP, minf(1.0, delta * 8.0))
 	# Clamp an toàn: giữ ankle + foot ở mức dorsiflex nhẹ (mũi hướng lên)
 	# để tránh chân chìm đất khi đứng độn (foot sink do spring overshoot).
 	# Chỉ áp dụng khi trên mặt đất (không cho bơi/rơi).
@@ -119,7 +199,8 @@ func _clamp_feet_safe() -> void:
 	if mesh == null or base == null:
 		return
 	var s: int = base._state
-	if s == CharacterBase.State.SWIM or s == CharacterBase.State.JUMP or s == CharacterBase.State.FALL or s == CharacterBase.State.DEAD or s == CharacterBase.State.SPRINT or s == CharacterBase.State.CROUCH:
+	# ATTACK cũng loại: thế đánh có chủ ý nhấc gót chân sau đạp nền (plantarflex)
+	if s == CharacterBase.State.SWIM or s == CharacterBase.State.JUMP or s == CharacterBase.State.FALL or s == CharacterBase.State.DEAD or s == CharacterBase.State.SPRINT or s == CharacterBase.State.CROUCH or s == CharacterBase.State.AIR_ATTACK or s == CharacterBase.State.ATTACK:
 		return
 	if mesh.ankle_l != null and is_instance_valid(mesh.ankle_l):
 		mesh.ankle_l.rotation.x = max(mesh.ankle_l.rotation.x, -0.02)
@@ -140,7 +221,15 @@ func _idle(delta: float, t: float) -> void:
 	var chest: float = abs(breath) * 0.06
 	# Trọng tâm nhịp nhàng dồn lực từ chân này sang chân kia (qua pelvis z + nghiêng hông)
 	mesh.pelvis.position.z = _spring("pelvis_z", shift * 0.05, 2.5, 0.9, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", shift * 0.012, 2.5, 0.9, delta)
 	mesh.pelvis.rotation.z = _spring("pelvis_twist", shift * 0.06, 2.0, 0.8, delta)
+	# Neutralize mọi khớp nghiêng có thể bị kẹt từ state trước (air/hit/dash...):
+	# nếu không ghi đè liên tục, hông/thân giữ nguyên độ nghiêng cũ → đứng lệch.
+	mesh.pelvis.rotation.x = _spring("pelvis_x", 0.0, 3.0, 1.0, delta)
+	mesh.body.rotation.z = _spring("body_z", 0.0, 4.0, 1.0, delta)
+	mesh.rig.rotation.z = _spring("rig_z", 0.0, 5.0, 1.0, delta)
+	mesh.head.rotation.y = _spring("head_y", shift * 0.04, 2.5, 0.8, delta)
+	mesh.backpack.rotation.x = _spring("bp_rx", 0.0, 4.0, 1.0, delta)
 	mesh.pelvis.rotation.x = _spring("pelvis_x", -shift * 0.03, 2.0, 0.8, delta)
 	# Nhún thở: ngực phồng lên, rig hơi nhấc theo nhịp hô hấp
 	mesh.rig.position.y = _spring("rig_y", 0.02 + chest * 0.04, 3.0, 1.0, delta)
@@ -174,64 +263,80 @@ func _idle(delta: float, t: float) -> void:
 	mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 6.0, 1.0, delta)
 	mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 6.0, 1.0, delta)
 
-# ── Đi bộ / chạy — chân dẫn bởi phase, tay chéo chân đối diện ─────────────────
-func _walk(delta: float, t: float, mult: float) -> void:
-	var cyc: float = t * walk_cycle_speed * mult
-	# Tăng tốc: biên độ hông to, tay vung rộng, gót không chạm đất.
-	var amp: float     = 0.40 + mult * 0.20       # biên độ hông
-	var knee_amp: float = 0.55 + mult * 0.20       # gập gối khi vung
-	var toe_off: float = 0.25 + mult * 0.08        # duỗi mũi chân khi đạp
-	var arm_amp: float  = 0.35 + mult * 0.12       # biên độ vung tay
-	# Chân trái/phải chênh PI: sin<0 vung tới (nhấc), sin>0 đỡ sau.
-	var ph_l: float = cyc
-	var ph_r: float = cyc + PI
-	var s_l: float = sin(ph_l)
-	var s_r: float = sin(ph_r)
-	# Hông (đùi): mang chân theo chu kỳ bước vuông góc với thân khi chạy
-	var hip_l: float = s_l * amp
-	var hip_r: float = s_r * amp
-	# Gối: gập mạnh khi chân vung tới (nhấc bàn), duỗi thẳng khi đỡ sau
-	var knee_l: float = knee_amp * max(0.0, -s_l)
-	var knee_r: float = knee_amp * max(0.0, -s_r)
-	# Cổ chân: duỗi mũi khi đạp cuối (toe-off), gập mũi lên khi hớt
+# ── Đi bộ — chân dẫn bởi pha bước theo tốc độ thật, tay chéo chân đối diện ───
+## Quy ước dấu (nhân vật nhìn về +Z): rotation.x âm = chi vung tới TRƯỚC,
+## dương = vung ra SAU. Khuỷu chỉ gập về trước (âm) như giải phẫu thật.
+func _walk(delta: float, _t: float) -> void:
+	var cyc: float = _advance_gait(delta)
+	var s_l: float = sin(cyc)
+	var s_r: float = sin(cyc + PI)
+	# Biên độ theo tốc độ thực: đi chậm bước ngắn, đi nhanh sải dài.
+	var sp: float = Vector2(base.velocity.x, base.velocity.z).length()
+	var spd_n: float = clamp(sp / max(base.move_speed, 0.1), 0.0, 1.6)
+	var amp: float      = 0.46 + spd_n * 0.24       # biên độ hông (tới 45°)
+	var knee_amp: float = 0.72 + spd_n * 0.38       # co gối giữa pha vung
+	var toe_off: float  = 0.30 + spd_n * 0.14       # duỗi mũi chân khi đạp
+	# Hông BẤT ĐỐI XỨNG: vung tới SÂU hơn (cẳng chân đưa rộng lên trước),
+	# đưa sau GIẢM mạnh — chân không quét quá nửa sau thân (hết cảm giác lùi).
+	var hip_fwd: float = amp * 1.18
+	var hip_back: float = amp * 0.60
+	var hip_l: float = s_l * (hip_fwd if s_l < 0.0 else hip_back) + 0.06 * pow(max(0.0, s_l), 1.5)
+	var hip_r: float = s_r * (hip_fwd if s_r < 0.0 else hip_back) + 0.06 * pow(max(0.0, s_r), 1.5)
+	# Gối: co giữa vung → DUỖI THẲNG vươn tới → lún tiếp đất → đạp
+	var knee_l: float = _gait_knee(s_l, knee_amp, cos(cyc) < 0.0)
+	var knee_r: float = _gait_knee(s_r, knee_amp, cos(cyc + PI) < 0.0)
+	# Cổ chân: gập gót MẠNH đúng lúc chạm đất (slap — chỉ khi ĐANG vung tới),
+	# duỗi mũi dứt khi đạp cuối
 	var flick_l: float = -toe_off * pow(max(0.0, s_l), 3.0)
 	var flick_r: float = -toe_off * pow(max(0.0, s_r), 3.0)
-	var dors_l: float = 0.30 * max(0.0, -s_l)
-	var dors_r: float = 0.30 * max(0.0, -s_r)
+	var slap_l: float = 0.34 * exp(-pow((s_l + 0.90) / 0.22, 2.0)) if cos(cyc) < 0.0 else 0.0
+	var slap_r: float = 0.34 * exp(-pow((s_r + 0.90) / 0.22, 2.0)) if cos(cyc + PI) < 0.0 else 0.0
+	var dors_l: float = 0.20 * max(0.0, -s_l) + slap_l
+	var dors_r: float = 0.20 * max(0.0, -s_r) + slap_r
 	var ankle_l: float = flick_l + dors_l
 	var ankle_r: float = flick_r + dors_r
 
-	mesh.leg_l.rotation.x   = _spring("leg_l_x",   hip_l,  9.0 + mult, 1.0, delta)
-	mesh.leg_r.rotation.x   = _spring("leg_r_x",   hip_r,  9.0 + mult, 1.0, delta)
-	mesh.knee_l.rotation.x  = _spring("knee_l_x",  knee_l,  9.0 + mult, 1.0, delta)
-	mesh.knee_r.rotation.x  = _spring("knee_r_x",  knee_r,  9.0 + mult, 1.0, delta)
-	mesh.ankle_l.rotation.x = _spring("ankle_l_x", ankle_l, 9.0 + mult, 1.0, delta)
-	mesh.ankle_r.rotation.x = _spring("ankle_r_x", ankle_r, 9.0 + mult, 1.0, delta)
+	mesh.leg_l.rotation.x   = _spring("leg_l_x",   hip_l,  10.0, 1.0, delta)
+	mesh.leg_r.rotation.x   = _spring("leg_r_x",   hip_r,  10.0, 1.0, delta)
+	mesh.knee_l.rotation.x  = _spring("knee_l_x",  knee_l,  10.0, 1.0, delta)
+	mesh.knee_r.rotation.x  = _spring("knee_r_x",  knee_r,  10.0, 1.0, delta)
+	mesh.ankle_l.rotation.x = _spring("ankle_l_x", ankle_l, 10.0, 1.0, delta)
+	mesh.ankle_r.rotation.x = _spring("ankle_r_x", ankle_r, 10.0, 1.0, delta)
 	# Chân hỗ trợ (stance) giữ mũi chân phẳng; chân hớt (swing) gãy mũi lên
-	# để không vấp. Trưởng hợp stance ankle<0 → foot level, không lún xuống đất.
+	# để không vấp. Trường hợp stance ankle<0 → foot level, không lún xuống đất.
 	mesh.foot_l.rotation.x = _spring("foot_l_x", max(0.0, -ankle_l) * 0.30, 8.0, 1.0, delta)
 	mesh.foot_r.rotation.x = _spring("foot_r_x", max(0.0, -ankle_r) * 0.30, 8.0, 1.0, delta)
 
-	# Nhún theo nhịp: chạm đất ≈ khi chân thẳng (sin gần 0)
-	var bob: float = abs(sin(cyc)) * (0.04 + mult * 0.02)
-	mesh.rig.position.y = _spring("rig_y", 0.02 + bob, 6.0, 1.0, delta)
-	mesh.rig.rotation.x = _spring("rig_x", -0.05 * mult, 6.0, 0.9, delta)
-	mesh.pelvis.rotation.z = _spring("pelvis_twist", sin(cyc) * (0.04 + mult * 0.03), 6.0, 0.8, delta)
-	mesh.pelvis.position.z = _spring("pelvis_z", sin(cyc * 0.5) * 0.03, 5.0, 0.9, delta)
-	# Thân ngả nhẹ theo chu kỳ, đầu lắc ngược nhẹ
-	mesh.body.rotation.x = _spring("body_x", -sin(cyc * 0.5) * (0.04 + mult * 0.02), 5.0, 0.9, delta)
-	mesh.neck.rotation.y = _spring("neck_y", sin(cyc * 0.5) * 0.10 * mult, 5.0, 0.8, delta)
-	mesh.head.rotation.z = _spring("head_z", sin(cyc * 0.5) * (0.05 + mult * 0.02), 5.0, 0.8, delta)
-	mesh.head.rotation.x = _spring("head_x", -0.04 * mult, 5.0, 0.9, delta)
-	mesh.neck.rotation.x = _spring("neck_x", -sin(cyc * 0.5) * 0.02 * mult, 5.0, 0.9, delta)
-	mesh.backpack.position.z = _spring("bp_z", -0.02 + abs(sin(cyc * 0.5)) * 0.02, 6.0, 0.9, delta)
-	mesh.backpack.rotation.x = _spring("bp_rx", sin(cyc * 0.5) * 0.05, 6.0, 0.9, delta)
+	# Nhún dọc: đỉnh ở mid-stance (chân trụ thẳng đứng), thấp nhất lúc
+	# double-support — biên độ LỚN + đường cong sắc để thân "rơi" vào từng bước.
+	var bob: float = pow(1.0 - abs(s_l), 1.35) * (0.055 + spd_n * 0.030)
+	mesh.rig.position.y = _spring("rig_y", 0.02 + bob, 7.0, 1.0, delta)
+	# Nghiêng người nhẹ về trước theo tốc độ (rotation.x dương = ngả trước).
+	mesh.rig.rotation.x = _spring("rig_x", 0.03 + spd_n * 0.06, 6.0, 0.9, delta)
+	# Hông lăn sâu: hạ hông bên chân vung — trọng tâm thật sự dồn bên trụ.
+	mesh.pelvis.rotation.z = _spring("pelvis_twist", -s_l * (0.055 + spd_n * 0.040), 6.0, 0.8, delta)
+	# Lắc trọng tâm NGANG sang bên chân trụ.
+	mesh.pelvis.position.x = _spring("pelvis_sway", -cos(cyc) * (0.034 + spd_n * 0.012), 5.0, 0.9, delta)
+	mesh.pelvis.position.z = _spring("pelvis_z", 0.0, 5.0, 0.9, delta)
+	# Neutralize khớp nghiêng không thuộc walk — chống kẹt nghiêng từ state trước.
+	mesh.pelvis.rotation.x = _spring("pelvis_x", 0.0, 4.0, 1.0, delta)
+	mesh.body.rotation.z = _spring("body_z", 0.0, 5.0, 1.0, delta)
+	mesh.rig.rotation.z = _spring("rig_z", 0.0, 5.0, 1.0, delta)
+	mesh.head.rotation.y = _spring("head_y", 0.0, 4.0, 0.8, delta)
+	# Đầu ổn định nhìn thẳng — bù ngược nhẹ cho nhún thân.
+	mesh.body.rotation.x = _spring("body_x", sin(cyc) * (0.02 + spd_n * 0.015), 5.0, 0.9, delta)
+	mesh.neck.rotation.y = _spring("neck_y", s_l * 0.05, 5.0, 0.8, delta)
+	mesh.head.rotation.z = _spring("head_z", sin(cyc) * 0.04, 5.0, 0.8, delta)
+	mesh.head.rotation.x = _spring("head_x", -(0.03 + spd_n * 0.05) * 0.6, 5.0, 0.9, delta)
+	mesh.neck.rotation.x = _spring("neck_x", sin(cyc) * 0.015, 5.0, 0.9, delta)
+	mesh.backpack.position.z = _spring("bp_z", -0.02 + bob * 0.4, 6.0, 0.9, delta)
+	mesh.backpack.rotation.x = _spring("bp_rx", sin(cyc) * 0.04, 6.0, 0.9, delta)
 
-	# Tay chéo chân ĐỐI DIỆN: khi chân L về trước (hip_l>0) tay L về sau.
-	# → tay L = -hip_l (đối diện chân L). Trước đây arm_l=-hip_r=+hip_l sai.
+	# Tay vung NGƯỢC chân cùng bên (contralateral): chân L tới → tay L ra sau.
+	# Base gần thẳng đứng (-0.06) thay vì chúi 34° như trước — hết dáng zombie.
 	if not _weapon_owns_arms():
-		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.60 + hip_l * 0.20, 9.0, 1.0, delta)
-		mesh.arm_r.rotation.x = _spring("arm_r_x", -0.60 + hip_r * 0.20, 9.0, 1.0, delta)
+		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.06 - hip_l * 0.85, 9.0, 1.0, delta)
+		mesh.arm_r.rotation.x = _spring("arm_r_x", -0.06 - hip_r * 0.85, 9.0, 1.0, delta)
 		mesh.arm_l.rotation.z = _spring("arm_l_z", 0.06, 7.0, 1.0, delta)
 		mesh.arm_r.rotation.z = _spring("arm_r_z", -0.06, 7.0, 1.0, delta)
 		_follow_l_elbow(delta)
@@ -242,23 +347,22 @@ func _walk(delta: float, t: float, mult: float) -> void:
 ## vung tay. Tay vung rộng từ ngang hông vọt lên ngang cằm, khuỷu khóa ~90°,
 ## vai rung theo tần số chân. Đùi nâng cao, chân sau duỗi thẳng (hip extension)
 ## đạp nền, tiếp đất bằng mũi/nửa trước bàn chân (gót không chạm đất).
-func _sprint(delta: float, t: float) -> void:
-	var cyc: float = t * walk_cycle_speed * sprint_cycle_mult
+func _sprint(delta: float, _t: float) -> void:
+	var cyc: float = _advance_gait(delta)
 	# Pha chân — đối xứng chân trái/phải
-	var ph_l: float = cyc
-	var ph_r: float = cyc + PI
-	var s_l: float = sin(ph_l)
-	var s_r: float = sin(ph_r)
-	# Đùi nâng cao (gấp ~70-90°) khi hớt, duỗi thẳng phía sau khi đạp → hip extension
-	var hip_l: float = s_l * 1.05
-	var hip_r: float = s_r * 1.05
-	# Gối: gập mạnh khi hớt (sin<0), duỗi thẳng khi đạp — latex mạnh hơn WALK
-	var knee_l: float = 1.15 * max(0.0, -s_l) + 0.10
-	var knee_r: float = 1.15 * max(0.0, -s_r) + 0.10
-	# Cổ chân: duỗi mũi (plantarflex) lúc đạp để đẩy bằng mũi, gãy nhẹ khi hớt.
-	# Sprint: gót không chạm — ankle duỗi mũi mạnh khi chân sau, hờ hụt khi hớt.
-	var ankle_l: float = -0.45 * max(0.0, s_l) + 0.25 * max(0.0, -s_l)
-	var ankle_r: float = -0.45 * max(0.0, s_r) + 0.25 * max(0.0, -s_r)
+	var s_l: float = sin(cyc)
+	var s_r: float = sin(cyc + PI)
+	# Đùi BẤT ĐỐI XỨNG: vung tới gần ngang (1.46), đưa sau ngắn gọn (0.88)
+	var hip_fwd_s: float = 1.46
+	var hip_back_s: float = 0.88
+	var hip_l: float = s_l * (hip_fwd_s if s_l < 0.0 else hip_back_s) + 0.10 * pow(max(0.0, s_l), 1.5)
+	var hip_r: float = s_r * (hip_fwd_s if s_r < 0.0 else hip_back_s) + 0.10 * pow(max(0.0, s_r), 1.5)
+	# Gối: co gọn giữa vung → duỗi thẳng vươn tới → đạp nổ (chu kỳ sinh học)
+	var knee_l: float = _gait_knee(s_l, 1.45, cos(cyc) < 0.0)
+	var knee_r: float = _gait_knee(s_r, 1.45, cos(cyc + PI) < 0.0)
+	# Cổ chân: đạp bằng mũi dứt khoát (plantarflex sâu), gập gót khi hớt
+	var ankle_l: float = -0.55 * max(0.0, s_l) + 0.28 * max(0.0, -s_l)
+	var ankle_r: float = -0.55 * max(0.0, s_r) + 0.28 * max(0.0, -s_r)
 
 	mesh.leg_l.rotation.x   = _spring("leg_l_x",   hip_l,  11.0, 1.0, delta)
 	mesh.leg_r.rotation.x   = _spring("leg_r_x",   hip_r,  11.0, 1.0, delta)
@@ -273,30 +377,33 @@ func _sprint(delta: float, t: float) -> void:
 	# Thân trên đổ gập về trước 15-20° (~0.26-0.35 rad)
 	mesh.rig.rotation.x = _spring("rig_x", 0.30, 10.0, 1.0, delta)
 	mesh.rig.rotation.z = _spring("rig_z", sin(cyc) * 0.03, 9.0, 0.9, delta)
-	# Nhún theo nhịp — vai rung theo từng bước, thân dao động dọc trục
-	var bob: float = abs(sin(cyc)) * 0.07
+	# Nhún dọc: đỉnh ở mid-stance, biên độ lớn — mỗi bước đập xuống một nhịp
+	var bob: float = pow(1.0 - abs(s_l), 1.3) * 0.10
 	mesh.rig.position.y = _spring("rig_y", 0.02 + bob, 9.0, 1.0, delta)
 	# Cột sống xoay nhẹ theo nhịp vung tay
-	mesh.body.rotation.x = _spring("body_x", -0.12 + sin(cyc * 0.5) * 0.05, 8.0, 0.9, delta)
-	mesh.pelvis.rotation.z = _spring("pelvis_twist", sin(cyc) * 0.08, 8.0, 0.8, delta)
+	mesh.body.rotation.x = _spring("body_x", -0.12 + sin(cyc) * 0.04, 8.0, 0.9, delta)
+	mesh.pelvis.rotation.z = _spring("pelvis_twist", -s_l * 0.13, 8.0, 0.8, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", -cos(cyc) * 0.042, 6.0, 0.9, delta)
 	mesh.pelvis.rotation.x = _spring("pelvis_x", -0.05, 7.0, 0.9, delta)
-	mesh.neck.rotation.y = _spring("neck_y", sin(cyc * 0.5) * 0.14, 7.0, 0.8, delta)
+	mesh.pelvis.position.z = _spring("pelvis_z", 0.0, 6.0, 0.9, delta)
+	mesh.body.rotation.z = _spring("body_z", 0.0, 5.0, 1.0, delta)
+	mesh.head.rotation.y = _spring("head_y", 0.0, 5.0, 0.8, delta)
+	mesh.neck.rotation.y = _spring("neck_y", s_l * 0.10, 7.0, 0.8, delta)
 	mesh.head.rotation.x = _spring("head_x", -0.15, 7.0, 0.9, delta)
-	mesh.head.rotation.z = _spring("head_z", sin(cyc * 0.5) * 0.06, 7.0, 0.8, delta)
+	mesh.head.rotation.z = _spring("head_z", sin(cyc) * 0.05, 7.0, 0.8, delta)
 	mesh.neck.rotation.x = _spring("neck_x", -0.06, 7.0, 0.9, delta)
-	mesh.backpack.position.z = _spring("bp_z", -0.06 + abs(sin(cyc * 0.5)) * 0.02, 8.0, 0.9, delta)
-	mesh.backpack.rotation.x = _spring("bp_rx", sin(cyc * 0.5) * 0.06, 8.0, 0.9, delta)
+	mesh.backpack.position.z = _spring("bp_z", -0.06 + bob * 0.25, 8.0, 0.9, delta)
+	mesh.backpack.rotation.x = _spring("bp_rx", sin(cyc) * 0.06, 8.0, 0.9, delta)
 
-	# Tay vung rộng — co 90° đưa ra trước (hông→cằm), không quặt sau lưng — hướng ngược
+	# Tay vung NGƯỢC chân cùng bên, base thẳng đứng; khuỷu khóa gập về trước
 	if not _weapon_owns_arms():
-		var arm_amp: float = 0.25
-		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.65 + hip_l * arm_amp, 12.0, 1.0, delta)
-		mesh.arm_r.rotation.x = _spring("arm_r_x", -0.65 + hip_r * arm_amp, 12.0, 1.0, delta)
+		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.10 - hip_l * 0.52, 12.0, 1.0, delta)
+		mesh.arm_r.rotation.x = _spring("arm_r_x", -0.10 - hip_r * 0.52, 12.0, 1.0, delta)
 		mesh.arm_l.rotation.z = _spring("arm_l_z", 0.14, 9.0, 0.9, delta)
 		mesh.arm_r.rotation.z = _spring("arm_r_z", -0.14, 9.0, 0.9, delta)
-		# Khuỷu khóa ~90° — gập trước ngực (đảo dấu do hướng ngược)
-		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -1.10, 14.0, 1.0, delta)
-		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -1.10, 14.0, 1.0, delta)
+		# Khuỷu khóa ~70-90° gập về TRƯỚC (âm = đúng giải phẫu)
+		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -1.20, 14.0, 1.0, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -1.20, 14.0, 1.0, delta)
 
 # ── Ngồi xổm / lẻn ─────────────────────────────────────────────────────────
 ## Chuyển tiếp vào: hông hạ thấp đột ngột, gập sâu gối, cột sống uốn cong,
@@ -305,7 +412,7 @@ func _sprint(delta: float, t: float) -> void:
 ## giữa (không gót) giảm xóc & tiếng động; tay đưa cao ngang ngực giữ thăng
 ## bằng, khuỷu tay co gập.
 func _crouch(delta: float, t: float) -> void:
-	var cyc: float = t * walk_cycle_speed * 0.5
+	var cyc: float = _advance_gait(delta)
 	var s_l: float = sin(cyc)
 	var s_r: float = sin(cyc + PI)
 	# Transition-in: hạ thấp hông đột ngột, gối gập sâu
@@ -318,6 +425,7 @@ func _crouch(delta: float, t: float) -> void:
 	mesh.head.rotation.x = _spring("head_x", -0.30, 7.0, 0.9, delta)
 	mesh.head.rotation.z = _spring("head_z", sin(t * 0.6) * 0.04, 5.0, 0.8, delta)
 	mesh.backpack.position.z = _spring("bp_z", -0.08, 5.0, 1.0, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", -cos(cyc) * 0.018, 5.0, 0.9, delta)
 	# Chân: bước ngắn — đùi gần như song song mặt đất (gập sâu toàn bộ khớp).
 	# sin<0 = vung tới (nhấc), sin>0 = đỡ sau.
 	var leg_base: float = -0.85
@@ -337,124 +445,129 @@ func _crouch(delta: float, t: float) -> void:
 	mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 6.0, 1.0, delta)
 	mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 6.0, 1.0, delta)
 	if not _weapon_owns_arms():
-		# Tay đưa cao ngang ngực/hông giữ thăng bằng, khuỷu co gập
-		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.50 + s_l * 0.10, 8.0, 0.8, delta)
-		mesh.arm_r.rotation.x = _spring("arm_r_x", -0.50 + s_r * 0.10, 8.0, 0.8, delta)
+		# Tay đưa cao ngang ngực/hông giữ thăng bằng, vung ngược chân, khuỷu co gập
+		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.50 - s_l * 0.10, 8.0, 0.8, delta)
+		mesh.arm_r.rotation.x = _spring("arm_r_x", -0.50 - s_r * 0.10, 8.0, 0.8, delta)
 		mesh.arm_l.rotation.z = _spring("arm_l_z", 0.15, 7.0, 0.9, delta)
 		mesh.arm_r.rotation.z = _spring("arm_r_z", -0.15, 7.0, 0.9, delta)
-		mesh.elbow_l.rotation.x = _spring("elbow_l_x", 0.90, 8.0, 0.8, delta)
-		mesh.elbow_r.rotation.x = _spring("elbow_r_x", 0.90, 8.0, 0.8, delta)
+		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -0.90, 8.0, 0.8, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.90, 8.0, 0.8, delta)
 		_follow_l_elbow(delta)
 		_follow_r_elbow(delta)
 
-# ── Lao nhanh ──────────────────────────────────────────────────────────────
-## 3 pha: Wind-up (chân trụ gập sâu nhún xuống, tay rút nhanh sau) →
-## Execution (đạp biến lực thành động năng, lao vọt theo đường chéo sát đất,
-## cột sống + chân sau duỗi thẳng tắp) → Recovery (chân trước vươn xa gập gối
-## hãm, tay xòe rộng/gạt xuống sàn cân bằng).
+# ── Dash / Dodge — bước né LOW GLIDE ─────────────────────────────────────────
+## Windup (~12%): hạ thấp lấy đà, gối chùng, tay rút về sau
+## Glide  (~70%): THÂN THẤP lao tới 24° — chân DẪN duỗi đặt XA TRƯỚC gót trụ,
+##                chân SAU duỗi đạp mũi kéo lê mặt đất, tay ôm thẳng cân bằng
+## Recover(~18%): thu hai chân về dưới thân, dâng người trở lại
 func _dash(delta: float, _t: float) -> void:
 	var rem: float = base._dash_timer
-	var prog: float = 1.0 - clamp(rem / base.dash_duration, 0.0, 1.0)
-	# Wind-up ~12%, Execution ~70%, Recovery ~18%
+	var prog: float = 1.0 - clampf(rem / base.dash_duration, 0.0, 1.0)
 	var down: float = smoothstep(0.0, 0.12, prog)
-	var up:   float = smoothstep(0.12, 0.82, prog)
-	var rec:  float = smoothstep(0.82, 1.0, prog)
-	# Wind-up: nhún sâu xuống chân trụ. Execution: nhẹ nhấc lao tới.
-	# Recovery: hạ nhẹ sau khi hãm.
-	mesh.rig.position.y  = _spring("rig_y",  0.02 + down * (-0.14) + up * 0.03 + rec * 0.04, 15.0, 1.0, delta)
-	# Cột sống duỗi thẳng lao theo đường chéo sát đất khi Execution
-	mesh.rig.rotation.x  = _spring("rig_x",  0.32 * up + 0.12 * rec, 14.0, 0.9, delta)
-	mesh.pelvis.rotation.x = _spring("pelvis_x", -0.18 * up, 12.0, 0.9, delta)
-	mesh.body.rotation.x  = _spring("body_x", 0.12 * up + 0.16 * rec, 12.0, 0.9, delta)
-	mesh.neck.rotation.x   = _spring("neck_x", 0.12 * up, 12.0, 0.9, delta)
-	mesh.head.rotation.x   = _spring("head_x", -0.22 * up, 12.0, 0.9, delta)
-	mesh.backpack.position.z = _spring("bp_z", -0.06 * up - 0.04 * rec, 12.0, 1.0, delta)
-	if not _weapon_owns_arms():
-		# Wind-up: tay rút nhanh về sau (tạo đà). Execution: tay xòe rộng.
-		# Recovery: tay gạt xuống sàn cân bằng lại trọng tâm.
-		var ax: float = lerp(-0.60, -0.10, up) * (1.0 - rec) - 0.30 * rec
-		var bx: float = 0.35 * down - 0.18 * up + 0.30 * rec
-		mesh.arm_l.rotation.x = _spring("arm_l_x", ax, 15.0, 0.9, delta)
-		mesh.arm_r.rotation.x = _spring("arm_r_x", ax, 15.0, 0.9, delta)
-		mesh.arm_l.rotation.z = _spring("arm_l_z", bx, 13.0, 0.9, delta)
-		mesh.arm_r.rotation.z = _spring("arm_r_z", -bx, 13.0, 0.9, delta)
-		# Khuỷu gập khi rút tay sau (wind-up), xòe thẳng khi phóng
-		mesh.elbow_l.rotation.x = _spring("elbow_l_x", 0.80 * down - 0.20 * up, 13.0, 0.9, delta)
-		mesh.elbow_r.rotation.x = _spring("elbow_r_x", 0.80 * down - 0.20 * up, 13.0, 0.9, delta)
-	# Chân: Wind-up chân trụ gập sâu nhún. Execution: chân sau duỗi thẳng tắp
-	# đạp nền, chân trước hướng lao. Recovery: chân trước vươn xa gập gối hãm.
-	var leg_wind: float = -0.55 * down
-	var leg_exec: float = -0.35 * up + 0.85 * rec
-	var knee_wind: float = 0.95 * down
-	var knee_exec: float = 0.08 * up + 0.95 * rec
-	# Ankle/foot luôn giữ mũi hướng lên nhẹ (dorsiflex) để tránh chân lún đất.
-	var ankle_target: float = 0.15 * up + 0.30 * rec
-	mesh.leg_l.rotation.x   = _spring("leg_l_x",   leg_wind + leg_exec, 13.0, 1.0, delta)
-	mesh.leg_r.rotation.x   = _spring("leg_r_x",   leg_wind + leg_exec, 13.0, 1.0, delta)
-	mesh.knee_l.rotation.x  = _spring("knee_l_x",  knee_wind + knee_exec, 13.0, 1.0, delta)
-	mesh.knee_r.rotation.x  = _spring("knee_r_x",  knee_wind + knee_exec, 13.0, 1.0, delta)
-	mesh.ankle_l.rotation.x = _spring("ankle_l_x", ankle_target, 13.0, 1.0, delta)
-	mesh.ankle_r.rotation.x = _spring("ankle_r_x", ankle_target, 13.0, 1.0, delta)
-	mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 13.0, 1.0, delta)
-	mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 13.0, 1.0, delta)
+	var glide: float = smoothstep(0.12, 0.30, prog) * (1.0 - smoothstep(0.78, 0.94, prog))
+	var rec: float = smoothstep(0.82, 1.0, prog)
 
-# ── Nhảy / rơi ─────────────────────────────────────────────────────────────
-## Chuỗi 3 pha: Take-off (khuỵu gối 45°, tay văng sau → duỗi dứt khoát 3 khớp
-## cổ chân-gối-hông + vung tay lên cao) → In-air/Fall (đỉnh: đùi thu nhẹ; rơi:
-## duỗi thẳng, tay xòe ngang, nhìn điểm hạ đất) → Landing (mũi chân chạm trước,
-## gối gập sâu hấp thụ, thân gập sâu, tay chống nhẹ đất).
-func _air(delta: float, t: float, rising: bool) -> void:
+	mesh.rig.position.y = _spring("rig_y", 0.02 - down * 0.10 - glide * 0.10 + rec * 0.06, 14.0, 1.0, delta)
+	mesh.rig.rotation.x = _spring("rig_x", 0.10 * down + 0.42 * glide + 0.10 * rec, 13.0, 0.9, delta)
+	mesh.pelvis.rotation.x = _spring("pelvis_x", -0.10 * glide, 12.0, 0.9, delta)
+	mesh.body.rotation.x = _spring("body_x", 0.08 * down + 0.14 * glide + 0.10 * rec, 12.0, 0.9, delta)
+	mesh.head.rotation.x = _spring("head_x", -0.16 * glide - 0.10 * rec, 12.0, 0.9, delta)
+	mesh.neck.rotation.x = _spring("neck_x", 0.08 * glide, 12.0, 0.9, delta)
+	mesh.backpack.position.z = _spring("bp_z", -0.05 * glide - 0.03 * rec, 12.0, 1.0, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", 0.0, 8.0, 0.9, delta)
+
+	if not _weapon_owns_arms():
+		# Tay: windup rút sau → glide ôm thẳng song song giữ thăng bằng → xòe hãm
+		var ax: float = -0.55 * down - 0.15 * glide - 0.35 * rec
+		var az: float = 0.30 * down + 0.10 * glide + 0.34 * rec
+		mesh.arm_r.rotation.x = _spring("arm_r_x", ax, 14.0, 0.9, delta)
+		mesh.arm_l.rotation.x = _spring("arm_l_x", ax * 0.8, 14.0, 0.9, delta)
+		mesh.arm_r.rotation.z = _spring("arm_r_z", -az, 13.0, 0.9, delta)
+		mesh.arm_l.rotation.z = _spring("arm_l_z", az, 13.0, 0.9, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.85 * down - 0.30 * glide - 0.10 * rec, 13.0, 0.9, delta)
+		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -0.85 * down - 0.50 * glide - 0.10 * rec, 13.0, 0.9, delta)
+
+	# Chân dẫn (trái) đặt xa trước gót trụ; chân sau (phải) đạp mũi kéo lê
+	var lead := Vector3(-0.30, 0.75, 0.10) * down
+	lead = lead.lerp(Vector3(-0.78, 0.48, 0.22), glide)
+	lead = lead.lerp(Vector3(-0.10, 0.35, 0.05), rec)
+	var trail := Vector3(0.25, 0.65, -0.10) * down
+	trail = trail.lerp(Vector3(0.72, 0.20, -0.46), glide)
+	trail = trail.lerp(Vector3(0.08, 0.40, 0.00), rec)
+	mesh.leg_l.rotation.x = _spring("leg_l_x", lead.x, 13.0, 1.0, delta)
+	mesh.knee_l.rotation.x = _spring("knee_l_x", lead.y, 13.0, 1.0, delta)
+	mesh.ankle_l.rotation.x = _spring("ankle_l_x", lead.z, 12.0, 1.0, delta)
+	mesh.leg_r.rotation.x = _spring("leg_r_x", trail.x, 13.0, 1.0, delta)
+	mesh.knee_r.rotation.x = _spring("knee_r_x", trail.y, 13.0, 1.0, delta)
+	mesh.ankle_r.rotation.x = _spring("ankle_r_x", trail.z, 12.0, 1.0, delta)
+	mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 12.0, 1.0, delta)
+	mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 12.0, 1.0, delta)
+
+# ── Nhảy / Rơi — NHẢY GỐI TÚC compact mạnh mẽ ────────────────────────────────
+## Take-off : chân ĐẨY (phải) duỗi bung mũi, chân DẪN (trái) hông vung mạnh
+##            lên trước — thân đổ tới, tay vung ĐỐI BÊN (phải lên)
+## Bay      : TÚC GỐI — cả hai chân co gập lên trước ngực (dẫn cao hơn, sau
+##            thấp lệch sau một nhịp), thân gom lại — dáng nhảy gọn mà lực
+## Rơi      : hai chân duỗi xuống chuẩn bị, chân dẫn tới trước một nhịp,
+##            gót gập sẵn, tay giơ giữ thăng bằng
+## Tiếp đất : hai gối gập sâu khác mức hấp thụ, thân ôm xuống, tay chống trước
+func _air(delta: float, _t: float, rising: bool) -> void:
 	var vy: float = base.velocity.y
 	var on_floor: bool = base.is_on_floor()
-	var tuck: float
-	if rising:
-		# Sau cú đẩy: chân đang duỗi thẳng dứt khoát (tuck≈0 khi vy~jump_v).
-		# Khi tiến về đỉnh (vy→0) đùi thu nhẹ về phía ngực (tuck→1) — curl chuẩn bị.
-		tuck = clamp((1.0 - abs(vy / base._jump_v)) * 1.4, 0.0, 1.0)
-	else:
-		tuck = clamp(1.0 + vy / base._jump_v, 0.0, 1.0) * 0.5
-	# Pha hạ cánh: dựa trên tốc độ rơi + trạng thái chạm đất.
-	var landing: float = 0.0
-	if not rising and vy < 0.0:
-		landing = clamp(-vy / base._grav_fall, 0.0, 1.0)
-		if on_floor:
-			landing = 1.0
-	var takeoff: float = 1.0 if rising else 0.0
-	# Take-off: nhấc nhẹ, lao lên. Fall: thẳng. Landing: ép xuống hấp thụ.
-	mesh.rig.position.y  = _spring("rig_y",  0.02 + takeoff * 0.06 - landing * 0.05, 8.0, 1.0, delta)
-	mesh.rig.rotation.x  = _spring("rig_x",  0.05 + tuck * 0.10 - landing * 0.15, 8.0, 0.9, delta)
-	# Thân: take-off hơi ngả sau để đột phá, fall duỗi thẳng, landing gập sâu
-	mesh.body.rotation.x   = _spring("body_x", -0.05 + tuck * 0.15 - landing * 0.35, 8.0, 0.9, delta)
-	mesh.pelvis.rotation.x = _spring("pelvis_x", 0.15 + tuck * 0.20 + landing * 0.35, 8.0, 0.9, delta)
-	mesh.head.rotation.x   = _spring("head_x", -0.12 + tuck * 0.08 - landing * 0.20, 7.0, 0.9, delta)
-	mesh.neck.rotation.x    = _spring("neck_x", 0.06, 6.0, 0.9, delta)
-	mesh.backpack.position.z = _spring("bp_z", -0.05 - tuck * 0.04, 8.0, 1.0, delta)
-	if not _weapon_owns_arms():
-		# Take-off: tay văng ra sau tạo đà rồi vung lên cao. Fall: xòe ngang.
-		# Landing: hớt xuống chống nhẹ đất.
-		var arm_spread: float = tuck * 0.35
-		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.35 - takeoff * 0.55 + landing * 0.40, 9.0, 0.9, delta)
-		mesh.arm_r.rotation.x = _spring("arm_r_x", -0.35 - takeoff * 0.55 + landing * 0.40, 9.0, 0.9, delta)
-		mesh.arm_l.rotation.z = _spring("arm_l_z", (0.25 + arm_spread) * (1.0 - takeoff) + 0.35 * takeoff + landing * 0.30, 8.0, 0.9, delta)
-		mesh.arm_r.rotation.z = _spring("arm_r_z", -(0.25 + arm_spread) * (1.0 - takeoff) - 0.35 * takeoff - landing * 0.30, 8.0, 0.9, delta)
-		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -0.25 - arm_spread * 0.5 + landing * 0.45, 8.0, 0.9, delta)
-		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.25 - arm_spread * 0.5 + landing * 0.45, 8.0, 0.9, delta)
-	# Chân: take-off duỗi dứt khoát 3 khớp (cổ chân-gối-hông) sau khi co gập,
-	# fall duỗi thẳng có kiểm soát, landing gập sâu hấp thụ + mũi chạm đất trước.
-	var tuck_leg: float = -0.35 - tuck * 0.30 + landing * (-0.45)
-	var tuck_knee: float = 0.20 + tuck * 0.95 + landing * 0.80
-	# Cổ chân: take-off giữ mũi hướng lên, fall duỗi thẳng, landing gãy mũi
-	# nhưng luôn dương (mũi hướng lên) để mũi chân chạm đất trước không lún gót.
-	var tuck_ankle: float = max(-0.05, -0.08 - tuck * 0.25 + landing * 0.35)
-	mesh.leg_l.rotation.x   = _spring("leg_l_x",   tuck_leg,  10.0 + tuck, 1.0, delta)
-	mesh.leg_r.rotation.x   = _spring("leg_r_x",   tuck_leg,  10.0 + tuck, 1.0, delta)
-	mesh.knee_l.rotation.x  = _spring("knee_l_x",  tuck_knee, 10.0 + tuck, 1.0, delta)
-	mesh.knee_r.rotation.x  = _spring("knee_r_x",  tuck_knee, 10.0 + tuck, 1.0, delta)
-	mesh.ankle_l.rotation.x = _spring("ankle_l_x", tuck_ankle, 9.0 + tuck, 1.0, delta)
-	mesh.ankle_r.rotation.x = _spring("ankle_r_x", tuck_ankle, 9.0 + tuck, 1.0, delta)
-	# Foot duỗi thẳng (0.0) — không bao giờ âm để tránh lún xuống đất.
+	# Tiến trình pha: apex_k theo |vy| — LÊN dần tới đỉnh rồi TỤT DẦN sau đỉnh
+	# (không reset khi chuyển JUMP→FALL để tư thế túc hiển thị trọn vẹn).
+	# Mũ 0.70 = front-load: lên nhanh giữ cao lâu — bù độ trễ spring gối.
+	var rise_p: float = pow(clampf(1.0 - abs(vy) / max(base._jump_v, 0.001), 0.0, 1.0), 0.70)
+	var fall_d: float = clampf(-vy / max(base._grav_fall, 0.001), 0.0, 1.0) if (not rising and vy < 0.0) else 0.0
+	var landing: float = fall_d
+	if not rising and on_floor:
+		landing = 1.0
+
+	# ── Chân DẪN (trái): đạp lên → GỐI TÚC CAO sát ngực → duỗi đón → hấp thụ ──
+	var lead := Vector3(-0.55, 1.20, 0.10)                            # take-off drive
+	lead = lead.lerp(Vector3(-1.26, 1.72, 0.16), rise_p)              # apex: túc cao
+	lead = lead.lerp(Vector3(-0.42, 0.58, 0.34), minf(fall_d, 1.0))   # duỗi đón đất
+	lead = lead.lerp(Vector3(-0.58, 1.10, 0.36), landing)             # hấp thụ sâu
+	# ── Chân SAU (phải): duỗi bung mũi → TÚC THEO thấp hơn lệch sau 1 nhịp ──
+	var trail := Vector3(0.38, 0.14, -0.52)
+	trail = trail.lerp(Vector3(-0.68, 1.58, 0.14), rise_p)
+	trail = trail.lerp(Vector3(0.22, 0.92, -0.18), minf(fall_d, 1.0))
+	trail = trail.lerp(Vector3(-0.34, 1.02, 0.30), landing)
+
+	mesh.leg_l.rotation.x = _spring("leg_l_x", lead.x, 11.0, 1.0, delta)
+	mesh.knee_l.rotation.x = _spring("knee_l_x", lead.y, 13.0, 1.0, delta)
+	mesh.ankle_l.rotation.x = _spring("ankle_l_x", lead.z, 10.0, 1.0, delta)
+	mesh.leg_r.rotation.x = _spring("leg_r_x", trail.x, 11.0, 1.0, delta)
+	mesh.knee_r.rotation.x = _spring("knee_r_x", trail.y, 13.0, 1.0, delta)
+	mesh.ankle_r.rotation.x = _spring("ankle_r_x", trail.z, 10.0, 1.0, delta)
 	mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 7.0, 1.0, delta)
 	mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 7.0, 1.0, delta)
+
+	# ── Thân: bật đổ tới → apex GOM NGƯỜI → rơi mở ra → đáp ôm xuống ──
+	var lean: float = 0.20 - rise_p * 0.10 + fall_d * 0.12 + landing * 0.22
+	mesh.rig.rotation.x = _spring("rig_x", lean, 8.0, 0.9, delta)
+	mesh.rig.position.y = _spring("rig_y", 0.02 + (0.06 if rising else 0.0) - landing * 0.07, 8.0, 1.0, delta)
+	mesh.body.rotation.x = _spring("body_x", -0.04 + rise_p * 0.16 + fall_d * 0.08 + landing * 0.24, 8.0, 0.9, delta)
+	mesh.pelvis.rotation.x = _spring("pelvis_x", 0.06 + rise_p * 0.08 + fall_d * 0.10 - landing * 0.05, 8.0, 0.9, delta)
+	mesh.head.rotation.x = _spring("head_x", -0.10 + landing * 0.14, 7.0, 0.9, delta)
+	mesh.neck.rotation.x = _spring("neck_x", 0.05, 6.0, 0.9, delta)
+	mesh.backpack.position.z = _spring("bp_z", -0.05 - rise_p * 0.03, 8.0, 1.0, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", 0.0, 5.0, 0.9, delta)
+
+	# ── Tay: vung ĐỐI BÊN khi bật → ÉP XUỐNG hai hông lúc apex (gom lực) →
+	# giơ rộng khi rơi → chống trước khi đáp ──
+	var arm_r_t: float = lerpf(lerpf(-1.55, -0.55, rise_p), -1.15, minf(fall_d, 1.0))
+	arm_r_t = lerpf(arm_r_t, -0.62, landing)
+	var arm_l_t: float = lerpf(lerpf(0.45, -0.50, rise_p), -1.05, minf(fall_d, 1.0))
+	arm_l_t = lerpf(arm_l_t, -0.62, landing)
+	var spread: float = 0.24 + rise_p * 0.10
+	if not _weapon_owns_arms():
+		mesh.arm_r.rotation.x = _spring("arm_r_x", arm_r_t, 9.0, 0.9, delta)
+		mesh.arm_l.rotation.x = _spring("arm_l_x", arm_l_t, 9.0, 0.9, delta)
+		mesh.arm_r.rotation.z = _spring("arm_r_z", -spread - landing * 0.18, 8.0, 0.9, delta)
+		mesh.arm_l.rotation.z = _spring("arm_l_z", spread + landing * 0.18, 8.0, 0.9, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.40 - rise_p * 0.55 - landing * 0.45, 8.0, 0.9, delta)
+		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -0.40 - rise_p * 0.55 - landing * 0.45, 8.0, 0.9, delta)
 
 # ── Bơi ────────────────────────────────────────────────────────────────────
 ## Cơ thể nằm ngang song song mặt nước: tay vươn dài về trước quạt theo hình
@@ -484,9 +597,9 @@ func _swim(delta: float, t: float) -> void:
 		# Vai xoay lăn theo nhịp quạt (scoop nước)
 		mesh.arm_l.rotation.z = _spring("arm_l_z",  a_l * 0.35, 7.0, 0.9, delta)
 		mesh.arm_r.rotation.z = _spring("arm_r_z", -a_r * 0.35, 7.0, 0.9, delta)
-		# Khuỷu duỗi khi vươn, gập khi kéo nước về sau hông
-		mesh.elbow_l.rotation.x = _spring("elbow_l_x", clamp(-a_l * 0.55 + 0.15, 0.0, 0.95), 9.0, 0.9, delta)
-		mesh.elbow_r.rotation.x = _spring("elbow_r_x", clamp(-a_r * 0.55 + 0.15, 0.0, 0.95), 9.0, 0.9, delta)
+		# Khuỷu duỗi khi vươn, gập về trước khi kéo nước về sau hông
+		mesh.elbow_l.rotation.x = _spring("elbow_l_x", clamp(-a_l * 0.55 - 0.10, -0.95, -0.05), 9.0, 0.9, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", clamp(-a_r * 0.55 - 0.10, -0.95, -0.05), 9.0, 0.9, delta)
 	# Flutter kick: chân duỗi thẳng, cổ chân duỗi tối đa (plantarflex), đập nhanh
 	# lên-xuống (phase đối nhau) tạo luồng đẩy & sóng về sau.
 	var kick_l: float = sin(cyc * 2.0 + PI * 0.5) * 0.50
@@ -506,6 +619,7 @@ func _eat(delta: float, t: float) -> void:
 	mesh.rig.position.y = _spring("rig_y", 0.02, 5.0, 1.0, delta)
 	mesh.rig.rotation.x = _spring("rig_x", 0.0, 6.0, 1.0, delta)
 	mesh.pelvis.rotation.x = _spring("pelvis_x", 0.20, 6.0, 1.0, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", 0.0, 6.0, 0.9, delta)
 	mesh.body.rotation.x = _spring("body_x", 0.10, 6.0, 0.9, delta)
 	# Đầu cúi xuống thức ăn, gật theo nhịp nhai
 	mesh.head.rotation.x = _spring("head_x", -0.18 - chew * 0.05, 8.0, 0.9, delta)
@@ -516,7 +630,7 @@ func _eat(delta: float, t: float) -> void:
 		# Tay phải đưa lên miệng (khuỷu gập mạnh), tay trái bưng bát
 		mesh.arm_r.rotation.x = _spring("arm_r_x", -1.15 - chew * 0.10, 9.0, 0.9, delta)
 		mesh.arm_r.rotation.z = _spring("arm_r_z", 0.10, 7.0, 0.9, delta)
-		mesh.elbow_r.rotation.x = _spring("elbow_r_x", 0.70 + chew * 0.06, 9.0, 0.9, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.70 - chew * 0.06, 9.0, 0.9, delta)
 		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.35 + chew * 0.08, 8.0, 0.9, delta)
 		mesh.arm_l.rotation.z = _spring("arm_l_z", 0.25, 7.0, 0.9, delta)
 		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -0.55, 8.0, 0.9, delta)
@@ -537,6 +651,7 @@ func _hit(delta: float, _t: float) -> void:
 	mesh.rig.rotation.x = _spring("rig_x", 0.20 - p * 0.14, 13.0, 0.9, delta)
 	mesh.body.rotation.x = _spring("body_x", 0.14 - p * 0.08, 12.0, 0.9, delta)
 	mesh.pelvis.rotation.x = _spring("pelvis_x", -0.15, 12.0, 1.0, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", 0.0, 8.0, 0.9, delta)
 	mesh.head.rotation.x = _spring("head_x", -0.15 + p * 0.10, 13.0, 0.9, delta)
 	mesh.neck.rotation.x = _spring("neck_x", 0.10, 12.0, 0.9, delta)
 	# Tay bật về sau, khuỷu cong phản xạ (vũ khí tự pose tay thì nhường)
@@ -573,8 +688,8 @@ func _dead(delta: float, t: float) -> void:
 		mesh.knee_r.rotation.x = lerp(mesh.knee_r.rotation.x, -0.30 * p, delta * 14.0)
 		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.40 * p, delta * 16.0)
 		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.40 * p, delta * 16.0)
-		mesh.elbow_l.rotation.x = lerp(mesh.elbow_l.rotation.x, 0.30 * p, delta * 15.0)
-		mesh.elbow_r.rotation.x = lerp(mesh.elbow_r.rotation.x, 0.30 * p, delta * 15.0)
+		mesh.elbow_l.rotation.x = lerp(mesh.elbow_l.rotation.x, -0.30 * p, delta * 15.0)
+		mesh.elbow_r.rotation.x = lerp(mesh.elbow_r.rotation.x, -0.30 * p, delta * 15.0)
 	elif prog < 0.60:
 		# ── Collapse: mất lực — cơ thể gập đôi, đầu gục trước, chi buông ──────
 		var p: float = (prog - 0.18) / 0.42
@@ -602,18 +717,20 @@ func _dead(delta: float, t: float) -> void:
 		mesh.head.rotation.x = lerp(mesh.head.rotation.x, -0.50, delta * 8.0)
 		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.10, delta * 6.0)
 		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.10, delta * 6.0)
-		# Chi buông thõng chạm đất
-		mesh.elbow_l.rotation.x = lerp(mesh.elbow_l.rotation.x, 0.35, delta * 6.0)
-		mesh.elbow_r.rotation.x = lerp(mesh.elbow_r.rotation.x, 0.35, delta * 6.0)
+		# Chi buông thõng chạm đất — khuỷu hơi gập về trước tự nhiên
+		mesh.elbow_l.rotation.x = lerp(mesh.elbow_l.rotation.x, -0.25, delta * 6.0)
+		mesh.elbow_r.rotation.x = lerp(mesh.elbow_r.rotation.x, -0.25, delta * 6.0)
 	mesh.foot_l.rotation.x = 0.0
 	mesh.foot_r.rotation.x = 0.0
 
 # ── Khuỷu tay theo đà quét của vai (elastic follow-through) ─────────────────
 ## Khi vai chuyển (arm.rotation.x chênh khỏi buông thõng), khuỷu tự gập/duỗi
 ## theo quán tính → cánh tay có độ trễ đàn hồi thay vì cứng đờ.
+## Khuỷu người CHỈ gập về trước (rotation.x âm) — dương là gãy ngược xương.
 func _elbow_bend_target(arm_angle: float) -> float:
-	var bend: float = 0.35 + arm_angle * 0.8
-	return clamp(bend, -0.65, 0.95)
+	# Vai đưa ra sau (dương) → khuỷu duỗi; vai đưa tới trước (âm) → gập thêm.
+	var bend: float = -0.16 + arm_angle * 0.45
+	return clamp(bend, -0.90, -0.04)
 
 func _follow_l_elbow(delta: float) -> void:
 	if _weapon_owns_arms():
@@ -625,390 +742,524 @@ func _follow_r_elbow(delta: float) -> void:
 		return
 	mesh.elbow_r.rotation.x = _spring("elbow_r_x", _elbow_bend_target(mesh.arm_r.rotation.x), 9.0, 0.75, delta)
 
-# ── Tấn công (giữ nguyên logic vũ khí — các pivot cũ vẫn tồn tại) ────────────
-func _attack(delta: float, _t: float) -> void:
-	var dur: float = base.attack_duration
-	var remaining: float = base._attack_timer
-	var prog: float = 1.0 - clamp(remaining / dur, 0.0, 1.0)
-	var step: int = player.combo_step if player != null else 0
-	var wp := mesh.weapon_pivot
-	const IDLE_WP: Vector3 = Vector3(90, 0, 0)
+# ── Tấn công — combo tự động theo chain (MeleeCombos) ────────────────────────
+## Mỗi bước combo 3 pha: WINDUP (kéo vũ khí ra sau, co người) → STRIKE (chém
+## dứt khoát; VFX + sát thương do physics gọi theo pha hit) → FOLLOW (đà theo).
+## Pose định nghĩa bằng bảng "khớp.trục" → giá trị đích (wp tính bằng ĐỘ),
+## nội suy mượt vào node bằng lerp với tốc độ khác nhau theo từng pha.
+const IDLE_WP := Vector3(90, 0, 0)
 
-	if remaining > _last_remaining + 0.001:
-		_slash_spawned = false
-	_last_remaining = remaining
+# Kiếm thép: ngang P→T, ngược T→P, đâm kết
+const _POSE_SWORD := [
+	{"w1": 0.34, "w2": 0.58,
+		"wind":   {"rig.y": 0.22, "body.x": 0.05, "head.y": 0.18, "arm_r.x": -1.55, "arm_r.z": -0.35, "elbow_r.x": -1.35, "arm_l.x": 0.20, "wp.x": 45.0, "wp.y": 65.0, "wp.z": -75.0},
+		"strike": {"rig.y": -0.30, "body.x": 0.14, "head.y": -0.24, "arm_r.x": 0.70, "arm_r.z": 0.40, "elbow_r.x": -0.15, "arm_l.x": -0.35, "wp.x": 150.0, "wp.y": -20.0, "wp.z": 14.0},
+		"follow": {"rig.y": -0.16, "body.x": 0.08, "head.y": -0.10, "arm_r.x": 0.35, "arm_r.z": 0.22, "elbow_r.x": -0.40, "arm_l.x": -0.12, "wp.x": 128.0, "wp.y": -8.0, "wp.z": 6.0}},
+	{"w1": 0.32, "w2": 0.56,
+		"wind":   {"rig.y": -0.22, "body.x": 0.05, "head.y": -0.18, "arm_r.x": -1.55, "arm_r.z": 0.35, "elbow_r.x": -1.35, "arm_l.x": 0.20, "wp.x": 45.0, "wp.y": -65.0, "wp.z": 75.0},
+		"strike": {"rig.y": 0.30, "body.x": 0.14, "head.y": 0.24, "arm_r.x": 0.70, "arm_r.z": -0.40, "elbow_r.x": -0.15, "arm_l.x": -0.35, "wp.x": 150.0, "wp.y": 20.0, "wp.z": -14.0},
+		"follow": {"rig.y": 0.16, "body.x": 0.08, "head.y": 0.10, "arm_r.x": 0.35, "arm_r.z": -0.22, "elbow_r.x": -0.40, "arm_l.x": -0.12, "wp.x": 128.0, "wp.y": 8.0, "wp.z": -6.0}},
+	{"w1": 0.36, "w2": 0.52,
+		"wind":   {"rig.y": 0.16, "rig.x": -0.06, "body.x": -0.04, "head.y": 0.12, "arm_r.x": -1.90, "arm_r.z": -0.15, "elbow_r.x": -1.60, "arm_l.x": -0.45, "wp.x": 80.0, "wp.y": 20.0, "wp.z": -10.0},
+		"strike": {"rig.y": -0.08, "rig.x": 0.16, "body.x": 0.16, "head.y": -0.06, "arm_r.x": -0.95, "arm_r.z": 0.05, "elbow_r.x": -0.10, "arm_l.x": 0.30, "wp.x": 96.0, "wp.y": 0.0, "wp.z": 0.0},
+		"follow": {"rig.x": 0.10, "body.x": 0.10, "arm_r.x": -0.70, "elbow_r.x": -0.50, "wp.x": 92.0, "wp.y": 0.0, "wp.z": 0.0}},
+]
 
-	var is_heavy: bool = player and player.equipped_weapon != null and (player.equipped_weapon.id == "axe" or player.equipped_weapon.id == "pickaxe")
-	var is_gs: bool = player and player.equipped_weapon != null and player.equipped_weapon.id == "iron_greatsword"
-	var is_halberd: bool = player and player.equipped_weapon != null and player.equipped_weapon.id == "iron_halberd"
+# Giáp tay da thú — COMBO VÕ THUẬT:
+##  • Thu đòn về HÔNG lấy đà (chamber: vai sau + khuỷu gập kín) — chuẩn võ
+##  • Đánh thẳng DUỖI KHUỶU hoàn toàn, thân xoay đấm sâu theo cú
+##  • Trình tự: Chưởng trái → Quyền phải → SONG CHƯỜNG ĐẨY ĐÔI → Hồi quyền phủ
+## rig.y DƯƠNG = vai trái tiến trước (khớp chân dẫn bước chẵn/lẻ).
+const _POSE_GLOVES := [
+	{"w1": 0.32, "w2": 0.50,
+		"wind":   {"rig.y": -0.36, "body.x": 0.06, "head.y": -0.16,
+			"arm_l.x": 0.44, "elbow_l.x": -1.95, "arm_l.z": 0.24,
+			"arm_r.x": -0.88, "elbow_r.x": -1.55, "arm_r.z": -0.28},
+		"strike": {"rig.y": 0.36, "body.x": 0.16, "head.y": 0.14,
+			"arm_l.x": -1.78, "elbow_l.x": -0.02, "arm_l.z": 0.04,
+			"arm_r.x": 0.38, "elbow_r.x": -1.85, "arm_r.z": -0.22},
+		"follow": {"rig.y": 0.12, "body.x": 0.08,
+			"arm_l.x": -0.74, "elbow_l.x": -0.90, "arm_r.x": -0.45, "elbow_r.x": -1.28}},
+	{"w1": 0.32, "w2": 0.50,
+		"wind":   {"rig.y": 0.36, "body.x": 0.06, "head.y": 0.16,
+			"arm_r.x": 0.46, "elbow_r.x": -1.98, "arm_r.z": -0.22,
+			"arm_l.x": -0.88, "elbow_l.x": -1.55, "arm_l.z": 0.28},
+		"strike": {"rig.y": -0.38, "body.x": 0.18, "head.y": -0.14,
+			"arm_r.x": -1.82, "elbow_r.x": -0.02, "arm_r.z": -0.04,
+			"arm_l.x": 0.40, "elbow_l.x": -1.88, "arm_l.z": 0.24},
+		"follow": {"rig.y": -0.12, "body.x": 0.08,
+			"arm_r.x": -0.76, "elbow_r.x": -0.94, "arm_l.x": -0.45, "elbow_l.x": -1.28}},
+	{"w1": 0.34, "w2": 0.54,
+		"wind":   {"rig.y": 0.10, "body.x": -0.04, "head.y": 0.06,
+			"arm_r.x": 0.50, "elbow_r.x": -1.90, "arm_r.z": -0.40,
+			"arm_l.x": 0.50, "elbow_l.x": -1.90, "arm_l.z": 0.40},
+		"strike": {"rig.y": 0.00, "body.x": 0.24, "head.x": -0.08,
+			"arm_r.x": -1.62, "elbow_r.x": -0.04, "arm_r.z": -0.10,
+			"arm_l.x": -1.62, "elbow_l.x": -0.04, "arm_l.z": 0.10},
+		"follow": {"rig.y": 0.00, "body.x": 0.10,
+			"arm_r.x": -0.70, "elbow_r.x": -1.00, "arm_l.x": -0.70, "elbow_l.x": -1.00}},
+	{"w1": 0.36, "w2": 0.54,
+		"wind":   {"rig.x": 0.24, "body.x": 0.22, "rig.y": 0.30, "head.x": 0.10,
+			"arm_r.x": 0.62, "elbow_r.x": -1.92, "arm_r.z": -0.16,
+			"arm_l.x": -0.86, "elbow_l.x": -1.58, "arm_l.z": 0.30},
+		"strike": {"rig.x": -0.14, "body.x": -0.10, "rig.y": -0.22, "head.x": -0.22,
+			"arm_r.x": -2.15, "elbow_r.x": -0.10, "arm_r.z": -0.06,
+			"arm_l.x": 0.20, "elbow_l.x": -1.80, "arm_l.z": 0.24},
+		"follow": {"rig.x": 0.02, "body.x": 0.02, "rig.y": -0.06,
+			"arm_r.x": -0.80, "elbow_r.x": -0.96, "arm_l.x": -0.44, "elbow_l.x": -1.26}},
+]
 
-	if is_heavy:
-		if prog < 0.35:
-			var p: float = prog / 0.35
-			wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, -35.0 + 90.0 * (1.0 - p), delta * 14.0)
-			wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 8.0 * p, delta * 14.0)
-			wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -5.0 * p, delta * 14.0)
-			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.70 * p, delta * 18.0)
-			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.06 * p, delta * 14.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.06 * p, delta * 14.0)
-			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.08 * p, delta * 12.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.06 * p, delta * 12.0)
-			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.14 * p, delta * 12.0)
-			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.10 * p, delta * 12.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", 0.55 * p, 10.0, 0.75, delta)
-		elif prog < 0.75:
-			if not _slash_spawned:
-				_slash_spawned = true
-				_spawn_slash(step)
-			var p: float = (prog - 0.35) / 0.40
-			wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 145.0, delta * 26.0)
-			wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -12.0, delta * 22.0)
-			wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 8.0, delta * 22.0)
-			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.50 * p - 0.70 * (1.0 - p), delta * 28.0)
-			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.12 * sin(p * PI), delta * 22.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.10 * sin(p * PI), delta * 18.0)
-			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.15 * sin(p * PI), delta * 18.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, -0.08 * sin(p * PI), delta * 16.0)
-			mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.18 * sin(p * PI), delta * 16.0)
-			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.10 * sin(p * PI), delta * 14.0)
-			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.15 * sin(p * PI), delta * 14.0)
-			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.20 * sin(p * PI), delta * 12.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.15, 12.0, 0.75, delta)
+# Đại kiếm — VŨ KHÍ 2 TAY, đòn NẶNG:
+##  • Cả hai tay nắm chuôi (arm_l vươn qua thân bám vào cán cùng arm_r)
+##  • Windup dài, xoay người sâu (rig.y ±0.5), kéo kiếm vòng ra sau lưng
+##  • Strike dứt một nhịp rồi follow quánh, lưỡi kéo lê xuống thấp
+##  • rw/rs/rf = tốc độ lerp riêng: chậm khi co, nhanh khi chém, rất chậm khi hồi
+const _POSE_GS := [
+	{"w1": 0.44, "w2": 0.66, "rw": 8.0, "rs": 22.0, "rf": 6.0,
+		"wind":   {"rig.y": 0.46, "rig.x": 0.05, "body.x": 0.12, "head.y": 0.32, "head.x": -0.06,
+			"arm_r.x": -2.10, "arm_r.z": -0.55, "elbow_r.x": -0.65,
+			"arm_l.x": -1.40, "arm_l.z": 0.50, "elbow_l.x": -0.95,
+			"wp.x": 30.0, "wp.y": 85.0, "wp.z": -90.0},
+		"strike": {"rig.y": -0.54, "rig.x": 0.16, "body.x": 0.22, "head.y": -0.40, "head.x": 0.08,
+			"arm_r.x": 0.80, "arm_r.z": 0.50, "elbow_r.x": -0.08,
+			"arm_l.x": -1.00, "arm_l.z": 0.62, "elbow_l.x": -0.35,
+			"wp.x": 160.0, "wp.y": -30.0, "wp.z": 22.0},
+		"follow": {"rig.y": -0.36, "rig.x": 0.13, "body.x": 0.15, "head.y": -0.24,
+			"arm_r.x": 0.45, "arm_r.z": 0.32, "elbow_r.x": -0.28,
+			"arm_l.x": -0.72, "arm_l.z": 0.48, "elbow_l.x": -0.58,
+			"wp.x": 140.0, "wp.y": -14.0, "wp.z": 10.0}},
+	{"w1": 0.46, "w2": 0.68, "rw": 8.0, "rs": 24.0, "rf": 6.0,
+		"wind":   {"rig.x": -0.15, "body.x": -0.10, "head.x": -0.32, "rig.y": 0.06,
+			"arm_r.x": -2.75, "arm_r.z": -0.10, "elbow_r.x": -0.45,
+			"arm_l.x": -2.60, "arm_l.z": 0.18, "elbow_l.x": -0.50,
+			"wp.x": 6.0, "wp.y": 0.0, "wp.z": 0.0},
+		"strike": {"rig.x": 0.30, "body.x": 0.28, "head.x": 0.16, "rig.y": -0.04,
+			"arm_r.x": 0.95, "arm_r.z": 0.05, "elbow_r.x": -0.06,
+			"arm_l.x": 0.80, "arm_l.z": 0.32, "elbow_l.x": -0.14,
+			"wp.x": 178.0, "wp.y": 0.0, "wp.z": 0.0},
+		"follow": {"rig.x": 0.20, "body.x": 0.18, "head.x": 0.07,
+			"arm_r.x": 0.62, "elbow_r.x": -0.25,
+			"arm_l.x": 0.48, "elbow_l.x": -0.35,
+			"wp.x": 162.0, "wp.y": 0.0, "wp.z": 0.0}},
+	{"w1": 0.46, "w2": 0.68, "rw": 8.0, "rs": 22.0, "rf": 6.0,
+		"wind":   {"rig.y": -0.50, "rig.x": 0.06, "body.x": 0.12, "head.y": -0.36,
+			"arm_r.x": -2.00, "arm_r.z": 0.55, "elbow_r.x": -0.55,
+			"arm_l.x": -1.60, "arm_l.z": 0.65, "elbow_l.x": -0.75,
+			"wp.x": 30.0, "wp.y": -85.0, "wp.z": 90.0},
+		"strike": {"rig.y": 0.58, "rig.x": 0.18, "body.x": 0.22, "head.y": 0.42,
+			"arm_r.x": 0.75, "arm_r.z": -0.50, "elbow_r.x": -0.08,
+			"arm_l.x": -0.88, "arm_l.z": 0.55, "elbow_l.x": -0.30,
+			"wp.x": 164.0, "wp.y": 32.0, "wp.z": -24.0},
+		"follow": {"rig.y": 0.38, "rig.x": 0.13, "head.y": 0.26,
+			"arm_r.x": 0.42, "arm_r.z": -0.30, "elbow_r.x": -0.30,
+			"arm_l.x": -0.62, "elbow_l.x": -0.52,
+			"wp.x": 142.0, "wp.y": 16.0, "wp.z": -12.0}},
+]
+
+# Halberd: đâm xa, chém trục, quét ngang
+const _POSE_HALBERD := [
+	{"w1": 0.34, "w2": 0.50,
+		"wind":   {"rig.y": 0.18, "body.x": 0.04, "head.y": 0.12, "arm_r.x": -0.85, "elbow_r.x": -1.55, "arm_l.x": -1.05, "elbow_l.x": -1.30, "wp.x": 88.0, "wp.y": 12.0, "wp.z": 0.0},
+		"strike": {"rig.y": -0.10, "rig.x": 0.12, "body.x": 0.14, "head.y": -0.06, "arm_r.x": -0.35, "elbow_r.x": -0.06, "arm_l.x": -0.55, "elbow_l.x": -0.35, "wp.x": 92.0, "wp.y": 0.0, "wp.z": 0.0},
+		"follow": {"rig.x": 0.06, "arm_r.x": -0.55, "elbow_r.x": -0.60, "wp.x": 90.0, "wp.y": 0.0, "wp.z": 0.0}},
+	{"w1": 0.36, "w2": 0.58,
+		"wind":   {"rig.x": -0.08, "body.x": -0.04, "arm_r.x": -2.30, "elbow_r.x": -0.70, "arm_l.x": -1.60, "wp.x": 25.0, "wp.y": 0.0, "wp.z": 0.0},
+		"strike": {"rig.x": 0.20, "body.x": 0.18, "arm_r.x": 0.90, "elbow_r.x": -0.10, "arm_l.x": 0.50, "wp.x": 165.0, "wp.y": 0.0, "wp.z": 0.0},
+		"follow": {"rig.x": 0.10, "arm_r.x": 0.50, "elbow_r.x": -0.40, "wp.x": 140.0, "wp.y": 0.0, "wp.z": 0.0}},
+	{"w1": 0.34, "w2": 0.62, "rw": 9.0, "rs": 26.0, "rf": 7.0,
+		# ĐÒN CUỐI: rút đà sâu ra sau (kích co hông, tay trái nắm gốc cán)
+		# → ĐÂM THẲNG giữ nguyên tư thế xuyên suốt pha LƯỚT → thu về
+		"wind":   {"rig.y": 0.42, "rig.x": -0.06, "body.x": -0.04, "head.y": 0.26,
+			"arm_r.x": -0.35, "elbow_r.x": -1.75, "arm_l.x": -0.30, "elbow_l.x": -1.85,
+			"wp.x": 62.0, "wp.y": 26.0, "wp.z": 14.0},
+		"strike": {"rig.y": -0.10, "rig.x": 0.20, "body.x": 0.18, "head.y": -0.04,
+			"arm_r.x": -1.05, "elbow_r.x": -0.08, "arm_l.x": -0.92, "elbow_l.x": -0.30,
+			"wp.x": 91.0, "wp.y": 0.0, "wp.z": 0.0},
+		"follow": {"rig.x": 0.10, "body.x": 0.10,
+			"arm_r.x": -0.60, "elbow_r.x": -0.70, "arm_l.x": -0.55, "elbow_l.x": -0.85,
+			"wp.x": 90.0, "wp.y": 4.0, "wp.z": 0.0}},
+]
+
+# Axe / pickaxe: chop phải, chop trái, chém dọc nặng
+const _POSE_HEAVY := [
+	{"w1": 0.36, "w2": 0.58,
+		"wind":   {"rig.y": 0.20, "body.x": 0.06, "head.y": 0.16, "arm_r.x": -2.20, "arm_r.z": -0.20, "elbow_r.x": -0.80, "arm_l.x": -0.40, "wp.x": 25.0, "wp.y": 30.0, "wp.z": -30.0},
+		"strike": {"rig.x": 0.20, "rig.y": -0.14, "body.x": 0.20, "head.y": -0.12, "arm_r.x": 0.90, "arm_r.z": 0.15, "elbow_r.x": -0.10, "wp.x": 160.0, "wp.y": -10.0, "wp.z": 8.0},
+		"follow": {"rig.x": 0.10, "arm_r.x": 0.50, "elbow_r.x": -0.40, "wp.x": 140.0, "wp.y": -5.0, "wp.z": 4.0}},
+	{"w1": 0.36, "w2": 0.58,
+		"wind":   {"rig.y": -0.20, "body.x": 0.06, "head.y": -0.16, "arm_r.x": -2.10, "arm_r.z": 0.30, "elbow_r.x": -0.80, "wp.x": 25.0, "wp.y": -30.0, "wp.z": 30.0},
+		"strike": {"rig.x": 0.18, "rig.y": 0.18, "body.x": 0.20, "head.y": 0.14, "arm_r.x": 0.85, "arm_r.z": -0.25, "elbow_r.x": -0.10, "wp.x": 158.0, "wp.y": 12.0, "wp.z": -8.0},
+		"follow": {"rig.x": 0.09, "rig.y": 0.08, "arm_r.x": 0.45, "elbow_r.x": -0.40, "wp.x": 138.0, "wp.y": 6.0, "wp.z": -4.0}},
+	{"w1": 0.40, "w2": 0.62,
+		"wind":   {"rig.x": -0.12, "body.x": -0.06, "arm_r.x": -2.50, "elbow_r.x": -0.60, "arm_l.x": -2.00, "wp.x": 10.0, "wp.y": 0.0, "wp.z": 0.0},
+		"strike": {"rig.x": 0.24, "body.x": 0.24, "arm_r.x": 1.00, "elbow_r.x": -0.06, "arm_l.x": 0.70, "wp.x": 170.0, "wp.y": 0.0, "wp.z": 0.0},
+		"follow": {"rig.x": 0.12, "arm_r.x": 0.55, "elbow_r.x": -0.35, "wp.x": 148.0, "wp.y": 0.0, "wp.z": 0.0}},
+]
+
+# Shovel / hoe: vẩy ngang, đào xuống kết
+const _POSE_TOOL := [
+	{"w1": 0.34, "w2": 0.56,
+		"wind":   {"rig.y": 0.20, "body.x": 0.05, "head.y": 0.16, "arm_r.x": -1.60, "arm_r.z": -0.30, "elbow_r.x": -1.10, "wp.x": 45.0, "wp.y": 50.0, "wp.z": -55.0},
+		"strike": {"rig.y": -0.26, "body.x": 0.14, "head.y": -0.18, "arm_r.x": 0.65, "arm_r.z": 0.30, "elbow_r.x": -0.15, "wp.x": 148.0, "wp.y": -15.0, "wp.z": 10.0},
+		"follow": {"rig.y": -0.12, "arm_r.x": 0.30, "elbow_r.x": -0.45, "wp.x": 126.0, "wp.y": -6.0, "wp.z": 4.0}},
+	{"w1": 0.38, "w2": 0.60,
+		"wind":   {"rig.x": -0.10, "body.x": -0.05, "arm_r.x": -2.30, "elbow_r.x": -0.70, "wp.x": 20.0, "wp.y": 0.0, "wp.z": 0.0},
+		"strike": {"rig.x": 0.22, "body.x": 0.20, "arm_r.x": 0.90, "elbow_r.x": -0.10, "wp.x": 162.0, "wp.y": 0.0, "wp.z": 0.0},
+		"follow": {"rig.x": 0.10, "arm_r.x": 0.50, "elbow_r.x": -0.40, "wp.x": 142.0, "wp.y": 0.0, "wp.z": 0.0}},
+]
+
+func _pose_table(wid: String) -> Array:
+	match wid:
+		"iron_sword": return _POSE_SWORD
+		"leather_gloves": return _POSE_GLOVES
+		"iron_greatsword": return _POSE_GS
+		"iron_halberd": return _POSE_HALBERD
+		"axe", "pickaxe": return _POSE_HEAVY
+		"shovel", "hoe": return _POSE_TOOL
+	return _POSE_SWORD
+
+## Ghi giá trị đích vào một khớp ("tên.trục") bằng lerp mượt.
+## "wp.*" là weapon_pivot và tính bằng rotation_degrees.
+func _set_joint(key: String, val: float, delta: float, rate: float) -> void:
+	var parts := key.split(".")
+	if parts.size() != 2:
+		return
+	var k: float = minf(1.0, delta * rate)
+	if parts[0] == "wp":
+		var wp := mesh.weapon_pivot
+		if wp == null or not is_instance_valid(wp):
+			return
+		var deg: Vector3 = wp.rotation_degrees
+		match parts[1]:
+			"x": deg.x = lerpf(deg.x, val, k)
+			"y": deg.y = lerpf(deg.y, val, k)
+			"z": deg.z = lerpf(deg.z, val, k)
+		wp.rotation_degrees = deg
+		return
+	var node: Node3D = null
+	match parts[0]:
+		"rig": node = mesh.rig
+		"body": node = mesh.body
+		"head": node = mesh.head
+		"neck": node = mesh.neck
+		"arm_l": node = mesh.arm_l
+		"arm_r": node = mesh.arm_r
+		"elbow_l": node = mesh.elbow_l
+		"elbow_r": node = mesh.elbow_r
+	if node == null or not is_instance_valid(node):
+		return
+	var rot: Vector3 = node.rotation
+	match parts[1]:
+		"x": rot.x = lerpf(rot.x, val, k)
+		"y": rot.y = lerpf(rot.y, val, k)
+		"z": rot.z = lerpf(rot.z, val, k)
+	node.rotation = rot
+
+## Trộn pose của bước combo hiện tại theo pha prog ∈ [0,1].
+## Windup đuổi dáng co vừa phải, strike bắt rất nhanh (snap), follow thả chậm.
+## Bước có thể override tốc độ: "rw"/"rs"/"rf" — đại kiếm dùng giá trị chậm
+## hơn để đòn có TRỌNG LƯỢNG (co lâu, chém dứt, hồi quánh).
+func _combo_blend(step: Dictionary, prog: float, delta: float) -> void:
+	var w1: float = step.w1
+	var w2: float = step.w2
+	var r_wind: float = step.get("rw", 16.0)
+	var r_strike: float = step.get("rs", 30.0)
+	var r_follow: float = step.get("rf", 11.0)
+	var wind: Dictionary = step.wind
+	var strike: Dictionary = step.strike
+	var follow: Dictionary = step.follow
+	for key in wind.keys():
+		var target: float
+		var rate: float
+		if prog < w1:
+			target = wind[key]
+			rate = r_wind
+		elif prog < w2:
+			target = strike.get(key, wind[key])
+			rate = r_strike
 		else:
-			wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
-			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
-			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
-			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
-			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
-			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
-			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
-			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
-			mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
-			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
-			_follow_r_elbow(delta)
-			_follow_l_elbow(delta)
+			target = follow.get(key, strike.get(key, wind[key]))
+			rate = r_follow
+		_set_joint(key, target, delta, rate)
 
-	elif is_gs:
-		if prog < 0.40:
-			var p: float = prog / 0.40
-			match step:
-				0:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, -40.0 + 90.0 * (1.0 - p), delta * 16.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 6.0 * p, delta * 14.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -4.0 * p, delta * 14.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.60 * p, delta * 20.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.05 * p, delta * 16.0)
-					mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.05 * p, delta * 14.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.06 * p, delta * 14.0)
-					mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.04 * p, delta * 12.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.10 * p, delta * 12.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.08 * p, delta * 12.0)
-				1:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 60.0, delta * 16.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 40.0, delta * 14.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -18.0, delta * 14.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.50 * p, delta * 20.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.22 * p, delta * 16.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.15 * p, delta * 14.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.22 * p, delta * 12.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.14 * p, delta * 12.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.06 * p, delta * 14.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", 0.50 * p, 10.0, 0.75, delta)
-		elif prog < 0.85:
-			if not _slash_spawned:
-				_slash_spawned = true
-				_spawn_slash(step)
-			var p: float = (prog - 0.40) / 0.45
-			match step:
-				0:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 155.0, delta * 28.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -10.0, delta * 24.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 7.0, delta * 24.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.60 * p - 0.60 * (1.0 - p), delta * 30.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 24.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.18 * sin(p * PI), delta * 20.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.20 * sin(p * PI), delta * 18.0)
-					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.14 * sin(p * PI), delta * 16.0)
-					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.22 * sin(p * PI), delta * 14.0)
-				1:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 118.0, delta * 28.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -30.0, delta * 24.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 24.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.80 * p - 0.50 * (1.0 - p), delta * 32.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.22 * sin(p * PI), delta * 26.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.35 * sin(p * PI), delta * 22.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.40 * sin(p * PI), delta * 20.0)
-					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.06 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.25 * sin(p * PI), delta * 18.0)
-					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.10 * p, delta * 20.0)
-			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.04 * sin(p * PI), delta * 18.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.06 * p, delta * 16.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.10, 12.0, 0.75, delta)
-		else:
-			wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
-			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
-			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
-			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
-			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
-			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
-			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
-			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
-			mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
-			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
-			# Đặt lại ankle/foot về phẳng — tránh kế thừa trạng thái lún đất từ state trước
-			mesh.ankle_l.rotation.x = _spring("ankle_l_x", 0.02, 10.0, 1.0, delta)
-			mesh.ankle_r.rotation.x = _spring("ankle_r_x", 0.02, 10.0, 1.0, delta)
-			mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 7.0, 1.0, delta)
-			mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 7.0, 1.0, delta)
-			_follow_r_elbow(delta)
-			_follow_l_elbow(delta)
-			if remaining <= 0.0 and player and player.combo_timer <= 0.0:
-				player.combo_step = 0
+## Chân khi tấn công — THẾ ĐÁNH CÓ LỰC (đọc là biết đánh):
+##  • Windup  : chân DẪN bước mạnh ra trước (hông vung sâu), thân nhấc lấy đà
+##  • Strike  : chân trước ĐẬP XUỐNG — gối gập sâu hấp thụ + truyền lực,
+##              chân sau duỗi thẳng tắp đạp hông về trước (gót nhấc),
+##              TOÀN THÂN LÚN XUỐNG = trọng lực dồn vào đòn
+##  • Follow  : giữ thế kiềng thấp ổn định, hồi chậm
+## Đổi bên theo bước chẵn/lẻ → mỗi đòn trong chain đánh vào thế chân khác.
+func _combo_legs(prog: float, delta: float, step_i: int, step: Dictionary) -> void:
+	var lead_is_right := (step_i % 2) == 0
+	var w1: float = step.get("w1", 0.35)
+	var w2: float = step.get("w2", 0.60)
+	# Trọng số 3 pha
+	var k_step: float = smoothstep(0.02, w1, prog)                     # bước ra
+	var k_drive: float = smoothstep(w1, w2, prog)                      # đập xuống
+	var k_settle: float = smoothstep(w2, minf(w2 + 0.22, 1.0), prog)   # giữ thế
 
-	elif is_halberd:
-		if prog < 0.35:
-			var p: float = prog / 0.35
-			match step:
-				0:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, -40.0 + 90.0 * (1.0 - p), delta * 16.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 6.0 * p, delta * 14.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -4.0 * p, delta * 14.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.60 * p, delta * 20.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.05 * p, delta * 16.0)
-					mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.05 * p, delta * 14.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.06 * p, delta * 14.0)
-					mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.04 * p, delta * 12.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.10 * p, delta * 12.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.08 * p, delta * 12.0)
-				1:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 60.0, delta * 16.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 40.0, delta * 14.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -18.0, delta * 14.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.50 * p, delta * 20.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.22 * p, delta * 16.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.15 * p, delta * 14.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.22 * p, delta * 12.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.14 * p, delta * 12.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.06 * p, delta * 14.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", 0.50 * p, 10.0, 0.75, delta)
-		elif prog < 0.80:
-			if not _slash_spawned:
-				_slash_spawned = true
-				_spawn_slash(step)
-			var p: float = (prog - 0.35) / 0.45
-			match step:
-				0:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 155.0, delta * 28.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -10.0, delta * 24.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 7.0, delta * 24.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.60 * p - 0.60 * (1.0 - p), delta * 30.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 24.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.18 * sin(p * PI), delta * 20.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.20 * sin(p * PI), delta * 18.0)
-					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.14 * sin(p * PI), delta * 16.0)
-					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.22 * sin(p * PI), delta * 14.0)
-				1:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 118.0, delta * 28.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -30.0, delta * 24.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 24.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.80 * p - 0.50 * (1.0 - p), delta * 32.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.22 * sin(p * PI), delta * 26.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.35 * sin(p * PI), delta * 22.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.40 * sin(p * PI), delta * 20.0)
-					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.06 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.25 * sin(p * PI), delta * 18.0)
-					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.10 * p, delta * 20.0)
-			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.04 * sin(p * PI), delta * 18.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.06 * p, delta * 16.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.10, 12.0, 0.75, delta)
-		else:
-			wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
-			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
-			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
-			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
-			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
-			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
-			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
-			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
-			mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
-			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
-			mesh.ankle_l.rotation.x = _spring("ankle_l_x", 0.02, 10.0, 1.0, delta)
-			mesh.ankle_r.rotation.x = _spring("ankle_r_x", 0.02, 10.0, 1.0, delta)
-			mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 7.0, 1.0, delta)
-			mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 7.0, 1.0, delta)
-			_follow_r_elbow(delta)
-			_follow_l_elbow(delta)
-			if remaining <= 0.0 and player and player.combo_timer <= 0.0:
-				player.combo_step = 0
+	# Key-pose chân DẪN: [hông, gối, cổ chân] — vung TỚI RỘNG, đưa sau VỪA
+	var lead_guard := Vector3(0.10, 0.18, 0.05)
+	var lead_step := Vector3(-0.98, 0.72, 0.26)    # cẳng chân đưa rộng lên trước
+	var lead_drive := Vector3(-0.62, 1.00, 0.06)   # đạp: gối gập SÂU, bàn chân trụ
+	var lead_hold := Vector3(-0.68, 0.84, 0.05)
+	# Key-pose chân SAU: duỗi đạp nền vừa phải — QUÁ XA sau gây cảm giác lùi
+	var trail_guard := Vector3(-0.08, 0.22, 0.05)
+	var trail_step := Vector3(0.36, 0.12, 0.12)
+	var trail_drive := Vector3(0.56, 0.05, -0.44)  # duỗi + gót nhấc đạp
+	var trail_hold := Vector3(0.44, 0.08, -0.28)
 
+	var lead: Vector3
+	if k_drive <= 0.0:
+		lead = lead_guard.lerp(lead_step, k_step)
 	else:
-		# ── Epic Fight prototype: iron_sword — IDLE → AUTO_ATTACK → RECOVERY ──
-		# Chuẩn khớp: vai (arm) xoay trước/sau, khuỷu (elbow) gập 90° khi chém,
-		# cổ tay/bàn tay theo weapon_pivot, chân trụ giữ thăng bằng.
-		if prog < 0.20:
-			# Anticipation: kéo kiếm ra sau, vai mở, khuỷu co nhẹ
-			var p: float = prog / 0.20
-			match step:
-				0:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 72.0, delta * 18.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 28.0, delta * 18.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -14.0, delta * 18.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.55 * p, delta * 22.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.20 * p, delta * 18.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.12 * p, delta * 16.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.18 * p, delta * 14.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.05 + 0.10 * p, delta * 14.0)
-					mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 0.08 * p, delta * 12.0)
-				1:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 72.0, delta * 18.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -28.0, delta * 18.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 14.0, delta * 18.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.55 * p, delta * 22.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.20 * p, delta * 18.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.12 * p, delta * 16.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.18 * p, delta * 14.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.05 + 0.10 * p, delta * 14.0)
-					mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, -0.08 * p, delta * 12.0)
-				2:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 82.0, delta * 18.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 42.0, delta * 18.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -7.0, delta * 18.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.28 * p, delta * 22.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.32 * p, delta * 18.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.20 * p, delta * 16.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.25 * p, delta * 14.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.05 + 0.12 * p, delta * 14.0)
-					mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 0.06 * p, delta * 12.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, -0.08 * p, delta * 16.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, -0.05 * p, delta * 14.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", 0.55 * p, 10.0, 0.75, delta)
-			mesh.elbow_l.rotation.x = _spring("elbow_l_x", 0.45 * p, 10.0, 0.75, delta)
-		elif prog < 0.65:
-			# AUTO_ATTACK active: chém — vai xoay trước, khuỷu duỗi 90°→mở, cổ tay dẫn
-			if not _slash_spawned:
-				_slash_spawned = true
-				_spawn_slash(step)
-			var p: float = (prog - 0.20) / 0.45
-			match step:
-				0:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 112.0, delta * 30.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -22.0, delta * 30.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 16.0, delta * 30.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.85 * p - 0.55 * (1.0 - p), delta * 32.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.10 * sin(p * PI), delta * 26.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, -0.18 * sin(p * PI), delta * 20.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, -0.22 * sin(p * PI), delta * 18.0)
-					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.15 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 0.10 * sin(p * PI), delta * 12.0)
-					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
-				1:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 112.0, delta * 30.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, 22.0, delta * 30.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, -16.0, delta * 30.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.85 * p - 0.55 * (1.0 - p), delta * 32.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.10 * sin(p * PI), delta * 26.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.18 * sin(p * PI), delta * 20.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.22 * sin(p * PI), delta * 18.0)
-					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.08 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.15 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, -0.10 * sin(p * PI), delta * 12.0)
-					mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.18 * sin(p * PI), delta * 14.0)
-				2:
-					wp.rotation_degrees.x = lerp(wp.rotation_degrees.x, 97.0, delta * 30.0)
-					wp.rotation_degrees.y = lerp(wp.rotation_degrees.y, -42.0, delta * 30.0)
-					wp.rotation_degrees.z = lerp(wp.rotation_degrees.z, 11.0, delta * 30.0)
-					mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, 0.55 * p - 0.28 * (1.0 - p), delta * 32.0)
-					mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, 0.14 * sin(p * PI), delta * 26.0)
-					mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.35 * sin(p * PI), delta * 22.0)
-					mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.30 * sin(p * PI), delta * 20.0)
-					mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.06 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, 0.12 * sin(p * PI), delta * 16.0)
-					mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 0.08 * sin(p * PI), delta * 12.0)
-					mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.22 * sin(p * PI), delta * 14.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.12 * p, delta * 22.0)
-			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, -0.05 * sin(p * PI), delta * 20.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.08 * p, delta * 18.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", 1.15, 12.0, 0.75, delta)
-			mesh.elbow_l.rotation.x = _spring("elbow_l_x", 0.95, 12.0, 0.75, delta)
+		lead = lead_step.lerp(lead_drive, k_drive).lerp(lead_hold, k_settle)
+	var trail: Vector3
+	if k_drive <= 0.0:
+		trail = trail_guard.lerp(trail_step, k_step)
+	else:
+		trail = trail_step.lerp(trail_drive, k_drive).lerp(trail_hold, k_settle)
+
+	# Hông lún sâu khi đập = trọng lượng dồn vào đòn; nhấc nhẹ khi bước
+	var drop: float = lerpf(lerpf(0.0, 0.025, k_step), -0.095, k_drive)
+	drop = lerpf(drop, -0.06, k_settle)
+
+	var leg_lead := mesh.leg_r if lead_is_right else mesh.leg_l
+	var leg_trail := mesh.leg_l if lead_is_right else mesh.leg_r
+	var an_lead := mesh.ankle_r if lead_is_right else mesh.ankle_l
+	var an_trail := mesh.ankle_l if lead_is_right else mesh.ankle_r
+
+	leg_lead.rotation.x = lerpf(leg_lead.rotation.x, lead.x, minf(1.0, delta * 14.0))
+	leg_trail.rotation.x = lerpf(leg_trail.rotation.x, trail.x, minf(1.0, delta * 14.0))
+	# Giang chân NGANG: chân dẫn hơi khép, chân sau dang ra ngoài — bệ đứng rộng
+	var side_f: float = 1.0 if lead_is_right else -1.0
+	leg_lead.rotation.z = lerpf(leg_lead.rotation.z, -side_f * 0.06 * k_drive, minf(1.0, delta * 10.0))
+	leg_trail.rotation.z = lerpf(leg_trail.rotation.z, side_f * 0.09 * k_drive, minf(1.0, delta * 10.0))
+	# Gối dùng spring chung tên với walk → chuyển state không giật pha
+	if lead_is_right:
+		mesh.knee_r.rotation.x = _spring("knee_r_x", lead.y, 11.0, 1.0, delta)
+		mesh.knee_l.rotation.x = _spring("knee_l_x", trail.y, 11.0, 1.0, delta)
+	else:
+		mesh.knee_l.rotation.x = _spring("knee_l_x", lead.y, 11.0, 1.0, delta)
+		mesh.knee_r.rotation.x = _spring("knee_r_x", trail.y, 11.0, 1.0, delta)
+	an_lead.rotation.x = lerpf(an_lead.rotation.x, lead.z, minf(1.0, delta * 12.0))
+	an_trail.rotation.x = lerpf(an_trail.rotation.x, trail.z, minf(1.0, delta * 12.0))
+
+	mesh.rig.position.y = _spring("rig_y", 0.02 + drop, 10.0, 1.0, delta)
+	# Hông xoay đấm theo hướng tấn công + lắc ngang sang chân trụ
+	mesh.pelvis.rotation.z = _spring("pelvis_twist", side_f * 0.10 * k_drive, 8.0, 0.8, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", -side_f * 0.020 * k_drive, 7.0, 0.9, delta)
+
+func _attack(delta: float, _t: float) -> void:
+	var remaining: float = base._attack_timer
+	var prog: float = 1.0 - clampf(remaining / max(base._cur_step_dur, 0.001), 0.0, 1.0)
+	# ── RIPoste (parry attack): phản đòn sau chặn — vung ngược lên + đâm ────
+	if base._is_riposte:
+		if remaining > _last_remaining + 0.001:
+			_start_trail("iron_sword")
+		_last_remaining = remaining
+		if not _trail_released and prog >= 0.34:
+			_trail_released = true
+			if _trail != null and is_instance_valid(_trail):
+				_trail.stop_recording()
+			SFXManager.play_attack_strong()
+		_riposte_blend(prog, delta)
+		_combo_legs(prog, delta, 1, {"w1": 0.24, "w2": 0.46})
+		return
+	var step_i: int = player.combo_step if player != null else 0
+	var wid: String = player.equipped_weapon.id if player != null and player.equipped_weapon != null else ""
+	var table: Array = _pose_table(wid)
+	step_i = clampi(step_i, 0, table.size() - 1)
+	# Bước mới bắt đầu (timer nhảy lên) → mở vệt kiếm mới cho đường vung này
+	if remaining > _last_remaining + 0.001:
+		_start_trail(wid)
+	_last_remaining = remaining
+	var step: Dictionary = table[step_i]
+	# Đúng thời điểm lưỡi quét (w2): khoá trail + âm vung + impact đấm
+	if not _trail_released and prog >= float(step.w2):
+		_trail_released = true
+		if _trail != null and is_instance_valid(_trail):
+			_trail.stop_recording()
+	if wid == "iron_greatsword" or wid == "axe" or wid == "pickaxe" or wid == "iron_halberd":
+		SFXManager.play_attack_strong()
+	else:
+		SFXManager.play_attack_weak()
+		if wid == "leather_gloves":
+			_spawn_punch_fx(step_i)
+	_combo_blend(step, prog, delta)
+	_combo_legs(prog, delta, step_i, step)
+
+# ── Sword trail — vệt lưỡi theo đúng đường vung thật ──────────────────────────
+var _trail: _TrailVFX = null
+var _trail_released: bool = true
+
+## Mở vệt kiếm cho một bước đánh: gắn vào weapon_pivot, tự mẫu transform lưỡi.
+func _start_trail(wid: String) -> void:
+	_kill_trail()
+	_trail_released = false
+	if mesh == null or mesh.weapon_pivot == null or not is_instance_valid(mesh.weapon_pivot):
+		return
+	var tip_y := 0.60
+	var life := 0.22
+	var col := Color(0.95, 0.97, 1.0)
+	match wid:
+		"iron_sword":
+			tip_y = 0.58; life = 0.22; col = Color(0.95, 0.97, 1.00)
+		"iron_greatsword":
+			tip_y = 1.05; life = 0.34; col = Color(0.80, 0.88, 1.00)
+		"iron_halberd":
+			tip_y = 0.82; life = 0.30; col = Color(0.65, 0.75, 0.85)
+		"axe":
+			tip_y = 0.44; life = 0.26; col = Color(1.00, 0.98, 0.92)
+		"pickaxe":
+			tip_y = 0.42; life = 0.26; col = Color(0.90, 0.94, 1.00)
+		"shovel", "hoe":
+			tip_y = 0.46; life = 0.22; col = Color(0.95, 0.92, 0.80)
+		"air":
+			tip_y = 0.70; life = 0.30; col = Color(0.88, 0.94, 1.00)
+		_:
+			return   # găng tay không có vệt kiếm (dùng PunchVFX)
+	_trail = _TrailVFX.new()
+	mesh.weapon_pivot.add_child(_trail)
+	_trail.setup(col, tip_y, life)
+
+func _kill_trail() -> void:
+	if _trail != null and is_instance_valid(_trail):
+		_trail.queue_free()
+	_trail = null
+
+## Impact đấm tại nắm tay đang đánh (bước chẵn tay trái, lẻ tay phải).
+# ── PARRY: thế chặn — kiếm dựng chéo chắn ngực, chân trụ vững, người vặn che ─
+func _parry(delta: float, _t: float) -> void:
+	mesh.rig.position.y = _spring("rig_y", -0.02, 9.0, 1.0, delta)
+	mesh.rig.rotation.x = _spring("rig_x", 0.06, 9.0, 0.9, delta)
+	mesh.rig.rotation.y = _spring("rig_rot_y", 0.20, 10.0, 0.9, delta)
+	mesh.body.rotation.x = _spring("body_x", 0.08, 8.0, 0.9, delta)
+	mesh.head.rotation.x = _spring("head_x", -0.04, 7.0, 0.9, delta)
+	mesh.head.rotation.y = _spring("head_y", 0.10, 7.0, 0.8, delta)
+	if not _weapon_owns_arms():
+		var wp := mesh.weapon_pivot
+		if wp != null and is_instance_valid(wp):
+			# Kiếm dựng CHÉO chắn trước thân
+			wp.rotation_degrees = wp.rotation_degrees.lerp(Vector3(18, -46, -12), minf(1.0, delta * 13.0))
+		mesh.arm_r.rotation.x = _spring("arm_r_x", -1.05, 11.0, 0.9, delta)
+		mesh.arm_r.rotation.z = _spring("arm_r_z", -0.30, 10.0, 0.9, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -1.15, 10.0, 0.9, delta)
+		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.95, 11.0, 0.9, delta)
+		mesh.arm_l.rotation.z = _spring("arm_l_z", 0.34, 10.0, 0.9, delta)
+		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -1.25, 10.0, 0.9, delta)
+	mesh.leg_l.rotation.x = _spring("leg_l_x", -0.36, 10.0, 1.0, delta)
+	mesh.knee_l.rotation.x = _spring("knee_l_x", 0.42, 10.0, 1.0, delta)
+	mesh.leg_r.rotation.x = _spring("leg_r_x", 0.24, 10.0, 1.0, delta)
+	mesh.knee_r.rotation.x = _spring("knee_r_x", 0.34, 10.0, 1.0, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", -0.018, 7.0, 0.9, delta)
+	mesh.pelvis.rotation.x = _spring("pelvis_x", 0.04, 7.0, 1.0, delta)
+
+## RIPoste blend: sau chặn vung NGƯỢC từ dưới-hông lên chéo rồi đâm tới —
+## vào thế cực nhanh (rate 22), chém dứt khoát, thu gọn.
+func _riposte_blend(prog: float, delta: float) -> void:
+	var w1 := 0.22
+	var w2 := 0.44
+	var wind := {
+		"rig.y": 0.30, "rig.x": 0.02, "body.x": 0.04, "head.y": 0.20,
+		"arm_r.x": 0.55, "elbow_r.x": -1.90, "arm_l.x": -0.70, "elbow_l.x": -1.35,
+		"wp.x": 55.0, "wp.y": 40.0, "wp.z": 40.0}
+	var strike := {
+		"rig.y": -0.26, "rig.x": 0.16, "body.x": 0.14, "head.y": -0.12,
+		"arm_r.x": -1.28, "elbow_r.x": -0.05, "arm_l.x": -0.98, "elbow_l.x": -0.42,
+		"wp.x": 92.0, "wp.y": 0.0, "wp.z": 0.0}
+	var follow := {
+		"rig.y": -0.12, "rig.x": 0.10, "body.x": 0.08,
+		"arm_r.x": -0.85, "elbow_r.x": -0.45, "arm_l.x": -0.62, "elbow_l.x": -0.80,
+		"wp.x": 88.0, "wp.y": 4.0, "wp.z": 0.0}
+	for key in wind.keys():
+		var target: float
+		var rate: float
+		if prog < w1:
+			target = wind[key]
+			rate = 22.0
+		elif prog < w2:
+			target = strike.get(key, wind[key])
+			rate = 32.0
 		else:
-			# RECOVERY → IDLE: thu kiếm, vai thả, khuỷu gập nhẹ về idle
-			var p: float = (prog - 0.65) / 0.35
-			wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, delta * 10.0)
-			mesh.rig.rotation.x = lerp(mesh.rig.rotation.x, 0.0, delta * 10.0)
-			mesh.rig.rotation.y = lerp(mesh.rig.rotation.y, 0.0, delta * 10.0)
-			mesh.rig.rotation.z = lerp(mesh.rig.rotation.z, 0.0, delta * 10.0)
-			mesh.body.rotation.x = lerp(mesh.body.rotation.x, 0.0, delta * 10.0)
-			mesh.head.rotation.x = lerp(mesh.head.rotation.x, 0.0, delta * 10.0)
-			mesh.head.rotation.y = lerp(mesh.head.rotation.y, 0.0, delta * 10.0)
-			mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -0.06, delta * 10.0)
-			mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -0.04, delta * 10.0)
-			mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -0.06, delta * 10.0)
-			mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 0.04, delta * 10.0)
-			mesh.elbow_r.rotation.x = _spring("elbow_r_x", lerp(1.15, 0.45, p), 10.0, 0.75, delta)
-			mesh.elbow_l.rotation.x = _spring("elbow_l_x", lerp(0.95, 0.45, p), 10.0, 0.75, delta)
-			mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, 0.02, delta * 10.0)
-			mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.02, delta * 10.0)
-			mesh.ankle_l.rotation.x = _spring("ankle_l_x", 0.02, 10.0, 1.0, delta)
-			mesh.ankle_r.rotation.x = _spring("ankle_r_x", 0.02, 10.0, 1.0, delta)
-			mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 7.0, 1.0, delta)
-			mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 7.0, 1.0, delta)
-			if remaining <= 0.0 and player and player.combo_timer <= 0.0:
-				player.combo_step = 0
+			target = follow.get(key, strike.get(key, wind[key]))
+			rate = 10.0
+		_set_joint(key, target, delta, rate)
 
-func _spawn_slash(step: int) -> void:
-	if not is_instance_valid(mesh) or not is_instance_valid(mesh.weapon_pivot):
+func _spawn_punch_fx(step_i: int) -> void:
+	var anchor: Node3D = mesh.elbow_r if (step_i % 2) == 1 else mesh.elbow_l
+	if anchor == null or not is_instance_valid(anchor):
 		return
-	if not player or not player.equipped_weapon:
-		return
-	var wp := mesh.weapon_pivot
-	var is_heavy: bool = player.equipped_weapon.id == "axe" or player.equipped_weapon.id == "pickaxe"
-	var is_gs: bool = player.equipped_weapon.id == "iron_greatsword"
-	var is_halberd: bool = player.equipped_weapon.id == "iron_halberd"
+	var pv := PunchVFX.new(1.0 + 0.15 * step_i, Color(0.85, 0.72, 0.40))
+	anchor.add_child(pv)
+	pv.position = Vector3(0, -0.24, 0.06)
 
-	if is_heavy:
-		var is_axe: bool = player.equipped_weapon.id == "axe"
-		var vfx := SlashVFX.new(75.0 if is_axe else 60.0, 0.40 if is_axe else 0.30, 0.10, Color.WHITE)
-		wp.add_child(vfx)
-		vfx.position = Vector3(0, 0.40, 0)
-		vfx.rotation_degrees = Vector3(0, 90, 0)
-	elif player.equipped_weapon.id == "iron_sword":
-		var vfx := SlashVFX.new(70.0, 0.5, 0.12, Color.WHITE)
-		wp.add_child(vfx)
-		vfx.position = Vector3(0, 0.40, 0)
-		match step:
-			0: vfx.rotation_degrees = Vector3(0, 0, 30)
-			1: vfx.rotation_degrees = Vector3(0, 0, -30)
-			2: vfx.rotation_degrees = Vector3(85, 0, 0)
-	elif is_gs:
-		var arc: float = 80.0 if step == 0 else 65.0
-		var radius: float = 0.55
-		var vfx := SlashVFX.new(arc, radius, 0.10, Color(0.85, 0.90, 1.00))
-		wp.add_child(vfx)
-		vfx.position = Vector3(0, 0.50, 0)
-		match step:
-			0: vfx.rotation_degrees = Vector3(0, 90, 0)
-			1: vfx.rotation_degrees = Vector3(90, 0, 30)
-	elif is_halberd:
-		var arc: float = 85.0 if step == 0 else 75.0
-		var radius: float = 0.55 if step == 0 else 0.60
-		var vfx := SlashVFX.new(arc, radius, 0.10, Color(0.55, 0.65, 0.75))
-		wp.add_child(vfx)
-		vfx.position = Vector3(0, 0.50, 0)
-		match step:
-			0: vfx.rotation_degrees = Vector3(0, 90, 0)
-			1: vfx.rotation_degrees = Vector3(90, 0, 30)
-	elif player.equipped_weapon.id == "leather_gloves":
-		var vfx := PunchVFX.new(1.0, Color(0.85, 0.72, 0.40))
-		wp.add_child(vfx)
-		vfx.position = Vector3(0, 0.25, 0.08)
+# ── Hạ thủ sau chain (RECOVERY) ────────────────────────────────────────────────
+## Vũ khí về thế thủ thấp hơi nâng (sẵn sàng), thân thẳng lại, hít một nhịp.
+func _recovery(delta: float, _t: float) -> void:
+	mesh.rig.rotation.x = _spring("rig_x", 0.04, 7.0, 0.9, delta)
+	mesh.rig.rotation.y = _spring("rig_rot_y", 0.0, 7.0, 0.9, delta)
+	mesh.body.rotation.x = _spring("body_x", 0.05, 7.0, 0.9, delta)
+	mesh.head.rotation.x = _spring("head_x", -0.03, 7.0, 0.9, delta)
+	mesh.head.rotation.y = _spring("head_y", 0.0, 6.0, 0.8, delta)
+	if not _weapon_owns_arms():
+		var wp := mesh.weapon_pivot
+		if wp != null and is_instance_valid(wp):
+			wp.rotation_degrees = wp.rotation_degrees.lerp(IDLE_WP, minf(1.0, delta * 9.0))
+		mesh.arm_r.rotation.x = _spring("arm_r_x", -0.35, 8.0, 0.9, delta)
+		mesh.arm_r.rotation.z = _spring("arm_r_z", -0.10, 8.0, 0.9, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -0.85, 8.0, 0.8, delta)
+		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.30, 8.0, 0.9, delta)
+		mesh.arm_l.rotation.z = _spring("arm_l_z", 0.12, 8.0, 0.9, delta)
+		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -0.80, 8.0, 0.8, delta)
+	mesh.leg_l.rotation.x = _spring("leg_l_x", 0.05, 8.0, 1.0, delta)
+	mesh.leg_r.rotation.x = _spring("leg_r_x", -0.05, 8.0, 1.0, delta)
+	mesh.knee_l.rotation.x = _spring("knee_l_x", 0.12, 8.0, 1.0, delta)
+	mesh.knee_r.rotation.x = _spring("knee_r_x", 0.12, 8.0, 1.0, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", 0.0, 6.0, 0.9, delta)
+	# Neutralize toàn bộ khớp nghiêng + chân sau chain → không dư nghiêng sang idle.
+	mesh.pelvis.rotation.x = _spring("pelvis_x", 0.0, 6.0, 1.0, delta)
+	mesh.pelvis.position.z = _spring("pelvis_z", 0.0, 6.0, 0.9, delta)
+	mesh.rig.rotation.z = _spring("rig_z", 0.0, 7.0, 1.0, delta)
+	mesh.body.rotation.z = _spring("body_z", 0.0, 7.0, 1.0, delta)
+	mesh.backpack.rotation.x = _spring("bp_rx", 0.0, 6.0, 1.0, delta)
+	mesh.neck.rotation.y = _spring("neck_y", 0.0, 6.0, 0.8, delta)
+	mesh.ankle_l.rotation.x = _spring("ankle_l_x", 0.03, 8.0, 1.0, delta)
+	mesh.ankle_r.rotation.x = _spring("ankle_r_x", 0.03, 8.0, 1.0, delta)
+	mesh.foot_l.rotation.x = _spring("foot_l_x", 0.0, 8.0, 1.0, delta)
+	mesh.foot_r.rotation.x = _spring("foot_r_x", 0.0, 8.0, 1.0, delta)
+
+# ── Đòn đánh trên không (AIR_ATTACK → LANDING) ────────────────────────────────
+## Co người giữa không trung, chém chéo từ trên vai phải xuống trái hông;
+## tiếp đất do physics chuyển sang RECOVERY dài hơn (hấp thụ cú đáp).
+func _air_attack(delta: float, _t: float) -> void:
+	var remaining: float = base._attack_timer
+	var prog: float = 1.0 - clampf(remaining / max(base._cur_step_dur, 0.001), 0.0, 1.0)
+	if remaining > _last_remaining + 0.001:
+		_start_trail("air")
+	_last_remaining = remaining
+	if not _trail_released and prog >= 0.62:
+		_trail_released = true
+		if _trail != null and is_instance_valid(_trail):
+			_trail.stop_recording()
+		SFXManager.play_attack_weak()
+	var strike_k: float = smoothstep(0.28, 0.62, prog)
+	mesh.rig.rotation.x = _spring("rig_x", 0.10 + prog * 0.14, 9.0, 0.9, delta)
+	mesh.rig.rotation.y = _spring("rig_rot_y", lerpf(0.24, -0.26, strike_k), 9.0, 0.9, delta)
+	mesh.body.rotation.x = _spring("body_x", 0.10 + prog * 0.10, 8.0, 0.9, delta)
+	mesh.head.rotation.x = _spring("head_x", -0.10, 7.0, 0.9, delta)
+	if not _weapon_owns_arms():
+		mesh.arm_r.rotation.x = _spring("arm_r_x", lerpf(-2.35, 0.85, strike_k), 13.0, 1.0, delta)
+		mesh.arm_r.rotation.z = _spring("arm_r_z", lerpf(-0.30, 0.30, strike_k), 11.0, 1.0, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", lerpf(-0.90, -0.08, strike_k), 12.0, 1.0, delta)
+		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.55, 9.0, 0.9, delta)
+		mesh.arm_l.rotation.z = _spring("arm_l_z", 0.25, 9.0, 0.9, delta)
+		mesh.elbow_l.rotation.x = _spring("elbow_l_x", -1.10, 9.0, 0.9, delta)
+	# Chân co trước mặt (tuck) — dáng đấm bay
+	mesh.leg_l.rotation.x = _spring("leg_l_x", -0.55, 9.0, 1.0, delta)
+	mesh.leg_r.rotation.x = _spring("leg_r_x", -0.20, 9.0, 1.0, delta)
+	mesh.knee_l.rotation.x = _spring("knee_l_x", 1.05, 9.0, 1.0, delta)
+	mesh.knee_r.rotation.x = _spring("knee_r_x", 0.65, 9.0, 1.0, delta)
+	mesh.ankle_l.rotation.x = _spring("ankle_l_x", 0.20, 8.0, 1.0, delta)
+	mesh.ankle_r.rotation.x = _spring("ankle_r_x", 0.10, 8.0, 1.0, delta)
+	mesh.pelvis.position.x = _spring("pelvis_sway", 0.0, 6.0, 0.9, delta)

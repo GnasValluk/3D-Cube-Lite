@@ -202,10 +202,21 @@ func _ready() -> void:
 	# ── 6. Xuống máy bay ────────────────────────────────────────────────────
 	print("-- 6. Xuống --")
 	var hub_rot_before_exit: float = heli._rotor_hub.rotation.y
+	# Regression: player bị nghiêng theo máy bay (driver.rotation.x/z do
+	# _sync_driver) → try_exit phải trả lại trục đứng, không nghiêng vĩnh viễn.
+	# Ép nghiêng rõ ràng rồi sync để có trạng thái xác định (khi hover thật thì
+	# tilt đã tự tắt ~0 nên không dùng được làm pre-check).
+	heli._rig.rotation.x = -0.20
+	heli._rig.rotation.z = 0.10
+	heli._sync_driver()
+	_check(absf(driver.rotation.x) > 0.05,
+		"pre-check: player đang nghiêng khi còn lái (x=%s)" % str(driver.rotation.x))
 	heli.try_exit()
 	_check(not heli.is_driven(), "try_exit: hết tài xế")
 	_check(not driver.has_meta("driving_vehicle"), "try_exit: nhả khóa điều khiển")
 	_check(driver.scale.is_equal_approx(Vector3.ONE), "try_exit: trả lại kích thước người chơi")
+	_check(absf(driver.rotation.x) < 0.001 and absf(driver.rotation.z) < 0.001,
+		"try_exit: player đứng thẳng trở lại (x=%s z=%s)" % [str(driver.rotation.x), str(driver.rotation.z)])
 	_check(driver.global_position.distance_to(heli.global_position) < 7.0,
 		"try_exit: người chơi đứng gần máy bay (d=%s)" % str(driver.global_position.distance_to(heli.global_position)))
 	await _wait_physics(60)

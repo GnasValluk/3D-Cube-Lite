@@ -14,7 +14,8 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"fishing_rod": _build_can_cau(pivot)
 		"iron_greatsword": _build_dai_kiem(pivot)
 		"iron_halberd": _build_iron_halberd(pivot)
-		"leather_gloves": _build_gang_tay(pivot)
+		# leather_gloves KHÔNG dựng vào weapon_pivot — PlayerCharacter gọi
+		# build_glove_hand thay thế khối bàn tay cả 2 bên.
 		"crossbow": _build_no(pivot)
 		"watermelon_cannon": _build_phao_dua_hau(pivot)
 		"arrow": _build_mui_ten(pivot)
@@ -320,60 +321,81 @@ static func iron_halberd_drop(p: Node3D) -> void:
 	ItemMeshShared.add_cube(p, 0, 4, 0, 1.5, 2.0, 0.8, iron)
 	ItemMeshShared.add_cube(p, 1, 2, 0, 1.8, 1.0, 0.5, edge)
 
-# ── Găng Tay Da Thú (Fur Leather Gloves) — chi tiết ─────────────────────────
-static func _build_gang_tay(p: Node3D) -> void:
-	var wrap := Node3D.new()
-	wrap.rotation_degrees = Vector3(-90, 0, 0)
-	wrap.position = Vector3(0, 0.11, 0.02)
-	p.add_child(wrap)
+# ── Giáp Tay Da Thú — BAO TRỌN CẢNH TAY DƯỚI ────────────────────────────────
+## Dựng trong hệ toạ độ KHUỶU TAY (trục -Y = dọc cẳng tay xuống đầu ngón).
+## Giáp phủ từ khuỷu (y=0) tới hết bàn tay (~-0.36): 3 tấm giáp da có đai
+## buckles, viền lông thú, mu tay có bảo hộ + đinh, ngón 2 đốt.
+## mirror = true cho tay trái (đảo phía ngón cái/buckle).
+static func build_glove_hand(p: Node3D, mirror: bool) -> void:
+	if p == null:
+		return
+	var s: float = -1.0 if mirror else 1.0   # dấu trục X: tay phải +1, tay trái -1
+	var leather    := _mat(Color(0.44, 0.29, 0.14))
+	var leather_l  := _mat(Color(0.55, 0.39, 0.20))
+	var dark       := _mat(Color(0.25, 0.15, 0.06))
+	var fur        := _mat(Color(0.68, 0.58, 0.45))
+	var fur_l      := _mat(Color(0.76, 0.67, 0.55))
+	var finger_mat := _mat(Color(0.52, 0.37, 0.18))
+	var stitch_c   := _mat(Color(0.62, 0.48, 0.28))
+	var metal_c    := _mat(Color(0.55, 0.55, 0.60))
+	var metal_d    := _mat(Color(0.35, 0.35, 0.40))
 
-	var leather     := _mat(Color(0.42, 0.28, 0.14))
-	var light       := _mat(Color(0.50, 0.34, 0.17))
-	var dark        := _mat(Color(0.28, 0.17, 0.07))
-	var finger_mat  := _mat(Color(0.58, 0.42, 0.20))
-	var stitch_c    := _mat(Color(0.55, 0.40, 0.22))
-	var metal_c     := _mat(Color(0.50, 0.50, 0.56))
-	var finger_w: Array[float] = [0.028, 0.028, 0.028, 0.022]
-	var finger_len: Array[float] = [0.06, 0.07, 0.06, 0.04]
-	var finger_off: Array[float] = [-0.045, -0.015, 0.015, 0.045]
+	# ── Cổ giáp trên loe ở khuỷu ─────────────────────────────────────────
+	_box(p, Vector3(0, -0.015, 0), Vector3(0.155, 0.05, 0.155), dark)
+	_box(p, Vector3(0, -0.048, 0), Vector3(0.165, 0.026, 0.165), fur)
+	_box(p, Vector3(0, -0.062, 0), Vector3(0.148, 0.010, 0.148), fur_l)
 
-	for s in [-1.0, 1.0]:
-		# weapon_pivot gắn ở tay phải → găng phải ở x dương nhẹ, găng trái ở x âm
-		var x: float = 0.02 if s > 0 else -0.20
+	# ── 3 tấm giáp cẳng tay (thon dần xuống) + đường chỉ ─────────────────
+	var plate_y := [-0.098, -0.152, -0.204]
+	var plate_sz := [Vector3(0.146, 0.056, 0.146), Vector3(0.139, 0.054, 0.139), Vector3(0.131, 0.052, 0.131)]
+	for i in range(3):
+		_box(p, Vector3(0, plate_y[i], 0), plate_sz[i], leather)
+		# Tấm lót sáng hơn mặt trước (+Z)
+		_box(p, Vector3(0, plate_y[i], 0.062), Vector3(plate_sz[i].x * 0.72, plate_sz[i].y * 0.7, 0.024), leather_l)
+		# Chỉ viền quanh tấm giáp
+		_box(p, Vector3(0, plate_y[i] + plate_sz[i].y * 0.42, 0), Vector3(plate_sz[i].x * 0.98, 0.004, plate_sz[i].z * 0.98), stitch_c)
 
-		# Cổ tay (wrist cuff)
-		_box(wrap, Vector3(x, -0.02, 0),  Vector3(0.14, 0.06, 0.16), dark)
-		_box(wrap, Vector3(x, -0.01, 0.08), Vector3(0.13, 0.002, 0.006), stitch_c)
-		_cyl(wrap, Vector3(x, -0.01, 0.07), 0.016, 0.06, metal_c)
+	# ── 2 đai da + buckle kim loại giữa các tấm ──────────────────────────
+	for by in [-0.125, -0.178]:
+		_box(p, Vector3(0, by, 0), Vector3(0.152, 0.022, 0.152), dark)
+		_box(p, Vector3(s * 0.079, by, 0), Vector3(0.022, 0.032, 0.034), metal_c)
+		_box(p, Vector3(s * 0.079, by, 0), Vector3(0.010, 0.018, 0.036), metal_d)
 
-		# Lòng bàn tay + mu bàn tay (palm + back)
-		_box(wrap, Vector3(x, 0.04, 0),   Vector3(0.15, 0.08, 0.15), leather)
-		_box(wrap, Vector3(x, 0.05, 0.05), Vector3(0.12, 0.06, 0.08), light)
+	# ── Viền lông thú ở cổ tay ───────────────────────────────────────────
+	_box(p, Vector3(0, -0.232, 0), Vector3(0.142, 0.024, 0.142), fur)
+	_box(p, Vector3(0, -0.244, 0), Vector3(0.120, 0.012, 0.120), fur_l)
 
-		# Đốt ngón tay (knuckle bumps)
-		for i in 4:
-			var kx: float = x + finger_off[i] * s
-			_box(wrap, Vector3(kx, 0.09, 0.04), Vector3(0.022, 0.025, 0.025), finger_mat)
+	# ── Bàn tay to hơn: lòng + mu bảo hộ có đinh ─────────────────────────
+	_box(p, Vector3(0, -0.278, 0), Vector3(0.115, 0.075, 0.115), leather)
+	_box(p, Vector3(0, -0.285, 0), Vector3(0.095, 0.055, 0.095), leather_l)
+	# Tấm bảo hộ mu tay + đinh tán
+	_box(p, Vector3(s * 0.006, -0.280, 0.050), Vector3(0.085, 0.058, 0.022), dark)
+	for sx in [-1.0, 0.0, 1.0]:
+		_cyl(p, Vector3(s * 0.006 + sx * 0.028, -0.280, 0.064), 0.007, 0.012, metal_c)
+	# Chỉ viền mu tay
+	_box(p, Vector3(0, -0.278,  0.060), Vector3(0.100, 0.070, 0.004), stitch_c)
 
-		# Ngón tay — 4 ngón, mỗi ngón 2 đốt (fingers, 2 segments each)
-		for i in 4:
-			var fx: float = x + finger_off[i] * s
-			var w: float = finger_w[i]
-			var fl: float = finger_len[i]
-			# Đốt gần (proximal)
-			_box(wrap, Vector3(fx, 0.10, 0.06), Vector3(w, 0.035, fl * 0.5), finger_mat)
-			# Đốt xa (distal)
-			_box(wrap, Vector3(fx, 0.10, 0.06 + fl * 0.35), Vector3(w * 0.85, 0.03, fl * 0.5), light)
-			# Đường chỉ khớp (stitch at joint)
-			_box(wrap, Vector3(fx, 0.10, 0.06 + fl * 0.22), Vector3(w * 0.9, 0.002, 0.002), stitch_c)
+	# ─️─ Đốt ngón (knuckles) ─────────────────────────────────────────────
+	for i in range(4):
+		var kx: float = (-0.038 + i * 0.025) * s
+		_box(p, Vector3(kx, -0.318, 0), Vector3(0.026, 0.024, 0.028), finger_mat)
 
-		# Ngón cái (thumb)
-		_box(wrap, Vector3(x + 0.05 * s, 0.02, 0.07), Vector3(0.04, 0.05, 0.05), finger_mat)
-		_box(wrap, Vector3(x + 0.06 * s, 0.01, 0.09), Vector3(0.035, 0.04, 0.04), light)
+	# ── 4 ngón tay hướng xuống (theo trục -Y của cánh tay) ───────────────
+	for i in range(4):
+		var fx: float = (-0.038 + i * 0.025) * s
+		var fl: float = [0.058, 0.068, 0.063, 0.048][i]
+		# Đốt gần
+		_box(p, Vector3(fx, -0.342, 0), Vector3(0.023, fl * 0.55, 0.026), finger_mat)
+		# Đốt xa (hơi thon) + móc kim loại nhỏ
+		_box(p, Vector3(fx, -0.342 - fl * 0.42, 0), Vector3(0.019, fl * 0.48, 0.022), leather_l)
+		_box(p, Vector3(fx, -0.342 - fl * 0.70, 0), Vector3(0.014, 0.014, 0.016), metal_d)
+		# Chỉ khớp ngón
+		_box(p, Vector3(fx, -0.342 - fl * 0.24, 0), Vector3(0.021, 0.003, 0.024), stitch_c)
 
-		# Đường chỉ viền (edge stitching)
-		_box(wrap, Vector3(x, 0.04,  0.065), Vector3(0.14, 0.002, 0.002), stitch_c)
-		_box(wrap, Vector3(x, 0.04, -0.065), Vector3(0.14, 0.002, 0.002), stitch_c)
+	# ── Ngón cái (về phía trong cơ thể) ──────────────────────────────────
+	_box(p, Vector3(-s * 0.062, -0.268, 0.014), Vector3(0.034, 0.052, 0.040), finger_mat)
+	_box(p, Vector3(-s * 0.066, -0.298, 0.016), Vector3(0.030, 0.040, 0.034), leather_l)
+	_box(p, Vector3(-s * 0.066, -0.320, 0.016), Vector3(0.024, 0.014, 0.028), metal_d)
 
 # ── Drop / display ─────────────────────────────────────────────────────────
 static func greatsword_drop(p: Node3D) -> void:

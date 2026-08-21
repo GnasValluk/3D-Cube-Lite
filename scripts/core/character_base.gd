@@ -66,6 +66,8 @@ func get_total_def() -> float:
 @export var dash_duration:      float = 0.18
 @export var dash_cooldown:      float = 0.80
 @export var attack_duration:    float = 0.45
+## Thời gian hạ thủ sau khi hết chain combo (RECOVERY → IDLE).
+@export var recovery_duration:  float = 0.24
 @export var melee_damage:       int   = 0
 @export var melee_range:        float = 2.2
 @export var auto_aim_range:     float = 20.0
@@ -103,6 +105,31 @@ var effects: StatusEffects = null
 var _melee_hit_once: bool = false
 var _melee_hit_progress: float = 0.25
 
+# ── Melee combo (auto-attack chain) ───────────────────────────────────────────
+## Chain đang chạy (mảng bước {dur, hit, lunge}) — PlayerCharacter gán khi bắt đầu.
+var _combo_chain: Array = []
+## Index bước hiện tại trong chain.
+var _combo_index: int = 0
+## Bấm chuột trong lúc đang vung → nối đòn tiếp theo ngay khi bước hiện tại kết thúc.
+var _attack_buffered: bool = false
+## Thời lượng + pha hit của bước HIỆN TẠI (mỗi bước combo khác nhau).
+var _cur_step_dur: float = 0.45
+var _cur_hit_frac: float = 0.25
+## Đếm ngược hạ thủ RECOVERY.
+var _recover_timer: float = 0.0
+## Air attack: 1 lần mỗi lần rời mặt đất.
+var _air_attack_available: bool = true
+# ── Combo SLIDE (kích sắt đòn cuối): lao tới quét sát thương dọc đường lướt ──
+var _combo_slide: bool = false
+var _combo_slide_cd: float = 0.0
+var _combo_slide_ticks: int = 0
+
+# ── Parry / Riposte ───────────────────────────────────────────────────────────
+var _parry_timer: float = 0.0     # tổng thời gian giữ thế parry
+var _parry_window: float = 0.0    # cửa sổ active — trúng đòn trong này = hoá giải
+var _is_riposte: bool = false     # cú đánh hiện tại là PARRY ATTACK (phản đòn)
+var _dash_ghost_cd: float = 0.0
+
 # ── Oxygen / Swimming ──────────────────────────────────────
 @export var max_oxygen: float = 100.0
 var oxygen: float = 100.0
@@ -115,7 +142,12 @@ var _swim_jump_cd: float = 0.0
 var _water_check_cd: float = 0.0
 
 # ── State machine ─────────────────────────────────────────────────────────────
-enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD, SWIM, EAT }
+## Vòng đời đánh thường (melee combo):
+##   IDLE → ATTACK (từng bước chain, giữ chuột/bấm đệm để nối đòn)
+##        → RECOVERY (hết chain, hạ thủ) → IDLE
+##   Nhảy + đánh → AIR_ATTACK → chạm đất → RECOVERY (LANDING) → IDLE
+##   DASH đóng vai DODGE (có i-frame ngắn).
+enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD, SWIM, EAT, RECOVERY, AIR_ATTACK, PARRY }
 var _state: State = State.IDLE
 
 # ── Timers ────────────────────────────────────────────────────────────────────
@@ -254,6 +286,117 @@ func _on_secondary_attack() -> void:  pass
 func _on_show_animation() -> void:    pass
 func _on_dash() -> void:              pass
 func _on_offline_tick(_delta: float, _cd_delta: float) -> void: pass
+
+## Bắt đầu một cú đánh thường (1 đòn đơn mặc định; PlayerCharacter ghi đè
+## để chạy chain combo theo vũ khí).
+func _begin_primary_attack() -> void:
+	_combo_chain = []
+	_combo_index = 0
+	_cur_step_dur = attack_duration
+	_cur_hit_frac = _melee_hit_progress
+	_attack_timer = attack_duration
+	_state = State.ATTACK
+	_melee_hit_once = false
+	_on_primary_attack()
+
+## Gọi khi bước đánh hiện tại kết thúc: true = nối bước tiếp (auto-chain),
+## false = vào RECOVERY. Mặc định: hết 1 đòn → RECOVERY.
+func _advance_combo() -> bool:
+	return false
+
+# ── Parry / Riposte ───────────────────────────────────────────────────────────
+## Vũ khí có thể parry không? (kiếm/đại kiếm/kích — PC ghi đè theo trang bị)
+func _can_parry() -> bool:
+	return false
+
+## Chuột phải: vào thế PARRY — cửa sổ 0.30s đầu hoá giải đòn cận chiến.
+func _begin_parry() -> void:
+	if not _can_parry():
+		return
+	if _attack_timer > 0.0 or _attack2_timer > 0.0 or _state == State.DASH \
+			or _hit_timer > 0.0 or not is_on_floor() or _freeze_timer > 0.0:
+		return
+	_state = State.PARRY
+	_parry_timer = 0.42
+	_parry_window = 0.30
+	velocity *= 0.2
+	SFXManager.play_sweep()
+
+## Kẻ địch đánh trúng trong cửa sổ parry → HOÁ GIẢI hoàn toàn + RIPoste
+## (parry attack) lập tức: xoay mặt về địch, lao tới đánh mạnh. true = đã chặn.
+func _try_parry(attacker: Node3D) -> bool:
+	if _state != State.PARRY or _parry_window <= 0.0:
+		return false
+	if attacker == null or not is_instance_valid(attacker):
+		return false
+	var off: Vector3 = attacker.global_position - global_position
+	off.y = 0.0
+	if off.length() > 3.2:
+		return false   # đòn xa (đạn...) không parry được
+	# ── PARRY THÀNH CÔNG ──
+	_parry_window = 0.0
+	camera_shake(0.10, 0.14)
+	SFXManager.play_sweep()
+	_spawn_parry_spark()
+	if off.length_squared() > 0.001:
+		rotation.y = atan2(off.x, off.z)
+	# RIPoste: đánh mạnh ngay, dùng máy ATTACK + cờ riêng cho animator
+	_is_riposte = true
+	_combo_chain = []
+	_combo_index = 0
+	attack_duration = 0.40
+	_cur_step_dur = 0.40 * (2.0 if _underwater else 1.0)
+	_cur_hit_frac = 0.30
+	_attack_timer = _cur_step_dur
+	_melee_hit_once = false
+	_state = State.ATTACK
+	_recover_timer = 0.0
+	_start_forward_lunge(8.5, 0.20)
+	return true
+
+## Tia lửa kim loại chạm nhau tại ngực — hiệu ứng chặn đòn thành công.
+func _spawn_parry_spark() -> void:
+	if _rig == null or not is_inside_tree():
+		return
+	var mat := MeshBuilder.emit_mat(Color(1.0, 0.96, 0.78), Color(1.0, 0.88, 0.50), 7.0)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var core := MeshInstance3D.new()
+	var sph := SphereMesh.new()
+	sph.radius = 0.09
+	sph.height = 0.18
+	core.mesh = sph
+	core.material_override = mat
+	core.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var parent := get_parent()
+	if parent == null:
+		return
+	parent.add_child(core)
+	core.global_position = global_position + Vector3(0, 0.85, 0) \
+		- global_transform.basis.z * 0.38
+	var tw := core.create_tween().set_parallel()
+	tw.tween_property(core, "scale", Vector3(2.6, 2.6, 2.6), 0.10)
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.14)
+	tw.tween_property(mat, "emission_energy_multiplier", 0.0, 0.14)
+	tw.tween_callback(core.queue_free).set_delay(0.15)
+
+# ── Rung màn hình ─────────────────────────────────────────────────────────────
+## Rung camera hiện hành (TP/FP đều có add_shake). NPC gọi vô hại.
+func camera_shake(intensity: float, duration: float) -> void:
+	if not _is_player or not is_inside_tree():
+		return
+	var cam := get_viewport().get_camera_3d()
+	if cam != null and cam.has_method("add_shake"):
+		cam.add_shake(intensity, duration)
+
+## Rung màn hình khi NHẬN SÁT THƯƠNG — cường độ theo tỉ lệ dmg/max_hp:
+## đòn nhỏ chỉ nhấp nháy, đòn mất nhiều máu làm màn hình rung mạnh.
+func _damage_shake(dmg: int) -> void:
+	if not _is_player:
+		return
+	var ratio: float = clampf(float(dmg) / float(maxi(max_hp, 1)), 0.0, 1.0)
+	var intensity: float = clampf(0.05 + ratio * 0.55, 0.05, 0.45)
+	var duration: float = clampf(0.16 + ratio * 0.40, 0.16, 0.55)
+	camera_shake(intensity, duration)
 
 func apply_freeze(duration: float) -> void:
 	if not is_alive:
@@ -519,7 +662,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.pressed:
 			if mb.button_index == MOUSE_BUTTON_LEFT:
-				if _lmb_cd <= 0.0 and _freeze_timer <= 0.0 and _attack_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
+				if _lmb_cd <= 0.0 and _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
 					if not try_skill(stamina_cost_lmb):
 						return
 					_aim_dir = _calc_aim_dir()
@@ -527,10 +670,11 @@ func _unhandled_input(event: InputEvent) -> void:
 					if _aim_dir.dot(fwd) < 0.99:
 						rotation.y = atan2(_aim_dir.x, _aim_dir.z)
 					_lmb_cd = lmb_cooldown
-					_attack_timer = attack_duration
-					_state = State.ATTACK
-					_melee_hit_once = false
-					_on_primary_attack()
+					if _state == State.ATTACK and _attack_timer > 0.0:
+						# Đang vung: đệm cú tiếp theo cho chain tự nối.
+						_attack_buffered = true
+					else:
+						_begin_primary_attack()
 
 # ── Physics ───────────────────────────────────────────────────────────────────
 func _physics_process(delta: float) -> void:
@@ -564,6 +708,26 @@ func _physics_process(delta: float) -> void:
 	_attack2_timer  = max(_attack2_timer - delta, 0.0)
 	_action_lunge_timer = max(_action_lunge_timer - delta, 0.0)
 	_invul_timer    = max(_invul_timer - delta, 0.0)
+	if _recover_timer > 0.0:
+		_recover_timer = max(_recover_timer - delta, 0.0)
+	if _parry_timer > 0.0:
+		_parry_timer = max(_parry_timer - delta, 0.0)
+	if _parry_window > 0.0:
+		_parry_window = max(_parry_window - delta, 0.0)
+
+	# ── Combo auto-chain: bước đánh kết thúc → nối đòn hoặc vào RECOVERY ──────
+	if _attack_timer <= 0.0 and _state == State.ATTACK:
+		_combo_slide = false
+		_is_riposte = false
+		if not _advance_combo():
+			_state = State.RECOVERY
+			_recover_timer = recovery_duration
+	elif _state == State.RECOVERY and _recover_timer <= 0.0 and _attack_timer <= 0.0:
+		_state = State.IDLE
+
+	# ── Parry: hết thời gian giữ thế → về IDLE ────────────────────────────────
+	if _state == State.PARRY and _parry_timer <= 0.0:
+		_state = State.IDLE
 
 	if _hit_timer > 0.0:
 		velocity.x *= 0.3
@@ -604,7 +768,7 @@ func _physics_process(delta: float) -> void:
 
 	# Đang lái thuyền/máy kéo: bỏ qua điều khiển di chuyển — vị trí do xe đồng bộ
 	if _is_player and (has_meta("driving_boat") or has_meta("driving_vehicle")):
-		if _attack_timer > 0.0 and not _melee_hit_once and (1.0 - _attack_timer / attack_duration) >= _melee_hit_progress:
+		if _attack_timer > 0.0 and not _melee_hit_once and (1.0 - _attack_timer / max(_cur_step_dur, 0.001)) >= _cur_hit_frac:
 			_do_melee_hit()
 		_animate(delta)
 		return
@@ -612,7 +776,7 @@ func _physics_process(delta: float) -> void:
 	# Underwater / swimming
 	if _underwater:
 		_Swim.swim_physics(self, delta)
-		if _attack_timer > 0.0 and not _melee_hit_once and (1.0 - _attack_timer / attack_duration) >= _melee_hit_progress:
+		if _attack_timer > 0.0 and not _melee_hit_once and (1.0 - _attack_timer / max(_cur_step_dur, 0.001)) >= _cur_hit_frac:
 			_do_melee_hit()
 		return
 
@@ -684,9 +848,12 @@ func _physics_process(delta: float) -> void:
 		_rig.scale = Vector3(sx, _sy_cur, sx)
 
 	# Movement input
-	var attacking: bool = _attack_timer > 0.0
+	# AIR_ATTACK vẫn tính là đang vung (hit check chạy) nhưng không khoá state
+	# ATTACK — giữ state riêng để animator pose đòn trên không.
+	var swinging: bool = _attack_timer > 0.0
+	var attacking: bool = swinging and _state != State.AIR_ATTACK
 	var devouring: bool = _attack2_timer > 0.0
-	var lunging: bool = _action_lunge_timer > 0.0 and (attacking or devouring)
+	var lunging: bool = _action_lunge_timer > 0.0 and (swinging or devouring)
 	var dir: Vector3 = _read_input()
 	var crouching: bool
 	var sprinting: bool
@@ -710,8 +877,17 @@ func _physics_process(delta: float) -> void:
 
 	var spd: float = crouch_speed if crouching else (sprint_speed if sprinting else move_speed)
 	spd *= get_speed_multiplier()
+	# Đánh thường vẫn di chuyển được nhưng chậm (đòn giữ thế), RECOVERY gần như tự do.
+	var atk_mult: float = 1.0
+	if _state == State.ATTACK or _state == State.AIR_ATTACK:
+		atk_mult = 0.35
+	elif _state == State.RECOVERY:
+		atk_mult = 0.70
+	elif _state == State.PARRY:
+		atk_mult = 0.25   # giữ thế parry gần như đứng chân
+	spd *= atk_mult
 
-	if dir.length_squared() > 0.001 and not attacking and not devouring:
+	if dir.length_squared() > 0.001 and not devouring:
 		dir = dir.normalized()
 		velocity.x = move_toward(velocity.x, dir.x * spd, acceleration * delta)
 		velocity.z = move_toward(velocity.z, dir.z * spd, acceleration * delta)
@@ -724,11 +900,20 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, 0.0, friction * delta)
 		velocity.z = move_toward(velocity.z, 0.0, friction * delta)
 
-	# Melee hit detection (ATTACK state)
-	if attacking and not _melee_hit_once and (1.0 - _attack_timer / attack_duration) >= _melee_hit_progress:
+	# Melee hit detection (ATTACK + AIR_ATTACK — theo pha hit của bước combo)
+	if _combo_slide and _action_lunge_timer > 0.0:
+		# SLIDE (kích sắt đòn cuối): đánh LẠI định kỳ trong lúc lao để quét
+		# sát thương dọc đường lướt — mục tiêu mới đi vào tầm vẫn ăn đòn.
+		_combo_slide_cd -= delta
+		if _combo_slide_cd <= 0.0 and _combo_slide_ticks < 4:
+			_combo_slide_cd = 0.09
+			_combo_slide_ticks += 1
+			_do_melee_hit()
+	elif swinging and not _melee_hit_once and \
+			(1.0 - _attack_timer / max(_cur_step_dur, 0.001)) >= _cur_hit_frac:
 		_do_melee_hit()
 
-	# Dash trigger
+	# Dash trigger (DODGE): i-frame ngắn giúp né đòn trong lúc lướt
 	var want_dash: bool = false
 	if _is_player:
 		want_dash = Input.is_action_pressed("dash") and _q_cd <= 0.0 and _freeze_timer <= 0.0 and not attacking and not devouring
@@ -747,14 +932,27 @@ func _physics_process(delta: float) -> void:
 		_dash_cd     = dash_cooldown
 		_state       = State.DASH
 		_sy_tgt      = 1.15
+		_invul_timer = maxf(_invul_timer, dash_duration + 0.04)
+		_recover_timer = 0.0
 		_on_dash()
 		SFXManager.play_sweep()
 		move_and_slide()
 		_animate(delta)
 		return
 
-	# State update
-	if attacking:
+	# AIR_ATTACK chạm đất khi đòn kết thúc → LANDING: hấp thụ qua RECOVERY dài hơn
+	if _state == State.AIR_ATTACK and on_floor and not swinging:
+		_state = State.RECOVERY
+		_recover_timer = recovery_duration * 1.6
+
+	# State update — AIR_ATTACK/RECOVERY/PARRY tự quản vòng đời, không bị ghi đè
+	if _state == State.AIR_ATTACK and swinging:
+		pass  # đang vung trên không
+	elif _state == State.RECOVERY and _recover_timer > 0.0 and not swinging:
+		pass  # hạ thủ sau chain / tiếp đất
+	elif _state == State.PARRY and not swinging:
+		pass  # giữ thế parry đến hết timer
+	elif attacking:
 		_state = State.ATTACK
 	elif devouring:
 		_state = State.DEVOUR

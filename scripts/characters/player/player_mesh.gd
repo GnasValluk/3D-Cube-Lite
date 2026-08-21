@@ -46,6 +46,9 @@ var ankle_l:  Node3D  # khớp cổ chân trái (parent của bàn chân trái)
 var ankle_r:  Node3D  # khớp cổ chân phải
 var foot_l:   Node3D  # bàn chân trái
 var foot_r:   Node3D  # bàn chân phải
+## Khối bàn tay gốc — găng tay sẽ THAY THẾ (ẩn tay + đeo model găng cùng chỗ).
+var hand_l:   Node3D
+var hand_r:   Node3D
 
 ## Thiết lập palette trước khi build.
 func set_palette(palette: Dictionary) -> void:

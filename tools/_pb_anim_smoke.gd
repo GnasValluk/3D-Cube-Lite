@@ -55,6 +55,8 @@ func _ready() -> void:
 		CharacterBase.State.DEAD,
 		CharacterBase.State.SWIM,
 		CharacterBase.State.EAT,
+		CharacterBase.State.RECOVERY,
+		CharacterBase.State.AIR_ATTACK,
 	]
 	for s in states:
 		_fake_base.set_state(s)

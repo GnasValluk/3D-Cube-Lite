@@ -232,8 +232,12 @@ func _build_arm(shoulder: Node3D, left: bool) -> void:
 	else:    elbow_r = elbow
 	# Cẳng tay
 	MeshBuilder.box(elbow, Vector3(0, -0.11, 0), Vector3(0.11, 0.22, 0.11), _sh)
-	# Bàn tay
-	MeshBuilder.box(elbow, Vector3(0, -0.22, 0), Vector3(0.10, 0.09, 0.10), _sk)
+	# Bàn tay — giữ tham chiếu để găng tay thay thế khi trang bị
+	var hand := MeshBuilder.box(elbow, Vector3(0, -0.22, 0), Vector3(0.10, 0.09, 0.10), _sk)
+	if left:
+		hand_l = hand
+	else:
+		hand_r = hand
 
 	if left:
 		gauntlet_l_pivot = MeshBuilder.pivot(elbow, Vector3(0, -0.18, 0))

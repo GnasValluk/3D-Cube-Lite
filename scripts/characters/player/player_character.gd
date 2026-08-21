@@ -11,6 +11,8 @@ const _Mortar := preload("player_mortar.gd")
 const _EggThrow := preload("player_egg_throw.gd")
 const _Halberd := preload("player_halberd.gd")
 const _Fishing := preload("player_fishing.gd")
+const _Combos := preload("melee_combos.gd")
+const _GunPose := preload("player_gun_pose.gd")
 const _TavernDoor := preload("res://scripts/world/chunk/tavern_door.gd")
 const _Skin := preload("res://scripts/characters/player/player_skin.gd")
 const _WorldChunk := preload("res://scripts/world/chunk/world_chunk.gd")
@@ -111,6 +113,12 @@ var _m200_bolt_cd: float = 0.0
 var _m200_hold_base: Vector3 = Vector3.ZERO
 var _m200_hold_captured: bool = false
 var _m200_recoil: float = 0.0
+## Blend tư thế ngắm súng (0 = cầm thường → 1 = ADS tối đa), dùng chung bởi
+## PlayerGunPose + các script súng.
+var _gun_ads_blend: float = 0.0
+## Câu cá: đang cầm cần + (thả câu hoặc đang vung ném lưỡi)
+var _fishing_active: bool = false
+var _fish_cast_t: float = 0.0
 
 const HALBERD_CHARGE_TIME: float = 0.7
 ## Tỷ lệ phóng to nhân vật người chơi (~20%): mesh + capsule + hit_radius.
@@ -130,13 +138,20 @@ func _ensure_highlight() -> void:
 	_block_highlight.visible = false
 	add_child(_block_highlight)
 
+## Vũ khí được PARRY bằng chuột phải (kiếm/đại kiếm/kích sắt).
+const PARRY_WEAPONS := ["iron_sword", "iron_greatsword", "iron_halberd"]
+
+func _can_parry() -> bool:
+	return equipped_weapon != null and equipped_weapon.id in PARRY_WEAPONS
+
 func _build_character() -> void:
 	combo_step = 0
 	combo_timer = 0.0
 	move_speed = 4.2
 	sprint_speed = 7.5
 	jump_height = 1.1
-	dash_speed = 10.0
+	dash_speed = 16.0
+	dash_duration = 0.26   # DASH DÀI: 16 × 0.26 ≈ 4.2m (cũ ~1.8m)
 	attack_duration = 0.50
 	attack_power = 1
 	defense = 0
@@ -600,6 +615,10 @@ func _do_respawn() -> void:
 	oxygen_changed.emit(int(oxygen), int(max_oxygen))
 	stamina_changed.emit(stamina, max_stamina)
 	revive()
+	# Xoá tư thế chết (rig gập 1.35 rad) + spring cũ → hồi sinh đứng thẳng ngay,
+	# không nhảy cóc từ pose nằm sang idle.
+	if _anim != null:
+		_anim.reset_pose()
 	# Miến nhiễm sau hồi sinh để slime đang canh ở điểm spawn không giết lại
 	# ngay lập tức (death loop vô hạn khi không có i-frame). `_invul_timer` chỉ
 	# bị trừ một lần trong _physics_process → 5.0 này là đúng 5.0s thực tế
@@ -817,6 +836,7 @@ func _update_weapon_mesh() -> void:
 	var pivot: Node3D = _mesh.weapon_pivot
 	for ch in pivot.get_children():
 		ch.queue_free()
+	_clear_gloves()
 	var item_id: String = equipped_weapon.id if equipped_weapon != null else ""
 	if item_id.is_empty():
 		if _bow_aiming:
@@ -827,6 +847,7 @@ func _update_weapon_mesh() -> void:
 		_m200_bolt_cd = 0.0
 		_m200_recoil = 0.0
 		_m200_hold_captured = false
+		_set_hands_visible(true)
 		return
 	if item_id in ["pickaxe", "shovel", "axe", "hoe", "iron_sword", "fishing_rod", "iron_greatsword", "leather_gloves", "crossbow", "arrow", "watermelon_cannon", "watermelon_nuke_ammo", "pumpkin_mortar", "iron_halberd", "flashlight", "ak_12", "bullet_762mm", "m200", "bullet_338mm"]:
 		if item_id != "ak_12":
@@ -837,14 +858,84 @@ func _update_weapon_mesh() -> void:
 			_m200_bolt_cd = 0.0
 			_m200_recoil = 0.0
 			_m200_hold_captured = false
+		if item_id == "leather_gloves":
+			# Găng tay THAY THẾ khối bàn tay: ẩn 2 tay gốc, đeo model găng
+			# lên cả 2 khuỷu — không còn mảng "dính trước ngực".
+			_set_hands_visible(false)
+			_glove_l = Node3D.new()
+			_glove_l.name = "GloveL"
+			_mesh.elbow_l.add_child(_glove_l)
+			ToolsMesh.build_glove_hand(_glove_l, true)
+			_glove_r = Node3D.new()
+			_glove_r.name = "GloveR"
+			_mesh.elbow_r.add_child(_glove_r)
+			ToolsMesh.build_glove_hand(_glove_r, false)
+			return
+		_set_hands_visible(true)
 		ToolsMesh.build_held(pivot, item_id)
 		if item_id == "crossbow":
 			_bow_string_node = null
 	else:
+		_set_hands_visible(true)
 		var held_scale := Node3D.new()
 		held_scale.scale = Vector3(1.5, 1.5, 1.5)
 		pivot.add_child(held_scale)
 		ItemMesh.build(held_scale, item_id)
+
+## Wrapper model găng đang đeo — xoá khi đổi vũ khí/tháo trang bị.
+var _glove_l: Node3D = null
+var _glove_r: Node3D = null
+
+func _clear_gloves() -> void:
+	for n in [_glove_l, _glove_r]:
+		if n != null and is_instance_valid(n):
+			n.queue_free()
+	_glove_l = null
+	_glove_r = null
+
+## Ẩn/hiện khối bàn tay gốc (dùng khi đeo/tháo găng tay).
+func _set_hands_visible(vis: bool) -> void:
+	if _mesh == null:
+		return
+	if _mesh.hand_l != null and is_instance_valid(_mesh.hand_l):
+		_mesh.hand_l.visible = vis
+	if _mesh.hand_r != null and is_instance_valid(_mesh.hand_r):
+		_mesh.hand_r.visible = vis
+
+## Sinh 1 BÓNG LƯU ẢNH (bản sao mờ của toàn bộ rig) tại tư thế hiện tại —
+## mờ dần rồi tự xoá. Gọi liên tục trong lúc DASH → vệt bóng theo đường lướt.
+func _spawn_dash_ghost() -> void:
+	if _mesh == null or _mesh.ground_anchor == null \
+			or not _mesh.ground_anchor.is_inside_tree():
+		return
+	var src := _mesh.ground_anchor
+	var parent := get_parent()
+	if parent == null:
+		return
+	var ghost := src.duplicate() as Node3D
+	parent.add_child(ghost)
+	ghost.global_transform = src.global_transform
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.albedo_color = Color(0.45, 0.75, 1.00, 0.40)
+	mat.emission_enabled = true
+	mat.emission = Color(0.35, 0.65, 1.00)
+	mat.emission_energy_multiplier = 1.2
+	_apply_ghost_material(ghost, mat)
+	var tw := ghost.create_tween().set_parallel()
+	tw.tween_property(mat, "albedo_color:a", 0.0, 0.28)
+	tw.tween_property(mat, "emission_energy_multiplier", 0.0, 0.28)
+	tw.chain().tween_callback(ghost.queue_free)
+
+static func _apply_ghost_material(node: Node, mat: Material) -> void:
+	for ch in node.get_children():
+		if ch is MeshInstance3D:
+			var mi := ch as MeshInstance3D
+			mi.material_override = mat
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		if ch is Node3D:
+			_apply_ghost_material(ch, mat)
 
 ## Cầm weapon trực tiếp từ hotbar (không remove khỏi inventory)
 func equip_weapon_direct(item: ItemDef, slot_idx: int = -1) -> void:
@@ -1011,6 +1102,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			if held != null and held.type == ItemDef.Type.FOOD:
 				_start_eating()
 				return
+			# PARRY (chuột phải): kiếm / đại kiếm / kích sắt → thế chặn
+			if equipped_weapon != null and equipped_weapon.id in PARRY_WEAPONS:
+				_begin_parry()
+				return
 			# Mining — cúp/xẻng on RIGHT click (giữ chuột để đào)
 			if equipped_weapon != null:
 				var wep_id: String = equipped_weapon.id
@@ -1069,40 +1164,88 @@ func _unhandled_input(event: InputEvent) -> void:
 					"pumpkin_mortar": _Mortar.start_aim(self); return
 					"watermelon_cannon": _Bow.start_cannon_aim(self); return
 					"fishing_rod": _Fishing.action(self); return
-					"iron_halberd": return
-				if _freeze_timer <= 0.0 and _attack2_timer <= 0.0 and _state != State.DASH:
-					var wep_id: String = equipped_weapon.id if equipped_weapon else ""
-					var is_heavy: bool = wep_id == "axe" or wep_id == "pickaxe" or wep_id == "hoe"
-					if is_heavy:
-						if _attack_timer > 0.0: return
-						combo_step = 0
-					else:
-						var max_step: int = 1 if wep_id == "iron_greatsword" else 2
-						if combo_timer > 0.0 and combo_step < max_step:
-							combo_step += 1
-						elif _attack_timer <= 0.0:
-							combo_step = 0
-						else:
+				# ── Melee auto-combo ─────────────────────────────────────────
+				if _freeze_timer > 0.0 or _attack2_timer > 0.0 or _state == State.DASH:
+					return
+				if (_state == State.ATTACK or _state == State.AIR_ATTACK) and _attack_timer > 0.0:
+					# Đang vung: đệm cú — chain tự nối khi bước hiện tại hết.
+					_attack_buffered = true
+					return
+				var wep_id: String = equipped_weapon.id
+				var chain: Array = _Combos.chain_for(wep_id)
+				if chain.is_empty():
+					return
+				if not is_on_floor():
+					# Nhảy + đánh → AIR_ATTACK (1 lần mỗi lần rời đất)
+					if _air_attack_available:
+						if not try_skill(stamina_cost_lmb):
 							return
-						combo_timer = COMBO_WINDOW
-					if not try_skill(stamina_cost_lmb):
-						return
-					_aim_dir = _calc_aim_dir()
-					var fwd := global_transform.basis.z
-					if _aim_dir.dot(fwd) < 0.99:
-						rotation.y = atan2(_aim_dir.x, _aim_dir.z)
-					_lmb_cd = 0.0
-					match wep_id:
-						"pickaxe": attack_duration = 0.65; _melee_hit_progress = 0.35
-						"axe": attack_duration = 0.85; _melee_hit_progress = 0.35
-						"hoe": attack_duration = 0.60; _melee_hit_progress = 0.30
-						"iron_greatsword": attack_duration = 1.00; _melee_hit_progress = 0.40
-						"leather_gloves": attack_duration = 0.35; _melee_hit_progress = 0.20
-						_: attack_duration = 0.50; _melee_hit_progress = 0.25
-					_attack_timer = attack_duration * (2.0 if _underwater else 1.0)
-					_state = State.ATTACK
-					_melee_hit_once = false
+						_aim_dir = _calc_aim_dir()
+						var fwd_air := global_transform.basis.z
+						if _aim_dir.dot(fwd_air) < 0.99:
+							rotation.y = atan2(_aim_dir.x, _aim_dir.z)
+						_begin_air_attack(chain)
+					return
+				if not try_skill(stamina_cost_lmb):
+					return
+				_aim_dir = _calc_aim_dir()
+				var fwd := global_transform.basis.z
+				if _aim_dir.dot(fwd) < 0.99:
+					rotation.y = atan2(_aim_dir.x, _aim_dir.z)
+				_lmb_cd = 0.0
+				_combo_chain = chain
+				_begin_combo_step(0)
 				return
+
+## Bắt đầu một bước trong chain combo: đặt timer/hit-pha/lunge theo bảng dữ liệu.
+func _begin_combo_step(idx: int) -> void:
+	_combo_slide = false
+	_combo_slide_ticks = 0
+	combo_step = idx
+	combo_timer = COMBO_WINDOW
+	var st: Dictionary = _Combos.step_at(_combo_chain, idx)
+	var dur: float = st.dur * (2.0 if _underwater else 1.0)
+	attack_duration = st.dur
+	_cur_step_dur = dur
+	_cur_hit_frac = st.hit
+	_attack_timer = dur
+	_state = State.ATTACK
+	_melee_hit_once = false
+	if equipped_weapon != null and equipped_weapon.id == "iron_halberd" \
+			and idx == _combo_chain.size() - 1:
+		# ĐÒN CUỐI KÍCH SẮT: rút đà → ĐÂM THẲNG + LƯỚT dài trước mặt,
+		# sát thương quét dọc đường lướt (xem character_base slide tick).
+		_combo_slide = true
+		_combo_slide_cd = 0.05
+		_start_forward_lunge(st.lunge * 1.6, dur * 0.42)
+	else:
+		_start_forward_lunge(st.lunge, 0.14)
+
+## Đòn đánh trên không: vung chéo xuống, tiếp đất vào RECOVERY (landing).
+func _begin_air_attack(chain: Array) -> void:
+	_air_attack_available = false
+	_combo_chain = chain
+	attack_duration = 0.50
+	_cur_step_dur = 0.50 * (2.0 if _underwater else 1.0)
+	_cur_hit_frac = 0.45
+	_attack_timer = _cur_step_dur
+	_state = State.AIR_ATTACK
+	_melee_hit_once = false
+	_start_forward_lunge(2.0, 0.12)
+
+## Auto-chain: giữ chuột trái (hoặc bấm đệm trong lúc vung) → nối bước kế tiếp.
+func _advance_combo() -> bool:
+	if _combo_chain.is_empty():
+		return false
+	var want_next: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _attack_buffered
+	_attack_buffered = false
+	if not want_next:
+		return false
+	var nxt: int = combo_step + 1
+	if nxt >= _combo_chain.size():
+		return false
+	_begin_combo_step(nxt)
+	return true
 
 func _on_bobber_done(item_id: String) -> void:
 	_Fishing.on_bobber_done(self, item_id)
@@ -1361,6 +1504,13 @@ func _process(delta: float) -> void:
 	_Bow.update_pose(self)
 	_AK.update_pose(self, delta)
 	_M200.update_pose(self, delta)
+	_GunPose.apply(self, delta)   # tư thế xạ thủ toàn thân: đầu ngắm, thân, thế đứng
+	# ── Câu cá: active khi đang vung ném hoặc thả câu; pose riêng cho cần ──
+	if _fish_cast_t > 0.0:
+		_fish_cast_t = maxf(_fish_cast_t - delta, 0.0)
+	_fishing_active = _bobber != null or _fish_cast_t > 0.0
+	if _fishing_active:
+		_Fishing.update_pose(self, delta)
 	if _m200_bolt_cd > 0.0:
 		_m200_bolt_cd = maxf(_m200_bolt_cd - delta, 0.0)
 	if equipped_weapon != null and equipped_weapon.id == "iron_halberd":
@@ -1418,6 +1568,14 @@ func _on_dash() -> void:
 
 func _physics_process(delta: float) -> void:
 	super._physics_process(delta)
+	if is_on_floor():
+		_air_attack_available = true
+	# ── Dash AFTERIMAGE: rải bóng lưu ảnh xanh mờ dọc đường lướt ─────────────
+	if _state == State.DASH and _mesh != null:
+		_dash_ghost_cd -= delta
+		if _dash_ghost_cd <= 0.0:
+			_dash_ghost_cd = 0.045
+			_spawn_dash_ghost()
 	if _eating and is_alive and _active and not _underwater:
 		_state = State.EAT
 		velocity.x *= 0.5

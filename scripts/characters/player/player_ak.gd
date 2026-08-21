@@ -132,8 +132,11 @@ static func fire_shot(player) -> void:
 	SFXManager.play_gun_shot()
 	_muzzle_flash(player, spawn_from, dir)
 	_kick(player, dir)
+	# Rung màn hình nhẹ mỗi phát — cảm giác bắn tự động
+	player.camera_shake(0.030, 0.07)
 
-## Pose cầm/ngắm AK-12: giơ súng ngang, hai tay giữ súng khi bắn, hạ thấp khi nghỉ.
+## Pose cầm/ngắm AK-12 — đầy đủ: tư thế bắn, ngắm ADS nâng súng lên mắt,
+## lắc súng theo thở + nhịp bước, giật nòng khi bắn.
 static func update_pose(player, delta: float) -> void:
 	if player._mesh == null or player._mesh.weapon_pivot == null or player._mesh.arm_r == null:
 		return
@@ -146,31 +149,59 @@ static func update_pose(player, delta: float) -> void:
 		player._ak_hold_base = wp.position
 		player._ak_hold_captured = true
 	var is_ak_aiming: bool = player._bow_aiming
+	# Blend ADS mượt (dùng chung với PlayerGunPose qua _gun_ads_blend)
+	player._gun_ads_blend = lerpf(player._gun_ads_blend, 1.0 if is_ak_aiming else 0.0, minf(1.0, delta * 9.0))
+	var ads: float = player._gun_ads_blend
+
 	# Giật nòng: từ từ hồi về 0.
 	player._ak_recoil = maxf(player._ak_recoil - delta * 3.0, 0.0)
-	# Súng luôn xoay nòng ra trước (giống tư thế nỏ) + ngả nhẹ khi giật.
-	var target_rot: Vector3 = Vector3(90, 0, 0)
-	target_rot.x += player._ak_recoil * 3.0
-	wp.rotation_degrees = wp.rotation_degrees.lerp(target_rot, 0.15)
-	# Giật lùi dọc theo hướng bắn ngược + hạ nhẹ nòng, rồi hồi về vị trí cầm gốc.
-	# Không dùng tween riêng cho position — chỉ lerp về base cố định để không trôi.
+
+	# ── BÙ NGHỊCH GÓC TAY — chống "cầm gậy phép" ────────────────────────────
+	# Trục nòng thế giới = Rx(arm + elbow + wp)·(0,1,0); độ ngẩng ε = 90° − Σ.
+	# Nòng NGANG ⇔ Σ=90° ⇒ wp_x = 90° − tổng góc tay. Tư thế tay mục tiêu:
+	# ngắm (-0.62, -1.35) / hạ súng (-0.30, -1.05).
+	var arm_sum_t: float = lerpf(-1.35, -1.97, ads)
+	var t: float = player._time
+	var speed: float = Vector2(player.velocity.x, player.velocity.z).length()
+	var move_k: float = clampf(speed / max(player.move_speed, 0.1), 0.0, 1.5)
+	var gait: float = player._anim._gait_phase if player._anim != null else t * 6.0
+	var target_rot: Vector3 = Vector3(90.0 - rad_to_deg(arm_sum_t), 0, 0)
+	target_rot.x += 12.0 * (1.0 - ads)                             # nghỉ: mũi chúi xuống 12°
+	target_rot.x -= player._ak_recoil * 3.0                        # giật: nòng hốc LÊN
+	target_rot.z += sin(gait) * 1.4 * move_k * (1.0 - ads * 0.7)   # lắc lùn khi chạy
+	target_rot.x += sin(t * 2.1) * 0.5 * (1.0 - ads * 0.8)         # thở
+	wp.rotation_degrees = wp.rotation_degrees.lerp(target_rot, 0.18)
+
+	# Vị trí: base + giật lùi + LẮC THỞ/BƯỚC + NÂNG SÚNG LÊN MẮT khi ADS.
 	var aim: Vector3 = player._bow_aim_dir
 	if aim.length_squared() < 0.001:
 		aim = -player.global_transform.basis.z
 	var kick: Vector3 = -aim * (player._ak_recoil * 0.05)
 	kick.y -= player._ak_recoil * 0.02
-	wp.position = wp.position.lerp(player._ak_hold_base + kick, delta * 14.0)
+	var sway := Vector3(
+		sin(t * 1.7) * 0.004 + cos(gait * 0.5) * 0.006 * move_k,
+		sin(t * 2.3) * 0.003 + abs(sin(gait)) * 0.008 * move_k,
+		0.0)
+	sway *= (1.0 - ads * 0.75)   # bám súng chặt khi ngắm → sway gần như 0
+	var ads_raise := Vector3(-0.02, 0.10, 0.06) * ads   # đưa lên tầm mắt, vào giữa
+	wp.position = wp.position.lerp(player._ak_hold_base + kick + sway + ads_raise, delta * 14.0)
+
 	if is_ak_aiming:
-		# Tay phải đẩy tay cầm, tay trái giữ thân — tư thế ngắm bắn
-		player._mesh.arm_r.rotation.x = lerp(player._mesh.arm_r.rotation.x, -0.55, 0.15)
-		player._mesh.arm_r.rotation.z = lerp(player._mesh.arm_r.rotation.z, -0.06, 0.12)
-		player._mesh.arm_l.rotation.x = lerp(player._mesh.arm_l.rotation.x, -0.42, 0.15)
-		player._mesh.arm_l.rotation.z = lerp(player._mesh.arm_l.rotation.z, 0.18, 0.12)
+		# Tay phải đẩy tay cầm sát vai, tay trái giữ ốp lót — tư thế ngắm bắn
+		player._mesh.arm_r.rotation.x = lerp(player._mesh.arm_r.rotation.x, -0.62, 0.15)
+		player._mesh.arm_r.rotation.z = lerp(player._mesh.arm_r.rotation.z, -0.05, 0.12)
+		player._mesh.elbow_r.rotation.x = lerp(player._mesh.elbow_r.rotation.x, -1.35, 0.10)
+		player._mesh.arm_l.rotation.x = lerp(player._mesh.arm_l.rotation.x, -0.52, 0.15)
+		player._mesh.arm_l.rotation.z = lerp(player._mesh.arm_l.rotation.z, 0.24, 0.12)
+		player._mesh.elbow_l.rotation.x = lerp(player._mesh.elbow_l.rotation.x, -1.15, 0.10)
 	else:
-		# Cầm súng hạ thấp, nghỉ ngơi
-		player._mesh.arm_r.rotation.x = lerp(player._mesh.arm_r.rotation.x, -0.22, 0.12)
-		player._mesh.arm_l.rotation.x = lerp(player._mesh.arm_l.rotation.x, -0.14, 0.12)
-		player._mesh.arm_l.rotation.z = lerp(player._mesh.arm_l.rotation.z, 0.10, 0.12)
+		# Cầm súng hạ thấp trước ngực, sẵn sàng giơ
+		player._mesh.arm_r.rotation.x = lerp(player._mesh.arm_r.rotation.x, -0.30, 0.12)
+		player._mesh.arm_r.rotation.z = lerp(player._mesh.arm_r.rotation.z, -0.08, 0.12)
+		player._mesh.elbow_r.rotation.x = lerp(player._mesh.elbow_r.rotation.x, -1.05, 0.10)
+		player._mesh.arm_l.rotation.x = lerp(player._mesh.arm_l.rotation.x, -0.20, 0.12)
+		player._mesh.arm_l.rotation.z = lerp(player._mesh.arm_l.rotation.z, 0.14, 0.12)
+		player._mesh.elbow_l.rotation.x = lerp(player._mesh.elbow_l.rotation.x, -0.95, 0.10)
 
 ## Ánh lửa nòng: chùm sáng hình nón + lõi sáng + tia lửa bắn về hướng đạn.
 static func _muzzle_flash(player, pos: Vector3, dir: Vector3) -> void:

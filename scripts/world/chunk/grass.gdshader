@@ -1,9 +1,10 @@
 shader_type spatial;
-render_mode diffuse_burley, specular_disabled;
+render_mode diffuse_burley, specular_disabled, cull_disabled;
 
-// Cỏ lúa / cỏ biển / rêu: lá gồm các khối voxel xếp chồng. Mỗi khối lưu chiều
-// cao trong lá ở kênh alpha (0 = gốc, 1 = ngọn). Vertex shader làm lá đu đưa
-// mượt theo thời gian: gốc đứng yên, ngọn dao động nhiều nhất (h^2).
+// Cỏ lúa / cỏ biển: MỖI LÁ = 1 lưới LÁ CONG duy nhất (thay nhiều voxel xếp
+// chồng). Gradient sáng-tối trộn trong vertex COLOR.rgb; COLOR.a = tỉ lệ cao
+// (0 = gốc, 1 = ngọn) → vertex shader làm lá đu đưa: gốc đứng yên,
+// ngọn dao động nhiều nhất (h^2). INSTANCE color nhân hue đặc trưng từng lá.
 
 uniform float wind_strength : hint_range(0.0, 0.4) = 0.06;
 uniform float wind_speed : hint_range(0.0, 6.0) = 1.8;

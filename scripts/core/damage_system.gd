@@ -7,6 +7,10 @@ extends RefCounted
 static func take_damage(character: CharacterBase, amount: int, attacker: Node3D = null, damage_type: int = 0) -> void:
 	if not character.is_alive or character._invul_timer > 0.0:
 		return
+	# PARRY: đòn cận chiến trúng cửa sổ parry → hoá giải 100% + phản đòn lập tức
+	if character._try_parry(attacker):
+		character.hp_changed.emit(character.hp, character.max_hp)
+		return
 	var total_def: float = character.get_total_def()
 	var dmg := maxi(1, amount - int(total_def))
 	if character.shield > 0:
@@ -26,6 +30,8 @@ static func take_damage(character: CharacterBase, amount: int, attacker: Node3D 
 		character._attack2_timer = 0.0
 		character.hp_changed.emit(character.hp, character.max_hp)
 		character.damage_taken.emit(dmg, attacker)
+		# Rung màn hình theo mức sát thương so với % HP (chỉ player có camera)
+		character._damage_shake(dmg)
 	if character.hp <= 0:
 		character._die(attacker)
 
@@ -60,6 +66,11 @@ static func revive(character: CharacterBase) -> void:
 	character._death_timer = 0.0
 	character._hit_timer = 0.0
 	character._invul_timer = 0.0
+	# Trả lại trục đứng thân nhân vật: chết khi đang trên phương tiện (helicopter
+	# nghiêng thân theo máy bay qua rotation.x/z) hoặc dính tilt cũ khiến player
+	# hồi sinh bị NGHIÊNG vĩnh viễn. Chỉ zero pitch/roll, giữ hướng yaw.
+	character.rotation.x = 0.0
+	character.rotation.z = 0.0
 	# Reset fall/floor tracking để frame hồi sinh xuống đất được đánh giá lại
 	# (trước đây _falling còn true + _fall_start_y cũ → trigger damage/collision
 	# nhầm hoặc kẹt trong trạng thái chưa bao giờ "chạm đất").

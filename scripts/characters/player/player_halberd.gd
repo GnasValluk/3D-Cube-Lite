@@ -170,7 +170,9 @@ static func do_melee(player) -> void:
 			1:
 				player.attack_duration = 0.70
 				player._melee_hit_progress = 0.30
-		player._attack_timer = player.attack_duration * (2.0 if player._underwater else 1.0)
+		player._cur_step_dur = player.attack_duration * (2.0 if player._underwater else 1.0)
+		player._cur_hit_frac = player._melee_hit_progress
+		player._attack_timer = player._cur_step_dur
 		player._state = player.State.ATTACK
 		player._melee_hit_once = false
 

@@ -2,6 +2,57 @@ extends RefCounted
 
 const GV: float = 0.036
 const _GRASS_CONST_INF: int = 999
+const BLADE_SEGS := 7
+
+static var _blade_mesh: ArrayMesh = null
+
+## ── LÁ CỎ MỘT KHỐI CONG — theo kiểu LÁC ĐẦM LẦY ─────────────────────────────
+## Dải lá DẸT RỘNG võng ra trước (arc bậc 2 về +Z), thon nhọn dần lên ngọn,
+## gradient trộn sẵn trong vertex COLOR.rgb; COLOR.a = tỉ lệ cao cho sway.
+## Màu ĐẶC TRƯNG từng lá nhân qua INSTANCE color. So với bản cũ: LÁ TO & BỤI
+## DÀY HƠN (width scale + blade count tăng ở add_voxel_grass).
+static func make_blade_mesh() -> ArrayMesh:
+	if _blade_mesh != null:
+		return _blade_mesh
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var segs := 6
+	var lefts: Array[Vector3] = []
+	var rights: Array[Vector3] = []
+	var cols: Array[Color] = []
+	for i in range(segs + 1):
+		var t: float = float(i) / float(segs)
+		var y: float = t * (1.0 - 0.22 * t * t)          # võng nhẹ xuống đầu xa
+		var arc: float = 0.62 * t * t                    # võng hẳn ra TRƯỚC (+Z)
+		var hw: float = 0.50 * (1.0 - t * 0.72)          # gốc ±0.50 → ngọn ±0.14
+		# Gradient: gốc xanh trầm → ngọn sáng vàng lúa
+		var col := Color(
+			0.40 + t * 0.55,
+			0.50 + t * 0.46,
+			0.26 + t * 0.24)
+		lefts.append(Vector3(-hw, y, arc))
+		rights.append(Vector3(hw, y, arc))
+		cols.append(Color(col.r, col.g, col.b, t))
+	for i in range(segs):
+		var l0 := lefts[i]; var r0 := rights[i]
+		var l1 := lefts[i + 1]; var r1 := rights[i + 1]
+		var c0 := cols[i]; var c1 := cols[i + 1]
+		# Mặt trước
+		st.set_color(c0); st.add_vertex(l0)
+		st.set_color(c0); st.add_vertex(r0)
+		st.set_color(c1); st.add_vertex(l1)
+		st.set_color(c0); st.add_vertex(r0)
+		st.set_color(c1); st.add_vertex(r1)
+		st.set_color(c1); st.add_vertex(l1)
+		# Mặt sau (qu winding) — nhìn được cả 2 phía
+		st.set_color(c0); st.add_vertex(r0)
+		st.set_color(c0); st.add_vertex(l0)
+		st.set_color(c1); st.add_vertex(r1)
+		st.set_color(c0); st.add_vertex(l0)
+		st.set_color(c1); st.add_vertex(l1)
+		st.set_color(c1); st.add_vertex(r1)
+	_blade_mesh = st.commit()
+	return _blade_mesh
 
 static func _noise(x: float, y: float) -> float:
 	return sin(x * 0.0071 + y * 0.0053) * 0.40 \
@@ -51,7 +102,8 @@ static func add_voxel_grass(vx: int, vz: int, pos: Vector3, out_xforms: Array, o
 	var det := _noise(float(wx), float(wz))
 	var det2 := _noise(float(wx + 888), float(wz + 999))
 
-	var blade_count: int = int(5 + (det * 0.5 + 0.5) * 12)
+	# BỤI DÀY: nhiều lá hơn bản cũ (~60%) cho từng cụm cỏ lúa
+	var blade_count: int = int(8 + (det * 0.5 + 0.5) * 20)
 	blade_count = int(blade_count * fade)
 	if blade_count < 2:
 		return
@@ -145,63 +197,34 @@ static func _add_seagrass_clump(s: int, offset: Vector3, blade_count: int,
 		ss = ss * 16807 + 1
 		var radius: float = float(ss & 0x7FFF) / 32768.0 * spread
 		ss = ss * 16807 + 1
-		var voxel_count: int = 5 + (ss & 0x3)
+		var cv: float = float(ss & 0xFF) / 256.0
 		ss = ss * 16807 + 1
 		var curve_angle: float = angle + (float(ss & 0x7FFF) / 32768.0 - 0.5) * 1.2
 		ss = ss * 16807 + 1
-		var cv := float(ss & 0xFF) / 256.0
-		var base_col: Color
-		var tip_col: Color
-		if zone == 0:
-			# Vùng tím — tím biếc, hồng nhạt, tím đậm (nhiều sắc hơn cỏ lúa)
-			base_col = Color(0.45 + cv * 0.25, 0.12 + cv * 0.22, 0.62 + cv * 0.28)
-			tip_col = Color(0.80, 0.58, 0.95)
-		else:
-			# Vùng xanh dương — xanh biếc, xanh ngọc, lam (nhiều sắc hơn cỏ lúa)
-			base_col = Color(0.06 + cv * 0.16, 0.42 + cv * 0.20, 0.62 + cv * 0.26)
-			tip_col = Color(0.45, 0.92, 0.95)
+		var h_var: float = 0.78 + float(ss & 0xFF) / 256.0 * 0.45
+
+		# Một lá = một instance cong; cao hơn cỏ lúa (nước 1.25-3.5)
+		var hh: float = GV * 6.2 * height_scale * h_var
+		var ww: float = hh * (0.26 + cv * 0.14)
 
 		var bx: float = offset.x + cos(angle) * radius
 		var bz: float = offset.z + sin(angle) * radius
 
-		for j in range(voxel_count):
-			var t: float = float(j) / float(voxel_count - 1)
-			ss = ss * 16807 + 1
+		# Uốn cong mạnh hơn cỏ lúa — sóng nước đu đưa (xoay hướng cong riêng)
+		var b := Basis().rotated(Vector3.UP, curve_angle + 0.6)
+		b.x *= ww * 1.10
+		b.y *= hh
+		b.z *= ww
+		out_xforms.append(Transform3D(b, Vector3(bx, offset.y, bz)))
 
-			# Uốn cong mạnh hơn cỏ lúa — sóng nước đu đưa
-			var curve: float = t * t * 0.045 * height_scale
-			var cvx: float = cos(curve_angle) * curve
-			var cvz: float = sin(curve_angle) * curve
-
-			var vy: float = float(j) * GV * height_scale
-			var taper: float = 1.0 - t * 0.35
-
-			var pos_x := bx + cvx
-			var pos_z := bz + cvz
-			var pos_y := offset.y + vy
-
-			var col: Color
-			if t > 0.60:
-				col = base_col.lerp(tip_col, (t - 0.60) / 0.40 * 0.55)
-			else:
-				col = base_col.lerp(
-					Color(minf(base_col.r * 1.4, 1.0), minf(base_col.g * 1.3, 1.0), minf(base_col.b * 1.15, 1.0)),
-					t * 0.6)
-			var cv2 := float(ss & 0xFF) / 256.0
-			col.r = clampf(col.r + (cv2 - 0.5) * 0.05, 0.0, 1.0)
-			col.g = clampf(col.g + (cv2 - 0.5) * 0.05, 0.0, 1.0)
-			col.b = clampf(col.b + (cv2 - 0.5) * 0.04, 0.0, 1.0)
-
-			var xz_scale: float = GV * taper * height_scale
-			var y_scale: float = GV * height_scale * 1.02
-			var b := Basis()
-			b.x = Vector3(xz_scale, 0.0, 0.0)
-			b.y = Vector3(0.0, y_scale, 0.0)
-			b.z = Vector3(0.0, 0.0, xz_scale)
-			out_xforms.append(Transform3D(b, Vector3(pos_x, pos_y, pos_z)))
-			var c := col * 0.72
-			c.a = t  # chiều cao trong lá (0= gốc, 1= ngọn) → shader sway
-			out_colors.append(c)
+		# Màu vùng nhân vào gradient lưới lá
+		var col: Color
+		if zone == 0:
+			col = Color(0.92 + cv * 0.14, 0.52 + cv * 0.16, 1.22)              # tím biếc
+		else:
+			col = Color(0.48 + cv * 0.10, 1.10, 1.18)                          # xanh ngọc
+		col.a = 1.0
+		out_colors.append(col)
 
 static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float, height_scale: float, out_xforms: Array, out_colors: Array) -> void:
 	var ss := s
@@ -211,54 +234,33 @@ static func _add_clump(s: int, offset: Vector3, blade_count: int, spread: float,
 		ss = ss * 16807 + 1
 		var radius: float = float(ss & 0x7FFF) / 32768.0 * spread
 		ss = ss * 16807 + 1
-		var voxel_count: int = 4 + (ss & 0x3)
+		var cv: float = float(ss & 0xFF) / 256.0
 		ss = ss * 16807 + 1
 		var curve_angle: float = angle + (float(ss & 0x7FFF) / 32768.0 - 0.5) * 1.2
 		ss = ss * 16807 + 1
-		var cv := float(ss & 0xFF) / 256.0
-		var base_col := Color(0.03 + cv * 0.12, 0.34 + cv * 0.34, 0.02 + cv * 0.06)
 		var mature: bool = (ss & 0x1) == 0
+		ss = ss * 16807 + 1
+		var h_var: float = 0.78 + float(ss & 0xFF) / 256.0 * 0.45
+
+		# Một lá = MỘT instance: CỌNG LÁ DÀY (rộng hơn cũ ~60%) như lác đầm lầy
+		var hh: float = GV * 5.2 * height_scale * h_var
+		var ww: float = hh * (0.48 + cv * 0.22)
 
 		var bx: float = offset.x + cos(angle) * radius
 		var bz: float = offset.z + sin(angle) * radius
 
-		for j in range(voxel_count):
-			var t: float = float(j) / float(voxel_count - 1)
-			ss = ss * 16807 + 1
+		# Xoay hướng võng của lá + scale: y=cao, z=võng ra trước, x=rộng lá
+		var b := Basis().rotated(Vector3.UP, curve_angle)
+		b.x *= ww * 1.15
+		b.y *= hh
+		b.z *= ww
+		out_xforms.append(Transform3D(b, Vector3(bx, offset.y, bz)))
 
-			var curve: float = t * t * 0.032 * height_scale
-			var cvx: float = cos(curve_angle) * curve
-			var cvz: float = sin(curve_angle) * curve
-
-			var vy: float = float(j) * GV * height_scale
-			var taper: float = 1.0 - t * 0.35
-
-			var pos_x := bx + cvx
-			var pos_z := bz + cvz
-			var pos_y := offset.y + vy
-
-			var col: Color
-			if mature and t > 0.65:
-				var seed_t := (t - 0.65) / 0.35
-				var gold := Color(0.85 + cv * 0.10, 0.72 + cv * 0.08, 0.10 + cv * 0.05)
-				var green := Color(0.08 + cv * 0.12, 0.56 + cv * 0.20, 0.03 + cv * 0.06)
-				col = green.lerp(gold, seed_t)
-			else:
-				col = base_col.lerp(Color(base_col.r + 0.18, base_col.g + 0.10, base_col.b * 0.7), t)
-			var cv2 := float(ss & 0xFF) / 256.0
-			col.r = clampf(col.r + (cv2 - 0.5) * 0.04, 0.0, 1.0)
-			col.g = clampf(col.g + (cv2 - 0.5) * 0.04, 0.0, 1.0)
-			col.b = clampf(col.b + (cv2 - 0.5) * 0.03, 0.0, 1.0)
-
-			var xz_scale: float = GV * taper * height_scale
-			var y_scale: float = GV * height_scale * 1.02
-			var b := Basis()
-			b.x = Vector3(xz_scale, 0.0, 0.0)
-			b.y = Vector3(0.0, y_scale, 0.0)
-			b.z = Vector3(0.0, 0.0, xz_scale)
-			out_xforms.append(Transform3D(b, Vector3(pos_x, pos_y, pos_z)))
-			var c := col * 0.88
-			c.a = t  # chiều cao trong lá (0= gốc, 1= ngọn) → shader sway
-			out_colors.append(c)
-
-		# (Bông lúa sẽ thêm sau)
+		# Màu ĐẶC TRƯNG nhân vào gradient có sẵn trong lưới lá
+		var col: Color
+		if mature:
+			col = Color(1.12 + cv * 0.10, 0.94 + cv * 0.08, 0.32 + cv * 0.10)   # vàng chín
+		else:
+			col = Color(0.34 + cv * 0.26, 1.02 + cv * 0.10, 0.28 + cv * 0.14)   # xanh lúa non
+		col.a = 1.0
+		out_colors.append(col)

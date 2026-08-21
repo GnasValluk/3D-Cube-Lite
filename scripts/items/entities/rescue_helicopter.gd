@@ -108,6 +108,10 @@ func try_exit() -> void:
 	if is_instance_valid(player):
 		player.remove_meta("driving_vehicle")
 		player.scale = Vector3.ONE
+		# _sync_driver nghiêng thân player theo máy bay (rotation.x/z) —
+		# phải trả lại trục đứng ngay khi xuống, nếu không player nghiêng vĩnh viễn.
+		player.rotation.x = 0.0
+		player.rotation.z = 0.0
 	_disable_driver_collision(player, false)
 	if player == null or not is_instance_valid(player) or not player.is_inside_tree():
 		return
@@ -171,9 +175,15 @@ func _chunk_at(wx: float, wz: float) -> Node:
 func _physics_process(delta: float) -> void:
 	_time += delta
 
+	# Tài xế chết/biến mất → tự xuống, trả lại trục đứng thân người
 	if _driver != null and (not is_instance_valid(_driver) or not _driver.is_inside_tree() \
 			or (_driver.get("is_alive") != null and not bool(_driver.get("is_alive")))):
-		_driver.remove_meta("driving_vehicle")
+		if is_instance_valid(_driver):
+			_driver.remove_meta("driving_vehicle")
+			_driver.rotation.x = 0.0
+			_driver.rotation.z = 0.0
+			if "scale" in _driver:
+				_driver.scale = Vector3.ONE
 		_driver = null
 
 	var fwd := -global_transform.basis.z
