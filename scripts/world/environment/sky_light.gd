@@ -134,11 +134,11 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	mat.set_shader_parameter("sun_dir", sun_dir)
 	mat.set_shader_parameter("sun_color", sun_color)
 	# Nắng không gắt lúc trưa: giữ năng lượng ở mức ~9h sáng (min day_t 0.72).
-	var sun_e_noon: float = lerp(0.0, 2.1, minf(day_t, 0.72))
+	var sun_e_noon: float = lerp(0.0, 2.4, minf(day_t, 0.72))
 	mat.set_shader_parameter("sun_energy", sun_e_noon * (1.0 - weather * 0.55))
-	# Mặt trời nhỏ + xa: chỉ ~1.1° (bán kính), quầng mềm trong shader.
-	mat.set_shader_parameter("sun_angle_max", 1.1)
-	mat.set_shader_parameter("sun_curve", 0.1)
+	# Đĩa mặt trời nhìn THẤY RÕ như ảnh tham chiếu: to hơn một chút, quầng mềm.
+	mat.set_shader_parameter("sun_angle_max", 1.45)
+	mat.set_shader_parameter("sun_curve", 0.08)
 
 	# ── Mặt trăng: quỹ đạo riêng, LUÔN đối diện mặt trời ──────────────────────
 	# Trăng luôn nằm phía ngược với mặt trời nên đêm nào cũng thấy trăng:
