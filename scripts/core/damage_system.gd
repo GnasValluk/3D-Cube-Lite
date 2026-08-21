@@ -11,6 +11,10 @@ static func take_damage(character: CharacterBase, amount: int, attacker: Node3D 
 	if character._try_parry(attacker):
 		character.hp_changed.emit(character.hp, character.max_hp)
 		return
+	# GUARD KHIÊN: đang đỡ + đòn đến từ mặt trước → chặn hoàn toàn, trừ độ bền
+	if character.try_guard_block(attacker, amount):
+		character.hp_changed.emit(character.hp, character.max_hp)
+		return
 	var total_def: float = character.get_total_def()
 	var dmg := maxi(1, amount - int(total_def))
 	if character.shield > 0:

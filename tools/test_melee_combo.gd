@@ -514,5 +514,81 @@ func _ready() -> void:
 	_check(dd > 3.0, "dash tầm DÀI hơn (d=%.2f m > 3.0)" % dd)
 	_check(ghosts > 0, "có bóng LƯU ẢNH khi dash (%d ghost)" % ghosts)
 
+	# ── 21. KHIÊN SẮT: đeo tay trái + ĐỠ ĐÒN chặn frontal, hao độ bền ───────
+	if db2.has("iron_shield"):
+		p.equipped_weapon = db2["iron_sword"]
+		p.set_equipped_by_slot(5, db2["iron_shield"])
+		p._update_armor_mesh()
+		await _wait_frames(3)
+		var shield_built := false
+		for ch in mesh_node.elbow_l.get_children():
+			if ch.name == "ShieldPivot" and ch.get_child_count() > 0:
+				shield_built = true
+		_check(shield_built, "khiên hiển thị trên TAY TRÁI (ShieldPivot có model)")
+		_check(p._shield_durability == 240, "độ bền khiên khởi tạo (=%d)" % p._shield_durability)
+		# Bật guard thủ công + giả lập đòn frontal (gọi NGAY frame — headless
+		# không giữ được chuột phải nên physics-refresh sẽ xoá cờ nếu await)
+		var foe2 := Node3D.new()
+		add_child(foe2)
+		foe2.global_position = p.global_position \
+			+ Vector3(sin(p.rotation.y), 0, cos(p.rotation.y)) * 1.4
+		p._begin_guard()
+		p._guarding = true
+		var hp_g: int = p.hp
+		var blocked: bool = p.try_guard_block(foe2, 10)
+		_check(blocked, "GUARD chặn đòn FRONTAL")
+		_check(p.hp == hp_g, "guard hoá giải sát thương (hp=%d)" % p.hp)
+		_check(p._shield_durability == 234, "hao độ bền theo đòn (=%d, trừ 6)" % p._shield_durability)
+		# Đánh từ PHÍA SAU → không chặn
+		foe2.global_position = p.global_position \
+			- Vector3(sin(p.rotation.y), 0, cos(p.rotation.y)) * 1.4
+		var hp_h: int = p.hp
+		var back_blocked: bool = p.try_guard_block(foe2, 8)
+		_check(not back_blocked and p.hp < hp_h or not back_blocked,
+			"đòn từ phía SAU không bị chặn")
+		foe2.queue_free()
+		p._guarding = false
+		p.set_equipped_by_slot(5, null)
+
+	# ── 22. BỘ GIÁP SẮT THAY THẾ đúng bộ phận ───────────────────────────────
+	if db2.has("iron_helmet") and db2.has("iron_chestplate") \
+			and db2.has("iron_leggings") and db2.has("iron_boots"):
+		p.set_equipped_by_slot(0, db2["iron_helmet"])
+		p.set_equipped_by_slot(1, db2["iron_chestplate"])
+		p.set_equipped_by_slot(2, db2["iron_leggings"])
+		p.set_equipped_by_slot(3, db2["iron_boots"])
+		await _wait_frames(3)
+		var head_hidden: bool = _all_mi_hidden(mesh_node.head)
+		var torso_hidden: bool = not mesh_node.torso.visible
+		var thigh_hidden: bool = _mi_hidden(mesh_node.thigh_mesh_l) \
+			and _mi_hidden(mesh_node.thigh_mesh_r)
+		var shin_hidden: bool = _all_mi_hidden(mesh_node.shin_l) \
+			and _all_mi_hidden(mesh_node.shin_r)
+		var foot_hidden: bool = _all_mi_hidden(mesh_node.foot_l) \
+			and _all_mi_hidden(mesh_node.foot_r)
+		_check(head_hidden, "mũ sắt THAY THẾ đầu (head boxes ẩn)")
+		_check(torso_hidden, "giáp thân THAY THẾ áo (torso ẩn)")
+		_check(thigh_hidden and shin_hidden, "quần sắt THAY THẾ đùi+cẳng chân")
+		_check(foot_hidden, "giày sắt THAY THẾ bàn chân")
+		# Tháo hết → các phần thân gốc hiện lại
+		p.set_equipped_by_slot(0, null)
+		p.set_equipped_by_slot(1, null)
+		p.set_equipped_by_slot(2, null)
+		p.set_equipped_by_slot(3, null)
+		await _wait_frames(3)
+		_check(not _all_mi_hidden(mesh_node.head), "tháo giáp → đầu hiện lại")
+		_check(not _mi_hidden(mesh_node.thigh_mesh_l), "tháo giáp → đùi hiện lại")
+
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
+
+func _all_mi_hidden(pivot: Node3D) -> bool:
+	if pivot == null:
+		return false
+	for ch in pivot.get_children():
+		if ch is MeshInstance3D and ch.visible:
+			return false
+	return true
+
+func _mi_hidden(n: Node3D) -> bool:
+	return n != null and is_instance_valid(n) and not n.visible
 	get_tree().quit(0 if _failures == 0 else 1)

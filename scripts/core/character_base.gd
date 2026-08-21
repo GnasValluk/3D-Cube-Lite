@@ -354,6 +354,11 @@ func _try_parry(attacker: Node3D) -> bool:
 	_start_forward_lunge(8.5, 0.20)
 	return true
 
+## GUARD KHIÊN (mặc định không có — PlayerCharacter override khi đeo khiên):
+## true = đã chặn hoàn toàn đòn frontal, damage system bỏ qua.
+func try_guard_block(_attacker: Node3D, _amount: int) -> bool:
+	return false
+
 ## Tia lửa kim loại chạm nhau tại ngực — hiệu ứng chặn đòn thành công.
 func _spawn_parry_spark() -> void:
 	if _rig == null or not is_inside_tree():

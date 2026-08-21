@@ -49,6 +49,11 @@ var foot_r:   Node3D  # bàn chân phải
 ## Khối bàn tay gốc — găng tay sẽ THAY THẾ (ẩn tay + đeo model găng cùng chỗ).
 var hand_l:   Node3D
 var hand_r:   Node3D
+## Khối đùi gốc — giáp quần thay thế (ẩn khi mặc giáp chân)
+var thigh_mesh_l: Node3D
+var thigh_mesh_r: Node3D
+## Khiên — đeo vào tay TRÁI (slot trang bị phụ)
+var shield_pivot: Node3D
 
 ## Thiết lập palette trước khi build.
 func set_palette(palette: Dictionary) -> void:

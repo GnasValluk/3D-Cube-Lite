@@ -119,6 +119,10 @@ var _gun_ads_blend: float = 0.0
 ## Câu cá: đang cầm cần + (thả câu hoặc đang vung ném lưỡi)
 var _fishing_active: bool = false
 var _fish_cast_t: float = 0.0
+## ĐỠ ĐÒN KHIÊN: đang GIỮ chuột phải với khiên ở slot phụ
+var _guarding: bool = false
+## Độ bền khiên hiện tại (-1 = không phải khiên/chưa khởi tạo)
+var _shield_durability: int = -1
 
 const HALBERD_CHARGE_TIME: float = 0.7
 ## Tỷ lệ phóng to nhân vật người chơi (~20%): mesh + capsule + hit_radius.
@@ -756,6 +760,7 @@ func _update_armor_mesh() -> void:
 	_clear_armor_pivot(_mesh.boot_l_pivot)
 	_clear_armor_pivot(_mesh.boot_r_pivot)
 	_clear_armor_pivot(_mesh.ring_pivot)
+	_clear_armor_pivot(_mesh.shield_pivot)
 	_clear_armor_pivot(_mesh.back_gear_pivot)
 	if _mesh.backpack != null:
 		_mesh.backpack.visible = not (equipped_back != null and _is_armor_visible(4))
@@ -765,6 +770,19 @@ func _update_armor_mesh() -> void:
 		_mesh.hair_pivot.visible = not (equipped_head != null and _is_armor_visible(0))
 	if _mesh.tails_pivot != null:
 		_mesh.tails_pivot.visible = not (equipped_head != null and _is_armor_visible(0))
+	# ── THAY THẾ ĐÚNG BỘ PHẬN: giáp che đâu thì ẩn phần thân gốc đó ──────────
+	_set_part_hidden(_mesh.head, equipped_head != null and _is_armor_visible(0))
+	var legs_on := equipped_legs != null and _is_armor_visible(2)
+	if _mesh.thigh_mesh_l != null and is_instance_valid(_mesh.thigh_mesh_l):
+		_mesh.thigh_mesh_l.visible = not legs_on
+	if _mesh.thigh_mesh_r != null and is_instance_valid(_mesh.thigh_mesh_r):
+		_mesh.thigh_mesh_r.visible = not legs_on
+	_set_part_hidden(_mesh.shin_l, legs_on)
+	_set_part_hidden(_mesh.shin_r, legs_on)
+	var boots_on := equipped_feet != null and _is_armor_visible(3)
+	_set_part_hidden(_mesh.foot_l, boots_on)
+	_set_part_hidden(_mesh.foot_r, boots_on)
+
 	if equipped_head != null and _is_armor_visible(0):
 		_build_armor(_mesh.helmet_pivot, equipped_head.id)
 	if equipped_body != null and _is_armor_visible(1):
@@ -778,9 +796,23 @@ func _update_armor_mesh() -> void:
 		_build_armor(_mesh.boot_l_pivot, equipped_feet.id)
 		_build_armor(_mesh.boot_r_pivot, equipped_feet.id)
 	if equipped_sub != null and _is_armor_visible(5):
-		_build_armor(_mesh.ring_pivot, equipped_sub.id)
+		if equipped_sub.id == "iron_shield":
+			# KHIÊN đeo tay TRÁI (pivot riêng dưới khuỷu trái)
+			if _mesh.shield_pivot != null:
+				_build_armor(_mesh.shield_pivot, "iron_shield")
+		else:
+			_build_armor(_mesh.ring_pivot, equipped_sub.id)
 	if equipped_back != null and _is_armor_visible(4):
 		_build_armor(_mesh.back_gear_pivot, equipped_back.id)
+
+## Ẩn/hiện các MeshInstance3D TRỰC TIẾP của một pivot (không đụng pivot con
+## như hair/gauntlet) — dùng để giáp THAY THẾ phần thân gốc.
+func _set_part_hidden(pivot: Node3D, hidden: bool) -> void:
+	if pivot == null or not is_instance_valid(pivot):
+		return
+	for ch in pivot.get_children():
+		if ch is MeshInstance3D:
+			ch.visible = not hidden
 
 func _clear_armor_pivot(pivot: Node3D) -> void:
 	if pivot == null:
@@ -825,10 +857,67 @@ func set_equipped_by_slot(idx: int, item: ItemDef) -> void:
 		2: equipped_legs = item
 		3: equipped_feet = item
 		4: equipped_back = item
-		5: equipped_sub = item
+		5:
+			equipped_sub = item
+			# Khởi tạo độ bền khiên khi đeo vào slot phụ
+			_shield_durability = item.max_durability if item != null and item.max_durability > 0 else -1
 	_update_armor_mesh()
 	if idx == 4:
 		_refresh_backpack_state()
+
+## ── ĐỠ ĐÒN KHIÊN ──────────────────────────────────────────────────────────────
+## Giữ chuột phải: vào thế đỡ (dùng visual PARRY) — chặn sát thương đánh vào
+## MẶT TRƯỚC, hao độ bền khiên theo mức đòn. Nhả chuột để hạ khiên.
+func _begin_guard() -> void:
+	if _shield_durability == 0:
+		return
+	if _attack_timer > 0.0 or _attack2_timer > 0.0 or _state == State.DASH \
+			or _hit_timer > 0.0 or not is_on_floor() or _freeze_timer > 0.0:
+		return
+	_guarding = true
+	_state = State.PARRY          # tái sử dụng visual thế chặn của parry
+	_parry_timer = 0.30           # tự hạ nếu nhả chuột sớm
+	_parry_window = 0.0           # guard KHÔNG có cửa sổ riposte
+	velocity *= 0.2
+
+## Gọi từ damage_system: true = đã CHẶN hoàn toàn đòn frontal (trừ độ bền).
+func try_guard_block(attacker: Node3D, amount: int) -> bool:
+	if not _guarding or _shield_durability <= 0:
+		return false
+	if attacker == null or not is_instance_valid(attacker):
+		return false   # nguồn không rõ (độc/nóng...) không chặn được
+	var off: Vector3 = attacker.global_position - global_position
+	off.y = 0.0
+	var dist: float = off.length()
+	if dist > 3.6:
+		return false
+	if dist > 0.05:
+		var fwd := Vector3(sin(rotation.y), 0.0, cos(rotation.y))
+		if fwd.dot(off / dist) < 0.30:
+			return false   # đánh từ phía sau/hông → khiên không che được
+	# CHẶN THÀNH CÔNG: hao độ bền theo sát thương nhận vào
+	var cost: int = maxi(1, int(round(amount * 0.6)))
+	_shield_durability = maxi(0, _shield_durability - cost)
+	camera_shake(0.06, 0.10)
+	SFXManager.play_pop()
+	_spawn_parry_spark()
+	if _shield_durability <= 0:
+		_break_shield()
+	return true
+
+## Khiên vỡ: gỡ khỏi slot phụ + xoá khỏi kho.
+func _break_shield() -> void:
+	_scroll_inventory_message("(Khiên Sắt đã vỡ!)")
+	SFXManager.play_glass_break()
+	if inventory != null:
+		for i in range(inventory.slots.size()):
+			var slot: ItemSlot = inventory.slots[i]
+			if not slot.is_empty() and slot.item == equipped_sub:
+				slot.clear()
+				break
+	equipped_sub = null
+	_guarding = false
+	_update_armor_mesh()
 
 func _update_weapon_mesh() -> void:
 	if _mesh == null or _mesh.weapon_pivot == null:
@@ -1056,6 +1145,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if not mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
 			_stop_mining()
 			_stop_eating()
+			_guarding = false
 		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _bow_aiming:
 			if equipped_weapon != null and equipped_weapon.id == "m200":
 				# M200: nhả LMB = bắn 1 phát (kèm hồi thoi nòng).
@@ -1134,7 +1224,12 @@ func _unhandled_input(event: InputEvent) -> void:
 						mine_tgt = _raycast_target_block()
 					if mine_tgt != Vector3.ZERO:
 						_start_mining(mine_tgt)
-					return
+						return
+			# ĐỠ ĐÒN KHIÊN: giữ chuột phải với khiên ở slot phụ
+			if equipped_sub != null and equipped_sub.id == "iron_shield" \
+					and _is_armor_visible(5):
+				_begin_guard()
+				return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
 			var holding_heavy: bool = equipped_weapon != null and \
 				(equipped_weapon.id == "axe" or equipped_weapon.id == "pickaxe" or equipped_weapon.id == "hoe")
@@ -1576,6 +1671,15 @@ func _physics_process(delta: float) -> void:
 		if _dash_ghost_cd <= 0.0:
 			_dash_ghost_cd = 0.045
 			_spawn_dash_ghost()
+	# ── GUARD KHIÊN: giữ chuột phải → duy trì thế đỡ (PARRY visual) ──────────
+	if _guarding:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT) and equipped_sub != null \
+				and equipped_sub.id == "iron_shield" and _shield_durability > 0 \
+				and is_alive and _active:
+			_state = State.PARRY
+			_parry_timer = maxf(_parry_timer, 0.25)
+		else:
+			_guarding = false
 	if _eating and is_alive and _active and not _underwater:
 		_state = State.EAT
 		velocity.x *= 0.5

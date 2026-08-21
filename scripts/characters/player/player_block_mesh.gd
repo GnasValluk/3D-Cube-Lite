@@ -171,8 +171,12 @@ func _build_legs() -> void:
 	_build_leg(leg_r, false)
 
 func _build_leg(hip: Node3D, left: bool) -> void:
-	# Khối đùi
-	MeshBuilder.box(hip, Vector3(0, -0.17, 0), Vector3(0.15, 0.32, 0.15), _sk2)
+	# Khối đùi — giữ tham chiếu để giáp quần THAY THẾ (ẩn khi mặc)
+	var thigh := MeshBuilder.box(hip, Vector3(0, -0.17, 0), Vector3(0.15, 0.32, 0.15), _sk2)
+	if left:
+		thigh_mesh_l = thigh
+	else:
+		thigh_mesh_r = thigh
 	var knee := MeshBuilder.pivot(hip, Vector3(0, -0.34, 0))
 	knee.name = "KneeL" if left else "KneeR"
 	if left: knee_l = knee
@@ -206,7 +210,7 @@ func _build_leg(hip: Node3D, left: bool) -> void:
 	boot.name = "BootLPivot" if left else "BootRPivot"
 	if left: boot_l_pivot = boot
 	else:    boot_r_pivot = boot
-	var armor := MeshBuilder.pivot(hip, Vector3(0, -0.14, 0))
+	var armor := MeshBuilder.pivot(hip, Vector3(0, -0.02, 0))
 	armor.name = "LegArmorLPivot" if left else "LegArmorRPivot"
 	armor.scale = Vector3(0.65, 0.65, 0.65)
 	if left: leg_armor_l_pivot = armor
@@ -243,6 +247,9 @@ func _build_arm(shoulder: Node3D, left: bool) -> void:
 		gauntlet_l_pivot = MeshBuilder.pivot(elbow, Vector3(0, -0.18, 0))
 		gauntlet_l_pivot.name = "GauntletLPivot"
 		gauntlet_l_pivot.scale = Vector3(0.5, 0.5, 0.5)
+		# KHIÊN — đeo tay TRÁI, tấm chắn hướng ra trước (+Z nhân vật)
+		shield_pivot = MeshBuilder.pivot(elbow, Vector3(0.02, -0.16, 0.06))
+		shield_pivot.name = "ShieldPivot"
 	else:
 		gauntlet_r_pivot = MeshBuilder.pivot(elbow, Vector3(0, -0.18, 0))
 		gauntlet_r_pivot.name = "GauntletRPivot"

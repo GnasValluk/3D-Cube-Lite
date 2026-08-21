@@ -46,6 +46,7 @@ static func build(parent: Node3D, item_id: String) -> void:
 		"iron_chestplate": _build_iron_chestplate_icon(parent)
 		"iron_boots": _build_iron_boots_icon(parent)
 		"iron_leggings": _build_iron_leggings_icon(parent)
+		"iron_shield": _build_iron_shield_icon(parent)
 		"golden_ring": _build_golden_ring_icon(parent)
 		"leather_backpack": _build_leather_backpack_icon(parent)
 		"crossbow": ToolsMesh.no_drop(parent)
@@ -168,8 +169,13 @@ static func build(parent: Node3D, item_id: String) -> void:
 static func build_gauntlet(parent: Node3D) -> void:
 	_build_iron_gauntlets_icon(parent)
 
-## Mũ sắt kiểu Hy Lạp (Corinthian) — vòm bao trùm cả đầu + ụ má + thanh mũi +
-## tấm gáy + gờ sống vàng + mào đỏ. Đặt pivot giữa đầu nên bọc kín toàn đầu.
+## ── BỘ GIÁP SẮT — REBUILD KHỚP VỚI RIG JOINT MỚI (player_block) ────────────
+## Kích thước quy đổi V=0.03: đầu 10.7×8×8.7, thân 11.3×9.3×7.3, vai ±7,
+## đùi 11.3 dài, ống chân 10.3, bàn chân 5×2.3×8. Khi mặc sẽ THAY THẾ phần
+## thân gốc (ẩn đầu/thân/đùi/chân gốc — xem _update_armor_mesh).
+
+## Mũ sắt kiểu Hy Lạp — vòm bao TRỌN đầu (đầu gốc bị ẩn), mở mặt trước tối
+## để lộ "bóng mặt", gờ sống + mào đỏ.
 static func _build_iron_helmet_icon(p: Node3D) -> void:
 	var base := Color(0.62, 0.64, 0.70)
 	var hi   := Color(0.78, 0.80, 0.86)
@@ -177,77 +183,86 @@ static func _build_iron_helmet_icon(p: Node3D) -> void:
 	var gold := Color(0.92, 0.72, 0.22)
 	var gold_h := Color(1.00, 0.86, 0.42)
 	var red  := Color(0.85, 0.22, 0.30)
-	# Vòm chính bao trọn đầu (rộng hơn đầu một chút)
-	ItemMeshShared.add_cube(p, 0, 0, 0, 17, 9, 17, base)
-	ItemMeshShared.add_cube(p, 0, 5, 0, 15, 5, 15, base)
-	ItemMeshShared.add_cube(p, 0, 10, 0, 12, 3, 12, hi)
-	ItemMeshShared.add_cube(p, 0, 13, 0, 9, 3, 9, hi)
-	ItemMeshShared.add_cube(p, 0, 16, 0, 5, 2, 5, dk)
-	# Vành đáy bao quanh dưới đầu (bảo vệ tai + gáy)
-	ItemMeshShared.add_cube(p, 0, -5, 0, 17.5, 2, 17.5, dk)
-	# Tấm bảo vệ gáy sau cổ
-	ItemMeshShared.add_cube(p, 0, -4, -8, 16, 6, 3, dk)
-	# Ụ má hai bên (cheek guard) — dài xuống bảo vệ má/cằm
-	ItemMeshShared.add_cube(p, -9, -6, 5, 4, 8, 4, base)
-	ItemMeshShared.add_cube(p,  9, -6, 5, 4, 8, 4, base)
-	# Trán che (brow) chạy ngang qua mặt
-	ItemMeshShared.add_cube(p, 0, 3, 8.5, 16, 2, 3, dk)
-	# Thanh mũi (nose guard) chạy xuống
-	ItemMeshShared.add_cube(p, 0, 1, 9, 1.5, 4, 1.5, hi)
-	ItemMeshShared.add_cube(p, 0, -5, 8.5, 1.5, 3, 1.5, hi)
-	# Tấm cằm (chin guard)
-	ItemMeshShared.add_cube(p, 0, -7, 2, 8, 2, 2, base)
-	# Gờ sống đỉnh + chóp vàng
-	ItemMeshShared.add_cube(p, 0, 14.5, 0, 2.5, 3, 2.5, gold)
-	ItemMeshShared.add_cube(p, 0, 16, 0, 1.5, 2, 1.5, gold_h)
-	# Mào đỏ chảy ra sau lưng (crest)
-	ItemMeshShared.add_cube(p, 0, 12, -7, 2, 3, 2, red)
-	ItemMeshShared.add_cube(p, 0, 11, -9, 1.5, 2, 2, red)
-	ItemMeshShared.add_cube(p, 0, 10, -11, 1.5, 2, 2, red)
+	# Vòm chính — bọc kín đầu 10.7 rộng
+	ItemMeshShared.add_cube(p, 0, 3.2, 0, 12.5, 4.5, 12.5, base)
+	ItemMeshShared.add_cube(p, 0, 6.4, 0, 11.0, 3.5, 11.0, base)
+	ItemMeshShared.add_cube(p, 0, 8.8, 0, 8.0, 2.5, 8.0, hi)
+	ItemMeshShared.add_cube(p, 0, 10.6, 0, 4.0, 1.8, 4.0, dk)
+	# Vành đáy
+	ItemMeshShared.add_cube(p, 0, -0.8, 0, 13.2, 1.8, 13.2, dk)
+	# Tấm gáy
+	ItemMeshShared.add_cube(p, 0, -2.2, -6.4, 11.0, 5.0, 2.5, dk)
+	# Ụ má hai bên chạy xuống
+	ItemMeshShared.add_cube(p, -5.6, -2.0, 4.0, 2.6, 7.0, 3.0, base)
+	ItemMeshShared.add_cube(p,  5.6, -2.0, 4.0, 2.6, 7.0, 3.0, base)
+	# Mặt trước: khung trán + "bóng mặt" tối (đầu gốc đã ẩn → hố tối đọc là khe ngắm)
+	ItemMeshShared.add_cube(p, 0, 2.6, 6.0, 12.0, 1.6, 2.0, dk)
+	ItemMeshShared.add_cube(p, 0, -0.6, 6.15, 7.4, 3.6, 0.9, Color(0.05, 0.05, 0.07))
+	ItemMeshShared.add_cube(p, 0, 0.6, 6.4, 1.6, 5.0, 1.4, hi)
+	# Gờ sống vàng + mào đỏ
+	ItemMeshShared.add_cube(p, 0, 9.9, 0, 2.2, 2.4, 9.0, gold)
+	ItemMeshShared.add_cube(p, 0, 11.2, -2.5, 1.4, 1.6, 5.0, gold_h)
+	ItemMeshShared.add_cube(p, 0, 10.6, -6.4, 1.8, 2.4, 3.0, red)
+	ItemMeshShared.add_cube(p, 0, 9.4, -8.6, 1.4, 1.8, 3.0, red)
 
-## Quần sắt — giáp che đùi + đầu gối + ống chân (một chân, khi mặc nhân đôi lên hai chân)
+## Quần sắt — giáp đùi + gối + ống chân (một chân; pivot đặt ĐÚNG KHỚP HÔNG).
 static func _build_iron_leggings_icon(p: Node3D) -> void:
 	var base := Color(0.60, 0.63, 0.68)
 	var hi   := Color(0.76, 0.79, 0.85)
 	var dk   := Color(0.35, 0.37, 0.42)
-	# Đùi
-	ItemMeshShared.add_cube(p, 0, 2, 0, 7, 6, 7, base)
-	# Đầu gối (đai tối)
-	ItemMeshShared.add_cube(p, 0, -1, 0, 7, 3, 7, dk)
-	# Ống chân / bắp chân
-	ItemMeshShared.add_cube(p, 0, -4, 0, 6, 5, 6, base)
-	# Mặt trước sáng (mài sáng)
-	ItemMeshShared.add_cube(p, 0, 1, 3, 4, 4, 1.5, hi)
-	ItemMeshShared.add_cube(p, 0, -3, 3, 3.5, 3, 1.5, hi)
+	# Đùi giáp (thigh rig 11.3 dài)
+	ItemMeshShared.add_cube(p, 0, -5.75, 0, 6.4, 11.5, 6.4, base)
+	ItemMeshShared.add_cube(p, 0, -5.5, 3.0, 4.0, 7.0, 1.4, hi)
+	# Đai gối + gờ
+	ItemMeshShared.add_cube(p, 0, -12.6, 0, 7.0, 2.8, 7.0, dk)
+	ItemMeshShared.add_cube(p, 0, -12.6, 3.4, 3.0, 1.4, 1.2, hi)
+	# Ống chân (greave) tới cổ chân
+	ItemMeshShared.add_cube(p, 0, -18.9, 0, 5.8, 9.5, 5.8, base)
+	ItemMeshShared.add_cube(p, 0, -19.0, 3.1, 3.4, 6.0, 1.3, hi)
 	# Cổ chân
-	ItemMeshShared.add_cube(p, 0, -6, 0, 6, 2, 6, dk)
+	ItemMeshShared.add_cube(p, 0, -23.4, 0, 6.0, 2.0, 6.0, dk)
 
-## Giáp thân sắt — model thân nguyên khối mang giáp (thay thế áo/váy mặc định,
-## không đè lên để tránh chồng mesh). Dùng cho drop, icon và mặc trên người.
+## Giáp thân sắt — phủ khớp torso mới (11.3×9.3×7.3), vai đè đúng khớp vai ±7,
+## váy giáp ngắn che belt gốc.
 static func _build_iron_chestplate_icon(p: Node3D) -> void:
 	var base := Color(0.58, 0.60, 0.66)
 	var hi   := Color(0.74, 0.77, 0.83)
 	var dk   := Color(0.34, 0.36, 0.42)
 	var gold := Color(0.92, 0.72, 0.22)
-	# Áo lót trong (tunic) — thân đặc không hở
-	ItemMeshShared.add_cube(p, 0, 1, 0, 13, 10, 8, base)
-	# Vòng cổ / đai cổ
-	ItemMeshShared.add_cube(p, 0, 6, 0, 9, 2, 9, dk)
-	# Tấm ngực sáng
-	ItemMeshShared.add_cube(p, 0, 2, 4.5, 10, 6, 2, hi)
-	ItemMeshShared.add_cube(p, 0, 0, 4.5, 7, 3, 1.5, hi.lightened(0.05))
+	# Thân giáp chính (torso rig cao 9.3 tại y +2..+11 local pivot)
+	ItemMeshShared.add_cube(p, 0, 4.2, 0, 12.0, 9.5, 7.6, base)
+	# Vòng cổ
+	ItemMeshShared.add_cube(p, 0, 8.6, 0, 9.0, 1.8, 7.8, dk)
+	# Tấm ngực sáng 2 tầng
+	ItemMeshShared.add_cube(p, 0, 4.6, 3.9, 10.0, 5.5, 1.8, hi)
+	ItemMeshShared.add_cube(p, 0, 1.2, 3.85, 7.0, 3.0, 1.6, hi.lightened(0.05))
 	# Tấm lưng tối
-	ItemMeshShared.add_cube(p, 0, 2, -4.5, 10, 6, 2, dk)
-	# Vai giáp hai bên (pauldron)
-	ItemMeshShared.add_cube(p, -7.5, 3, 0, 3, 4, 3, dk)
-	ItemMeshShared.add_cube(p,  7.5, 3, 0, 3, 4, 3, dk)
-	# Đai lưng tối + viền vàng
-	ItemMeshShared.add_cube(p, 0, -3, 0, 14, 2, 6, dk)
-	ItemMeshShared.add_cube(p, 0, -3, 4.5, 14, 0.8, 1, gold)
-	# Váy giáp xoè (thay váy hồng)
-	ItemMeshShared.add_cube(p, 0, -6, 0, 14, 3, 7, base)
-	ItemMeshShared.add_cube(p, 0, -9, 0, 15, 3, 8, base)
-	ItemMeshShared.add_cube(p, 0, -11, 0, 15, 1.5, 8, hi)
+	ItemMeshShared.add_cube(p, 0, 4.6, -3.9, 10.0, 6.0, 1.8, dk)
+	# Pauldron hai vai (khớp vai ±7)
+	ItemMeshShared.add_cube(p, -7.3, 7.6, 0, 3.4, 3.6, 4.2, dk)
+	ItemMeshShared.add_cube(p,  7.3, 7.6, 0, 3.4, 3.6, 4.2, dk)
+	ItemMeshShared.add_cube(p, -7.4, 9.5, 0, 3.6, 1.2, 4.4, hi)
+	ItemMeshShared.add_cube(p,  7.4, 9.5, 0, 3.6, 1.2, 4.4, hi)
+	# Đai lưng vàng
+	ItemMeshShared.add_cube(p, 0, -0.4, 0, 13.6, 1.2, 7.8, gold)
+	# Váy giáp 2 tầng ngắn (che belt pelvis, không chạm đùi khi bước)
+	ItemMeshShared.add_cube(p, 0, -1.8, 0, 13.4, 2.6, 7.6, base)
+	ItemMeshShared.add_cube(p, 0, -3.9, 0, 14.2, 2.2, 8.0, dk)
+	ItemMeshShared.add_cube(p, 0, -5.0, 0, 14.6, 0.8, 8.3, hi)
+
+## Giày sắt — một chiếc (pivot ở khớp cổ chân, bọc bàn chân 5×2.3×8)
+static func _build_iron_boots_icon(p: Node3D) -> void:
+	var base := Color(0.60, 0.63, 0.68)
+	var hi   := Color(0.76, 0.79, 0.85)
+	var dk   := Color(0.35, 0.37, 0.42)
+	# Cổ giày vươn lên ống chân dưới
+	ItemMeshShared.add_cube(p, 0, 1.6, 0, 6.0, 3.6, 6.0, dk)
+	ItemMeshShared.add_cube(p, 0, 3.2, 0, 6.5, 1.0, 6.5, hi)
+	# Thân giày + mũi sáng
+	ItemMeshShared.add_cube(p, 0, -0.6, 1.4, 5.4, 3.2, 7.6, base)
+	ItemMeshShared.add_cube(p, 0, -0.9, 4.4, 4.6, 2.4, 2.6, hi)
+	# Đế dày
+	ItemMeshShared.add_cube(p, 0, -2.35, 1.4, 5.8, 1.5, 8.6, dk)
 
 ## Găng tay sắt — một chiếc (khi mặc giáp sắt nhân đôi lên hai tay, hợp thể vào thân)
 static func _build_iron_gauntlets_icon(p: Node3D) -> void:
@@ -265,21 +280,32 @@ static func _build_iron_gauntlets_icon(p: Node3D) -> void:
 	# Ngón tay
 	ItemMeshShared.add_cube(p, 0, -4.5, 0, 5, 2, 4, base)
 
-## Giày sắt — một chiếc (khi mặc nhân đôi lên hai chân)
-static func _build_iron_boots_icon(p: Node3D) -> void:
-	var base := Color(0.60, 0.63, 0.68)
+## ── KHIÊN SẮT — kite shield đeo tay trái, mặt hướng ra TRƯỚC (+Z) ────────────
+static func _build_iron_shield_icon(p: Node3D) -> void:
+	var base := Color(0.58, 0.60, 0.66)
 	var hi   := Color(0.76, 0.79, 0.85)
-	var dk   := Color(0.35, 0.37, 0.42)
-	# Cổ giày
-	ItemMeshShared.add_cube(p, 0, 3, 0, 6, 5, 6, dk)
-	# Viền cổ giày sáng
-	ItemMeshShared.add_cube(p, 0, 4.2, 0, 6.5, 1, 6.5, hi)
-	# Thân giày
-	ItemMeshShared.add_cube(p, 0, 0, 0, 6, 5, 7, base)
-	# Mũi giày sáng
-	ItemMeshShared.add_cube(p, 0, -2, 4, 5, 3, 4, hi)
-	# Đế dày
-	ItemMeshShared.add_cube(p, 0, -3.5, 1, 6, 1.5, 8, dk)
+	var dk   := Color(0.34, 0.36, 0.42)
+	var gold := Color(0.92, 0.72, 0.22)
+	var wood := Color(0.42, 0.28, 0.14)
+	# Thân khiên gỗ viền sắt (kite: trên rộng dưới nhọn)
+	ItemMeshShared.add_cube(p, 0, 4.5, 0, 15, 10, 1.5, wood)
+	ItemMeshShared.add_cube(p, 0, -2.5, 0, 14, 6, 1.5, wood)
+	ItemMeshShared.add_cube(p, 0, -6.8, 0, 9, 3.4, 1.5, wood)
+	# Viền sắt quanh mép
+	ItemMeshShared.add_cube(p, 0, 9.6, 0, 16, 1.4, 1.9, dk)
+	ItemMeshShared.add_cube(p, 0, -8.6, 0, 10, 1.4, 1.9, dk)
+	ItemMeshShared.add_cube(p, -7.4, 1.0, 0, 1.6, 18.4, 1.9, dk)
+	ItemMeshShared.add_cube(p,  7.4, 1.0, 0, 1.6, 18.4, 1.9, dk)
+	# Gờ dọc giữa + boss kim loại trung tâm
+	ItemMeshShared.add_cube(p, 0, 1.0, 0.95, 2.4, 17.5, 0.6, hi)
+	ItemMeshShared.add_cube(p, 0, 1.0, 1.35, 4.6, 4.6, 0.8, base)
+	ItemMeshShared.add_cube(p, 0, 1.0, 1.85, 1.8, 1.8, 0.5, gold)
+	# Đinh tán 4 góc
+	for sx in [-1.0, 1.0]:
+		for sy in [-1.0, 1.0]:
+			ItemMeshShared.add_cube(p, sx * 5.6, 1.0 + sy * 6.6, 0.95, 1.1, 1.1, 0.6, hi)
+	# Tay cầm phía sau
+	ItemMeshShared.add_cube(p, 0, 1.0, -1.1, 5.0, 1.2, 1.2, dk)
 
 ## Nhẫn vàng — vòng nhẫn 8 cạnh + đá đỏ (đeo trên tay khi trang bị)
 static func _build_golden_ring_icon(p: Node3D) -> void:

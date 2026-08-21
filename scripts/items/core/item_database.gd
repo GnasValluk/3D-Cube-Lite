@@ -296,6 +296,7 @@ static func create_item_db() -> Dictionary:
 	_add(db, "golden_ring",     "Nhẫn Vàng",   ItemDef.Type.ARMOR, Color(0.90, 0.72, 0.12), "💍", "Nhẫn vàng — tăng vận may ẩn (+2 luck), câu được đồ hiếm hơn", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.SUB, 0, 2.0)
 	_add(db, "leather_backpack", "Balo Da Thú", ItemDef.Type.ARMOR, Color(0.45, 0.30, 0.18), "🎒", "Balo da thú chắc chắn — +4 slot kho đồ và +5% giới hạn tải", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.BACK, 0, 0.0, 0.0, 4, 1.05)
 	_add(db, "flashlight",      "Đèn Pin",     ItemDef.Type.ARMOR, Color(0.90, 0.90, 0.75), "🔦", "Đèn pin — chiếu sáng về phía trước khi cầm, luôn bật khi đeo vào slot phụ", false, 1, 0, 0, 0.0, ItemDef.ArmorSlot.SUB, 0)
+	_add(db, "iron_shield",     "Khiên Sắt",   ItemDef.Type.ARMOR, Color(0.55, 0.58, 0.66), "🛡", "Khiên sắt đeo tay trái — GIỮ CHUỘT PHẢI đỡ đòn: chặn sát thương đánh vào mặt trước, hao độ bền theo đòn", false, 1, 0, 0, 2.0, ItemDef.ArmorSlot.SUB, 240)
 
 	# ── Cây dầu ───────────────────────────────────────────────────────────────
 
