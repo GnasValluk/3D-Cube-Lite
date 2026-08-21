@@ -160,10 +160,12 @@ func animate(delta: float) -> void:
 			_attack(delta, t)
 		CharacterBase.State.RECOVERY:
 			_recovery(delta, t)
-		CharacterBase.State.AIR_ATTACK:
-			_air_attack(delta, t)
 		CharacterBase.State.PARRY:
 			_parry(delta, t)
+		CharacterBase.State.CHARGE:
+			_charge_pose(delta)
+		CharacterBase.State.AIR_ATTACK:
+			_air_attack(delta, t)
 		CharacterBase.State.JUMP:
 			_air(delta, t, true)
 		CharacterBase.State.FALL:
@@ -1058,6 +1060,21 @@ func _combo_legs(prog: float, delta: float, step_i: int, step: Dictionary) -> vo
 func _attack(delta: float, _t: float) -> void:
 	var remaining: float = base._attack_timer
 	var prog: float = 1.0 - clampf(remaining / max(base._cur_step_dur, 0.001), 0.0, 1.0)
+	# ── TRỌNG KÍCH phóng thích — pose riêng từng vũ khí ─────────────────────
+	if base._is_charged_release:
+		var wid_c: String = player.equipped_weapon.id if player != null and player.equipped_weapon != null else ""
+		if remaining > _last_remaining + 0.001:
+			_start_trail(wid_c)
+		_last_remaining = remaining
+		if not _trail_released and prog >= 0.40:
+			_trail_released = true
+			if _trail != null and is_instance_valid(_trail):
+				_trail.stop_recording()
+			SFXManager.play_attack_strong()
+			player.camera_shake(0.10 + 0.10 * base._charge_level, 0.20)
+		_charged_blend(prog, delta, wid_c)
+		_combo_legs(prog, delta, 0, {"w1": 0.26, "w2": 0.50})
+		return
 	# ── RIPoste (parry attack): phản đòn sau chặn — vung ngược lên + đâm ────
 	if base._is_riposte:
 		if remaining > _last_remaining + 0.001:
@@ -1195,6 +1212,105 @@ func _riposte_blend(prog: float, delta: float) -> void:
 		else:
 			target = follow.get(key, strike.get(key, wind[key]))
 			rate = 10.0
+		_set_joint(key, target, delta, rate)
+
+# ── VẬN LỰC (giữ chuột trái) — kéo vũ khí về sau, rung nhẹ khi đầy lực ───────
+func _charge_pose(delta: float) -> void:
+	var lvl: float = base._charge_level
+	var tremble: float = sin(base._time * 42.0) * 0.018 * lvl
+	var wid: String = player.equipped_weapon.id if player != null and player.equipped_weapon != null else ""
+	# Pose gồng riêng vũ khí: [vai, khuỷu, wp.x] kéo về sau tối đa
+	var pull := Vector3(0.62, -1.98, 30.0)
+	match wid:
+		"iron_greatsword", "iron_halberd":
+			pull = Vector3(0.85, -2.10, 16.0)
+		"leather_gloves":
+			pull = Vector3(0.55, -2.05, 90.0)
+	mesh.rig.rotation.x = _spring("rig_x", -0.10 * lvl, 9.0, 0.9, delta)
+	mesh.rig.rotation.y = _spring("rig_rot_y", 0.34 * lvl + tremble, 9.0, 0.9, delta)
+	mesh.body.rotation.x = _spring("body_x", 0.10 * lvl, 8.0, 0.9, delta)
+	if not _weapon_owns_arms():
+		var wp := mesh.weapon_pivot
+		if wp != null and is_instance_valid(wp):
+			wp.rotation_degrees = wp.rotation_degrees.lerp(
+				Vector3(pull.z, 26.0 * lvl, -20.0 * lvl), minf(1.0, delta * 10.0))
+		mesh.arm_r.rotation.x = _spring("arm_r_x", pull.x, 12.0, 0.95, delta)
+		mesh.elbow_r.rotation.x = _spring("elbow_r_x", pull.y, 12.0, 0.95, delta)
+		mesh.arm_l.rotation.x = _spring("arm_l_x", -0.72 * lvl - 0.15, 11.0, 0.95, delta)
+		mesh.arm_l.rotation.z = _spring("arm_l_z", 0.36 * lvl, 11.0, 0.95, delta)
+	# Chân trụ thấp dần theo mức vận — trọng lượng dồn xuống
+	var drop: float = 0.06 * lvl
+	mesh.leg_l.rotation.x = _spring("leg_l_x", -0.30 * lvl, 9.0, 1.0, delta)
+	mesh.knee_l.rotation.x = _spring("knee_l_x", 0.40 * lvl + 0.08, 9.0, 1.0, delta)
+	mesh.leg_r.rotation.x = _spring("leg_r_x", 0.24 * lvl, 9.0, 1.0, delta)
+	mesh.knee_r.rotation.x = _spring("knee_r_x", 0.34 * lvl + 0.08, 9.0, 1.0, delta)
+	mesh.rig.position.y = _spring("rig_y", 0.02 - drop, 9.0, 1.0, delta)
+
+## ── TRỌNG KÍCH phóng thích — bảng pose RIÊNG từng vũ khí ──────────────────────
+func _charged_blend(prog: float, delta: float, wid: String) -> void:
+	var table: Dictionary
+	match wid:
+		"iron_sword":
+			table = {"w1": 0.22, "w2": 0.52,
+				"wind":   {"rig.y": -0.60, "rig.x": 0.04},
+				"strike": {"rig.y": 1.35, "rig.x": 0.14, "body.x": 0.16,
+					"arm_r.x": -0.45, "elbow_r.x": -0.10, "wp.x": 150.0, "wp.y": 0.0, "wp.z": 8.0},
+				"follow": {"rig.y": 1.05, "arm_r.x": -0.70, "elbow_r.x": -0.35}}
+		"leather_gloves":
+			table = {"w1": 0.20, "w2": 0.46,
+				"wind":   {"rig.x": 0.28, "body.x": 0.24},
+				"strike": {"rig.x": -0.18, "body.x": -0.10, "head.x": -0.24,
+					"arm_r.x": -2.25, "elbow_r.x": -0.06, "arm_l.x": -2.10, "elbow_l.x": -0.10},
+				"follow": {"rig.x": -0.02, "arm_r.x": -1.30, "elbow_r.x": -0.50}}
+		"iron_greatsword":
+			table = {"w1": 0.30, "w2": 0.58,
+				"wind":   {"rig.x": -0.18, "body.x": -0.10, "rig.y": 0.10},
+				"strike": {"rig.x": 0.40, "body.x": 0.32, "head.x": 0.18,
+					"arm_r.x": -2.85, "arm_l.x": -2.70, "elbow_r.x": -0.06, "elbow_l.x": -0.08,
+					"wp.x": 182.0, "wp.y": 0.0, "wp.z": 0.0},
+				"follow": {"rig.x": 0.26, "arm_r.x": 0.80, "wp.x": 168.0}}
+		"iron_halberd":
+			table = {"w1": 0.24, "w2": 0.54,
+				"wind":   {"rig.y": -0.70, "rig.x": 0.06},
+				"strike": {"rig.y": 0.90, "rig.x": 0.18, "body.x": 0.18,
+					"arm_r.x": -0.75, "elbow_r.x": -0.10, "arm_l.x": -0.65, "elbow_l.x": -0.30,
+					"wp.x": 96.0, "wp.y": 0.0, "wp.z": 0.0},
+				"follow": {"rig.y": 0.55, "arm_r.x": -0.55}}
+		"axe":
+			table = {"w1": 0.28, "w2": 0.56,
+				"wind":   {"rig.x": -0.20, "rig.y": -0.30},
+				"strike": {"rig.x": 0.38, "rig.y": 0.30, "body.x": 0.28,
+					"arm_r.x": -2.90, "elbow_r.x": -0.06, "wp.x": 178.0, "wp.y": 0.0, "wp.z": 0.0},
+				"follow": {"rig.x": 0.24, "arm_r.x": 0.70, "wp.x": 160.0}}
+		"pickaxe":
+			table = {"w1": 0.26, "w2": 0.54,
+				"wind":   {"rig.x": -0.16, "rig.y": 0.34},
+				"strike": {"rig.x": 0.34, "rig.y": -0.36, "body.x": 0.26,
+					"arm_r.x": 1.00, "elbow_r.x": -0.08, "wp.x": 172.0, "wp.y": -14.0, "wp.z": -10.0},
+				"follow": {"rig.x": 0.22, "arm_r.x": 0.62, "wp.x": 154.0}}
+		_:
+			table = {"w1": 0.26, "w2": 0.54,
+				"wind":   {"rig.y": -0.44, "rig.x": 0.04},
+				"strike": {"rig.y": 0.52, "rig.x": 0.30, "body.x": 0.24,
+					"arm_r.x": -2.70, "elbow_r.x": -0.08, "wp.x": 170.0, "wp.y": 0.0, "wp.z": 0.0},
+				"follow": {"rig.x": 0.20, "arm_r.x": 0.60, "wp.x": 156.0}}
+	var w1: float = table.w1
+	var w2: float = table.w2
+	var wind: Dictionary = table.get("wind", {})
+	var strike: Dictionary = table.strike
+	var follow: Dictionary = table.follow
+	for key in wind.keys():
+		var target: float
+		var rate: float
+		if prog < w1:
+			target = wind[key]
+			rate = 20.0
+		elif prog < w2:
+			target = strike.get(key, wind[key])
+			rate = 30.0
+		else:
+			target = follow.get(key, strike.get(key, wind[key]))
+			rate = 9.0
 		_set_joint(key, target, delta, rate)
 
 func _spawn_punch_fx(step_i: int) -> void:

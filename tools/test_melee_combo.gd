@@ -20,6 +20,13 @@ func _click_left(pressed: bool) -> void:
 	ev.position = Vector2(100, 100)
 	Input.parse_input_event(ev)
 
+## Tap nhanh: nhấn-nhả 2 frame — ra đòn thường bước 0 (không vận lực)
+func _tap_left() -> void:
+	_click_left(true)
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	_click_left(false)
+
 func _wait_frames(n: int) -> void:
 	for i in range(n):
 		await get_tree().physics_frame
@@ -49,31 +56,33 @@ func _ready() -> void:
 	var chain: Array = _Combos.chain_for("iron_sword")
 	_check(chain.size() == 3, "kiếm có chain 3 đòn (got=%d)" % chain.size())
 
-	# ── 1. Bấm chuột → bước 0 ────────────────────────────────────────────────
-	_click_left(true)
+	# ── 1. TAP chuột → đòn thường bước 0 ─────────────────────────────────────
+	await _tap_left()
 	var got_attack := false
 	for i in range(15):
 		await get_tree().physics_frame
 		if p._state == p.State.ATTACK:
 			got_attack = true
 			break
-	_check(got_attack, "bấm chuột → ATTACK")
+	_check(got_attack, "tap chuột → ATTACK")
 	_check(p.combo_step == 0, "bắt đầu từ bước 0 (step=%d)" % p.combo_step)
 	_check(p._attack_timer > 0.0, "timer đếm ngược bước")
 
-	# ── 2. Giữ chuột → chain tự nối 0 → 1 → 2 ────────────────────────────────
+	# ── 2. BẤM ĐỆM NHỊP → chain tự nối 0 → 1 → 2 ─────────────────────────────
 	var saw_step1 := false
 	var saw_step2 := false
-	for i in range(120):
-		await get_tree().physics_frame
-		if p.combo_step == 1 and p._state == p.State.ATTACK:
-			saw_step1 = true
-		if p.combo_step == 2 and p._state == p.State.ATTACK:
-			saw_step2 = true
-		if p._state == p.State.RECOVERY:
-			break
-	_check(saw_step1, "giữ chuột → tự nối bước 1")
-	_check(saw_step2, "giữ chuột → tự nối bước 2")
+	for rep in range(4):
+		await _tap_left()
+		for i in range(34):
+			await get_tree().physics_frame
+			if p.combo_step == 1 and p._state == p.State.ATTACK:
+				saw_step1 = true
+			if p.combo_step == 2 and p._state == p.State.ATTACK:
+				saw_step2 = true
+			if p._state == p.State.RECOVERY:
+				break
+	_check(saw_step1, "bấm đệm nhịp → tự nối bước 1")
+	_check(saw_step2, "bấm đệm nhịp → tự nối bước 2")
 
 	# ── 3. Hết chain → RECOVERY (dù vẫn giữ chuột) → IDLE ────────────────────
 	var saw_recovery := false
@@ -91,10 +100,8 @@ func _ready() -> void:
 			break
 	_check(saw_idle, "RECOVERY hết → IDLE")
 
-	# ── 4. Thả chuột bấm lẻ 1 lần → chỉ 1 đòn rồi RECOVERY ───────────────────
-	_click_left(true)
-	await _wait_frames(2)
-	_click_left(false)
+	# ── 4. Bấm lẻ 1 lần (không đệm) → 1 đòn rồi RECOVERY ────────────────────
+	await _tap_left()
 	await _wait_frames(2)
 	_check(p._state == p.State.ATTACK, "bấm đơn → ATTACK")
 	var went_recovery := false
@@ -160,17 +167,14 @@ func _ready() -> void:
 	_check(wp_err < 4.0, "kiếm cầm về thế chuẩn (wp=%s err=%.1f)" % [str(wp_deg), wp_err])
 
 	# ── 7. Ngắt giữa đòn bằng HIT → wp vẫn phải hồi về thế chuẩn ────────────
-	_click_left(true)
-	var attacking_ok := false
-	for i in range(15):
-		await get_tree().physics_frame
-		if p._state == p.State.ATTACK:
-			attacking_ok = true
-			break
-	_check(attacking_ok, "bấm chuột để ngắt bằng HIT")
+	p._charge_pending = false
+	p._charging = false
+	p._combo_chain = _Combos.chain_for("iron_sword")
+	p._begin_combo_step(0)
+	var attacking_ok: bool = p._state == p.State.ATTACK
+	_check(attacking_ok, "có đòn đang vung để ngắt")
 	p.take_damage(1, null)   # HIT giữa chừng
 	await _wait_frames(40)
-	_click_left(false)
 	await _wait_frames(80)
 	var wp_err2: float = Vector3(90, 0, 0).distance_to(mesh_node.weapon_pivot.rotation_degrees)
 	_check(wp_err2 < 4.0, "bị HIT ngắt giữa đòn → kiếm vẫn về thế chuẩn (err=%.1f)" % wp_err2)
@@ -215,13 +219,11 @@ func _ready() -> void:
 			total_t += st.dur
 		_check(total_t > 2.6, "đại kiếm chuỗi nặng: tổng %.2fs > 2.6s" % total_t)
 		# Bắt đầu vung bước 0 → pose windup phải kéo TAY TRÁI lên nắm chuôi cùng
-		_click_left(true)
-		var gs_attacking := false
-		for i in range(15):
-			await get_tree().physics_frame
-			if p._state == p.State.ATTACK:
-				gs_attacking = true
-				break
+		p._charge_pending = false
+		p._charging = false
+		p._combo_chain = gs_chain
+		p._begin_combo_step(0)
+		var gs_attacking: bool = p._state == p.State.ATTACK
 		await _wait_frames(6)
 		var arm_l_x: float = mesh_node.arm_l.rotation.x
 		_check(gs_attacking and arm_l_x < -0.5,
@@ -237,7 +239,10 @@ func _ready() -> void:
 			await get_tree().physics_frame
 			if p._state == p.State.IDLE:
 				break
-		_click_left(true)
+		p._charge_pending = false
+		p._charging = false
+		p._combo_chain = _Combos.chain_for("iron_sword")
+		p._begin_combo_step(0)
 		var trail_found := false
 		var max_segs := 0
 		for i in range(25):
@@ -245,7 +250,6 @@ func _ready() -> void:
 			if p._anim != null and p._anim._trail != null and is_instance_valid(p._anim._trail):
 				trail_found = true
 				max_segs = maxi(max_segs, p._anim._trail._bases.size())
-		_click_left(false)
 		_check(trail_found, "vung kiếm → trail được tạo trên weapon_pivot")
 		_check(max_segs >= 4, "trail ghi được đường vung (%d đoạn)" % max_segs)
 		var trail_gone := false
@@ -265,7 +269,11 @@ func _ready() -> void:
 			await get_tree().physics_frame
 			if p._state == p.State.IDLE:
 				break
-		_click_left(true)
+		# Gọi trực tiếp bước đánh (tất định, không phụ thuộc input queue)
+		p._charge_pending = false
+		p._charging = false
+		p._combo_chain = _Combos.chain_for("iron_sword")
+		p._begin_combo_step(0)
 		var max_lead_knee := 0.0
 		var min_rig_y := 10.0
 		var min_trail_ankle := 10.0
@@ -366,7 +374,10 @@ func _ready() -> void:
 			await get_tree().physics_frame
 			if p._state == p.State.IDLE:
 				break
-		_click_left(true)
+		p._charge_pending = false
+		p._charging = false
+		p._combo_chain = _Combos.chain_for("leather_gloves")
+		p._begin_combo_step(0)
 		var straightest := 0.0    # giá trị elbow_l gần 0 nhất = duỗi thẳng nhất
 		var deepest := 0.0        # gập sâu nhất khi vung co
 		for i in range(18):
@@ -376,7 +387,6 @@ func _ready() -> void:
 			var e: float = mesh_node.elbow_l.rotation.x
 			straightest = maxf(straightest, e)
 			deepest = minf(deepest, e)
-		_click_left(false)
 		_check(deepest < -1.30, "vung co tay SÂU lấy đà (%.2f rad)" % deepest)
 		_check(straightest > -0.45, "ĐẤM DUỖI THẲNG khuỷu khi trúng (%.2f rad)" % straightest)
 
@@ -578,6 +588,30 @@ func _ready() -> void:
 		await _wait_frames(3)
 		_check(not _all_mi_hidden(mesh_node.head), "tháo giáp → đầu hiện lại")
 		_check(not _mi_hidden(mesh_node.thigh_mesh_l), "tháo giáp → đùi hiện lại")
+
+	# ── 23. TRỌNG KÍCH: giữ chuột VẬN LỰC → thả ra PHÓNG THÍCH ──────────────
+	if db2.has("iron_sword"):
+		p.equipped_weapon = db2["iron_sword"]
+		p._update_weapon_mesh()
+		await _wait_frames(5)
+		for i in range(90):
+			await get_tree().physics_frame
+			if p._state == p.State.IDLE:
+				break
+		_click_left(true)
+		var saw_charge := false
+		for i in range(42):
+			await get_tree().physics_frame
+			if p._state == p.State.CHARGE and p._charging:
+				saw_charge = true
+		_check(saw_charge, "giữ chuột → VẬN LỰC (State.CHARGE)")
+		_check(p._charge_level > 0.30, "mức vận tích luỹ (level=%.2f)" % p._charge_level)
+		_click_left(false)
+		await _wait_frames(2)
+		_check(p._state == p.State.ATTACK and p._is_charged_release,
+			"thả chuột → TRỌNG KÍCH phóng thích")
+		_check(p._charged_mult > 1.35,
+			"sát thương nhân theo mức vận (x%.2f)" % p._charged_mult)
 
 	print("TOTAL | %s | %d failures" % ["PASS" if _failures == 0 else "FAIL", _failures])
 

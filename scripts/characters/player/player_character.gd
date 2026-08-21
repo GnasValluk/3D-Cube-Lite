@@ -1272,7 +1272,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					"pumpkin_mortar": _Mortar.start_aim(self); return
 					"watermelon_cannon": _Bow.start_cannon_aim(self); return
 					"fishing_rod": _Fishing.action(self); return
-				# ── Melee auto-combo ─────────────────────────────────────────
+				# ── Melee auto-combo / TRỌNG KÍCH ─────────────────────────────
 				if _freeze_timer > 0.0 or _attack2_timer > 0.0 or _state == State.DASH:
 					return
 				if (_state == State.ATTACK or _state == State.AIR_ATTACK) and _attack_timer > 0.0:
@@ -1294,16 +1294,50 @@ func _unhandled_input(event: InputEvent) -> void:
 							rotation.y = atan2(_aim_dir.x, _aim_dir.z)
 						_begin_air_attack(chain)
 					return
-				if not try_skill(stamina_cost_lmb):
-					return
-				_aim_dir = _calc_aim_dir()
-				var fwd := global_transform.basis.z
-				if _aim_dir.dot(fwd) < 0.99:
-					rotation.y = atan2(_aim_dir.x, _aim_dir.z)
-				_lmb_cd = 0.0
-				_combo_chain = chain
-				_begin_combo_step(0)
+				# GIỮ CHUỘT TRÁI = VẬN LỰC (trọng kích) — thả ra để đánh.
+				_charge_pending = true
+				_charge_hold_t = 0.0
+				_charging = false
+				_charge_level = 0.0
 				return
+
+## Tap thường (giữ < 0.26s): vào combo bước 0 như trước.
+func _begin_primary_attack() -> void:
+	var wid: String = equipped_weapon.id if equipped_weapon != null else ""
+	var chain: Array = _Combos.chain_for(wid)
+	if chain.is_empty():
+		super._begin_primary_attack()
+		return
+	if not try_skill(stamina_cost_lmb):
+		return
+	_aim_dir = _calc_aim_dir()
+	var fwd := global_transform.basis.z
+	if _aim_dir.dot(fwd) < 0.99:
+		rotation.y = atan2(_aim_dir.x, _aim_dir.z)
+	_lmb_cd = 0.0
+	_combo_chain = chain
+	_begin_combo_step(0)
+
+## THẢ sau khi vận lực → TRỌNG KÍCH riêng từng vũ khí (MeleeCombos.CHARGED).
+func _release_charged() -> void:
+	var wid: String = equipped_weapon.id if equipped_weapon != null else ""
+	var spec: Dictionary = _Combos.charged_for(wid)
+	if not try_skill(stamina_cost_lmb):
+		return
+	_aim_dir = _calc_aim_dir()
+	rotation.y = atan2(_aim_dir.x, _aim_dir.z)
+	_lmb_cd = 0.0
+	var dur: float = spec.dur * (2.0 if _underwater else 1.0)
+	attack_duration = spec.dur
+	_cur_step_dur = dur
+	_cur_hit_frac = spec.hit
+	_charged_mult = lerpf(1.0, spec.mult, _charge_level)   # dmg theo mức vận
+	_is_charged_release = true
+	_attack_timer = dur
+	_state = State.ATTACK
+	_melee_hit_once = false
+	_start_forward_lunge(spec.lunge * (0.55 + 0.45 * _charge_level), dur * 0.30)
+	camera_shake(0.06 + 0.14 * _charge_level, 0.16 + 0.12 * _charge_level)
 
 ## Bắt đầu một bước trong chain combo: đặt timer/hit-pha/lunge theo bảng dữ liệu.
 func _begin_combo_step(idx: int) -> void:
@@ -1341,14 +1375,14 @@ func _begin_air_attack(chain: Array) -> void:
 	_melee_hit_once = false
 	_start_forward_lunge(2.0, 0.12)
 
-## Auto-chain: giữ chuột trái (hoặc bấm đệm trong lúc vung) → nối bước kế tiếp.
+## Auto-chain: bấm đệm trong lúc vung → nối bước kế tiếp (giữ chuột giờ là
+## VẬN LỰC trọng kích nên không còn nối bằng giữ).
 func _advance_combo() -> bool:
 	if _combo_chain.is_empty():
 		return false
-	var want_next: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _attack_buffered
-	_attack_buffered = false
-	if not want_next:
+	if not _attack_buffered:
 		return false
+	_attack_buffered = false
 	var nxt: int = combo_step + 1
 	if nxt >= _combo_chain.size():
 		return false

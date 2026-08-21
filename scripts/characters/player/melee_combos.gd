@@ -56,6 +56,24 @@ const CHAINS := {
 ## Chain dự phòng cho vũ khí cận chiến không nằm trong bảng (1 đòn đơn).
 const DEFAULT_STEP := {"dur": 0.50, "hit": 0.25, "lunge": 2.0}
 
+## ── ĐÒN TRỌNG KÍCH (GIỮ chuột trái vận lực → THẢ ra đánh) ────────────────────
+## Mỗi vũ khí một đòn khác nhau: dur thời gian đòn, hit pha trúng, lunge lao,
+## mult hệ số sát thương theo mức vận (nhân thêm vào attack_power).
+const CHARGED := {
+	"iron_sword":      {"dur": 0.74, "hit": 0.44, "lunge": 6.5, "mult": 2.0},  # xoay 360 chém
+	"leather_gloves":  {"dur": 0.64, "hit": 0.40, "lunge": 5.8, "mult": 2.1},  # thượng công chạm trời
+	"iron_greatsword": {"dur": 1.00, "hit": 0.52, "lunge": 5.2, "mult": 2.3},  # nhảy đập đất
+	"iron_halberd":    {"dur": 0.92, "hit": 0.48, "lunge": 9.0, "mult": 2.2},  # lốc xoáy song kích
+	"axe":             {"dur": 0.88, "hit": 0.46, "lunge": 4.6, "mult": 2.3},  # chém xoay nặng
+	"pickaxe":         {"dur": 0.84, "hit": 0.44, "lunge": 4.8, "mult": 2.2},  # khoan đục lao tới
+	"shovel":          {"dur": 0.76, "hit": 0.42, "lunge": 4.2, "mult": 2.0},  # vẩy đất nặng
+	"hoe":             {"dur": 0.76, "hit": 0.42, "lunge": 4.2, "mult": 2.0},
+}
+const CHARGED_DEFAULT := {"dur": 0.74, "hit": 0.44, "lunge": 6.0, "mult": 2.0}
+
+static func charged_for(weapon_id: String) -> Dictionary:
+	return CHARGED.get(weapon_id, CHARGED_DEFAULT)
+
 static func has_chain(weapon_id: String) -> bool:
 	return CHAINS.has(weapon_id)
 

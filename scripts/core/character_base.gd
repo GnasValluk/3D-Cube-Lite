@@ -130,6 +130,16 @@ var _parry_window: float = 0.0    # cửa sổ active — trúng đòn trong nà
 var _is_riposte: bool = false     # cú đánh hiện tại là PARRY ATTACK (phản đòn)
 var _dash_ghost_cd: float = 0.0
 
+# ── ĐÒN TRỌNG KÍCH: GIỮ chuột trái vận lực → THẢ ra đánh ─────────────────────
+const CHARGE_MIN: float = 0.26    # giữ ngắn hơn = tap thường
+const CHARGE_MAX: float = 1.35    # mức vận tối đa
+var _charge_pending: bool = false # đã nhấn nhưng chưa đủ thời gian xác định tap/hold
+var _charging: bool = false       # đang VẬN LỰC (pose gồng)
+var _charge_hold_t: float = 0.0
+var _charge_level: float = 0.0    # 0..1 — quyết định sát thương & độ mạnh pose
+var _charged_mult: float = 1.0    # hệ số dmg của cú trọng kích sắp/sắp đánh
+var _is_charged_release: bool = false  # cú ATTACK hiện tại là trọng kích
+
 # ── Oxygen / Swimming ──────────────────────────────────────
 @export var max_oxygen: float = 100.0
 var oxygen: float = 100.0
@@ -147,7 +157,7 @@ var _water_check_cd: float = 0.0
 ##        → RECOVERY (hết chain, hạ thủ) → IDLE
 ##   Nhảy + đánh → AIR_ATTACK → chạm đất → RECOVERY (LANDING) → IDLE
 ##   DASH đóng vai DODGE (có i-frame ngắn).
-enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD, SWIM, EAT, RECOVERY, AIR_ATTACK, PARRY }
+enum State { IDLE, WALK, SPRINT, CROUCH, DASH, ATTACK, DEVOUR, JUMP, FALL, HIT, DEAD, SWIM, EAT, RECOVERY, AIR_ATTACK, PARRY, CHARGE }
 var _state: State = State.IDLE
 
 # ── Timers ────────────────────────────────────────────────────────────────────
@@ -303,6 +313,10 @@ func _begin_primary_attack() -> void:
 ## false = vào RECOVERY. Mặc định: hết 1 đòn → RECOVERY.
 func _advance_combo() -> bool:
 	return false
+
+## THẢ chuột sau khi VẬN LỰC đủ → phóng thích trọng kích (PC override theo vũ khí).
+func _release_charged() -> void:
+	pass
 
 # ── Parry / Riposte ───────────────────────────────────────────────────────────
 ## Vũ khí có thể parry không? (kiếm/đại kiếm/kích — PC ghi đè theo trang bị)
@@ -724,6 +738,8 @@ func _physics_process(delta: float) -> void:
 	if _attack_timer <= 0.0 and _state == State.ATTACK:
 		_combo_slide = false
 		_is_riposte = false
+		_is_charged_release = false
+		_charged_mult = 1.0
 		if not _advance_combo():
 			_state = State.RECOVERY
 			_recover_timer = recovery_duration
@@ -733,6 +749,28 @@ func _physics_process(delta: float) -> void:
 	# ── Parry: hết thời gian giữ thế → về IDLE ────────────────────────────────
 	if _state == State.PARRY and _parry_timer <= 0.0:
 		_state = State.IDLE
+
+	# ── ĐÒN TRỌNG KÍCH: giữ chuột trái vận lực, thả ra phóng thích ────────────
+	if _charge_pending:
+		if _hit_timer > 0.0 or _state == State.DASH or not is_alive:
+			_charge_pending = false
+			_charging = false
+		elif not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_charge_pending = false
+			if _charging:
+				_charging = false
+				_release_charged()
+			else:
+				_begin_primary_attack()   # tap ngắn = đòn thường vào chain
+		else:
+			_charge_hold_t += delta
+			if _charge_hold_t >= CHARGE_MIN and not _charging:
+				_charging = true
+			if _charging:
+				_state = State.CHARGE
+				_charge_level = clampf(
+					(_charge_hold_t - CHARGE_MIN) / max(CHARGE_MAX - CHARGE_MIN, 0.01),
+					0.0, 1.0)
 
 	if _hit_timer > 0.0:
 		velocity.x *= 0.3
@@ -890,6 +928,8 @@ func _physics_process(delta: float) -> void:
 		atk_mult = 0.70
 	elif _state == State.PARRY:
 		atk_mult = 0.25   # giữ thế parry gần như đứng chân
+	elif _state == State.CHARGE:
+		atk_mult = 0.45   # vận lực di chuyển chậm, gồng lấy đà
 	spd *= atk_mult
 
 	if dir.length_squared() > 0.001 and not devouring:
@@ -921,7 +961,7 @@ func _physics_process(delta: float) -> void:
 	# Dash trigger (DODGE): i-frame ngắn giúp né đòn trong lúc lướt
 	var want_dash: bool = false
 	if _is_player:
-		want_dash = Input.is_action_pressed("dash") and _q_cd <= 0.0 and _freeze_timer <= 0.0 and not attacking and not devouring
+		want_dash = Input.is_action_pressed("dash") and _q_cd <= 0.0 and _freeze_timer <= 0.0 and not attacking and not devouring and not _charging
 	if want_dash:
 		if not try_skill(stamina_cost_q):
 			return
@@ -957,6 +997,8 @@ func _physics_process(delta: float) -> void:
 		pass  # hạ thủ sau chain / tiếp đất
 	elif _state == State.PARRY and not swinging:
 		pass  # giữ thế parry đến hết timer
+	elif _state == State.CHARGE and _charging:
+		pass  # đang vận lực trọng kích
 	elif attacking:
 		_state = State.ATTACK
 	elif devouring:
@@ -1009,7 +1051,7 @@ func _do_melee_hit() -> void:
 				var dot: float = fwd.dot(offset / dist)
 				if dot >= angle_threshold:
 					SFXManager.play_damage_hit()
-					var dmg: int = attack_power
+					var dmg: int = int(round(attack_power * _charged_mult))
 					if _is_player:
 						var pc := self as PlayerCharacter
 						if pc and pc.equipped_weapon:
@@ -1030,7 +1072,7 @@ func _do_melee_hit() -> void:
 			var dot: float = fwd.dot(offset / dist)
 			if dot >= angle_threshold:
 					SFXManager.play_damage_hit()
-					var dmg: int = attack_power
+					var dmg: int = int(round(attack_power * _charged_mult))
 					if _is_player:
 						var pc := self as PlayerCharacter
 						if pc and pc.equipped_weapon:
@@ -1050,7 +1092,7 @@ func _do_melee_hit() -> void:
 			var dot: float = fwd.dot(offset / dist)
 			if dot >= angle_threshold:
 					SFXManager.play_damage_hit()
-					var dmg: int = attack_power
+					var dmg: int = int(round(attack_power * _charged_mult))
 					if _is_player:
 						var pc := self as PlayerCharacter
 						if pc and pc.equipped_weapon:
@@ -1070,7 +1112,7 @@ func _do_melee_hit() -> void:
 			var dot: float = fwd.dot(offset / dist)
 			if dot >= angle_threshold:
 					SFXManager.play_damage_hit()
-					var dmg: int = attack_power
+					var dmg: int = int(round(attack_power * _charged_mult))
 					if _is_player:
 						var pc := self as PlayerCharacter
 						if pc and pc.equipped_weapon:
@@ -1092,7 +1134,7 @@ func _do_melee_hit() -> void:
 			var dot: float = fwd.dot(offset / dist)
 			if dot >= angle_threshold:
 					SFXManager.play_damage_hit()
-					var dmg: int = attack_power
+					var dmg: int = int(round(attack_power * _charged_mult))
 					if _is_player:
 						var pc := self as PlayerCharacter
 						if pc and pc.equipped_weapon:
@@ -1306,3 +1348,4 @@ func _find_water_manager() -> OpenWorldManager:
 	if scene == null:
 		return null
 	return scene.get_node_or_null("WorldManager") as OpenWorldManager
+
