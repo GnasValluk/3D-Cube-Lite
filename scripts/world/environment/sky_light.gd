@@ -93,7 +93,8 @@ static func update_sky(mat: ShaderMaterial, hour: float, weather: float, dayf: f
 	mat.set_shader_parameter("sky_top_color", top_color)
 	mat.set_shader_parameter("sky_horizon_color", hor_color)
 	mat.set_shader_parameter("sky_curve", 0.5)
-	var sky_energy_day: float = lerp(0.6, 1.2, minf(day_t, 0.72))
+	# Bầu trời TRƯA giữ XANH đậm rõ ràng (không bạc trắng): energy vừa phải
+	var sky_energy_day: float = lerp(0.6, 1.02, minf(day_t, 0.72))
 	mat.set_shader_parameter("sky_energy", sky_energy_day * (1.0 - weather * 0.35))
 
 	# Đất dưới chân trời: chân trời đất HÒA cùng màu trời (haze khí quyển) để

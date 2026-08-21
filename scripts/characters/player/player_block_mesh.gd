@@ -247,9 +247,10 @@ func _build_arm(shoulder: Node3D, left: bool) -> void:
 		gauntlet_l_pivot = MeshBuilder.pivot(elbow, Vector3(0, -0.18, 0))
 		gauntlet_l_pivot.name = "GauntletLPivot"
 		gauntlet_l_pivot.scale = Vector3(0.5, 0.5, 0.5)
-		# KHIÊN — đeo tay TRÁI, tấm chắn hướng ra trước (+Z nhân vật)
-		shield_pivot = MeshBuilder.pivot(elbow, Vector3(0.02, -0.16, 0.06))
+		# KHIÊN — đeo tay TRÁI, treo DỌC song song cánh tay, mặt hướng ra ngoài
+		shield_pivot = MeshBuilder.pivot(elbow, Vector3(-0.05, -0.17, 0.02))
 		shield_pivot.name = "ShieldPivot"
+		shield_pivot.rotation_degrees = Vector3(0, -90, 0)
 	else:
 		gauntlet_r_pivot = MeshBuilder.pivot(elbow, Vector3(0, -0.18, 0))
 		gauntlet_r_pivot.name = "GauntletRPivot"

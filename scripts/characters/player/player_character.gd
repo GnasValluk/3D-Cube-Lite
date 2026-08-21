@@ -851,6 +851,11 @@ func get_equipped_by_slot(idx: int) -> ItemDef:
 	return arr[idx] as ItemDef
 
 func set_equipped_by_slot(idx: int, item: ItemDef) -> void:
+	# Đại kiếm 2 tay + đang cầm phụ kiện tay → tự gỡ phụ kiện trước
+	if item != null and item.id == "iron_greatsword" and equipped_sub != null \
+			and equipped_sub.id in ["iron_shield", "flashlight"]:
+		equipped_sub = null
+		_scroll_inventory_message("(Buông phụ kiện tay để vung Đại Kiếm!)")
 	match idx:
 		0: equipped_head = item
 		1: equipped_body = item
@@ -858,6 +863,14 @@ func set_equipped_by_slot(idx: int, item: ItemDef) -> void:
 		3: equipped_feet = item
 		4: equipped_back = item
 		5:
+			# ĐẠI KIỂM 2 TAY: không đeo được phụ kiện CẦM TAY (khiên/đèn pin) —
+			# nhẫn/vòng trang sức vẫn đeo bình thường.
+			if item != null and equipped_weapon != null \
+					and equipped_weapon.id == "iron_greatsword" \
+					and item.id in ["iron_shield", "flashlight"]:
+				_scroll_inventory_message("(Đại Kiếm cần 2 tay — không cầm thêm phụ kiện!)")
+				_update_armor_mesh()
+				return
 			equipped_sub = item
 			# Khởi tạo độ bền khiên khi đeo vào slot phụ
 			_shield_durability = item.max_durability if item != null and item.max_durability > 0 else -1
@@ -1653,9 +1666,14 @@ func _sync_aim_camera_zoom() -> void:
 	if _use_tp and is_instance_valid(_tp_rig) and _tp_rig.has_method("set_aim"):
 		var aiming := _bow_aiming
 		if aiming:
-			var is_egg := _is_egg_aiming()
-			if is_egg or _halberd_throwing or _halberd_charge_time >= 0.0:
+			# Nỏ + các loại SÚNG: KHÔNG zoom gần nhân vật (giữ khoảng cách xem)
+			var wid2: String = equipped_weapon.id if equipped_weapon != null else ""
+			if wid2 in ["ak_12", "m200", "crossbow", "watermelon_cannon", "pumpkin_mortar"]:
 				aiming = false
+			else:
+				var is_egg := _is_egg_aiming()
+				if is_egg or _halberd_throwing or _halberd_charge_time >= 0.0:
+					aiming = false
 		_tp_rig.set_aim(aiming)
 
 func _on_dash() -> void:

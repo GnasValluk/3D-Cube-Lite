@@ -14,7 +14,7 @@ var _cloud_smat: StandardMaterial3D = null
 var _cloud_pos := PackedVector3Array()
 var _cloud_scale: Array[Vector3] = []
 var _cloud_wind := Vector3.ZERO
-const CLOUD_SPAN: float = 1500.0
+const CLOUD_SPAN: float = 2200.0
 const CLOUD_Y: float = 25.0
 
 const CYCLE_DURATION: float = 600.0
@@ -194,33 +194,35 @@ func _setup_clouds() -> void:
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20240613
+	var puff := SphereMesh.new()
+	puff.radius = 0.5
+	puff.height = 1.0
+	puff.radial_segments = 14
+	puff.rings = 8
 	var xf: Array = []
 	var cls: Array = []
-	for ci in range(52):
+	for ci in range(46):
 		var cx: float = rng.randf_range(-CLOUD_SPAN, CLOUD_SPAN) * 0.5
 		var cz: float = rng.randf_range(-CLOUD_SPAN, CLOUD_SPAN) * 0.5
-		var slabs: int = 2 + rng.randi_range(0, 2)
-		var cw: float = rng.randf_range(16.0, 38.0)
-		var cd: float = rng.randf_range(10.0, 26.0)
-		var thick: float = rng.randf_range(2.6, 4.4)
-		for si in range(slabs):
-			var w: float = cw * rng.randf_range(0.55, 1.00)
-			var d: float = cd * rng.randf_range(0.55, 1.00)
-			var ox: float = rng.randf_range(-cw * 0.28, cw * 0.28)
-			var oz: float = rng.randf_range(-cd * 0.28, cd * 0.28)
-			var oy: float = rng.randf_range(-0.5, 0.9)
-			var sc := Vector3(w, thick * rng.randf_range(0.8, 1.25), d)
+		var puffs: int = 3 + rng.randi_range(0, 2)
+		var cw: float = rng.randf_range(26.0, 60.0)    # MẢNG MÂY TO hơn trước gấp đôi
+		var cd: float = rng.randf_range(18.0, 44.0)
+		for si in range(puffs):
+			var w: float = cw * rng.randf_range(0.45, 1.05)
+			var d: float = cd * rng.randf_range(0.45, 1.05)
+			var hgt: float = rng.randf_range(6.5, 12.0)   # bồng bềnh dày như khói
+			var ox: float = rng.randf_range(-cw * 0.30, cw * 0.30)
+			var oz: float = rng.randf_range(-cd * 0.30, cd * 0.30)
+			var oy: float = rng.randf_range(-1.2, 2.4)
+			var sc := Vector3(w, hgt, d)
 			xf.append(Transform3D(Basis().scaled(sc), Vector3(cx + ox, oy, cz + oz)))
-			var shade: float = rng.randf_range(0.86, 1.06)
+			var shade: float = rng.randf_range(0.88, 1.08)
 			cls.append(Color(shade, shade, shade * 1.02))
 
-	var cube := BoxMesh.new()
-	cube.size = Vector3.ONE
-	cube.material = _cloud_smat
 	_cloud_mm_res = MultiMesh.new()
 	_cloud_mm_res.transform_format = MultiMesh.TRANSFORM_3D
 	_cloud_mm_res.use_colors = true
-	_cloud_mm_res.mesh = cube
+	_cloud_mm_res.mesh = puff
 	_cloud_mm_res.instance_count = xf.size()
 	_cloud_pos.resize(xf.size())
 	for i in range(xf.size()):
@@ -239,7 +241,7 @@ func _setup_clouds() -> void:
 func _update_clouds(delta: float, h: float, day_t: float, weather: float) -> void:
 	if _cloud_holder == null or _cloud_mm_res == null or _cloud_mm_res.instance_count == 0:
 		return
-	_cloud_wind += Vector3(7.0, 0.0, -2.5) * delta
+	_cloud_wind += Vector3(2.2, 0.0, -0.8) * delta   # TRÔI CHẬM — mây bồng bềnh
 	var cam := get_viewport().get_camera_3d()
 	var px: float = cam.global_position.x if cam != null else 0.0
 	var pz: float = cam.global_position.z if cam != null else 0.0
@@ -303,10 +305,9 @@ func _update_sun(h: float, rain_factor: float) -> void:
 	# Tông ấm buổi sáng kéo tới ~13h: trưa sáng dịu như 8–9h, không bạc gắt.
 	var morning_w: float = clamp(1.0 - absf(h - 8.5) / 5.0, 0.0, 1.0)
 	_sun.light_color = _sun.light_color.lerp(Color(1.00, 0.90, 0.72), morning_w * 0.30)
-	# Energy trưa giữ bằng mức lúc ~9h (không tăng tiếp) + hạ nhẹ so với
-	# trước (1.6→1.45) để trưa dịu, không chói gắt.
+	# Energy trưa GIỮA MỨC (1.22) — đủ sáng mà mặt đất không cháy trắng.
 	var energy_t: float = minf(day_t, 0.725)
-	_sun.light_energy = lerp(0.0, 1.45, pow(energy_t, 0.6)) * rain_factor
+	_sun.light_energy = lerp(0.0, 1.22, pow(energy_t, 0.6)) * rain_factor
 
 	# ── Ánh trăng: đèn Directional ngược phía mặt trời — ban đêm có trăng sáng thật ──
 	if _moon == null:

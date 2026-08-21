@@ -185,6 +185,11 @@ func animate(delta: float) -> void:
 			and mesh.weapon_pivot != null and is_instance_valid(mesh.weapon_pivot):
 		mesh.weapon_pivot.rotation_degrees = \
 			mesh.weapon_pivot.rotation_degrees.lerp(IDLE_WP, minf(1.0, delta * 8.0))
+	# Khiên: ngoài lúc đỡ → treo về dọc song song cánh tay
+	if base._state != CharacterBase.State.PARRY \
+			and mesh.shield_pivot != null and is_instance_valid(mesh.shield_pivot):
+		mesh.shield_pivot.rotation_degrees = \
+			mesh.shield_pivot.rotation_degrees.lerp(Vector3(0, -90, 0), minf(1.0, delta * 8.0))
 	# Clamp an toàn: giữ ankle + foot ở mức dorsiflex nhẹ (mũi hướng lên)
 	# để tránh chân chìm đất khi đứng độn (foot sink do spring overshoot).
 	# Chỉ áp dụng khi trên mặt đất (không cho bơi/rơi).
@@ -1142,6 +1147,12 @@ func _parry(delta: float, _t: float) -> void:
 		if wp != null and is_instance_valid(wp):
 			# Kiếm dựng CHÉO chắn trước thân
 			wp.rotation_degrees = wp.rotation_degrees.lerp(Vector3(18, -46, -12), minf(1.0, delta * 13.0))
+		# KHIÊN (nếu đeo): xoay mặt khiên ra TRƯỚC che thân khi đỡ
+		if player != null and player.equipped_sub != null \
+				and player.equipped_sub.id == "iron_shield" \
+				and mesh.shield_pivot != null and is_instance_valid(mesh.shield_pivot):
+			mesh.shield_pivot.rotation_degrees = mesh.shield_pivot.rotation_degrees.lerp(
+				Vector3(0, 0, 0), minf(1.0, delta * 11.0))
 		mesh.arm_r.rotation.x = _spring("arm_r_x", -1.05, 11.0, 0.9, delta)
 		mesh.arm_r.rotation.z = _spring("arm_r_z", -0.30, 10.0, 0.9, delta)
 		mesh.elbow_r.rotation.x = _spring("elbow_r_x", -1.15, 10.0, 0.9, delta)
