@@ -10,6 +10,7 @@ func setup() -> void:
 	pass
 
 func _ready() -> void:
+	is_plant = true
 	super._ready()
 	_build_mesh()
 

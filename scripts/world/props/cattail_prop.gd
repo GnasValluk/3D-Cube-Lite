@@ -10,6 +10,7 @@ func setup() -> void:
 	pass
 
 func _ready() -> void:
+	is_plant = true
 	super._ready()
 	_build_mesh()
 
@@ -105,3 +106,4 @@ static func _add_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vector3, 
 	st.add_vertex(center - u - v)
 	st.add_vertex(center + u + v)
 	st.add_vertex(center - u + v)
+

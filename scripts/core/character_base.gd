@@ -1172,7 +1172,8 @@ func _do_melee_hit() -> void:
 					var pc := self as PlayerCharacter
 					if pc and pc.equipped_weapon != null:
 						dmg = pc.equipped_weapon.atk_bonus
-				if pn.try_destroy(weapon_id, dmg):
+				dmg = int(round(dmg * _charged_mult))   # trọng kích cũng mạnh hơn với prop
+				if pn.try_destroy(weapon_id, dmg, self):
 					landed = true
 
 	# Độ bền vũ khí: mỗi đòn trúng đích giảm 1 (như Minecraft)

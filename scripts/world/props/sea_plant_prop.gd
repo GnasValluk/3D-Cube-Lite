@@ -24,6 +24,7 @@ func setup(type: String, h1: int, h2: int, wg: float = 3.0) -> void:
 	water_gap = wg
 
 func _ready() -> void:
+	is_plant = true
 	super._ready()
 	build(self, plant_type, seed_h1, seed_h2, water_gap)
 	if plant_type == "anemone":
@@ -516,3 +517,4 @@ static func _add_blade_quad(st: SurfaceTool, center: Vector3, u: Vector3, v: Vec
 	if u2.length() < 0.0001:
 		u2 = Vector3(-u.z, 0.0, u.x)
 	_add_quad(st, center, u2, v, n, col)
+

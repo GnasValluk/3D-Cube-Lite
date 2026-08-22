@@ -12,6 +12,12 @@ var _destroyed: bool = false
 ## `melee_range + hit_radius` (giống cá/heo/slime) để prop nhỏ (cua bùn,...)
 ## trúng được dù đứng hơi xa/lệch. Entity prop lớp riêng tự set khi cần.
 var hit_radius: float = 0.5
+## Prop THỰC VẬT (cây/cỏ/hoa): nhận sát thương từ MỌI nguồn nhưng KHÁNG 50%;
+## vũ khí DIỆT THỰC VẬT bỏ kháng + LUÔN CHÍ MẠNG.
+var is_plant: bool = false
+
+## Vũ khí khắc tinh của thực vật — bỏ kháng 50% & bảo đảm chí mạng
+const ANTI_PLANT_WEAPONS := ["axe", "iron_greatsword", "iron_scythe"]
 
 func _init(p_max_hp: int = 3, p_weapon_req: int = WeaponReq.NONE, p_drop_id: String = "") -> void:
 	max_hp = p_max_hp
@@ -23,19 +29,59 @@ func _ready() -> void:
 	hp = max_hp
 	add_to_group("destroyable_props")
 
-func try_destroy(weapon_id: String, damage: int = 1) -> bool:
-	if _destroyed or not _weapon_allowed(weapon_id):
+func try_destroy(weapon_id: String, damage: int = 1, attacker: Node = null) -> bool:
+	if _destroyed:
 		return false
-	hp -= damage
+	# Melee giữ rào đón loại vũ khí (cây cần rìu để chặt...) — nhưng vẫn áp
+	# quy tắc kháng/chí mạng thực vật qua take_plant_damage.
+	if not _weapon_allowed(weapon_id):
+		return false
+	return take_plant_damage(damage, weapon_id, attacker, false)
+
+## MỌI nguồn sát thương đi qua đây cho prop thực vật:
+##  • Kháng 50% TOÀN DIỆN (mọi vũ khí/nguồn)
+##  • RIÊNG rìu / đại kiếm / lưỡi hái: BỎ kháng + LUÔN CHÍ MẠNG
+##    (hệ số chí mạng = 1 + crit_dmg của kẻ tấn công, tối thiểu ×1.5)
+## ignore_requirement = true với nguồn ngoài melee (đạn/nổ) — không bị chặn
+## bởi rào "cây phải dùng rìu".
+func take_plant_damage(base_damage: int, weapon_id: String, attacker: Node = null,
+		ignore_requirement: bool = false) -> bool:
+	if _destroyed:
+		return false
+	if not ignore_requirement and not _weapon_allowed(weapon_id):
+		return false
+	var effective := maxi(1, base_damage)
+	var guaranteed_crit := false
+	if is_plant and weapon_id in ANTI_PLANT_WEAPONS:
+		guaranteed_crit = true
+	elif is_plant:
+		effective = maxi(1, int(round(effective * 0.5)))   # KHÁNG 50% toàn diện
+	if guaranteed_crit:
+		var crit_mult: float = 1.5
+		if attacker != null and "crit_dmg" in attacker:
+			crit_mult = 1.0 + maxf(float(attacker.crit_dmg), 0.5)
+		effective = maxi(1, int(round(effective * crit_mult)))
+	hp -= effective
 	if hp > 0:
 		_hit_flash()
-		_spawn_damage_number(damage)
+		_spawn_plant_number(effective, guaranteed_crit)
 		SFXManager.play_hurt()
 	else:
-		_spawn_damage_number(damage)
+		_spawn_plant_number(effective, guaranteed_crit)
 		SFXManager.play_block_break()
 		_die()
 	return true
+
+## Số sát thương nổi — chí mạng lên màu VÀNG cam to rõ.
+func _spawn_plant_number(dmg: int, crit: bool) -> void:
+	var world := get_tree().current_scene if get_tree() else null
+	if world == null:
+		return
+	var dn := FloatingDamage.new()
+	var col := Color(1.0, 0.78, 0.15) if crit else Color.WHITE
+	world.add_child(dn)
+	dn.setup(dmg, global_position + Vector3(0, 1.5, 0), col,
+		"CHÍ MẠNG" if crit else "")
 
 func _weapon_allowed(weapon_id: String) -> bool:
 	if weapon_requirement == WeaponReq.NONE:

@@ -19,6 +19,7 @@ var _stage: int = Stage.SPROUT
 var _check_timer: float = 0.0
 
 func _ready() -> void:
+	is_plant = true   # cây trồng/khoai/cỏ — kháng 50% & quy tắc thực vật
 	super._ready()
 	_birth_cycle = _get_now_cycle() \
 		- _hash_position_to_float(global_position) * _birth_span_days() * CYCLE_DURATION

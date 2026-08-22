@@ -245,6 +245,21 @@ func _deal_blast_damage() -> void:
 			ch.take_damage(_damage, _shooter, damage_type)
 			if split.alt > 0:
 				ch._spawn_damage_number(split.alt, _shooter, damage_type_alt)
+	# ── THỰC VẬT quanh điểm nổ cũng trúng đạn (mọi nguồn sát thương) ────────
+	# Kháng 50% tự áp trong take_plant_damage; bỏ qua rào loại vũ khí.
+	var tree := get_tree()
+	if tree == null:
+		return
+	for pn in tree.get_nodes_in_group("destroyable_props"):
+		if not is_instance_valid(pn) or not ("is_plant" in pn) or not pn.is_plant:
+			continue
+		if pn.get("_destroyed"):
+			continue
+		var off2: Vector3 = global_position - pn.global_position
+		off2.y = 0.0
+		var pr: float = float(pn.hit_radius) if "hit_radius" in pn else 0.5
+		if off2.length() <= _blast_radius() + pr:
+			pn.take_plant_damage(_damage, "", _shooter, true)
 
 func _get_characters() -> Array:
 	var chars: Array = []
