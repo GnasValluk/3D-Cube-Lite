@@ -159,10 +159,15 @@ func _update_camera_position() -> void:
 	# chắn giữa tầm nhìn — reset về 0 khi nhả ngắm (blend về 0).
 	var fwd := -_camera_dir()
 	var screen_right := fwd.cross(Vector3.UP).normalized()
+	# Vai bắn: camera dịch PHẢI + NHÌN vào điểm lệch phải trước ngực
+	# → player bị đẩy sang TRÁI khung hình, chừa tâm cho crosshair
 	offset += screen_right * (aim_offset_right * _aim_blend)
-	offset += Vector3.UP * (-0.12 * _aim_blend)   # hạ nhẹ = vai không che tâm
 	_camera.position = offset + _shake_offset
-	_camera.look_at(global_position + _shake_offset * 0.08, Vector3.UP)
+	var aim_target := global_position \
+		+ screen_right * (aim_offset_right * 2.0 * _aim_blend) \
+		+ Vector3.UP * (0.10 * _aim_blend) \
+		+ _shake_offset * 0.08
+	_camera.look_at(aim_target, Vector3.UP)
 
 func _update_shake(delta: float) -> void:
 	if _shake_timer <= 0.0:

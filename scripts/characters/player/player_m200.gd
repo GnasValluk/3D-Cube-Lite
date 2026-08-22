@@ -49,15 +49,10 @@ static func fire(player) -> void:
 		return
 	if player._m200_bolt_cd > 0.0:
 		return
-	# Hết băng: tự nạp; không có dự trữ mới báo.
-	if player._mag_ammo <= 0:
-		if player._count_reserve("bullet_338mm") > 0:
-			player._start_reload()
-		else:
-			player._scroll_inventory_message(player.tr("NO_M200_AMMO"))
-			cancel_aim(player)
+	if not consume_ammo(player):
+		player._scroll_inventory_message(player.tr("NO_M200_AMMO"))
+		cancel_aim(player)
 		return
-	player._mag_ammo -= 1
 	player._damage_equipped_tool(1)
 
 	var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 16)

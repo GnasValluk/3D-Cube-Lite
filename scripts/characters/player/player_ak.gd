@@ -78,14 +78,9 @@ static func update_fire(player, delta: float) -> void:
 		return
 	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
-	# Hết băng: tự NẠP ĐẠN từ kho dự trữ; hết hẳn mới báo & ngừng.
-	if player._mag_ammo <= 0:
-		if not player._reloading:
-			if player._count_reserve("bullet_762mm") > 0:
-				player._start_reload()
-			else:
-				player._scroll_inventory_message(player.tr("NO_AK_AMMO"))
-				cancel_aim(player)
+	if not has_ammo(player):
+		player._scroll_inventory_message(player.tr("NO_AK_AMMO"))
+		cancel_aim(player)
 		return
 	player._ak_fire_cooldown -= delta
 	if player._ak_fire_cooldown > 0.0:
@@ -94,9 +89,9 @@ static func update_fire(player, delta: float) -> void:
 	fire_shot(player)
 
 static func fire_shot(player) -> void:
-	if player._mag_ammo <= 0:
+	if not consume_ammo(player):
+		cancel_aim(player)
 		return
-	player._mag_ammo -= 1
 	player._damage_equipped_tool(1)
 
 	var base_dmg: int = player.attack_power + (player.equipped_weapon.atk_bonus if player.equipped_weapon else 8)

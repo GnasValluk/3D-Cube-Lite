@@ -315,21 +315,18 @@ static func fire(player) -> void:
 	arrow.global_position = spawn_from + aim_dir * 0.5
 	arrow.setup(aim_dir, total_dmg, arrow_speed, range_len, player)
 
-## ── NỎ bắn kiểu SÚNG: mỗi nhấn chuột trái 1 mũi tên từ BĂNG 7 ────────────────
-## (không còn kéo-aim như cung). Nạp đạn bằng phím G.
+## ── NỎ bắn kiểu SÚNG: mỗi nhấn chuột trái 1 mũi tên ăn thẳng từ kho ──────────
 static func shoot_crossbow_instant(player) -> void:
 	if not player.equipped_weapon or player.equipped_weapon.id != "crossbow":
 		return
-	if player._cb_cd > 0.0 or player._reloading:
+	if player._cb_cd > 0.0:
 		return
-	if player._mag_ammo <= 0:
-		if player._count_reserve("arrow") > 0:
-			player._start_reload()
-		else:
-			player._scroll_inventory_message(player.tr("BOW_NO_ARROWS"))
+	if not has_arrows(player):
+		player._scroll_inventory_message(player.tr("BOW_NO_ARROWS"))
 		return
 	player._cb_cd = 0.55
-	player._mag_ammo -= 1
+	if not consume_arrow(player):
+		return
 	player._damage_equipped_tool(1)
 
 	var base_dmg: int = player.attack_power \
@@ -348,7 +345,6 @@ static func shoot_crossbow_instant(player) -> void:
 		var to_tgt: Vector3 = player._aim_world_point - spawn_from
 		if to_tgt.length_squared() > 0.01:
 			aim_dir = to_tgt.normalized()
-			aim_dir.y = clampf(aim_dir.y, -0.6, 0.6)
 	if aim_dir.length_squared() < 0.001:
 		aim_dir = -player.global_transform.basis.z
 
