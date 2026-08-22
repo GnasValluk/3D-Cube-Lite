@@ -127,6 +127,18 @@ var _shield_durability: int = -1
 ## CUNG GỖ: điểm neo vị trí cầm gốc + cờ đã capture
 var _lb_hold_base: Vector3 = Vector3.ZERO
 var _lb_hold_captured: bool = false
+## ── HỆ BĂNG ĐẠN / NẠP ĐẠN (AK-12 · M200 · Nỏ) ────────────────────────────────
+var _mag_ammo: int = 0            # viên hiện có trong băng
+var _mag_size: int = 0            # sức chứa băng (0 = vũ khí không dùng băng)
+var _reloading: bool = false
+var _reload_t: float = 0.0
+var _reload_take: int = 0         # số viên sẽ nạp khi xong thời gian
+var _cb_cd: float = 0.0           ## cooldown bắn nỏ (semi-auto)
+const MAG_SIZES := {"ak_12": 30, "m200": 11, "crossbow": 7}
+const RELOAD_TIMES := {"ak_12": 1.6, "m200": 1.4, "crossbow": 1.1}
+const MAG_AMMO_ITEM := {"ak_12": "bullet_762mm", "m200": "bullet_338mm", "crossbow": "arrow"}
+## Crosshair HUD hiển thị khi ngắm/bắn súng·nỏ·cung
+var _crosshair: Control = null
 
 const HALBERD_CHARGE_TIME: float = 0.7
 ## Tỷ lệ phóng to nhân vật người chơi (~20%): mesh + capsule + hit_radius.
@@ -570,6 +582,8 @@ func _spawn_scattered_drops(death_pos: Vector3 = Vector3.INF) -> void:
 		for slot in inventory.slots:
 			slot.clear()
 	equipped_weapon = null
+	_mag_size = 0
+	_mag_ammo = 0
 	equipped_head = null
 	equipped_body = null
 	equipped_legs = null
@@ -668,6 +682,7 @@ func use_item_from_inventory(idx: int) -> void:
 			var src_dur: int = inventory.slots[idx].durability if idx >= 0 and idx < inventory.slots.size() else -1
 			_stop_mining()
 			equipped_weapon = item
+			_sync_mag_on_equip()
 			inventory.remove_item(idx, 1)
 			if old != null:
 				var old_dur: int = -1
@@ -703,6 +718,7 @@ func use_item_from_inventory(idx: int) -> void:
 			var src_dur_t: int = inventory.slots[idx].durability if idx >= 0 and idx < inventory.slots.size() else -1
 			_stop_mining()
 			equipped_weapon = item
+			_sync_mag_on_equip()
 			inventory.remove_item(idx, 1)
 			if old_t != null:
 				var old_dur_t: int = -1
@@ -881,6 +897,7 @@ func set_equipped_by_slot(idx: int, item: ItemDef) -> void:
 			# Khởi tạo độ bền khiên khi đeo vào slot phụ
 			_shield_durability = item.max_durability if item != null and item.max_durability > 0 else -1
 	_update_armor_mesh()
+	_sync_mag_on_equip()
 	if idx == 4:
 		_refresh_backpack_state()
 
@@ -937,6 +954,93 @@ func _break_shield() -> void:
 	equipped_sub = null
 	_guarding = false
 	_update_armor_mesh()
+
+## ── HỆ BĂNG ĐẠN ────────────────────────────────────────────────────────────────
+## ID vũ khí đang dùng hệ băng đạn; "" nếu không thuộc.
+func _mag_weapon_id() -> String:
+	var wid: String = equipped_weapon.id if equipped_weapon != null else ""
+	return wid if MAG_SIZES.has(wid) else ""
+
+## Đồng bộ băng khi TRANG BỊ/ĐỔI súng·nỏ: tự nạp đầy từ kho nếu đủ viên.
+func _sync_mag_on_equip() -> void:
+	var wid := _mag_weapon_id()
+	if wid == "":
+		_mag_size = 0
+		_mag_ammo = 0
+		return
+	_mag_size = MAG_SIZES[wid]
+	var ammo_id: String = MAG_AMMO_ITEM[wid]
+	var take: int = mini(_mag_size, _count_reserve(ammo_id))
+	if take > 0:
+		_consume_reserve(ammo_id, take)
+	_mag_ammo = take
+
+func _count_reserve(ammo_id: String) -> int:
+	var n := 0
+	if inventory == null:
+		return 0
+	for slot in inventory.slots:
+		if not slot.is_empty() and slot.item.id == ammo_id:
+			n += slot.count
+	return n
+
+func _consume_reserve(ammo_id: String, amount: int) -> void:
+	var left := amount
+	if inventory == null:
+		return
+	for i in range(inventory.slots.size()):
+		if left <= 0:
+			break
+		var slot: ItemSlot = inventory.slots[i]
+		if not slot.is_empty() and slot.item.id == ammo_id:
+			var take: int = mini(slot.count, left)
+			inventory.remove_item(i, take)
+			left -= take
+
+## NHẤN G (reload): nạp băng từ kho dự trữ.
+func _start_reload() -> void:
+	var wid := _mag_weapon_id()
+	if wid == "" or _reloading or _mag_ammo >= _mag_size:
+		return
+	var ammo_id: String = MAG_AMMO_ITEM[wid]
+	var need: int = _mag_size - _mag_ammo
+	var have: int = _count_reserve(ammo_id)
+	if have <= 0:
+		_scroll_inventory_message(tr("BOW_NO_ARROWS"))
+		return
+	var take: int = mini(need, have)
+	_reloading = true
+	_reload_t = RELOAD_TIMES[wid]
+	_reload_take = take
+	SFXManager.play_click()
+
+func _finish_reload() -> void:
+	_mag_ammo = mini(_mag_ammo + _reload_take, _mag_size)
+	_reloading = false
+	_reload_take = 0
+	SFXManager.play_block_place()
+	_scroll_inventory_message("Đã nạp đạn (%d/%d)" % [_mag_ammo, _mag_size])
+
+## CROSSHAIR giữa màn hình — hiện khi ngắm/bắn súng·nỏ·cung.
+func _ensure_crosshair() -> void:
+	if _crosshair != null and is_instance_valid(_crosshair):
+		return
+	_crosshair = preload("res://scripts/ui/hud/crosshair.gd").new()
+	_crosshair.set_anchors_preset(Control.PRESET_CENTER)
+	add_child(_crosshair)
+
+func _update_crosshair() -> void:
+	_ensure_crosshair()
+	var wid := equipped_weapon.id if equipped_weapon != null else ""
+	var show := false
+	match wid:
+		"ak_12", "m200":
+			show = _bow_aiming and not _reloading
+		"crossbow", "wooden_bow":
+			show = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) \
+				or (_bow_aiming and wid == "wooden_bow")
+	if _crosshair != null:
+		_crosshair.visible = show
 
 func _update_weapon_mesh() -> void:
 	if _mesh == null or _mesh.weapon_pivot == null:
@@ -1100,6 +1204,7 @@ func equip_weapon_direct(item: ItemDef, slot_idx: int = -1) -> void:
 	print("[Player] equip_weapon_direct: ", item.id if item != null else "null")
 	_stop_mining()
 	equipped_weapon = item
+	_sync_mag_on_equip()
 	_equipped_slot_idx = slot_idx
 	_equipped_durability = -1
 	_update_weapon_mesh()
@@ -1195,6 +1300,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 				return
 			if k.is_action_pressed("jump") and _freeze_timer <= 0.0 and can_jump():
 				_jbuf = JUMP_BUFFER
+			if k.is_action_pressed("reload"):
+				_start_reload()
 			if k.is_action_pressed("save_game"):
 				if SaveManager:
 					SaveManager.save_game()
@@ -1322,7 +1429,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				match equipped_weapon.id:
 					"ak_12": _AK.start_fire(self); return
 					"m200": _M200.start_aim(self); return
-					"crossbow": _Bow.start_aim(self); return
+					"crossbow": _Bow.shoot_crossbow_instant(self); return
 					"pumpkin_mortar": _Mortar.start_aim(self); return
 					"watermelon_cannon": _Bow.start_cannon_aim(self); return
 					"fishing_rod": _Fishing.action(self); return
@@ -1687,6 +1794,8 @@ func _on_tool_broken() -> void:
 	_equipped_slot_idx = -1
 	_equipped_durability = -1
 	equipped_weapon = null
+	_mag_size = 0
+	_mag_ammo = 0
 	_stop_mining()
 	_update_weapon_mesh()
 	SFXManager.play_hurt()
@@ -1771,6 +1880,14 @@ func _process(delta: float) -> void:
 		_Fishing.update_pose(self, delta)
 	if _m200_bolt_cd > 0.0:
 		_m200_bolt_cd = maxf(_m200_bolt_cd - delta, 0.0)
+	# ── NẠP ĐẠN: đếm ngược rồi nạp số viên đã trừ sẵn ────────────────────────
+	if _cb_cd > 0.0:
+		_cb_cd = maxf(_cb_cd - delta, 0.0)
+	if _reloading:
+		_reload_t -= delta
+		if _reload_t <= 0.0:
+			_finish_reload()
+	_update_crosshair()
 	if _bow_aiming:
 		if _state == State.HIT:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"

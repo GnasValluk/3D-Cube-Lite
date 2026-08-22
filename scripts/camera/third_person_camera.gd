@@ -19,7 +19,8 @@ extends Node3D
 @export var zoom_max: float = 22.0
 @export var zoom_step:    float  = 0.5
 @export var aim_zoom:     float  = 1.8  # Khoảng cách khi đang ngắm (góc 3)
-@export var aim_offset_right: float = 0.55  # Nhích camera sang phải khi ngắm (đơn vị thế giới)
+@export var aim_offset_right: float = 1.25  # Nhích camera sang PHẢI khi ngắm
+# → player nằm BÊN TRÁI màn hình, chừa tâm cho crosshair
 
 @onready var _camera: Camera3D = $Camera3D
 

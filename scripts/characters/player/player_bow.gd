@@ -315,6 +315,56 @@ static func fire(player) -> void:
 	arrow.global_position = spawn_from + aim_dir * 0.5
 	arrow.setup(aim_dir, total_dmg, arrow_speed, range_len, player)
 
+## ── NỎ bắn kiểu SÚNG: mỗi nhấn chuột trái 1 mũi tên từ BĂNG 7 ────────────────
+## (không còn kéo-aim như cung). Nạp đạn bằng phím G.
+static func shoot_crossbow_instant(player) -> void:
+	if not player.equipped_weapon or player.equipped_weapon.id != "crossbow":
+		return
+	if player._cb_cd > 0.0 or player._reloading:
+		return
+	if player._mag_ammo <= 0:
+		if player._count_reserve("arrow") > 0:
+			player._start_reload()
+		else:
+			player._scroll_inventory_message(player.tr("BOW_NO_ARROWS"))
+		return
+	player._cb_cd = 0.55
+	player._mag_ammo -= 1
+	player._damage_equipped_tool(1)
+
+	var base_dmg: int = player.attack_power \
+		+ (player.equipped_weapon.atk_bonus if player.equipped_weapon else 8)
+	var total_dmg: int = int(base_dmg * 1.35)
+
+	var spawn_from: Vector3 = _muzzle_world(player)
+	var aim_dir: Vector3 = player._bow_aim_dir
+	if player._aim_tp_mode and player._aim_world_point != Vector3.ZERO:
+		var to_tgt: Vector3 = player._aim_world_point - spawn_from
+		if to_tgt.length_squared() > 0.01:
+			aim_dir = to_tgt.normalized()
+			aim_dir.y = clampf(aim_dir.y, -0.6, 0.6)
+	if aim_dir.length_squared() < 0.001:
+		aim_dir = -player.global_transform.basis.z
+
+	var spread := deg_to_rad(0.5)
+	var up_ref := Vector3.UP
+	if absf(aim_dir.dot(up_ref)) > 0.98:
+		up_ref = Vector3.RIGHT
+	var right := aim_dir.cross(up_ref).normalized()
+	var up2 := right.cross(aim_dir).normalized()
+	var dir := (aim_dir + right * randf_range(-spread, spread)
+		+ up2 * randf_range(-spread, spread)).normalized()
+
+	var arrow := ArrowProjectile.new()
+	var world: Node = player.get_tree().current_scene
+	if world:
+		world.add_child(arrow)
+	else:
+		player.add_child(arrow)
+	arrow.global_position = spawn_from + dir * 0.4
+	arrow.setup(dir, total_dmg, 58.0, 70.0, player)
+	SFXManager.play_cast()
+
 static func fire_watermelon_cannon(player) -> void:
 	if not player.try_skill(player.stamina_cost_lmb):
 		return
