@@ -145,6 +145,7 @@ var _charge_spin_t: float = 0.0
 var _hit_override_range: float = -1.0 # >0 = đè tầm đánh (bán nguyệt/nón...)
 var _hit_override_angle: float = -1.0 # >=0 = đè ngưỡng góc (0 = nửa vòng trước)
 var _hit_ignore_angle: bool = false   # bỏ hẳn kiểm tra hướng (360° xoay)
+var _charge_knockup: bool = false     # đòn đấm dập đất: hất tung nhẹ kẻ địch
 
 # ── Oxygen / Swimming ──────────────────────────────────────
 @export var max_oxygen: float = 100.0
@@ -750,6 +751,7 @@ func _physics_process(delta: float) -> void:
 		_hit_override_range = -1.0
 		_hit_override_angle = -1.0
 		_hit_ignore_angle = false
+		_charge_knockup = false
 		if not _advance_combo():
 			_state = State.RECOVERY
 			_recover_timer = recovery_duration
@@ -1077,6 +1079,9 @@ func _do_melee_hit() -> void:
 						if pc and pc.equipped_weapon:
 							dmg += pc.equipped_weapon.atk_bonus
 					ch.take_damage(dmg, self)
+					# ĐẤM DÂP ĐẤT (găng tay trọng kích): hất tung nhẹ kẻ địch
+					if _charge_knockup and ch is CharacterBody3D:
+						ch.velocity.y = 4.5
 					landed = true
 	# Also hit fish in the "fish" group (cá tự nhiên trong FishSpawner + cá nở
 	# từ trứng đều vào group này — nếu chỉ quét FishSpawner thì cá từ trứng

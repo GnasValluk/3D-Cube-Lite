@@ -1350,6 +1350,16 @@ func _release_charged() -> void:
 	_charge_spin = false
 
 	match wid:
+		"leather_gloves":
+			# NHẢY VÚT 3m về trước → ĐẤM DÂM ĐẤT: AOE quanh thân + HẤT TUNG nhẹ
+			_spawn_dash_ghost()
+			var fwd_g := Vector3(sin(rotation.y), 0.0, cos(rotation.y))
+			global_position += fwd_g * 3.0
+			velocity = Vector3.ZERO
+			_hit_ignore_angle = true
+			_hit_override_range = 3.0
+			_charge_knockup = true
+			camera_shake(0.16, 0.22)
 		"iron_greatsword":
 			# Vung NGANG cực mạnh trái → phải — BÁN NGUYÊT phía trước (dot ≥ 0)
 			_hit_override_range = 4.8 * (0.75 + 0.25 * _charge_level)

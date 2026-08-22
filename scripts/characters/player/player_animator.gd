@@ -1316,6 +1316,15 @@ func _charged_blend(prog: float, delta: float, wid: String) -> void:
 		return
 	var table: Dictionary
 	match wid:
+		"leather_gloves":
+			# ĐẤM DÂM ĐẤT: nhảy vút → hai tay giơ cao → DÁP XUỐNG sàn
+			table = {"w1": 0.34, "w2": 0.56,
+				"wind":   {"rig.x": -0.18, "body.x": -0.12, "head.x": 0.14,
+					"arm_r.x": -2.35, "elbow_r.x": -0.28, "arm_l.x": -2.30, "elbow_l.x": -0.30},
+				"strike": {"rig.x": 0.48, "body.x": 0.36, "head.x": 0.24,
+					"arm_r.x": 0.66, "elbow_r.x": -0.05, "arm_l.x": 0.60, "elbow_l.x": -0.07},
+				"follow": {"rig.x": 0.26, "body.x": 0.20,
+					"arm_r.x": 0.34, "elbow_r.x": -0.55}}
 		"iron_sword":
 			# TỐC BIẾN CHÉM: ngang dứt khoát một đường, nón phía trước
 			table = {"w1": 0.18, "w2": 0.44,
@@ -1360,6 +1369,8 @@ func _charged_blend(prog: float, delta: float, wid: String) -> void:
 	var strike: Dictionary = table.strike
 	var follow: Dictionary = table.follow
 	for key in wind.keys():
+		if key == "wp.x":
+			continue   # wp.x bù riêng phía dưới để lưỡi LUÔN NGANG
 		var target: float
 		var rate: float
 		if prog < w1:
@@ -1372,6 +1383,17 @@ func _charged_blend(prog: float, delta: float, wid: String) -> void:
 			target = follow.get(key, strike.get(key, wind[key]))
 			rate = 9.0
 		_set_joint(key, target, delta, rate)
+	# BÙ NGHỊCH GÓC TAY: Σ = arm + elbow + wp phải = 90° → lưỡi NGANG mặt đất
+	# (charged pose nâng tay cao nên không bù thì lưỡi chọc lên trời)
+	var arm_sum_deg: float = rad_to_deg(
+		mesh.arm_r.rotation.x + mesh.elbow_r.rotation.x)
+	var wp2 := mesh.weapon_pivot
+	if wp2 != null and is_instance_valid(wp2):
+		var rx: float = wp2.rotation_degrees.x
+		rx = lerpf(rx, 90.0 - arm_sum_deg - base._charge_level * 6.0,
+			minf(1.0, delta * 22.0))
+		var rz: float = wp2.rotation_degrees.z
+		wp2.rotation_degrees = Vector3(rx, wp2.rotation_degrees.y, rz)
 
 func _spawn_punch_fx(step_i: int) -> void:
 	var anchor: Node3D = mesh.elbow_r if (step_i % 2) == 1 else mesh.elbow_l
