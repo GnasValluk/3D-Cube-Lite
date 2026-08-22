@@ -319,22 +319,34 @@ static func _build_luoi_hai(p: Node3D) -> void:
 			_box(node, Vector3(0, -0.030, 0), Vector3(0.050, 0.014, seg_len), edge)
 		prev = nxt
 
-## ── CUNG GỖ — 2 cánh cong đối xứng + dây (dọc trục Y; pose xoay ngang) ──────
+## ── CUNG GỖ — 2 cánh CONG MƯỢT nối liền (segment xoay theo spine) ───────────
+## Spine parabol: gốc ±0.46 hơi vểnh ra sau (-X), giữa phồng về trước (+X).
+## Dây cung động do PlayerLongbow cập nhật (tips tại x=-0.06, y=±0.46).
 static func _build_cung_go(p: Node3D) -> void:
 	var wood := _mat(Color(0.48, 0.32, 0.15))
 	var wood_d := _mat(Color(0.36, 0.23, 0.10))
 	var wrap := _mat(Color(0.55, 0.40, 0.22))
-	# Cánh trên: 3 đoạn cong dần ra sau
-	_cyl(p, Vector3(-0.008, 0.14, 0), 0.020, 0.16, wood)
-	_cyl(p, Vector3(-0.032, 0.30, 0), 0.017, 0.15, wood)
-	_cyl(p, Vector3(-0.058, 0.43, 0), 0.013, 0.13, wood_d)
-	# Cánh dưới đối xứng
-	_cyl(p, Vector3(-0.008, -0.14, 0), 0.020, 0.16, wood)
-	_cyl(p, Vector3(-0.032, -0.30, 0), 0.017, 0.15, wood)
-	_cyl(p, Vector3(-0.058, -0.43, 0), 0.013, 0.13, wood_d)
+	var segs := 8   # mỗi cánh 4 đoạn
+	var pts: Array[Vector3] = []
+	for i in range(segs + 1):
+		var t: float = float(i) / float(segs)          # 0 đáy → 1 đỉnh
+		var y: float = lerpf(-0.46, 0.46, t)
+		var x: float = -0.06 + 0.20 * (1.0 - pow(2.0 * t - 1.0, 2.0))   # phồng giữa
+		pts.append(Vector3(x, y, 0))
+	for i in range(segs):
+		var a := pts[i]
+		var b := pts[i + 1]
+		var node := Node3D.new()
+		node.position = (a + b) * 0.5
+		node.basis = Basis.looking_at((b - a).normalized(), Vector3.RIGHT)
+		p.add_child(node)
+		var mcol: StandardMaterial3D = wood if i % 2 == 0 else wood_d
+		var th: float = 0.040 - absf(float(i) - float(segs) * 0.5) * 0.010
+		# Box dọc theo hướng đoạn (Z), dẹt theo X — mặt lá cung hướng camera
+		_box(node, Vector3.ZERO, Vector3(0.030, 0.046 - th * 0.4, a.distance_to(b) + 0.02), mcol)
 	# Chuôi bọc da giữa
-	_cyl(p, Vector3(0, 0.0, 0), 0.024, 0.15, wrap)
-	# Dây cung: 2 đoạn nối đỉnh cánh qua hốc (được PlayerLongbow cập nhật động)
+	_cyl(p, Vector3(0.13, 0.0, 0), 0.024, 0.15, wrap)
+	# Dây cung: 2 đoạn nối đỉnh cánh qua hốc (PlayerLongbow cập nhật động)
 	var str_node := Node3D.new()
 	str_node.name = "BowString"
 	p.add_child(str_node)

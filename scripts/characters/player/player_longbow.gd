@@ -230,9 +230,9 @@ static func _update_string(player, d: float) -> void:
 		s_bot.name = "SegBottom"
 		str_node.add_child(s_bot)
 	# Đầu cánh cung & hốc dây bị kéo ra SAU (-X local) theo d
-	var tip_t := Vector3(-0.05, 0.46, 0.0)
-	var tip_b := Vector3(-0.05, -0.46, 0.0)
-	var nock := Vector3(-0.05 - 0.30 * d, 0.0, 0.0)
+	var tip_t := Vector3(-0.06, 0.46, 0.0)
+	var tip_b := Vector3(-0.06, -0.46, 0.0)
+	var nock := Vector3(-0.06 - 0.30 * d, 0.0, 0.0)
 	_place_seg(str_node.get_node("SegTop"), tip_t, nock)
 	_place_seg(str_node.get_node("SegBottom"), nock, tip_b)
 

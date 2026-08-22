@@ -1187,12 +1187,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_Bow.fire_watermelon_cannon(self)
 				_Bow.cancel_aim(self)
 			return
-		if not mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT and _halberd_charge_time >= 0.0:
-			if _halberd_throwing:
-				_Halberd.fire_throw(self)
-			else:
-				_Halberd.do_melee(self)
-			return
 		if mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
 			# AK-12: chuột phải bật/tắt ADS (ngắm), chuột trái để bắn.
 			if equipped_weapon != null and equipped_weapon.id == "ak_12":
@@ -1669,15 +1663,6 @@ func _process(delta: float) -> void:
 		_Fishing.update_pose(self, delta)
 	if _m200_bolt_cd > 0.0:
 		_m200_bolt_cd = maxf(_m200_bolt_cd - delta, 0.0)
-	if equipped_weapon != null and equipped_weapon.id == "iron_halberd":
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			if _halberd_charge_time < 0.0:
-				_halberd_charge_time = 0.0
-			_halberd_charge_time += delta
-			if _halberd_charge_time >= HALBERD_CHARGE_TIME and not _halberd_throwing:
-				_Halberd.start_throw_aim(self)
-			if _halberd_throwing:
-				_Halberd.update_aim(self, delta)
 	if _bow_aiming:
 		if _state == State.HIT:
 			var is_mortar := equipped_weapon != null and equipped_weapon.id == "pumpkin_mortar"
@@ -1714,19 +1699,14 @@ func _process(delta: float) -> void:
 		_Halberd.cancel_aim(self)
 
 func _sync_aim_camera_zoom() -> void:
-	# Góc 3: khi nhấn giữ chuột trái để aim (nỏ/súng cối/pháo dưa hấu)
+	# Góc 3: khi nhấn giữ chuột trái để aim (nỏ/súng cối/pháo dưa hấu/cung)
 	# thì zoom camera gần player theo kiểu bắn súng.
 	if _use_tp and is_instance_valid(_tp_rig) and _tp_rig.has_method("set_aim"):
 		var aiming := _bow_aiming
 		if aiming:
-			# Nỏ + các loại SÚNG: KHÔNG zoom gần nhân vật (giữ khoảng cách xem)
-			var wid2: String = equipped_weapon.id if equipped_weapon != null else ""
-			if wid2 in ["ak_12", "m200", "crossbow", "watermelon_cannon", "pumpkin_mortar", "wooden_bow"]:
+			var is_egg := _is_egg_aiming()
+			if is_egg or _halberd_throwing or _halberd_charge_time >= 0.0:
 				aiming = false
-			else:
-				var is_egg := _is_egg_aiming()
-				if is_egg or _halberd_throwing or _halberd_charge_time >= 0.0:
-					aiming = false
 		_tp_rig.set_aim(aiming)
 
 func _on_dash() -> void:
