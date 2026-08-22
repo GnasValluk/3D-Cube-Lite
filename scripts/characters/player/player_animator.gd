@@ -101,7 +101,7 @@ func _spring(name: String, target: float, freq: float, zeta: float, delta: float
 
 ## Vũ khí tự điều khiển tay riêng (update_pose chạy sau animator trong _process):
 ## animator nhường tay để tránh giằng co (spring freq cao dễ "giành" lại pose).
-const _ARMS_OWNED_WEAPONS: Array[String] = ["ak_12", "m200", "crossbow", "watermelon_cannon", "pumpkin_mortar"]
+const _ARMS_OWNED_WEAPONS: Array[String] = ["ak_12", "m200", "crossbow", "watermelon_cannon", "pumpkin_mortar", "wooden_bow"]
 
 func _weapon_owns_arms() -> bool:
 	# Câu cá: khi đang thả câu/cầm cần chờ, pose cần do PlayerFishing điều khiển

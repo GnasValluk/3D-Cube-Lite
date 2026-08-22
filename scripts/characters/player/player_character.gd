@@ -13,6 +13,7 @@ const _Halberd := preload("player_halberd.gd")
 const _Fishing := preload("player_fishing.gd")
 const _Combos := preload("melee_combos.gd")
 const _GunPose := preload("player_gun_pose.gd")
+const _Longbow := preload("player_longbow.gd")
 const _TavernDoor := preload("res://scripts/world/chunk/tavern_door.gd")
 const _Skin := preload("res://scripts/characters/player/player_skin.gd")
 const _WorldChunk := preload("res://scripts/world/chunk/world_chunk.gd")
@@ -123,6 +124,9 @@ var _fish_cast_t: float = 0.0
 var _guarding: bool = false
 ## Độ bền khiên hiện tại (-1 = không phải khiên/chưa khởi tạo)
 var _shield_durability: int = -1
+## CUNG GỖ: điểm neo vị trí cầm gốc + cờ đã capture
+var _lb_hold_base: Vector3 = Vector3.ZERO
+var _lb_hold_captured: bool = false
 
 const HALBERD_CHARGE_TIME: float = 0.7
 ## Tỷ lệ phóng to nhân vật người chơi (~20%): mesh + capsule + hit_radius.
@@ -1169,6 +1173,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			if equipped_weapon != null and equipped_weapon.id == "ak_12":
 				# Nhả LMB: dừng bắn, ADS vẫn giữ (bật/tắt bằng RMB).
 				return
+			if equipped_weapon != null and equipped_weapon.id == "wooden_bow":
+				# CUNG: thả tay phải → buông dây bắn tên.
+				_Longbow.release(self)
+				return
 			if _is_egg_aiming():
 				_EggThrow.fire(self)
 			elif equipped_weapon and equipped_weapon.id == "crossbow":
@@ -1274,6 +1282,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					"pumpkin_mortar": _Mortar.start_aim(self); return
 					"watermelon_cannon": _Bow.start_cannon_aim(self); return
 					"fishing_rod": _Fishing.action(self); return
+					"wooden_bow": _Longbow.start_draw(self); return
 				# ── Melee auto-combo / TRỌNG KÍCH ─────────────────────────────
 				if _freeze_timer > 0.0 or _attack2_timer > 0.0 or _state == State.DASH:
 					return
@@ -1649,6 +1658,9 @@ func _process(delta: float) -> void:
 	_AK.update_pose(self, delta)
 	_M200.update_pose(self, delta)
 	_GunPose.apply(self, delta)   # tư thế xạ thủ toàn thân: đầu ngắm, thân, thế đứng
+	# Cung gỗ: cầm đi bộ khi KHÔNG đang kéo (đang kéo thì update_draw lo)
+	if equipped_weapon != null and equipped_weapon.id == "wooden_bow" and not _bow_aiming:
+		_Longbow.update_carry(self, delta)
 	# ── Câu cá: active khi đang vung ném hoặc thả câu; pose riêng cho cần ──
 	if _fish_cast_t > 0.0:
 		_fish_cast_t = maxf(_fish_cast_t - delta, 0.0)
@@ -1673,6 +1685,8 @@ func _process(delta: float) -> void:
 				_M200.cancel_aim(self)
 			elif equipped_weapon != null and equipped_weapon.id == "ak_12":
 				_AK.cancel_aim(self)
+			elif equipped_weapon != null and equipped_weapon.id == "wooden_bow":
+				_Longbow.cancel_draw(self)
 			elif _is_egg_aiming():
 				_EggThrow.cancel_aim(self)
 			elif is_mortar:
@@ -1686,6 +1700,9 @@ func _process(delta: float) -> void:
 			elif equipped_weapon != null and equipped_weapon.id == "ak_12":
 				_Bow.update_aim(self, delta)
 				_AK.update_fire(self, delta)
+			elif equipped_weapon != null and equipped_weapon.id == "wooden_bow":
+				_Bow.update_aim(self, delta)      # nhắm mục tiêu chung (aim point)
+				_Longbow.update_draw(self, delta) # pose kéo dây + dây cung động
 			elif _is_egg_aiming():
 				_EggThrow.update_aim(self, delta)
 			elif is_mortar:
@@ -1704,7 +1721,7 @@ func _sync_aim_camera_zoom() -> void:
 		if aiming:
 			# Nỏ + các loại SÚNG: KHÔNG zoom gần nhân vật (giữ khoảng cách xem)
 			var wid2: String = equipped_weapon.id if equipped_weapon != null else ""
-			if wid2 in ["ak_12", "m200", "crossbow", "watermelon_cannon", "pumpkin_mortar"]:
+			if wid2 in ["ak_12", "m200", "crossbow", "watermelon_cannon", "pumpkin_mortar", "wooden_bow"]:
 				aiming = false
 			else:
 				var is_egg := _is_egg_aiming()

@@ -14,6 +14,7 @@ static func build_held(pivot: Node3D, item_id: String) -> void:
 		"fishing_rod": _build_can_cau(pivot)
 		"iron_greatsword": _build_dai_kiem(pivot)
 		"iron_scythe": _build_luoi_hai(pivot)
+		"wooden_bow": _build_cung_go(pivot)
 		"iron_halberd": _build_iron_halberd(pivot)
 		# leather_gloves KHÔNG dựng vào weapon_pivot — PlayerCharacter gọi
 		# build_glove_hand thay thế khối bàn tay cả 2 bên.
@@ -317,6 +318,45 @@ static func _build_luoi_hai(p: Node3D) -> void:
 		if i >= segs - 3:
 			_box(node, Vector3(0, -0.030, 0), Vector3(0.050, 0.014, seg_len), edge)
 		prev = nxt
+
+## ── CUNG GỖ — 2 cánh cong đối xứng + dây (dọc trục Y; pose xoay ngang) ──────
+static func _build_cung_go(p: Node3D) -> void:
+	var wood := _mat(Color(0.48, 0.32, 0.15))
+	var wood_d := _mat(Color(0.36, 0.23, 0.10))
+	var wrap := _mat(Color(0.55, 0.40, 0.22))
+	# Cánh trên: 3 đoạn cong dần ra sau
+	_cyl(p, Vector3(-0.008, 0.14, 0), 0.020, 0.16, wood)
+	_cyl(p, Vector3(-0.032, 0.30, 0), 0.017, 0.15, wood)
+	_cyl(p, Vector3(-0.058, 0.43, 0), 0.013, 0.13, wood_d)
+	# Cánh dưới đối xứng
+	_cyl(p, Vector3(-0.008, -0.14, 0), 0.020, 0.16, wood)
+	_cyl(p, Vector3(-0.032, -0.30, 0), 0.017, 0.15, wood)
+	_cyl(p, Vector3(-0.058, -0.43, 0), 0.013, 0.13, wood_d)
+	# Chuôi bọc da giữa
+	_cyl(p, Vector3(0, 0.0, 0), 0.024, 0.15, wrap)
+	# Dây cung: 2 đoạn nối đỉnh cánh qua hốc (được PlayerLongbow cập nhật động)
+	var str_node := Node3D.new()
+	str_node.name = "BowString"
+	p.add_child(str_node)
+	for nm in ["SegTop", "SegBottom"]:
+		var s := MeshInstance3D.new()
+		s.name = nm
+		s.mesh = CylinderMesh.new()
+		s.mesh.top_radius = 0.004
+		s.mesh.bottom_radius = 0.004
+		s.mesh.height = 1.0
+		s.material_override = StandardMaterial3D.new()
+		(s.material_override as StandardMaterial3D).albedo_color = Color(0.92, 0.90, 0.82)
+		s.material_override.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		str_node.add_child(s)
+
+## Drop / display cung gỗ (voxel)
+static func wooden_bow_drop(p: Node3D) -> void:
+	var wood := Color(0.48, 0.32, 0.15)
+	var str_c := Color(0.90, 0.88, 0.80)
+	ItemMeshShared.add_cube(p, 0, -4, 0, 1.0, 5.0, 1.0, wood)
+	ItemMeshShared.add_cube(p, -1, 0, 0, 1.0, 8.0, 1.0, wood)
+	ItemMeshShared.add_cube(p, 2, 0, 0, 0.6, 9.0, 0.6, str_c)
 
 ## Drop / display lưỡi hái (voxel nhỏ)
 static func iron_scythe_drop(p: Node3D) -> void:
