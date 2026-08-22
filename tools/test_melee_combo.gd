@@ -612,6 +612,42 @@ func _ready() -> void:
 			"thả chuột → TRỌNG KÍCH phóng thích")
 		_check(p._charged_mult > 1.35,
 			"sát thương nhân theo mức vận (x%.2f)" % p._charged_mult)
+		p._guarding = false
+		for i in range(130):
+			await get_tree().physics_frame
+			if p._state == p.State.IDLE:
+				break
+
+	# ── 23b. HÌNH SÁT THƯƠNG ĐẶC BIỆT theo vũ khí ───────────────────────────
+	var spec_weps := {
+		"iron_greatsword": func() -> bool: return p._hit_override_range > 4.0 \
+			and absf(p._hit_override_angle) < 0.01,
+		"iron_halberd": func() -> bool: return p._combo_slide,
+		"axe": func() -> bool: return p._charge_spin and p._hit_ignore_angle,
+		"iron_sword": func() -> bool: return absf(p._hit_override_angle - 0.42) < 0.02 \
+			and p._hit_override_range > 3.5,
+	}
+	for wid_s in spec_weps:
+		if not db2.has(wid_s):
+			continue
+		p.equipped_weapon = db2[wid_s]
+		p._update_weapon_mesh()
+		await _wait_frames(3)
+		for i in range(90):
+			await get_tree().physics_frame
+			if p._state == p.State.IDLE:
+				break
+		p._charge_pending = false
+		p._charging = false
+		p._charge_level = 1.0
+		p._release_charged()
+		var fn: Callable = spec_weps[wid_s]
+		var ok_special: bool = fn.call()
+		_check(ok_special, "%s → hình sát thương ĐẶC BIỆT bật đúng" % wid_s)
+		for i in range(140):
+			await get_tree().physics_frame
+			if p._state == p.State.IDLE or p._state == p.State.RECOVERY:
+				break
 
 	# ── 24. LƯỠI HÁI SẮT: chain 3 đòn + 2 tay chặn khiên + pose 2 tay ───────
 	if db2.has("iron_scythe"):

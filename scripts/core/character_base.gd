@@ -139,6 +139,12 @@ var _charge_hold_t: float = 0.0
 var _charge_level: float = 0.0    # 0..1 — quyết định sát thương & độ mạnh pose
 var _charged_mult: float = 1.0    # hệ số dmg của cú trọng kích sắp/sắp đánh
 var _is_charged_release: bool = false  # cú ATTACK hiện tại là trọng kích
+# ── HÌNH SÁT THƯƠNG ĐẶC BIỆT của trọng kích ──────────────────────────────────
+var _charge_spin: bool = false        # xoay tròn AOE quanh thân (rìu)
+var _charge_spin_t: float = 0.0
+var _hit_override_range: float = -1.0 # >0 = đè tầm đánh (bán nguyệt/nón...)
+var _hit_override_angle: float = -1.0 # >=0 = đè ngưỡng góc (0 = nửa vòng trước)
+var _hit_ignore_angle: bool = false   # bỏ hẳn kiểm tra hướng (360° xoay)
 
 # ── Oxygen / Swimming ──────────────────────────────────────
 @export var max_oxygen: float = 100.0
@@ -740,6 +746,10 @@ func _physics_process(delta: float) -> void:
 		_is_riposte = false
 		_is_charged_release = false
 		_charged_mult = 1.0
+		_charge_spin = false
+		_hit_override_range = -1.0
+		_hit_override_angle = -1.0
+		_hit_ignore_angle = false
 		if not _advance_combo():
 			_state = State.RECOVERY
 			_recover_timer = recovery_duration
@@ -946,13 +956,15 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, friction * delta)
 
 	# Melee hit detection (ATTACK + AIR_ATTACK — theo pha hit của bước combo)
-	if _combo_slide and _action_lunge_timer > 0.0:
-		# SLIDE (kích sắt đòn cuối): đánh LẠI định kỳ trong lúc lao để quét
-		# sát thương dọc đường lướt — mục tiêu mới đi vào tầm vẫn ăn đòn.
+	# SLIDE (kích) / SPIN (rìu): đánh LẠI định kỳ trong lúc đòn di chuyển để
+	# quét mục tiêu dọc đường lướt / quanh thân xoay.
+	var sweep_active: bool = (_combo_slide and _action_lunge_timer > 0.0) \
+		or (_charge_spin and _attack_timer > 0.0)
+	if sweep_active:
 		_combo_slide_cd -= delta
-		if _combo_slide_cd <= 0.0 and _combo_slide_ticks < 4:
-			_combo_slide_cd = 0.09
-			_combo_slide_ticks += 1
+		if _combo_slide_cd <= 0.0:
+			_combo_slide_cd = 0.11
+			_melee_hit_once = false
 			_do_melee_hit()
 	elif swinging and not _melee_hit_once and \
 			(1.0 - _attack_timer / max(_cur_step_dur, 0.001)) >= _cur_hit_frac:
@@ -1038,6 +1050,13 @@ func _do_melee_hit() -> void:
 				"pickaxe", "shovel", "hoe": range_scale = 1.1
 				"leather_gloves": range_scale = 0.9
 	var max_dist: float = melee_range * range_scale
+	# Trọng kích ĐÈ hình sát thương: bán nguyệt / nón / 360° xoay
+	if _hit_override_range > 0.0:
+		max_dist = _hit_override_range
+	if _hit_ignore_angle:
+		angle_threshold = -2.0
+	elif _hit_override_angle >= 0.0:
+		angle_threshold = _hit_override_angle
 	var landed := false
 	var mgr := _find_character_manager()
 	if mgr == null:

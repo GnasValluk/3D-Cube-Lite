@@ -1323,7 +1323,8 @@ func _begin_primary_attack() -> void:
 	_combo_chain = chain
 	_begin_combo_step(0)
 
-## THẢ sau khi vận lực → TRỌNG KÍCH riêng từng vũ khí (MeleeCombos.CHARGED).
+## THẢ sau khi vận lực → TRỌNG KÍCH riêng từng vũ khí (MeleeCombos.CHARGED)
+## + hình sát thương đặc biệt: bán nguyệt / lướt / xoay AOE / tốc biến nón.
 func _release_charged() -> void:
 	var wid: String = equipped_weapon.id if equipped_weapon != null else ""
 	var spec: Dictionary = _Combos.charged_for(wid)
@@ -1341,7 +1342,50 @@ func _release_charged() -> void:
 	_attack_timer = dur
 	_state = State.ATTACK
 	_melee_hit_once = false
-	_start_forward_lunge(spec.lunge * (0.55 + 0.45 * _charge_level), dur * 0.30)
+	_combo_chain = []
+	# Mặc định: hình thường (reset override)
+	_hit_override_range = -1.0
+	_hit_override_angle = -1.0
+	_hit_ignore_angle = false
+	_charge_spin = false
+
+	match wid:
+		"iron_greatsword":
+			# Vung NGANG cực mạnh trái → phải — BÁN NGUYÊT phía trước (dot ≥ 0)
+			_hit_override_range = 4.8 * (0.75 + 0.25 * _charge_level)
+			_hit_override_angle = 0.0
+			_start_forward_lunge(2.4, dur * 0.30)
+		"iron_halberd":
+			# Giữ thương về sau → THẢ ĐÂM + LƯỚT dài, sát thương trên đường đi
+			_combo_slide = true
+			_combo_slide_cd = 0.06
+			_start_forward_lunge(spec.lunge * 1.6, dur * 0.50)
+		"axe":
+			# XOAY LIÊN TỤC 3 VÒNG — AOE 360° quanh thân, tick liên tục
+			_charge_spin = true
+			_charge_spin_t = dur
+			_hit_ignore_angle = true
+			_hit_override_range = 4.4
+			_start_forward_lunge(1.5, dur * 0.5)
+		"iron_sword":
+			# TỐC BIẾN vào kẻ địch gần nhất ≤ 3m → chém ngang NÓN phía trước
+			var tgt := _find_nearest_target()
+			if tgt != null and global_position.distance_to(tgt.global_position) <= 3.2:
+				_spawn_dash_ghost()
+				var to_t: Vector3 = tgt.global_position - global_position
+				to_t.y = 0.0
+				var dir_t: Vector3 = to_t.normalized() if to_t.length_squared() > 0.001 \
+					else Vector3(sin(rotation.y), 0, cos(rotation.y))
+				# Tốc biến tới CẠNH mục tiêu (lệch phải 40°) rồi quay mặt vào nó
+				var side := dir_t.cross(Vector3.UP).normalized()
+				global_position += dir_t * maxf(to_t.length() - 1.15, 0.4) + side * 0.9
+				rotation.y = atan2(-dir_t.x, -dir_t.z)
+				velocity = Vector3.ZERO
+			_hit_override_range = 3.9
+			_hit_override_angle = 0.42   # nón ~±65° phía trước
+			_start_forward_lunge(2.6, dur * 0.28)
+		_:
+			_start_forward_lunge(spec.lunge * (0.55 + 0.45 * _charge_level), dur * 0.30)
 	camera_shake(0.06 + 0.14 * _charge_level, 0.16 + 0.12 * _charge_level)
 
 ## Bắt đầu một bước trong chain combo: đặt timer/hit-pha/lunge theo bảng dữ liệu.

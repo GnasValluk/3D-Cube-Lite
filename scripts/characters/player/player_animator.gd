@@ -1292,64 +1292,68 @@ func _charge_pose(delta: float) -> void:
 
 ## ── TRỌNG KÍCH phóng thích — bảng pose RIÊNG từng vũ khí ──────────────────────
 func _charged_blend(prog: float, delta: float, wid: String) -> void:
+	# ── RÌU: XOAY LIÊN TỤC 3 VÒNG — AOE quanh thân, thân thấp tay vươn ──────
+	if wid == "axe":
+		var spin: float = prog * TAU * 3.0
+		mesh.rig.rotation.y = spin
+		mesh.body.rotation.y = sin(prog * TAU * 6.0) * 0.05
+		mesh.rig.rotation.x = _spring("rig_x", 0.20 - prog * 0.06, 10.0, 0.9, delta)
+		mesh.rig.position.y = _spring("rig_y", 0.02 - 0.07 * (1.0 - abs(prog - 0.5) * 2.0), 9.0, 1.0, delta)
+		mesh.head.rotation.x = _spring("head_x", -0.08, 7.0, 0.9, delta)
+		mesh.arm_r.rotation.x = lerp(mesh.arm_r.rotation.x, -1.38, minf(1.0, delta * 12.0))
+		mesh.arm_r.rotation.z = lerp(mesh.arm_r.rotation.z, -1.15, minf(1.0, delta * 12.0))
+		mesh.elbow_r.rotation.x = lerp(mesh.elbow_r.rotation.x, -0.10, minf(1.0, delta * 12.0))
+		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -1.25, minf(1.0, delta * 12.0))
+		mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 1.10, minf(1.0, delta * 12.0))
+		mesh.elbow_l.rotation.x = lerp(mesh.elbow_l.rotation.x, -0.12, minf(1.0, delta * 12.0))
+		mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, -0.42, minf(1.0, delta * 9.0))
+		mesh.knee_l.rotation.x = lerp(mesh.knee_l.rotation.x, 0.52, minf(1.0, delta * 9.0))
+		mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.34, minf(1.0, delta * 9.0))
+		mesh.knee_r.rotation.x = lerp(mesh.knee_r.rotation.x, 0.46, minf(1.0, delta * 9.0))
+		mesh.pelvis.position.x = _spring("pelvis_sway", 0.0, 7.0, 0.9, delta)
+		if prog >= 0.98:
+			mesh.rig.rotation.y = fposmod(mesh.rig.rotation.y, TAU)   # chuẩn hoá sau 3 vòng
+		return
 	var table: Dictionary
 	match wid:
 		"iron_sword":
-			table = {"w1": 0.22, "w2": 0.52,
-				"wind":   {"rig.y": -0.60, "rig.x": 0.04},
-				"strike": {"rig.y": 1.35, "rig.x": 0.14, "body.x": 0.16,
-					"arm_r.x": -0.45, "elbow_r.x": -0.10, "wp.x": 150.0, "wp.y": 0.0, "wp.z": 8.0},
-				"follow": {"rig.y": 1.05, "arm_r.x": -0.70, "elbow_r.x": -0.35}}
-		"leather_gloves":
-			table = {"w1": 0.20, "w2": 0.46,
-				"wind":   {"rig.x": 0.28, "body.x": 0.24},
-				"strike": {"rig.x": -0.18, "body.x": -0.10, "head.x": -0.24,
-					"arm_r.x": -2.25, "elbow_r.x": -0.06, "arm_l.x": -2.10, "elbow_l.x": -0.10},
-				"follow": {"rig.x": -0.02, "arm_r.x": -1.30, "elbow_r.x": -0.50}}
+			# TỐC BIẾN CHÉM: ngang dứt khoát một đường, nón phía trước
+			table = {"w1": 0.18, "w2": 0.44,
+				"wind":   {"rig.y": -0.85, "rig.x": 0.02, "body.x": 0.04},
+				"strike": {"rig.y": 0.95, "rig.x": 0.16, "body.x": 0.18, "head.y": -0.14,
+					"arm_r.x": -1.18, "elbow_r.x": -0.04, "arm_l.x": -1.02, "elbow_l.x": -0.40,
+					"wp.x": 94.0, "wp.y": -6.0, "wp.z": 4.0},
+				"follow": {"rig.y": 0.55, "arm_r.x": -0.85, "elbow_r.x": -0.35}}
 		"iron_greatsword":
-			table = {"w1": 0.30, "w2": 0.58,
-				"wind":   {"rig.x": -0.18, "body.x": -0.10, "rig.y": 0.10},
-				"strike": {"rig.x": 0.40, "body.x": 0.32, "head.x": 0.18,
-					"arm_r.x": -2.85, "arm_l.x": -2.70, "elbow_r.x": -0.06, "elbow_l.x": -0.08,
-					"wp.x": 182.0, "wp.y": 0.0, "wp.z": 0.0},
-				"follow": {"rig.x": 0.26, "arm_r.x": 0.80, "wp.x": 168.0}}
+			# ĐẠI KIẾM: giữ kiếm về SAU-TRÁI cao → VUNG NGANG cực mạnh qua mặt
+			table = {"w1": 0.30, "w2": 0.60, "rw": 7.0, "rs": 24.0, "rf": 6.0,
+				"wind":   {"rig.y": -1.15, "rig.x": 0.00, "body.x": 0.06, "head.y": -0.42,
+					"arm_r.x": -0.30, "elbow_r.x": -1.70, "arm_l.x": -0.20, "elbow_l.x": -1.80,
+					"wp.x": 24.0, "wp.y": -120.0, "wp.z": 100.0},
+				"strike": {"rig.y": 1.30, "rig.x": 0.18, "body.x": 0.22, "head.y": 0.48,
+					"arm_r.x": -0.90, "elbow_r.x": -0.06, "arm_l.x": -0.78, "elbow_l.x": -0.28,
+					"wp.x": 96.0, "wp.y": 8.0, "wp.z": -6.0},
+				"follow": {"rig.y": 0.85, "rig.x": 0.12, "body.x": 0.14,
+					"arm_r.x": -0.62, "elbow_r.x": -0.32,
+					"wp.x": 88.0, "wp.y": 4.0, "wp.z": 0.0}}
 		"iron_halberd":
-			table = {"w1": 0.24, "w2": 0.54,
-				"wind":   {"rig.y": -0.70, "rig.x": 0.06},
-				"strike": {"rig.y": 0.90, "rig.x": 0.18, "body.x": 0.18,
-					"arm_r.x": -0.75, "elbow_r.x": -0.10, "arm_l.x": -0.65, "elbow_l.x": -0.30,
-					"wp.x": 96.0, "wp.y": 0.0, "wp.z": 0.0},
-				"follow": {"rig.y": 0.55, "arm_r.x": -0.55}}
-		"iron_scythe":
-			# LIỀM CHẾT: xoay tròn gặt quanh thân (vòng ~200°) rồi vung kết lên
-			table = {"w1": 0.20, "w2": 0.62,
-				"wind":   {"rig.y": -1.10, "rig.x": 0.10, "body.x": 0.12,
-					"arm_r.x": -1.60, "elbow_r.x": -0.70, "arm_l.x": -1.30,
-					"wp.x": 40.0, "wp.y": -80.0, "wp.z": 84.0},
-				"strike": {"rig.y": 2.20, "rig.x": 0.16, "body.x": 0.18, "head.y": 0.60,
-					"arm_r.x": 0.85, "elbow_r.x": -0.08,
-					"wp.x": 168.0, "wp.y": 34.0, "wp.z": -24.0},
-				"follow": {"rig.y": 1.40, "rig.x": -0.10, "head.x": -0.16,
-					"arm_r.x": -1.90, "elbow_r.x": -0.30,
-					"wp.x": 30.0, "wp.y": 0.0, "wp.z": 0.0}}
-		"axe":
-			table = {"w1": 0.28, "w2": 0.56,
-				"wind":   {"rig.x": -0.20, "rig.y": -0.30},
-				"strike": {"rig.x": 0.38, "rig.y": 0.30, "body.x": 0.28,
-					"arm_r.x": -2.90, "elbow_r.x": -0.06, "wp.x": 178.0, "wp.y": 0.0, "wp.z": 0.0},
-				"follow": {"rig.x": 0.24, "arm_r.x": 0.70, "wp.x": 160.0}}
-		"pickaxe":
-			table = {"w1": 0.26, "w2": 0.54,
-				"wind":   {"rig.x": -0.16, "rig.y": 0.34},
-				"strike": {"rig.x": 0.34, "rig.y": -0.36, "body.x": 0.26,
-					"arm_r.x": 1.00, "elbow_r.x": -0.08, "wp.x": 172.0, "wp.y": -14.0, "wp.z": -10.0},
-				"follow": {"rig.x": 0.22, "arm_r.x": 0.62, "wp.x": 154.0}}
+			# GIỮ THƯƠNG về sau → ĐÂM THẲNG GIỮ nguyên suốt pha LƯỚT tới trước
+			table = {"w1": 0.26, "w2": 0.44, "rw": 9.0, "rs": 26.0, "rf": 5.0,
+				"wind":   {"rig.y": 0.50, "rig.x": -0.06, "body.x": -0.06, "head.y": 0.30,
+					"arm_r.x": -0.20, "elbow_r.x": -1.80, "arm_l.x": -0.25, "elbow_l.x": -1.88,
+					"wp.x": 58.0, "wp.y": 24.0, "wp.z": 16.0},
+				"strike": {"rig.y": -0.06, "rig.x": 0.22, "body.x": 0.20, "head.y": -0.04,
+					"arm_r.x": -1.10, "elbow_r.x": -0.04, "arm_l.x": -0.96, "elbow_l.x": -0.26,
+					"wp.x": 91.0, "wp.y": 0.0, "wp.z": 0.0},
+				"follow": {"rig.x": 0.12, "body.x": 0.12,
+					"arm_r.x": -0.70, "elbow_r.x": -0.55, "wp.x": 90.0, "wp.y": 0.0, "wp.z": 0.0}}
 		_:
-			table = {"w1": 0.26, "w2": 0.54,
-				"wind":   {"rig.y": -0.44, "rig.x": 0.04},
-				"strike": {"rig.y": 0.52, "rig.x": 0.30, "body.x": 0.24,
-					"arm_r.x": -2.70, "elbow_r.x": -0.08, "wp.x": 170.0, "wp.y": 0.0, "wp.z": 0.0},
-				"follow": {"rig.x": 0.20, "arm_r.x": 0.60, "wp.x": 156.0}}
+			# Mặc định: giữ về sau → chém xoay mạnh (scythe/gloves/pickaxe/hoe)
+			table = {"w1": 0.24, "w2": 0.54,
+				"wind":   {"rig.y": -0.90, "rig.x": 0.08},
+				"strike": {"rig.y": 1.45, "rig.x": 0.20, "body.x": 0.20,
+					"arm_r.x": -1.10, "elbow_r.x": -0.06, "wp.x": 160.0, "wp.y": 0.0, "wp.z": 0.0},
+				"follow": {"rig.y": 0.90, "arm_r.x": -0.70, "elbow_r.x": -0.32}}
 	var w1: float = table.w1
 	var w2: float = table.w2
 	var wind: Dictionary = table.get("wind", {})
@@ -1446,3 +1450,4 @@ func _air_attack(delta: float, _t: float) -> void:
 	mesh.ankle_l.rotation.x = _spring("ankle_l_x", 0.20, 8.0, 1.0, delta)
 	mesh.ankle_r.rotation.x = _spring("ankle_r_x", 0.10, 8.0, 1.0, delta)
 	mesh.pelvis.position.x = _spring("pelvis_sway", 0.0, 6.0, 0.9, delta)
+
