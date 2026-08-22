@@ -13,7 +13,6 @@ var _cloud_mm_res: MultiMesh = null
 var _cloud_smat: StandardMaterial3D = null
 var _cloud_pos := PackedVector3Array()
 var _cloud_scale: Array[Vector3] = []
-static var _puff_tex: Texture2D = null
 var _cloud_wind := Vector3.ZERO
 const CLOUD_SPAN: float = 2200.0
 const CLOUD_Y: float = 25.0
@@ -176,10 +175,10 @@ func _setup_lights() -> void:
 		if l:
 			l.light_energy = 0.0
 
-## ── TẦNG MÂY KHỐI y=25 — các MẢNG KHỐI box dày kiểu voxel ────────────────────
-## ~52 cụm, mỗi cụm 2-4 slab box chồng lệch (rộng 9-38m, dày ~3-5m) trải trên
-## diện 1500×1500. Mỗi frame: wrap vị trí quanh người chơi theo chu kỳ SPAN
-## (trường mây vô tận) + trôi chậm theo gió. Màu tint theo giờ qua albedo.
+## ── TẦNG MÂY VOXEL y=25 — TỔNG HỢP CÁC KHỐI LỚN thành mây lớn ────────────────
+## ~40 cụm trên diện 2600×2600: mỗi cụm = 2-4 SLAB BOX khổng lồ chồng lệch
+## (dài 45-130m, dày 4-6m) tạo mảng mây đặc. ĐỔ BÓNG: directional light chiếu
+## qua mây tạo bóng đổ trên mặt đất. Trôi chậm + wrap vô tận quanh người chơi.
 func _setup_clouds() -> void:
 	if _cloud_holder != null:
 		return
@@ -189,60 +188,41 @@ func _setup_clouds() -> void:
 	add_child(_cloud_holder)
 
 	_cloud_smat = StandardMaterial3D.new()
-	_cloud_smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	_cloud_smat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	_cloud_smat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	_cloud_smat.vertex_color_use_as_albedo = true
-	if _puff_tex == null:
-		# Texture KHÓI tròn mềm sinh bằng gradient radial (không cần file)
-		var g := Gradient.new()
-		g.set_color(0, Color(1, 1, 1, 0))
-		g.set_color(1, Color(1, 1, 1, 1))
-		g.add_point(0.45, Color(1, 1, 1, 0.55))
-		g.add_point(0.78, Color(1, 1, 1, 0.92))
-		var gt := GradientTexture2D.new()
-		gt.gradient = g
-		gt.fill = GradientTexture2D.FILL_RADIAL
-		gt.fill_from = Vector2(0.5, 0.5)
-		gt.fill_to = Vector2(0.5, 0.98)
-		gt.width = 128
-		gt.height = 128
-		_puff_tex = gt
-	_cloud_smat.albedo_texture = _puff_tex
+	_cloud_smat.roughness = 1.0
+	_cloud_smat.metallic = 0.0
+	_cloud_smat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	_cloud_smat.albedo_color = Color(1, 1, 1, 0.96)
 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20240613
-	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE
-	quad.material = _cloud_smat
+	var cbox := BoxMesh.new()
+	cbox.size = Vector3.ONE
+	cbox.material = _cloud_smat
 	var xf: Array = []
 	var cls: Array = []
-	for ci in range(46):
+	for ci in range(40):
 		var cx: float = rng.randf_range(-CLOUD_SPAN, CLOUD_SPAN) * 0.5
 		var cz: float = rng.randf_range(-CLOUD_SPAN, CLOUD_SPAN) * 0.5
-		var puffs: int = 5 + rng.randi_range(0, 3)
-		var cw: float = rng.randf_range(34.0, 80.0)   # mảng mây TO
-		var cd: float = rng.randf_range(24.0, 56.0)
-		var base_y: float = rng.randf_range(-3.0, 4.5)
-		for si in range(puffs):
-			var w: float = cw * rng.randf_range(0.55, 1.15)
-			var hgt: float = w * rng.randf_range(0.42, 0.62)
-			var ox: float = rng.randf_range(-cw * 0.30, cw * 0.30)
-			var oz: float = rng.randf_range(-cd * 0.30, cd * 0.30)
-			var oy: float = base_y + rng.randf_range(-1.6, 2.6)
-			var sc := Vector3(w, hgt, w)
+		var slabs: int = 2 + rng.randi_range(0, 2)
+		var cw: float = rng.randf_range(50.0, 130.0)   # KHỐI MÂY KHỔNG LỒ
+		var cd: float = rng.randf_range(36.0, 90.0)
+		var thick: float = rng.randf_range(4.0, 6.0)
+		for si in range(slabs):
+			var w: float = cw * rng.randf_range(0.55, 1.00)
+			var d: float = cd * rng.randf_range(0.55, 1.00)
+			var ox: float = rng.randf_range(-cw * 0.22, cw * 0.22)
+			var oz: float = rng.randf_range(-cd * 0.22, cd * 0.22)
+			var oy: float = si * 1.1 - 1.0
+			var sc := Vector3(w, thick * rng.randf_range(0.85, 1.2), d)
 			xf.append(Transform3D(Basis().scaled(sc), Vector3(cx + ox, oy, cz + oz)))
-			# Puff giữa cụm đậm hơn, rìa nhạt — khối khói có chiều sâu
-			var center_f: float = 1.0 - float(si) / float(puffs)
-			var shade: float = lerpf(0.76, 1.06,
-				clampf(center_f + rng.randf_range(-0.12, 0.12), 0.0, 1.0))
-			cls.append(Color(shade, shade, shade * 1.03,
-				rng.randf_range(0.40, 0.68)))
+			var shade: float = lerpf(1.02, 0.88, float(si) / maxf(slabs - 1, 1))
+			cls.append(Color(shade, shade, shade * 1.01))
 
 	_cloud_mm_res = MultiMesh.new()
 	_cloud_mm_res.transform_format = MultiMesh.TRANSFORM_3D
 	_cloud_mm_res.use_colors = true
-	_cloud_mm_res.mesh = quad
+	_cloud_mm_res.mesh = cbox
 	_cloud_mm_res.instance_count = xf.size()
 	_cloud_pos.resize(xf.size())
 	for i in range(xf.size()):
@@ -254,7 +234,7 @@ func _setup_clouds() -> void:
 
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = _cloud_mm_res
-	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	_cloud_holder.add_child(mmi)
 
 ## Mỗi frame: trôi theo gió + wrap quanh camera; tint màu theo giờ.
