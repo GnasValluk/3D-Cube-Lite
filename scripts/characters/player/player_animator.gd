@@ -1106,13 +1106,19 @@ func _attack(delta: float, _t: float) -> void:
 		var wid_c: String = player.equipped_weapon.id if player != null and player.equipped_weapon != null else ""
 		if remaining > _last_remaining + 0.001:
 			_start_trail(wid_c)
+			_gs_slam_done = false
 		_last_remaining = remaining
 		if not _trail_released and prog >= 0.40:
 			_trail_released = true
 			if _trail != null and is_instance_valid(_trail):
 				_trail.stop_recording()
 			SFXManager.play_attack_strong()
-			player.camera_shake(0.10 + 0.10 * base._charge_level, 0.20)
+		# ĐẠI KIẾM: điểm CHÉM DẬP chạm đất → VFX sóng chấn + rung mạnh
+		if wid_c == "iron_greatsword" and not _gs_slam_done and prog >= 0.54:
+			_gs_slam_done = true
+			player._spawn_gslam_vfx()
+			player.camera_shake(0.30, 0.42)
+			SFXManager.play_block_break()
 		_charged_blend(prog, delta, wid_c)
 		_combo_legs(prog, delta, 0, {"w1": 0.26, "w2": 0.50})
 		return
@@ -1156,6 +1162,7 @@ func _attack(delta: float, _t: float) -> void:
 # ── Sword trail — vệt lưỡi theo đúng đường vung thật ──────────────────────────
 var _trail: _TrailVFX = null
 var _trail_released: bool = true
+var _gs_slam_done: bool = false
 
 ## Mở vệt kiếm cho một bước đánh: gắn vào weapon_pivot, tự mẫu transform lưỡi.
 func _start_trail(wid: String) -> void:
@@ -1306,6 +1313,14 @@ func _charged_blend(prog: float, delta: float, wid: String) -> void:
 		mesh.arm_l.rotation.x = lerp(mesh.arm_l.rotation.x, -1.25, minf(1.0, delta * 12.0))
 		mesh.arm_l.rotation.z = lerp(mesh.arm_l.rotation.z, 1.10, minf(1.0, delta * 12.0))
 		mesh.elbow_l.rotation.x = lerp(mesh.elbow_l.rotation.x, -0.12, minf(1.0, delta * 12.0))
+		# RÌU NGANG: bù wp để thân búa nằm ngang vươn ra ngoài khi xoay
+		var axe_wp := mesh.weapon_pivot
+		if axe_wp != null and is_instance_valid(axe_wp):
+			var arm_sum_axe: float = mesh.arm_r.rotation.x + mesh.elbow_r.rotation.x
+			var rdeg := axe_wp.rotation_degrees
+			rdeg.x = lerpf(rdeg.x, 90.0 - rad_to_deg(arm_sum_axe), minf(1.0, delta * 14.0))
+			rdeg.y = lerpf(rdeg.y, -90.0, minf(1.0, delta * 10.0))   # lưỡi hướng ra ngoài
+			axe_wp.rotation_degrees = rdeg
 		mesh.leg_l.rotation.x = lerp(mesh.leg_l.rotation.x, -0.42, minf(1.0, delta * 9.0))
 		mesh.knee_l.rotation.x = lerp(mesh.knee_l.rotation.x, 0.52, minf(1.0, delta * 9.0))
 		mesh.leg_r.rotation.x = lerp(mesh.leg_r.rotation.x, 0.34, minf(1.0, delta * 9.0))
@@ -1334,17 +1349,17 @@ func _charged_blend(prog: float, delta: float, wid: String) -> void:
 					"wp.x": 94.0, "wp.y": -6.0, "wp.z": 4.0},
 				"follow": {"rig.y": 0.55, "arm_r.x": -0.85, "elbow_r.x": -0.35}}
 		"iron_greatsword":
-			# ĐẠI KIẾM: giữ kiếm về SAU-TRÁI cao → VUNG NGANG cực mạnh qua mặt
-			table = {"w1": 0.30, "w2": 0.60, "rw": 7.0, "rs": 24.0, "rf": 6.0,
-				"wind":   {"rig.y": -1.15, "rig.x": 0.00, "body.x": 0.06, "head.y": -0.42,
-					"arm_r.x": -0.30, "elbow_r.x": -1.70, "arm_l.x": -0.20, "elbow_l.x": -1.80,
-					"wp.x": 24.0, "wp.y": -120.0, "wp.z": 100.0},
-				"strike": {"rig.y": 1.30, "rig.x": 0.18, "body.x": 0.22, "head.y": 0.48,
-					"arm_r.x": -0.90, "elbow_r.x": -0.06, "arm_l.x": -0.78, "elbow_l.x": -0.28,
-					"wp.x": 96.0, "wp.y": 8.0, "wp.z": -6.0},
-				"follow": {"rig.y": 0.85, "rig.x": 0.12, "body.x": 0.14,
-					"arm_r.x": -0.62, "elbow_r.x": -0.32,
-					"wp.x": 88.0, "wp.y": 4.0, "wp.z": 0.0}}
+			# NHẢY vồng tới → GIƠ KIẾM cao → CHÉM DẬP xuống đất (VFX+rung ở w2)
+			table = {"w1": 0.40, "w2": 0.56, "rw": 8.0, "rs": 26.0, "rf": 4.5,
+				"wind":   {"rig.x": -0.16, "body.x": -0.10, "head.x": -0.22,
+					"arm_r.x": -2.75, "arm_l.x": -2.65, "elbow_r.x": -0.30, "elbow_l.x": -0.32,
+					"wp.x": 6.0, "wp.y": 0.0, "wp.z": 0.0},
+				"strike": {"rig.x": 0.58, "body.x": 0.40, "head.x": 0.30,
+					"arm_r.x": 0.78, "arm_l.x": 0.68, "elbow_r.x": -0.05, "elbow_l.x": -0.06,
+					"wp.x": 150.0, "wp.y": 0.0, "wp.z": 0.0},
+				"follow": {"rig.x": 0.36, "body.x": 0.26, "head.x": 0.16,
+					"arm_r.x": 0.48, "elbow_r.x": -0.28,
+					"wp.x": 140.0}}
 		"iron_halberd":
 			# GIỮ THƯƠNG về sau → ĐÂM THẲNG GIỮ nguyên suốt pha LƯỚT tới trước
 			table = {"w1": 0.26, "w2": 0.44, "rw": 9.0, "rs": 26.0, "rf": 5.0,

@@ -1374,4 +1374,3 @@ func _find_water_manager() -> OpenWorldManager:
 	if scene == null:
 		return null
 	return scene.get_node_or_null("WorldManager") as OpenWorldManager
-

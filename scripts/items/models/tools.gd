@@ -282,57 +282,85 @@ static func _build_dai_kiem(p: Node3D) -> void:
 	_box(p, Vector3(0.034, 0.52, 0), Vector3(0.002, 0.44, 0.028), _mat(Color(0.50, 0.52, 0.60)))
 	_box(p, Vector3(-0.034, 0.52, 0), Vector3(0.002, 0.44, 0.028), _mat(Color(0.50, 0.52, 0.60)))
 
-## ── Lưỡi Hái Sắt — cán dài 2 tay + lưỡi liềm cong sắc (kiểu tử thần gặt) ─────
+## ── Lưỡi Hái Sắt — TỬ THẦN GẶT: cán dài ngang kích, lưỡi liềm lớn chi tiết ───
+## Tổng chiều dài ngang với halberd (~0.95m): cán 1.15 + lưỡi cong 0.62 vươn
+## sang bên, có ornament xương ở khớp, răng cưa trên mép trong lưỡi.
 static func _build_luoi_hai(p: Node3D) -> void:
-	var wood := _mat(Color(0.32, 0.19, 0.09))
-	var wrap := _mat(Color(0.20, 0.12, 0.06))
-	var iron := _mat(Color(0.52, 0.54, 0.60))
-	var iron_d := _mat(Color(0.30, 0.31, 0.35))
-	var edge := _mat(Color(0.87, 0.89, 0.95))
-	# Cán dài dọc +Y, bọc da phần cầm dưới
-	_cyl(p, Vector3(0, -0.16, 0), 0.040, 0.18, wrap)
-	_cyl(p, Vector3(0, 0.16, 0), 0.032, 0.82, wood)
-	# Đệm tay giữa cán (điểm tựa tay trái)
-	_cyl(p, Vector3(0, 0.02, 0), 0.046, 0.05, iron_d)
-	# Khớp sắt nối lưỡi ở đỉnh cán
-	_cyl(p, Vector3(0, 0.60, 0), 0.048, 0.08, iron)
-	_box(p, Vector3(0, 0.65, 0), Vector3(0.09, 0.032, 0.09), iron_d)
-	# Lưỡi LIỀM: chuỗi đoạn cong quét ~112° rồi cụp xuống, thon & sắc dần
-	var segs := 7
-	var prev := Vector3(0.03, 0.66, 0.0)
+	var wood := _mat(Color(0.26, 0.15, 0.08))
+	var wrap := _mat(Color(0.16, 0.09, 0.05))
+	var iron := _mat(Color(0.46, 0.48, 0.55))
+	var iron_d := _mat(Color(0.24, 0.25, 0.29))
+	var edge := _mat(Color(0.88, 0.90, 0.96))
+	var bone := _mat(Color(0.82, 0.78, 0.66))
+	var gold := _mat(Color(0.72, 0.55, 0.18))
+	# ── CÁN DÀI (ngang halberd): từ chuôi -0.30 tới khớp lưỡi +0.85 ─────────
+	_cyl(p, Vector3(0, -0.22, 0), 0.042, 0.20, wrap)     # chuôi bọc da
+	_cyl(p, Vector3(0, 0.28, 0), 0.034, 1.00, wood)      # cán chính dài
+	_cyl(p, Vector3(0, -0.06, 0), 0.048, 0.06, iron_d)   # đai sắt dưới
+	_cyl(p, Vector3(0, 0.42, 0), 0.046, 0.05, iron_d)    # đai sắt giữa
+	# Đệm tay trái (điểm tựa)
+	_cyl(p, Vector3(0, 0.10, 0), 0.048, 0.06, wrap)
+
+	# ── KHỚP XƯƠNG: đầu lâu nhỏ + 2 chấu cong ─────────────────────────────
+	_box(p, Vector3(0, 0.70, 0), Vector3(0.075, 0.09, 0.075), bone)
+	_box(p, Vector3(-0.018, 0.715, 0.032), Vector3(0.016, 0.02, 0.02),
+		_mat(Color(0.10, 0.06, 0.04)))
+	_box(p, Vector3(0.018, 0.715, 0.032), Vector3(0.016, 0.02, 0.02),
+		_mat(Color(0.10, 0.06, 0.04)))
+	_box(p, Vector3(0, 0.685, 0.032), Vector3(0.030, 0.012, 0.012),
+		_mat(Color(0.10, 0.06, 0.04)))
+	# Chấu vàng hai bên khớp
+	_box(p, Vector3(-0.055, 0.78, 0), Vector3(0.03, 0.05, 0.03), gold)
+	_box(p, Vector3(0.055, 0.78, 0), Vector3(0.03, 0.05, 0.03), gold)
+
+	# ── LƯỠI LIỀM LỚN: quét ~130° bán kính 0.62, cụp sâu, RĂNG CƯA ─────────
+	var segs := 9
+	var prev := Vector3(0.04, 0.80, 0.0)
 	for i in range(segs):
 		var t1: float = float(i + 1) / float(segs)
-		var ang: float = t1 * PI * 0.62
-		var drop: float = t1 * t1 * 0.34
-		var nxt := Vector3(cos(ang) * 0.47 + 0.02, 0.66 - drop, sin(ang) * 0.11)
+		var ang: float = t1 * PI * 0.72            # quét ~130°
+		var drop: float = t1 * t1 * 0.50           # cụp sâu dần xuống
+		var nxt := Vector3(cos(ang) * 0.62 + 0.03,
+			0.80 - drop, sin(ang) * 0.14 * sin(ang))
 		var dir := (nxt - prev).normalized()
-		var seg_len: float = prev.distance_to(nxt) + 0.02
+		var seg_len: float = prev.distance_to(nxt) + 0.025
 		var node := Node3D.new()
 		node.position = (prev + nxt) * 0.5
 		node.basis = Basis.looking_at(dir, Vector3.UP)
 		p.add_child(node)
-		var mcol: StandardMaterial3D = iron if i % 2 == 0 else iron_d
-		var th: float = 0.050 - t1 * 0.014
-		_box(node, Vector3.ZERO, Vector3(th + 0.004, 0.048 - t1 * 0.012, seg_len), mcol)
-		# Mép SẮC phía dưới lưỡi ở 1/3 cuối
-		if i >= segs - 3:
-			_box(node, Vector3(0, -0.030, 0), Vector3(0.050, 0.014, seg_len), edge)
+		var taper: float = 1.0 - t1 * 0.45
+		var spine_th: float = 0.055 * taper
+		# Sống lưỡi tối (phía trên)
+		_box(node, Vector3(0, 0.020, 0),
+			Vector3(0.020, 0.040 - t1 * 0.010, seg_len), iron_d)
+		# Thân lưỡi chính
+		_box(node, Vector3(0, -0.006, 0),
+			Vector3(spine_th, 0.055 - t1 * 0.012, seg_len), iron)
+		# MÉP SẮC phát sáng nhẹ dọc lưỡi
+		_box(node, Vector3(0, -0.030 * taper, 0),
+			Vector3(0.055 * taper + 0.006, 0.012, seg_len), edge)
+		# RĂNG CƯA trên mép trong (3 nha mỗi đoạn ở nửa ngoài)
+		if i >= segs - 4:
+			for k in range(2):
+				var tt: float = 0.35 + 0.30 * k
+				_box(node, Vector3(0, -0.030 * taper - 0.008, (tt - 0.5) * seg_len),
+					Vector3(0.030, 0.016, 0.012), edge)
 		prev = nxt
 
-## ── CUNG GỖ — 2 cánh CONG MƯỢT nối liền (segment xoay theo spine) ───────────
-## Spine parabol: gốc ±0.46 hơi vểnh ra sau (-X), giữa phồng về trước (+X).
-## Dây cung động do PlayerLongbow cập nhật (tips tại x=-0.06, y=±0.46).
+## ── CUNG GỖ — RECURVE LỚN (1.2m) 10 đoạn cong mượt + đầu chóp vàng ──────────
+## Spine: hai đầu vểnh nhẹ ra sau (-X) nơi buộc dây, giữa phồng về trước.
 static func _build_cung_go(p: Node3D) -> void:
-	var wood := _mat(Color(0.48, 0.32, 0.15))
+	var wood := _mat(Color(0.50, 0.34, 0.16))
 	var wood_d := _mat(Color(0.36, 0.23, 0.10))
+	var gold := _mat(Color(0.85, 0.66, 0.20))
 	var wrap := _mat(Color(0.55, 0.40, 0.22))
-	var segs := 8   # mỗi cánh 4 đoạn
+	var segs := 10
 	var pts: Array[Vector3] = []
 	for i in range(segs + 1):
-		var t: float = float(i) / float(segs)          # 0 đáy → 1 đỉnh
-		var y: float = lerpf(-0.46, 0.46, t)
-		var x: float = -0.06 + 0.20 * (1.0 - pow(2.0 * t - 1.0, 2.0))   # phồng giữa
-		pts.append(Vector3(x, y, 0))
+		var t: float = float(i) / float(segs)
+		var y: float = lerpf(-0.60, 0.60, t)
+		var bulge: float = 0.26 * pow(sin(PI * t), 1.15)
+		pts.append(Vector3(-0.06 + bulge, y, 0))
 	for i in range(segs):
 		var a := pts[i]
 		var b := pts[i + 1]
@@ -341,12 +369,25 @@ static func _build_cung_go(p: Node3D) -> void:
 		node.basis = Basis.looking_at((b - a).normalized(), Vector3.RIGHT)
 		p.add_child(node)
 		var mcol: StandardMaterial3D = wood if i % 2 == 0 else wood_d
-		var th: float = 0.040 - absf(float(i) - float(segs) * 0.5) * 0.010
-		# Box dọc theo hướng đoạn (Z), dẹt theo X — mặt lá cung hướng camera
-		_box(node, Vector3.ZERO, Vector3(0.030, 0.046 - th * 0.4, a.distance_to(b) + 0.02), mcol)
-	# Chuôi bọc da giữa
-	_cyl(p, Vector3(0.13, 0.0, 0), 0.024, 0.15, wrap)
-	# Dây cung: 2 đoạn nối đỉnh cánh qua hốc (PlayerLongbow cập nhật động)
+		var th: float = lerpf(0.036, 0.020,
+			absf(float(i) - float(segs) * 0.5) / float(segs * 0.5))
+		_box(node, Vector3.ZERO, Vector3(0.032, th, a.distance_to(b) + 0.02), mcol)
+	# Chóp VÀNG 2 đầu cánh
+	var cap_top := Node3D.new()
+	cap_top.position = (pts[segs] + pts[segs - 1]) * 0.5
+	cap_top.basis = Basis.looking_at((pts[segs] - pts[segs - 1]).normalized(), Vector3.RIGHT)
+	p.add_child(cap_top)
+	_cyl(cap_top, Vector3.ZERO, 0.016, 0.07, gold)
+	var cap_bot := Node3D.new()
+	cap_bot.position = (pts[0] + pts[1]) * 0.5
+	cap_bot.basis = Basis.looking_at((pts[0] - pts[1]).normalized(), Vector3.RIGHT)
+	p.add_child(cap_bot)
+	_cyl(cap_bot, Vector3.ZERO, 0.016, 0.07, gold)
+	# Chuôi bọc da + 2 vòng vàng
+	_cyl(p, Vector3(0.13, 0.0, 0), 0.026, 0.18, wrap)
+	_cyl(p, Vector3(0.13, 0.095, 0), 0.027, 0.015, gold)
+	_cyl(p, Vector3(0.13, -0.095, 0), 0.027, 0.015, gold)
+	# Dây cung động (PlayerLongbow cập nhật)
 	var str_node := Node3D.new()
 	str_node.name = "BowString"
 	p.add_child(str_node)

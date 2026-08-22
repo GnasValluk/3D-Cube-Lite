@@ -621,7 +621,7 @@ func _ready() -> void:
 	# ── 23b. HÌNH SÁT THƯƠNG ĐẶC BIỆT theo vũ khí ───────────────────────────
 	var spec_weps := {
 		"iron_greatsword": func() -> bool: return p._hit_override_range > 4.0 \
-			and absf(p._hit_override_angle) < 0.01,
+			and p._hit_ignore_angle,
 		"iron_halberd": func() -> bool: return p._combo_slide,
 		"axe": func() -> bool: return p._charge_spin and p._hit_ignore_angle,
 		"iron_sword": func() -> bool: return absf(p._hit_override_angle - 0.42) < 0.02 \

@@ -1010,6 +1010,56 @@ func _set_hands_visible(vis: bool) -> void:
 	if _mesh.hand_r != null and is_instance_valid(_mesh.hand_r):
 		_mesh.hand_r.visible = vis
 
+## Vòng sóng xung kích + bụi đất bắn quanh điểm đáp — VFX chém dập của đại kiếm.
+func _spawn_gslam_vfx() -> void:
+	var root := get_parent()
+	if root == null or not is_inside_tree():
+		return
+	# 1) Vòng sóng xung kích loe to rồi mờ
+	var ring_mat := StandardMaterial3D.new()
+	ring_mat.albedo_color = Color(1.0, 0.85, 0.45, 0.9)
+	ring_mat.emission_enabled = true
+	ring_mat.emission = Color(1.0, 0.75, 0.30)
+	ring_mat.emission_energy_multiplier = 3.2
+	ring_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var ring := MeshInstance3D.new()
+	var tor := TorusMesh.new()
+	tor.inner_radius = 0.55
+	tor.outer_radius = 0.85
+	ring.mesh = tor
+	ring.material_override = ring_mat
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	root.add_child(ring)
+	ring.global_position = Vector3(global_position.x, global_position.y + 0.10,
+		global_position.z)
+	var tw := ring.create_tween().set_parallel()
+	tw.tween_property(ring, "scale", Vector3(8.0, 1.8, 8.0), 0.36).set_ease(Tween.EASE_OUT)
+	tw.tween_property(ring_mat, "albedo_color:a", 0.0, 0.38)
+	tw.tween_property(ring_mat, "emission_energy_multiplier", 0.0, 0.38)
+	tw.chain().tween_callback(ring.queue_free)
+	# 2) Bụi đá bắn vòng quanh
+	for i in range(10):
+		var dust_mat := StandardMaterial3D.new()
+		dust_mat.albedo_color = Color(0.55, 0.44, 0.30)
+		dust_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		var d := MeshInstance3D.new()
+		var sm := SphereMesh.new()
+		sm.radius = randf_range(0.05, 0.10)
+		sm.height = sm.radius * 2.0
+		d.mesh = sm
+		d.material_override = dust_mat
+		d.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		root.add_child(d)
+		var ang: float = TAU * float(i) / 10.0 + randf_range(-0.2, 0.2)
+		var dir := Vector3(cos(ang), randf_range(0.6, 1.4), sin(ang))
+		d.global_position = global_position + Vector3(cos(ang) * 0.5, 0.15, sin(ang) * 0.5)
+		var dtw := d.create_tween().set_parallel()
+		dtw.tween_property(d, "global_position",
+			d.global_position + dir * randf_range(1.2, 2.2), 0.32).set_ease(Tween.EASE_OUT)
+		dtw.tween_property(dust_mat, "albedo_color:a", 0.0, 0.32)
+		dtw.chain().tween_callback(d.queue_free)
+
 ## Sinh 1 BÓNG LƯU ẢNH (bản sao mờ của toàn bộ rig) tại tư thế hiện tại —
 ## mờ dần rồi tự xoá. Gọi liên tục trong lúc DASH → vệt bóng theo đường lướt.
 func _spawn_dash_ghost() -> void:
@@ -1361,10 +1411,14 @@ func _release_charged() -> void:
 			_charge_knockup = true
 			camera_shake(0.16, 0.22)
 		"iron_greatsword":
-			# Vung NGANG cực mạnh trái → phải — BÁN NGUYÊT phía trước (dot ≥ 0)
-			_hit_override_range = 4.8 * (0.75 + 0.25 * _charge_level)
-			_hit_override_angle = 0.0
-			_start_forward_lunge(2.4, dur * 0.30)
+			# NHẢY CAO vồng tới ~3m → CHÉM DẬP kiếm xuống đất
+			# AOE quanh điểm đáp + sóng chấn VFX + rung màn hình mạnh
+			_spawn_dash_ghost()
+			var fwd_gs := Vector3(sin(rotation.y), 0, cos(rotation.y))
+			velocity = fwd_gs * 9.0 + Vector3.UP * 7.0
+			_hit_ignore_angle = true
+			_hit_override_range = 4.4
+			_charge_knockup = true
 		"iron_halberd":
 			# Giữ thương về sau → THẢ ĐÂM + LƯỚT dài, sát thương trên đường đi
 			_combo_slide = true
