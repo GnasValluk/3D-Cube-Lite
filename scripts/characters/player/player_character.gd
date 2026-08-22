@@ -139,6 +139,8 @@ const RELOAD_TIMES := {"ak_12": 1.6, "m200": 1.4, "crossbow": 1.1}
 const MAG_AMMO_ITEM := {"ak_12": "bullet_762mm", "m200": "bullet_338mm", "crossbow": "arrow"}
 ## Crosshair HUD hiển thị khi ngắm/bắn súng·nỏ·cung
 var _crosshair: Control = null
+## PANEL thông tin vũ khí góc trái dưới
+var _weapon_panel: Control = null
 
 const HALBERD_CHARGE_TIME: float = 0.7
 ## Tỷ lệ phóng to nhân vật người chơi (~20%): mesh + capsule + hit_radius.
@@ -968,12 +970,9 @@ func _sync_mag_on_equip() -> void:
 		_mag_size = 0
 		_mag_ammo = 0
 		return
+	# Băng lúc mới cầm = RỖNG (nạp bằng G từ kho dự trữ) — không ăn sẵn đạn
 	_mag_size = MAG_SIZES[wid]
-	var ammo_id: String = MAG_AMMO_ITEM[wid]
-	var take: int = mini(_mag_size, _count_reserve(ammo_id))
-	if take > 0:
-		_consume_reserve(ammo_id, take)
-	_mag_ammo = take
+	_mag_ammo = 0
 
 func _count_reserve(ammo_id: String) -> int:
 	var n := 0
@@ -1022,25 +1021,80 @@ func _finish_reload() -> void:
 	_scroll_inventory_message("Đã nạp đạn (%d/%d)" % [_mag_ammo, _mag_size])
 
 ## CROSSHAIR giữa màn hình — hiện khi ngắm/bắn súng·nỏ·cung.
+## Đặt trong CanvasLayer riêng để KHÔNG bị scale/transform của player ảnh hưởng.
 func _ensure_crosshair() -> void:
 	if _crosshair != null and is_instance_valid(_crosshair):
 		return
+	var scene := get_tree().current_scene if get_tree() else null
+	if scene == null:
+		return
+	var layer := CanvasLayer.new()
+	layer.name = "CrosshairLayer"
+	layer.layer = 50
+	scene.add_child(layer)
 	_crosshair = preload("res://scripts/ui/hud/crosshair.gd").new()
-	_crosshair.set_anchors_preset(Control.PRESET_CENTER)
-	add_child(_crosshair)
+	layer.add_child(_crosshair)
 
 func _update_crosshair() -> void:
 	_ensure_crosshair()
+	if _crosshair == null or not is_instance_valid(_crosshair):
+		return
 	var wid := equipped_weapon.id if equipped_weapon != null else ""
 	var show := false
 	match wid:
 		"ak_12", "m200":
 			show = _bow_aiming and not _reloading
-		"crossbow", "wooden_bow":
-			show = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) \
-				or (_bow_aiming and wid == "wooden_bow")
-	if _crosshair != null:
+		"wooden_bow":
+			show = _bow_aiming or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+		"crossbow":
+			show = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _reloading
+	if _crosshair != null and is_instance_valid(_crosshair):
 		_crosshair.visible = show
+		_crosshair.set_anchors_preset(Control.PRESET_CENTER)
+		# Cung: vạch nới rộng + sáng dần theo ĐỘ KÉO CĂNG dây
+		if wid == "wooden_bow" and is_instance_valid(_crosshair):
+			var d: float = clampf(_bow_charge / maxf(_bow_max_charge, 0.01), 0.0, 1.0)
+			_crosshair.call("set_charge", d if _bow_aiming else 0.0)
+	_ensure_weapon_panel()
+	_update_weapon_panel()
+
+## PANEL góc trái dưới: tên + sát thương + băng đạn/độ bền của item đang cầm.
+func _update_weapon_panel() -> void:
+	if _weapon_panel == null or not is_instance_valid(_weapon_panel):
+		return
+	if equipped_weapon == null:
+		_weapon_panel.call("set_info", "", "", "")
+		return
+	var it: ItemDef = equipped_weapon
+	var stat_text := "Sát thương: %d" % (attack_power + it.atk_bonus)
+	var ammo_text := ""
+	match _mag_weapon_id():
+		"ak_12", "m200", "crossbow":
+			ammo_text = "%s  |  Đạn: %d/%d" % [
+				"ĐANG NẠP..." if _reloading else "Sẵn sàng", _mag_ammo, _mag_size]
+			var reserve: int = _count_reserve(MAG_AMMO_ITEM[_mag_weapon_id()])
+			ammo_text += "  (kho: %d)" % reserve
+		_:
+			pass
+	if equipped_sub != null and equipped_sub.id == "iron_shield":
+		var dur_txt := "∞"
+		dur_txt = str(_shield_durability) if _shield_durability >= 0 else dur_txt
+		ammo_text += ("   Khiên: %s độ bền" % dur_txt) if ammo_text == "" \
+			else ammo_text + "   · Khiên: %s" % dur_txt
+	_weapon_panel.call("set_info", it.name, stat_text, ammo_text)
+
+func _ensure_weapon_panel() -> void:
+	if _weapon_panel != null and is_instance_valid(_weapon_panel):
+		return
+	var scene := get_tree().current_scene if get_tree() else null
+	if scene == null:
+		return
+	var layer := CanvasLayer.new()
+	layer.name = "WeaponPanelLayer"
+	layer.layer = 49
+	scene.add_child(layer)
+	_weapon_panel = preload("res://scripts/ui/hud/weapon_panel.gd").new()
+	layer.add_child(_weapon_panel)
 
 func _update_weapon_mesh() -> void:
 	if _mesh == null or _mesh.weapon_pivot == null:

@@ -337,7 +337,13 @@ static func shoot_crossbow_instant(player) -> void:
 	var total_dmg: int = int(base_dmg * 1.35)
 
 	var spawn_from: Vector3 = _muzzle_world(player)
-	var aim_dir: Vector3 = player._bow_aim_dir
+	# Hướng bắn = TÂM MÀN HÌNH (camera) — khớp crosshair đang hiển thị
+	var cam: Camera3D = player.get_viewport().get_camera_3d() if player.get_viewport() else null
+	var aim_dir: Vector3
+	if cam != null:
+		aim_dir = -cam.global_transform.basis.z
+	else:
+		aim_dir = player._bow_aim_dir
 	if player._aim_tp_mode and player._aim_world_point != Vector3.ZERO:
 		var to_tgt: Vector3 = player._aim_world_point - spawn_from
 		if to_tgt.length_squared() > 0.01:
